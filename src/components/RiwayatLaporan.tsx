@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
+import { isReportMatchingKepling } from '../lib/formatter';
 
 interface RiwayatLaporanProps {
   items: LaporanHarianItem[];
@@ -87,9 +88,20 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
 
       if (!matchesKeyword) return false;
 
-      // 2. Filter by Petugas
-      if (selectedPetugas !== 'ALL' && item.namaKepling !== selectedPetugas) {
-        return false;
+      // 2. Filter by Petugas (Ketat, mencegah kesalahan laporan antar-kepling)
+      if (selectedPetugas !== 'ALL') {
+        const targetKepling = KEPLING_ACCOUNTS.find(
+          (k) => k.nama.trim().toLowerCase() === selectedPetugas.trim().toLowerCase()
+        );
+        if (targetKepling) {
+          if (!isReportMatchingKepling(item, targetKepling)) {
+            return false;
+          }
+        } else if (
+          item.namaKepling?.trim().toLowerCase() !== selectedPetugas.trim().toLowerCase()
+        ) {
+          return false;
+        }
       }
 
       // 3. Filter by Specific Date

@@ -28,7 +28,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   onLogout,
 }) => {
   return (
-    <header className="bg-emerald-800 text-white shadow-lg">
+    <header className="bg-emerald-800 text-white shadow-lg print:hidden">
       {/* Top Banner with Medan Logo Replica and Tagline */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-emerald-700/60 text-xs">
         {/* Official Slogan Badge */}

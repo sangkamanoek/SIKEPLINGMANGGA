@@ -1,1 +1,70 @@
 @import "tailwindcss";
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm 6mm 10mm;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 100% !important;
+    height: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hilangkan efek blur, shadow, background yang tidak diinginkan */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Sembunyikan elemen navigasi dan tombol interaktif saat cetak */
+  .no-print,
+  nav,
+  header.print\:hidden,
+  footer.print\:hidden,
+  button,
+  input,
+  textarea,
+  select {
+    display: none !important;
+  }
+
+  /* Kontainer wajib pas 1 lembar kertas A4 (tinggi maks ~275mm) */
+  .page-print-single {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: 275mm !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Cegah pemotongan halaman di dalam tabel */
+  table, tr, td, th, .avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 1px solid #334155 !important;
+    padding: 3px 6px !important;
+  }
+}

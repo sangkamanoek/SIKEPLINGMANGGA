@@ -15,6 +15,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata } from '../types';
+import { formatTanggalIndonesia } from '../lib/formatter';
 
 interface DetailLaporanModalProps {
   item: LaporanHarianItem | null;
@@ -91,6 +92,20 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       setSaveSuccessMsg('');
     }
   }, [item]);
+
+  const displayTanggal = React.useMemo(() => {
+    if (!item?.tanggal) return '';
+    if (item.tanggal.includes('-')) {
+      const parts = item.tanggal.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        if (!isNaN(d.getTime())) {
+          return formatTanggalIndonesia(d);
+        }
+      }
+    }
+    return item.tanggal;
+  }, [item?.tanggal]);
 
   if (!isOpen || !item) return null;
 
@@ -226,8 +241,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto print:p-0 print:m-0 print:bg-white print:static print:inset-auto print:overflow-visible print:block">
+      {/* 1. TAMPILAN INTERAKTIF MODAL (HANYA DITAMPILKAN DI LAYAR, DISEMBUNYIKAN SAAT CETAK) */}
+      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-6 print:hidden">
         {/* Header Modal */}
         <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
@@ -717,11 +733,11 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 <button
                   type="button"
                   onClick={handlePrint}
-                  className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-                  title="Cetak Laporan Fisik"
+                  className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  title="Cetak Laporan Resmi Kedinasan 1 Lembar A4 / Simpan PDF"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Cetak</span>
+                  <Printer className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Cetak PDF (1 Lembar)</span>
                 </button>
               </div>
 
@@ -749,6 +765,198 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               </div>
             </>
           )}
+        </div>
+      </div>
+
+      {/* 2. LEMBAR CETAK RESMI KEDINASAN PEMKO MEDAN (DIJAMIN PAS 1 LEMBAR A4 / PDF) */}
+      <div
+        id="lembar-cetak-laporan-kepling"
+        className="hidden print:block page-print-single bg-white text-slate-900 w-full max-w-[195mm] mx-auto py-1 font-serif text-[8.5pt] leading-tight"
+      >
+        {/* KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
+        <div className="flex items-center gap-3 pb-1 border-b-[2px] border-black mb-0.5">
+          <img
+            src="/logo_pemko_medan.png"
+            alt="Logo Pemko Medan"
+            className="w-14 h-14 object-contain shrink-0"
+          />
+          <div className="text-center flex-1 pr-6">
+            <div className="text-[11pt] font-black tracking-wider uppercase font-serif">
+              PEMERINTAH KOTA MEDAN
+            </div>
+            <div className="text-[10pt] font-bold tracking-wide uppercase font-serif">
+              KECAMATAN MEDAN TUNTUNGAN
+            </div>
+            <div className="text-[12pt] font-black tracking-wider uppercase font-serif">
+              KELURAHAN MANGGA
+            </div>
+            <div className="text-[7.5pt] text-slate-700 italic font-sans">
+              Jalan Bunga Sedap Malam IX No. 1 Medan • Kode Pos: 20135
+            </div>
+          </div>
+        </div>
+        <div className="border-b-[0.5px] border-black mb-2" />
+
+        {/* JUDUL LAPORAN */}
+        <div className="text-center my-1.5">
+          <h1 className="text-[10.5pt] font-black uppercase tracking-wide underline font-serif">
+            LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN
+          </h1>
+          <div className="text-[8pt] font-semibold text-slate-800 mt-0.5">
+            Hari: {item.hari.toUpperCase()} &nbsp;|&nbsp; Tanggal: {displayTanggal}
+          </div>
+        </div>
+
+        {/* DATA IDENTITAS PETUGAS */}
+        <div className="mb-2 text-[8.5pt] bg-slate-50/50 p-1.5 rounded border border-slate-300">
+          <table className="w-full text-left">
+            <tbody>
+              <tr>
+                <td className="w-28 font-bold py-0.5">Nama Petugas</td>
+                <td className="w-3">:</td>
+                <td className="font-bold uppercase">{item.namaKepling}</td>
+                <td className="w-24 font-bold py-0.5">Kelurahan</td>
+                <td className="w-3">:</td>
+                <td>{item.kelurahan}</td>
+              </tr>
+              <tr>
+                <td className="font-bold py-0.5">Jabatan / Wilayah</td>
+                <td>:</td>
+                <td className="font-bold">{item.jabatan}</td>
+                <td className="font-bold py-0.5">Kecamatan</td>
+                <td>:</td>
+                <td>{item.kecamatan}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* TABEL 4 PILAR KINERJA & TUGAS HARIAN */}
+        <div className="mb-2">
+          <div className="text-[8pt] font-bold uppercase tracking-wider mb-1 text-slate-900">
+            A. REKAPITULASI CAPAIAN 4 PILAR & KEGIATAN HARIAN:
+          </div>
+          <table className="print-table w-full text-left text-[8pt] border border-black">
+            <thead>
+              <tr className="bg-slate-100 text-slate-900 font-bold">
+                <th className="w-7 text-center py-1">NO</th>
+                <th className="w-52 py-1">URAIAN KEGIATAN / PILAR KINERJA</th>
+                <th className="w-28 text-center py-1">REALISASI</th>
+                <th className="py-1">KETERANGAN / RINCIAN LAPANGAN</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="text-center font-bold">1</td>
+                <td className="font-bold">Opsir Pajak Bumi & Bangunan (PBB)</td>
+                <td className="text-center font-bold">
+                  {item.kinerja?.opsirPbbWp || 0} WP
+                </td>
+                <td>{item.kinerja?.opsirPbbKeterangan || 'Penagihan / sosialisasi pembayaran PBB warga.'}</td>
+              </tr>
+              <tr>
+                <td className="text-center font-bold">2</td>
+                <td className="font-bold">Perlindungan Sosial (PERLINSOS)</td>
+                <td className="text-center font-bold">
+                  {item.kinerja?.perlinsosKk || 0} KK
+                </td>
+                <td>{item.kinerja?.perlinsosKeterangan || 'Pendataan dan verifikasi warga penerima bansos.'}</td>
+              </tr>
+              <tr>
+                <td className="text-center font-bold">3</td>
+                <td className="font-bold">Identitas Kependudukan Digital (IKD)</td>
+                <td className="text-center font-bold">
+                  {item.kinerja?.ikdOrang || 0} Orang
+                </td>
+                <td>{item.kinerja?.ikdKeterangan || 'Fasilitasi aktivasi aplikasi IKD warga.'}</td>
+              </tr>
+              <tr>
+                <td className="text-center font-bold">4</td>
+                <td className="font-bold">BPJS Ketenagakerjaan (Pekerja Rentan)</td>
+                <td className="text-center font-bold">
+                  {item.kinerja?.bpjsKetenagakerjaanOrang || 0} Orang
+                </td>
+                <td>{item.kinerja?.bpjsKetenagakerjaanKeterangan || 'Sosialisasi jaminan sosial pekerja rentan.'}</td>
+              </tr>
+              <tr>
+                <td className="text-center font-bold">5</td>
+                <td className="font-bold">Pos Ronda / SISKAMLING</td>
+                <td className="text-center font-bold">
+                  {item.kinerja?.poskamlingStatus || 'Kondusif'}
+                </td>
+                <td>
+                  {item.kinerja?.poskamlingLokasi ? `Lokasi: ${item.kinerja.poskamlingLokasi}. ` : ''}
+                  {item.kinerja?.poskamlingPetugas ? `Petugas: ${item.kinerja.poskamlingPetugas}. ` : ''}
+                  {item.kinerja?.poskamlingKeterangan || 'Situasi lingkungan aman dan kondusif.'}
+                </td>
+              </tr>
+              <tr>
+                <td className="text-center font-bold">6</td>
+                <td className="font-bold">Kegiatan Kebersihan & Lainnya</td>
+                <td className="text-center font-bold">Terlaksana</td>
+                <td>{item.kinerja?.kegiatanLainnya || 'Pemantauan kebersihan, ketertiban umum, dan drainase lingkungan warga.'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* DOKUMENTASI FOTO KEGIATAN (KOMPAK MAKS 3 FOTO AGAR PASTI 1 LEMBAR) */}
+        {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
+          <div className="mb-2 avoid-break">
+            <div className="text-[8pt] font-bold uppercase tracking-wider mb-1 text-slate-900">
+              B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):
+            </div>
+            <div className="flex items-center gap-2">
+              {item.dokumentasiFoto.slice(0, 3).map((foto, idx) => (
+                <div
+                  key={foto.id || idx}
+                  className="h-16 w-32 rounded border border-slate-400 overflow-hidden relative shrink-0 bg-slate-100"
+                >
+                  <img
+                    src={foto.url}
+                    alt={foto.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[6.5pt] px-1 truncate text-center">
+                    {foto.name}
+                  </div>
+                </div>
+              ))}
+              {item.dokumentasiFoto.length > 3 && (
+                <span className="text-[7.5pt] italic text-slate-600 pl-1">
+                  (+{item.dokumentasiFoto.length - 3} foto lainnya terlampir pada sistem)
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TANDA TANGAN RESMI PENGESAHAN DOKUMEN */}
+        <div className="mt-3 pt-1 avoid-break text-[8.5pt]">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="text-center">
+              <div>Mengetahui,</div>
+              <div className="font-bold uppercase">LURAH KELURAHAN MANGGA</div>
+              <div className="h-12" />
+              <div className="font-bold underline">( ............................................................ )</div>
+              <div className="text-[7.5pt] text-slate-700 mt-0.5">NIP. ....................................................</div>
+            </div>
+
+            <div className="text-center">
+              <div>Medan, {displayTanggal}</div>
+              <div>Yang Melaporkan,</div>
+              <div className="font-bold uppercase">{item.jabatan}</div>
+              <div className="h-12" />
+              <div className="font-bold underline uppercase">( {item.namaKepling} )</div>
+              <div className="text-[7.5pt] text-slate-700 mt-0.5">Kepala Lingkungan</div>
+            </div>
+          </div>
+        </div>
+
+        {/* FOOTER RESMI DOKUMEN */}
+        <div className="mt-2 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic">
+          <span>SI KEPLING MANGGA • Sistem Informasi Pelaporan Kinerja Harian Kepling</span>
+          <span>Dokumen Resmi 1 Lembar • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
         </div>
       </div>
     </div>

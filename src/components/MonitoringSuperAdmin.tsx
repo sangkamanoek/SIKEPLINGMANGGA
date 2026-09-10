@@ -25,7 +25,12 @@ import {
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
-import { formatTanggalIndonesia, getNamaHariIndonesia, getTodayLocalIso } from '../lib/formatter';
+import {
+  formatTanggalIndonesia,
+  getNamaHariIndonesia,
+  getTodayLocalIso,
+  isReportMatchingKepling,
+} from '../lib/formatter';
 
 interface MonitoringSuperAdminProps {
   reports: LaporanHarianItem[];
@@ -84,16 +89,8 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
   const keplingReportMap = useMemo(() => {
     const map = new Map<string, LaporanHarianItem>();
     KEPLING_ACCOUNTS.forEach((k) => {
-      // Find matching report by keplingId, nama or jabatan
-      const match = reportsOnDate.find((r) => {
-        if (r.keplingId && r.keplingId === k.id) return true;
-        const matchName =
-          r.namaKepling.trim().toLowerCase() === k.nama.trim().toLowerCase();
-        const matchJabatan =
-          r.jabatan.trim().toLowerCase().includes(k.lingkungan.toLowerCase()) ||
-          r.jabatan.trim().toLowerCase() === k.jabatan.toLowerCase();
-        return matchName || matchJabatan;
-      });
+      // Find matching report strictly by isReportMatchingKepling
+      const match = reportsOnDate.find((r) => isReportMatchingKepling(r, k));
       if (match) {
         map.set(k.id, match);
       }

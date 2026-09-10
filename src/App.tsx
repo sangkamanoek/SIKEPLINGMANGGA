@@ -590,7 +590,7 @@ export default function App() {
       )}
 
       {/* Navigation Tabs Bar */}
-      <div className="bg-white border-b border-slate-200 shadow-2xs sticky top-0 z-30">
+      <div className="bg-white border-b border-slate-200 shadow-2xs sticky top-0 z-30 print:hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between overflow-x-auto">
           <div className="flex gap-1">
             {activeAccount.role === 'kepling' ? (
@@ -792,7 +792,7 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6">
+      <main className={`flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 ${isModalOpen ? 'print:hidden' : ''}`}>
         {activeTab === 'form' && (
           <FormLaporan
             onSaveReport={handleSaveReport}
@@ -966,7 +966,7 @@ export default function App() {
       />
 
       {/* Footer matching Professional Polish style */}
-      <footer className="bg-white border-t border-slate-200 px-6 sm:px-8 py-3.5 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] gap-3">
+      <footer className="bg-white border-t border-slate-200 px-6 sm:px-8 py-3.5 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] gap-3 print:hidden">
         <div>Sistem Pelaporan Mandiri & Pengingat Tugas • Kota Medan</div>
         <div className="flex items-center gap-6">
           <span className="text-emerald-700 font-bold">#MedanUntukSemua</span>

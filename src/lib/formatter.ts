@@ -122,3 +122,92 @@ export function buildWhatsAppShareUrl(phone: string, text: string): string {
   }
   return `https://api.whatsapp.com/send?text=${encoded}`;
 }
+
+const ROMAN_NUMERALS: [string, number][] = [
+  ['XXIV', 24], ['XXIII', 23], ['XXII', 22], ['XXI', 21], ['XX', 20],
+  ['XIX', 19], ['XVIII', 18], ['XVII', 17], ['XVI', 16], ['XV', 15],
+  ['XIV', 14], ['XIII', 13], ['XII', 12], ['XI', 11], ['X', 10],
+  ['IX', 9], ['VIII', 8], ['VII', 7], ['VI', 6], ['V', 5],
+  ['IV', 4], ['III', 3], ['II', 2], ['I', 1]
+];
+
+/**
+ * Ekstraksi nomor lingkungan (1 - 24) secara presisi tanpa salah mengenali angka romawi.
+ * Mencegah bug di mana "Lingkungan XX" salah terbaca sebagai "Lingkungan X".
+ */
+export function extractNomorLingkungan(text?: string | null): number | null {
+  if (!text) return null;
+  const upper = text.toUpperCase().trim();
+
+  // 1. Cek pola angka eksplisit: "Lingkungan 20", "LK 10", "Kepling 5"
+  const numMatch = upper.match(/\b(?:LINGKUNGAN|KEPLING|LK)\s*(\d{1,2})\b/i);
+  if (numMatch) {
+    const n = parseInt(numMatch[1], 10);
+    if (n >= 1 && n <= 24) return n;
+  }
+
+  // 2. Cek angka Romawi yang didahului kata Lingkungan/Kepling: "Lingkungan XX", "Kepala Lingkungan X"
+  for (const [roman, num] of ROMAN_NUMERALS) {
+    const regex = new RegExp(`\\b(?:LINGKUNGAN|KEPLING|LK)\\s+${roman}\\b`, 'i');
+    if (regex.test(upper)) {
+      return num;
+    }
+  }
+
+  // 3. Cek angka Romawi berdiri sendiri dengan word boundary
+  for (const [roman, num] of ROMAN_NUMERALS) {
+    const regex = new RegExp(`\\b${roman}\\b`, 'i');
+    if (regex.test(upper)) {
+      return num;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Validasi apakah sebuah laporan benar-benar milik akun Kepling tertentu.
+ * Menggunakan pencocokan keplingId, nama lengkap, dan nomor lingkungan eksak.
+ * Menghindari penggunaan substring .includes('Lingkungan X') yang dapat salah mencocokkan 'Lingkungan XX'.
+ */
+export function isReportMatchingKepling(
+  report: LaporanHarianItem,
+  kepling: { id: string; nama: string; nomorLingkungan?: number; jabatan?: string; lingkungan?: string }
+): boolean {
+  if (!report || !kepling) return false;
+
+  // 1. Jika laporan memiliki keplingId, gunakan kecocokan ID eksak
+  if (report.keplingId) {
+    return report.keplingId === kepling.id;
+  }
+
+  // 2. Pencocokan nama lengkap (case-insensitive & trimmed)
+  if (report.namaKepling && kepling.nama) {
+    const rName = report.namaKepling.trim().toLowerCase();
+    const kName = kepling.nama.trim().toLowerCase();
+    if (rName === kName) {
+      return true;
+    }
+  }
+
+  // 3. Pencocokan nomor lingkungan eksak (1 s/d 24)
+  const reportLingkunganNum =
+    extractNomorLingkungan(report.jabatan) ||
+    extractNomorLingkungan((report as any).lingkungan);
+
+  if (reportLingkunganNum !== null && kepling.nomorLingkungan) {
+    return reportLingkunganNum === kepling.nomorLingkungan;
+  }
+
+  // 4. Pencocokan string jabatan/lingkungan secara utuh (equality, BUKAN includes)
+  const rJabatan = (report.jabatan || '').trim().toLowerCase();
+  const kJabatan = (kepling.jabatan || '').trim().toLowerCase();
+  const kLingkungan = (kepling.lingkungan || '').trim().toLowerCase();
+
+  if (rJabatan && (rJabatan === kJabatan || rJabatan === kLingkungan)) {
+    return true;
+  }
+
+  return false;
+}
+

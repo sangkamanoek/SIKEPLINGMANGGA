@@ -36,6 +36,7 @@ import {
   resetTargetsCapaianToDefaults,
 } from '../lib/targetsApi';
 import { ModalEditTargetCapaian } from './ModalEditTargetCapaian';
+import { isReportMatchingKepling } from '../lib/formatter';
 
 interface DashboardCapaianKeplingProps {
   reports: LaporanHarianItem[];
@@ -123,31 +124,13 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   // Kepling specific reports
   const myReports = useMemo(() => {
     if (mode !== 'kepling') return [];
-    return filteredReportsByPeriod.filter((r) => {
-      if (r.keplingId && r.keplingId === activeAccount.id) return true;
-      const matchName =
-        r.namaKepling.trim().toLowerCase() === activeAccount.nama.trim().toLowerCase();
-      const matchLingkungan =
-        activeAccount.lingkungan &&
-        (r.jabatan.toLowerCase().includes(activeAccount.lingkungan.toLowerCase()) ||
-          r.jabatan.toLowerCase() === activeAccount.jabatan.toLowerCase());
-      return matchName || matchLingkungan;
-    });
+    return filteredReportsByPeriod.filter((r) => isReportMatchingKepling(r, activeAccount));
   }, [filteredReportsByPeriod, activeAccount, mode]);
 
   // All time Kepling reports (for calculating total days logged)
   const myAllTimeReports = useMemo(() => {
     if (mode !== 'kepling') return [];
-    return reports.filter((r) => {
-      if (r.keplingId && r.keplingId === activeAccount.id) return true;
-      const matchName =
-        r.namaKepling.trim().toLowerCase() === activeAccount.nama.trim().toLowerCase();
-      const matchLingkungan =
-        activeAccount.lingkungan &&
-        (r.jabatan.toLowerCase().includes(activeAccount.lingkungan.toLowerCase()) ||
-          r.jabatan.toLowerCase() === activeAccount.jabatan.toLowerCase());
-      return matchName || matchLingkungan;
-    });
+    return reports.filter((r) => isReportMatchingKepling(r, activeAccount));
   }, [reports, activeAccount, mode]);
 
   // Capaian aggregasi untuk Single Kepling
@@ -186,14 +169,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     > = {};
 
     KEPLING_ACCOUNTS.forEach((k) => {
-      const kReports = filteredReportsByPeriod.filter((r) => {
-        if (r.keplingId && r.keplingId === k.id) return true;
-        const matchName = r.namaKepling.trim().toLowerCase() === k.nama.trim().toLowerCase();
-        const matchJabatan =
-          r.jabatan.toLowerCase().includes(k.lingkungan.toLowerCase()) ||
-          r.jabatan.toLowerCase() === k.jabatan.toLowerCase();
-        return matchName || matchJabatan;
-      });
+      const kReports = filteredReportsByPeriod.filter((r) => isReportMatchingKepling(r, k));
 
       let pbb = 0;
       let perlinsos = 0;
@@ -222,14 +198,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   // Aggregasi untuk Seluruh 24 Kepling (Menggabungkan Laporan Riil + Override Super Admin)
   const keplingSummaryList = useMemo(() => {
     return KEPLING_ACCOUNTS.map((k, index) => {
-      const kReports = filteredReportsByPeriod.filter((r) => {
-        if (r.keplingId && r.keplingId === k.id) return true;
-        const matchName = r.namaKepling.trim().toLowerCase() === k.nama.trim().toLowerCase();
-        const matchJabatan =
-          r.jabatan.toLowerCase().includes(k.lingkungan.toLowerCase()) ||
-          r.jabatan.toLowerCase() === k.jabatan.toLowerCase();
-        return matchName || matchJabatan;
-      });
+      const kReports = filteredReportsByPeriod.filter((r) => isReportMatchingKepling(r, k));
 
       const reported = reportedStatsMap[k.id] || {
         pbb: 0,
@@ -285,9 +254,24 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     });
   }, [filteredReportsByPeriod, reportedStatsMap, targetsMap]);
 
-  // Sorted leaderboard
+  // Sorted leaderboard - Diurutkan berdasarkan persentase capaian target Perlinsos
   const sortedLeaderboard = useMemo(() => {
-    return [...keplingSummaryList].sort((a, b) => b.score - a.score || b.reportCount - a.reportCount);
+    return [...keplingSummaryList].sort((a, b) => {
+      // 1. Urutan utama: Persentase capaian Perlinsos tertinggi ke terendah
+      if (b.perlinsosPercentage !== a.perlinsosPercentage) {
+        return b.perlinsosPercentage - a.perlinsosPercentage;
+      }
+      // 2. Tie-breaker 1: Jumlah realisasi Perlinsos (KK)
+      if (b.perlinsos !== a.perlinsos) {
+        return b.perlinsos - a.perlinsos;
+      }
+      // 3. Tie-breaker 2: Jumlah laporan yang dikirim
+      if (b.reportCount !== a.reportCount) {
+        return b.reportCount - a.reportCount;
+      }
+      // 4. Tie-breaker 3: Nomor lingkungan
+      return (a.kepling.nomorLingkungan || 0) - (b.kepling.nomorLingkungan || 0);
+    });
   }, [keplingSummaryList]);
 
   // Filtered kepling cards for display
@@ -369,7 +353,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           </div>
 
           {/* Period Filter Buttons */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-emerald-950/60 p-1.5 rounded-2xl border border-emerald-600/40 shrink-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-emerald-950/60 p-1.5 rounded-2xl border border-emerald-600/40 shrink-0 print:hidden">
             <button
               type="button"
               onClick={() => setPeriod('TODAY')}
@@ -844,17 +828,22 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   <Trophy className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-900 text-base sm:text-lg">
-                    Leaderboard & Capaian Kinerja 24 Kepling
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-slate-900 text-base sm:text-lg">
+                      Rangking & Leaderboard 24 Kepling
+                    </h3>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-900 px-2 py-0.5 rounded-full border border-blue-200">
+                      Urutan Persentase Perlinsos
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-500">
-                    Peringkat keaktifan dan akumulasi 4 pilar kinerja per Kepala Lingkungan
+                    Peringkat resmi 24 Kepala Lingkungan diurutkan dari persentase capaian target PERLINSOS tertinggi
                   </p>
                 </div>
               </div>
 
               {/* Action and Search Box */}
-              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto print:hidden">
                 <button
                   type="button"
                   onClick={() => {
@@ -886,10 +875,17 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               <div className="my-6 grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 {/* Juara 2 */}
                 <div className="p-4 bg-linear-to-b from-slate-50 to-slate-100/50 rounded-2xl border border-slate-200 text-center relative overflow-hidden order-2 sm:order-1">
-                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-black uppercase mb-2">
-                    🥈 Peringkat 2
+                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-black uppercase mb-1.5">
+                    🥈 Peringkat 2 Perlinsos
                   </span>
-                  <div className="w-10 h-10 rounded-full bg-slate-300 text-slate-800 font-black text-xs mx-auto flex items-center justify-center mb-1.5 shadow-2xs">
+                  <div className="text-2xl sm:text-3xl font-black text-blue-900 tracking-tight">
+                    {sortedLeaderboard[1].perlinsosPercentage}%
+                  </div>
+                  <div className="text-[11px] font-bold text-slate-500 mb-2">
+                    {sortedLeaderboard[1].perlinsos} / {sortedLeaderboard[1].targetPerlinsos} KK
+                  </div>
+
+                  <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-800 font-black text-xs mx-auto flex items-center justify-center mb-1 shadow-2xs">
                     {sortedLeaderboard[1].kepling.nomorLingkungan}
                   </div>
                   <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate">
@@ -911,11 +907,18 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 </div>
 
                 {/* Juara 1 */}
-                <div className="p-5 bg-linear-to-b from-amber-50 to-amber-100/50 rounded-2xl border-2 border-amber-300 text-center relative overflow-hidden shadow-sm order-1 sm:order-2">
-                  <span className="inline-block px-3 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase mb-2 shadow-xs">
-                    🥇 Peringkat 1 Teraktif
+                <div className="p-5 bg-linear-to-b from-amber-50 to-amber-100/60 rounded-2xl border-2 border-amber-400 text-center relative overflow-hidden shadow-sm order-1 sm:order-2">
+                  <span className="inline-block px-3 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase mb-1.5 shadow-xs">
+                    🥇 Peringkat 1 Perlinsos
                   </span>
-                  <div className="w-12 h-12 rounded-full bg-amber-400 text-slate-950 font-black text-sm mx-auto flex items-center justify-center mb-2 shadow-sm">
+                  <div className="text-3xl sm:text-4xl font-black text-blue-950 tracking-tight">
+                    {sortedLeaderboard[0].perlinsosPercentage}%
+                  </div>
+                  <div className="text-xs font-black text-amber-900 mb-2">
+                    Capaian: {sortedLeaderboard[0].perlinsos} dari {sortedLeaderboard[0].targetPerlinsos} KK
+                  </div>
+
+                  <div className="w-11 h-11 rounded-full bg-amber-400 text-slate-950 font-black text-sm mx-auto flex items-center justify-center mb-1.5 shadow-sm">
                     {sortedLeaderboard[0].kepling.nomorLingkungan}
                   </div>
                   <h4 className="font-black text-slate-900 text-sm sm:text-base truncate">
@@ -946,10 +949,17 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
                 {/* Juara 3 */}
                 <div className="p-4 bg-linear-to-b from-amber-50/50 to-orange-50/40 rounded-2xl border border-amber-200/80 text-center relative overflow-hidden order-3">
-                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-black uppercase mb-2">
-                    🥉 Peringkat 3
+                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-black uppercase mb-1.5">
+                    🥉 Peringkat 3 Perlinsos
                   </span>
-                  <div className="w-10 h-10 rounded-full bg-amber-200 text-amber-900 font-black text-xs mx-auto flex items-center justify-center mb-1.5 shadow-2xs">
+                  <div className="text-2xl sm:text-3xl font-black text-blue-900 tracking-tight">
+                    {sortedLeaderboard[2].perlinsosPercentage}%
+                  </div>
+                  <div className="text-[11px] font-bold text-slate-500 mb-2">
+                    {sortedLeaderboard[2].perlinsos} / {sortedLeaderboard[2].targetPerlinsos} KK
+                  </div>
+
+                  <div className="w-9 h-9 rounded-full bg-amber-200 text-amber-900 font-black text-xs mx-auto flex items-center justify-center mb-1 shadow-2xs">
                     {sortedLeaderboard[2].kepling.nomorLingkungan}
                   </div>
                   <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate">
@@ -974,17 +984,19 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
             {/* List / Table of All 24 Kepling Performance */}
             <div className="divide-y divide-slate-100 mt-4">
-              <div className="hidden md:grid grid-cols-12 gap-3 py-2 px-3 text-[11px] font-black text-slate-400 uppercase tracking-wider">
+              <div className="hidden md:grid grid-cols-12 gap-3 py-2 px-3 text-[11px] font-black text-slate-400 uppercase tracking-wider items-center">
                 <div className="col-span-1 text-center">Rank</div>
                 <div className="col-span-3">Kepala Lingkungan</div>
+                <div className="col-span-2 text-center bg-blue-50/80 text-blue-900 py-1 rounded-md font-black">
+                  Rangking Perlinsos (%)
+                </div>
                 <div className="col-span-2 text-center">Status Lapor</div>
-                <div className="col-span-4 grid grid-cols-4 text-center">
+                <div className="col-span-3 grid grid-cols-3 text-center">
                   <span>PBB</span>
-                  <span>Perlinsos</span>
                   <span>IKD</span>
                   <span>BPJS TK</span>
                 </div>
-                <div className="col-span-2 text-right">Aksi</div>
+                <div className="col-span-1 text-right">Aksi</div>
               </div>
 
               {displayedKeplingCards.map((item, index) => (
@@ -997,7 +1009,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     <span
                       className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
                         index === 0
-                          ? 'bg-amber-400 text-slate-950 font-black'
+                          ? 'bg-amber-400 text-slate-950 font-black ring-2 ring-amber-300'
                           : index === 1
                           ? 'bg-slate-300 text-slate-900'
                           : index === 2
@@ -1025,12 +1037,35 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </div>
                   </div>
 
+                  {/* Perlinsos: Capaian & Target & Persentase (Kolom Utama Ranking) */}
+                  <div className="col-span-2 w-full md:w-auto text-center bg-blue-50/40 p-2 rounded-xl border border-blue-100/80">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span
+                        className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                          item.perlinsosPercentage >= 100
+                            ? 'bg-emerald-600 text-white'
+                            : item.perlinsosPercentage >= 50
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-amber-500 text-white'
+                        }`}
+                      >
+                        {item.perlinsosPercentage}%
+                      </span>
+                      {item.isPerlinsosOverridden && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="Capaian disesuaikan Admin" />
+                      )}
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-700 mt-1">
+                      {item.perlinsos} <span className="text-slate-400 font-normal">/ {item.targetPerlinsos} KK</span>
+                    </div>
+                  </div>
+
                   {/* Status Lapor Periode Ini */}
                   <div className="col-span-2 text-center w-full md:w-auto">
                     {item.reportCount > 0 ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
                         <CheckCircle2 className="w-3 h-3" />
-                        <span>{item.reportCount} Laporan ({item.hariMelapor} Hari)</span>
+                        <span>{item.reportCount} Lap ({item.hariMelapor} Hari)</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-400 text-[11px] font-semibold">
@@ -1039,28 +1074,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     )}
                   </div>
 
-                  {/* 4 Pilar Metrics */}
-                  <div className="col-span-4 grid grid-cols-4 gap-1.5 text-center w-full text-xs font-bold">
+                  {/* 3 Pilar Metrics: PBB, IKD, BPJS */}
+                  <div className="col-span-3 grid grid-cols-3 gap-1.5 text-center w-full text-xs font-bold">
                     <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
                       <span className="text-[9px] text-slate-400 block font-normal md:hidden">PBB</span>
                       <span className="text-emerald-700">{item.pbb} WP</span>
-                    </div>
-
-                    {/* Perlinsos: Capaian & Target */}
-                    <div className="bg-blue-50/50 p-1.5 rounded-lg border border-blue-100 relative">
-                      <span className="text-[9px] text-blue-500 block font-normal md:hidden">PERLINSOS</span>
-                      <span className="text-blue-900 font-black block">
-                        {item.perlinsos}
-                        <span className="text-[10px] font-normal text-slate-400">/{item.targetPerlinsos}</span>
-                      </span>
-                      <div className="flex items-center justify-center gap-1 mt-0.5">
-                        <span className="text-[9px] font-extrabold text-blue-700 bg-blue-100 px-1 rounded">
-                          {item.perlinsosPercentage}%
-                        </span>
-                        {item.isPerlinsosOverridden && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="Capaian disesuaikan Admin" />
-                        )}
-                      </div>
                     </div>
 
                     <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
@@ -1075,25 +1093,24 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   </div>
 
                   {/* Aksi Buttons: Edit Target & Riwayat */}
-                  <div className="col-span-2 flex items-center justify-end gap-1.5 w-full md:w-auto">
+                  <div className="col-span-1 flex items-center justify-end gap-1.5 w-full md:w-auto">
                     <button
                       type="button"
                       onClick={() => {
                         setEditingKepling(item.kepling);
                         setIsModalEditOpen(true);
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 border border-amber-200"
+                      className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 transition-colors cursor-pointer border border-amber-200"
                       title="Edit Target PERLINSOS atau Total Capaian Kepling ini"
                     >
-                      <Sliders className="w-3 h-3 text-amber-700" />
-                      <span>Edit</span>
+                      <Sliders className="w-3.5 h-3.5 text-amber-700" />
                     </button>
 
                     {onSelectKeplingRiwayat && (
                       <button
                         type="button"
                         onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
-                        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-600 text-[11px] font-bold transition-colors cursor-pointer text-center"
+                        className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-600 text-[11px] font-bold transition-colors cursor-pointer text-center"
                         title="Lihat riwayat laporan kepling ini"
                       >
                         Riwayat
