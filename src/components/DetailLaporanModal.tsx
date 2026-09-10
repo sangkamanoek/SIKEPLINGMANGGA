@@ -955,17 +955,17 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           </table>
         </div>
 
-        {/* DOKUMENTASI FOTO KEGIATAN (KOMPAK MAKS 3 FOTO AGAR PASTI 1 LEMBAR) */}
+        {/* DOKUMENTASI FOTO KEGIATAN (SEMUA FOTO DITAMPILKAN DALAM GRID) */}
         {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
           <div className="mb-2 avoid-break">
             <div className="text-[8pt] font-bold uppercase tracking-wider mb-1 text-slate-900">
               B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):
             </div>
             <div className="grid grid-cols-3 gap-2">
-              {item.dokumentasiFoto.slice(0, 3).map((foto, idx) => (
+              {item.dokumentasiFoto.map((foto, idx) => (
                 <div
                   key={foto.id || idx}
-                  className="aspect-[4/3] w-full rounded border border-slate-400 overflow-hidden relative bg-slate-100"
+                  className="aspect-[4/3] w-full rounded border border-slate-400 overflow-hidden relative bg-slate-100 avoid-break"
                 >
                   <img
                     src={foto.url}
@@ -978,11 +978,6 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 </div>
               ))}
             </div>
-            {item.dokumentasiFoto.length > 3 && (
-              <div className="text-[7.5pt] italic text-slate-600 mt-1">
-                (+{item.dokumentasiFoto.length - 3} foto lainnya terlampir pada sistem)
-              </div>
-            )}
           </div>
         )}
 
