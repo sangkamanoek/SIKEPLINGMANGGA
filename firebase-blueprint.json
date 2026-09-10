@@ -1,0 +1,97 @@
+{
+  "collections": [
+    {
+      "name": "SIKEPLINGMANGGA",
+      "description": "Master data identitas dan konfigurasi aplikasi SI KEPLING MANGGA serta salinan laporan resmi",
+      "fields": {
+        "namaAplikasi": "string",
+        "kodeAplikasi": "string",
+        "deskripsi": "string",
+        "kelurahan": "string",
+        "kecamatan": "string",
+        "kota": "string",
+        "jumlahLingkungan": "number",
+        "databaseTersambung": "string",
+        "statusDatabase": "string",
+        "createdAt": "string",
+        "updatedAt": "string"
+      }
+    },
+    {
+      "name": "reports",
+      "description": "Laporan kinerja harian 24 Kepala Lingkungan Kelurahan Mangga",
+      "fields": {
+        "id": "string",
+        "namaKepling": "string",
+        "jabatan": "string",
+        "lingkungan": "string",
+        "tanggal": "string",
+        "kategori": "string",
+        "uraian": "string",
+        "lokasi": "string",
+        "jumlahWarga": "number",
+        "fotoUrl": "string",
+        "status": "string",
+        "capaianPerlinsos": "number",
+        "capaianPbb": "number",
+        "capaianIkd": "number",
+        "capaianBpjs": "number",
+        "createdAt": "string",
+        "updatedAt": "string"
+      }
+    },
+    {
+      "name": "targets_capaian",
+      "description": "Konfigurasi target dan override capaian per Kepling (kepling_1 s/d kepling_24)",
+      "fields": {
+        "keplingId": "string",
+        "nomorLingkungan": "number",
+        "targetPerlinsos": "number",
+        "targetPbb": "number",
+        "targetIkd": "number",
+        "targetBpjs": "number",
+        "overridePerlinsos": "number",
+        "overridePbb": "number",
+        "overrideIkd": "number",
+        "overrideBpjs": "number",
+        "catatanPenyesuaian": "string",
+        "updatedAt": "string",
+        "updatedBy": "string"
+      }
+    },
+    {
+      "name": "account_passwords",
+      "description": "Penyimpanan kata sandi akun kustom yang diperbarui",
+      "fields": {
+        "accountId": "string",
+        "password": "string",
+        "updatedAt": "string"
+      }
+    },
+    {
+      "name": "reminders",
+      "description": "Jadwal dan pengingat tugas harian Kepling",
+      "fields": {
+        "id": "string",
+        "title": "string",
+        "time": "string",
+        "description": "string",
+        "category": "string",
+        "enabled": "boolean",
+        "daysOfWeek": "array"
+      }
+    },
+    {
+      "name": "notification_logs",
+      "description": "Riwayat notifikasi sistem",
+      "fields": {
+        "id": "string",
+        "timestamp": "string",
+        "title": "string",
+        "message": "string",
+        "category": "string",
+        "read": "boolean"
+      }
+    }
+  ]
+}

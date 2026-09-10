@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // SI KEPLING MANGGA - Firestore Security Rules
+    // Mengizinkan akses baca dan tulis untuk koleksi sistem pelaporan Kepling Mangga
+
+    match /SIKEPLINGMANGGA/{docId} {
+      allow read, write: if true;
+    }
+
+    match /reports/{reportId} {
+      allow read, write: if true;
+    }
+
+    match /targets_capaian/{keplingId} {
+      allow read, write: if true;
+    }
+
+    match /account_passwords/{accountId} {
+      allow read, write: if true;
+    }
+
+    match /reminders/{reminderId} {
+      allow read, write: if true;
+    }
+
+    match /notification_logs/{logId} {
+      allow read, write: if true;
+    }
+
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
