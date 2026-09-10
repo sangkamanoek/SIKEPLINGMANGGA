@@ -47,6 +47,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
   // Editable Form States
@@ -89,6 +90,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       setEditPoskamlingKet(item.kinerja?.poskamlingKeterangan || '');
       setEditKegiatanLainnya(item.kinerja?.kegiatanLainnya || '');
       setIsEditing(false);
+      setShowDeleteConfirm(false);
       setSaveSuccessMsg('');
     }
   }, [item]);
@@ -210,16 +212,16 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     }
   };
 
-  const handleDelete = async () => {
-    if (!onDeleteReport) return;
-    const confirmDelete = window.confirm(
-      `Hapus laporan untuk ${item.namaKepling} (${item.jabatan}) tanggal ${item.tanggal}? Tindakan ini tidak dapat dibatalkan.`
-    );
-    if (!confirmDelete) return;
+  const handleDelete = () => {
+    setShowDeleteConfirm(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (!onDeleteReport || !item) return;
     setIsDeleting(true);
     try {
       await onDeleteReport(item.id);
+      setShowDeleteConfirm(false);
       onClose();
     } catch (err) {
       console.error('Delete error:', err);
@@ -266,6 +268,17 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            {isAdmin && !isEditing && onDeleteReport && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                title="Hapus laporan ini dari database (Admin)"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Hapus</span>
+              </button>
+            )}
             {isAdmin && !isEditing && onUpdateReport && (
               <button
                 type="button"
@@ -679,93 +692,135 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-          {isEditing ? (
-            <div className="flex items-center justify-between w-full">
-              {onDeleteReport && (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                  title="Hapus laporan ini dari database"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                  <span>{isDeleting ? 'Menghapus...' : 'Hapus Laporan'}</span>
-                </button>
-              )}
-
-              <div className="flex items-center gap-2 ml-auto">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveEdit}
-                  disabled={isSavingEdit}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{isSavingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
-                </button>
-              </div>
+        {showDeleteConfirm ? (
+          <div className="p-4 bg-rose-50 border-t border-rose-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs w-full animate-in fade-in duration-150">
+            <div className="flex items-center gap-2.5 text-rose-900 font-medium">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+              <span>
+                Yakin ingin menghapus laporan <strong>{item.namaKepling}</strong> ({item.jabatan}) tanggal <strong>{displayTanggal || item.tanggal}</strong>? Data akan terhapus permanen dari sistem & database.
+              </span>
             </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                {sheetMeta?.spreadsheetUrl && (
-                  <a
-                    href={sheetMeta.spreadsheetUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-100 text-emerald-800 border border-slate-200 rounded-xl text-xs font-bold shadow-2xs transition-colors"
-                  >
-                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Google Sheets</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                  title="Cetak Laporan Resmi Kedinasan 1 Lembar A4 / Simpan PDF"
-                >
-                  <Printer className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Cetak PDF (1 Lembar)</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={handleCopyText}
-                  className="flex-1 sm:flex-none px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'Tersalin' : 'Salin Teks'}</span>
-                </button>
-
-                {hasGoogleAuth && onSyncToCalendar && (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl font-bold transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-md shadow-rose-200 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Sekarang'}</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+            {isEditing ? (
+              <div className="flex items-center justify-between w-full">
+                {onDeleteReport && (
                   <button
                     type="button"
-                    onClick={handleSyncCalendarClick}
-                    disabled={isSyncingCalendar}
-                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 transition-colors cursor-pointer disabled:opacity-50"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                    title="Hapus laporan ini dari database"
                   >
-                    <Calendar className="w-4 h-4" />
-                    <span>{isSyncingCalendar ? 'Menyinkronkan...' : 'Sinkron ke Google Calendar'}</span>
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>{isDeleting ? 'Menghapus...' : 'Hapus Laporan'}</span>
                   </button>
                 )}
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveEdit}
+                    disabled={isSavingEdit}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{isSavingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+                  </button>
+                </div>
               </div>
-            </>
-          )}
-        </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {isAdmin && onDeleteReport && (
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                      title="Hapus laporan ini dari sistem dan database"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Hapus Laporan</span>
+                    </button>
+                  )}
+
+                  {sheetMeta?.spreadsheetUrl && (
+                    <a
+                      href={sheetMeta.spreadsheetUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-100 text-emerald-800 border border-slate-200 rounded-xl text-xs font-bold shadow-2xs transition-colors"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Google Sheets</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handlePrint}
+                    className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    title="Cetak Laporan Resmi Kedinasan 1 Lembar A4 / Simpan PDF"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Cetak PDF (1 Lembar)</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleCopyText}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copied ? 'Tersalin' : 'Salin Teks'}</span>
+                  </button>
+
+                  {hasGoogleAuth && onSyncToCalendar && (
+                    <button
+                      type="button"
+                      onClick={handleSyncCalendarClick}
+                      disabled={isSyncingCalendar}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Calendar className="w-4 h-4" />
+                      <span>{isSyncingCalendar ? 'Menyinkronkan...' : 'Sinkron ke Google Calendar'}</span>
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 2. LEMBAR CETAK RESMI KEDINASAN PEMKO MEDAN (DIJAMIN PAS 1 LEMBAR A4 / PDF) */}
@@ -906,28 +961,28 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             <div className="text-[8pt] font-bold uppercase tracking-wider mb-1 text-slate-900">
               B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):
             </div>
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {item.dokumentasiFoto.slice(0, 3).map((foto, idx) => (
                 <div
                   key={foto.id || idx}
-                  className="h-16 w-32 rounded border border-slate-400 overflow-hidden relative shrink-0 bg-slate-100"
+                  className="aspect-[4/3] w-full rounded border border-slate-400 overflow-hidden relative bg-slate-100"
                 >
                   <img
                     src={foto.url}
                     alt={foto.name}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[6.5pt] px-1 truncate text-center">
+                  <div className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[7pt] px-1 py-0.5 truncate text-center">
                     {foto.name}
                   </div>
                 </div>
               ))}
-              {item.dokumentasiFoto.length > 3 && (
-                <span className="text-[7.5pt] italic text-slate-600 pl-1">
-                  (+{item.dokumentasiFoto.length - 3} foto lainnya terlampir pada sistem)
-                </span>
-              )}
             </div>
+            {item.dokumentasiFoto.length > 3 && (
+              <div className="text-[7.5pt] italic text-slate-600 mt-1">
+                (+{item.dokumentasiFoto.length - 3} foto lainnya terlampir pada sistem)
+              </div>
+            )}
           </div>
         )}
 

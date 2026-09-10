@@ -13,6 +13,8 @@ import {
   Eye,
   CalendarPlus,
   Shield,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
@@ -27,6 +29,8 @@ interface RiwayatLaporanProps {
   onSyncToCalendar?: (item: LaporanHarianItem) => Promise<void>;
   hasGoogleAuth: boolean;
   initialPetugasFilter?: string;
+  isAdmin?: boolean;
+  onDeleteReport?: (id: string) => Promise<void>;
 }
 
 type FilterKegiatanType = 'ALL' | 'PBB' | 'PERLINSOS' | 'IKD' | 'BPJS' | 'POSKAMLING' | 'LAINNYA';
@@ -40,12 +44,29 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   onSyncToCalendar,
   hasGoogleAuth,
   initialPetugasFilter,
+  isAdmin = false,
+  onDeleteReport,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPetugas, setSelectedPetugas] = useState(initialPetugasFilter || 'ALL');
   const [selectedKegiatan, setSelectedKegiatan] = useState<FilterKegiatanType>('ALL');
   const [selectedDate, setSelectedDate] = useState('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  const handleExecuteDelete = async (id: string) => {
+    if (!onDeleteReport) return;
+    setIsDeletingId(id);
+    try {
+      await onDeleteReport(id);
+      setConfirmDeleteId(null);
+    } catch (err) {
+      console.error('Failed to delete report:', err);
+    } finally {
+      setIsDeletingId(null);
+    }
+  };
 
   // Sync if initialPetugasFilter changes
   React.useEffect(() => {
@@ -463,6 +484,18 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                     <span>Lihat Rincian</span>
                   </button>
 
+                  {isAdmin && onDeleteReport && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(confirmDeleteId === item.id ? null : item.id)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                      title="Hapus laporan ini dari sistem (Akses Admin)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Hapus</span>
+                    </button>
+                  )}
+
                   {hasGoogleAuth && onSyncToCalendar && (
                     <button
                       type="button"
@@ -477,6 +510,37 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* In-app Confirmation Banner for Admin Delete */}
+              {confirmDeleteId === item.id && (
+                <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-rose-900 font-medium">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>
+                      Hapus laporan <strong>{item.namaKepling}</strong> ({item.jabatan}) tanggal <strong>{item.tanggal}</strong> permanen dari database?
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(null)}
+                      disabled={isDeletingId === item.id}
+                      className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg font-bold transition-colors cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExecuteDelete(item.id)}
+                      disabled={isDeletingId === item.id}
+                      className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold shadow-2xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{isDeletingId === item.id ? 'Menghapus...' : 'Ya, Hapus'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* 4 Pillars Summary Badges */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-slate-100 text-xs">

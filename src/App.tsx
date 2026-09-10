@@ -33,7 +33,7 @@ import {
   saveNotificationLogs,
   sendNotification,
 } from './lib/notifications';
-import { SUPER_ADMIN_ACCOUNT, getAccountById, syncPasswordsWithServer } from './data/keplingList';
+import { SUPER_ADMIN_ACCOUNT, getAccountById, syncPasswordsWithServer, syncProfilesWithServer } from './data/keplingList';
 import { HeaderBanner } from './components/HeaderBanner';
 import { FormLaporan } from './components/FormLaporan';
 import { KalenderJadwal } from './components/KalenderJadwal';
@@ -46,6 +46,7 @@ import { DashboardCapaianKepling } from './components/DashboardCapaianKepling';
 import { PWAInstallModal } from './components/PWAInstallModal';
 import { LoginPage } from './components/LoginPage';
 import { UbahPasswordModal } from './components/UbahPasswordModal';
+import { EditProfileModal } from './components/EditProfileModal';
 import {
   fetchAllReports,
   saveReportToServer,
@@ -106,6 +107,7 @@ export default function App() {
 
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isUbahPasswordOpen, setIsUbahPasswordOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
@@ -225,6 +227,7 @@ export default function App() {
   // Initialization: Load reports from server, sync offline cache, and set auto-sync interval
   useEffect(() => {
     syncPasswordsWithServer();
+    syncProfilesWithServer();
     loadLocalReports();
     refreshAllReports(false);
     syncLocalReportsToServer();
@@ -564,6 +567,7 @@ export default function App() {
         onOpenAccountModal={() => setIsAccountModalOpen(true)}
         onOpenInstallModal={() => setIsInstallModalOpen(true)}
         onOpenUbahPassword={() => setIsUbahPasswordOpen(true)}
+        onOpenEditProfile={() => setIsEditProfileOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -893,6 +897,8 @@ export default function App() {
             onSyncToCalendar={handleSyncReportToCalendar}
             hasGoogleAuth={Boolean(token)}
             initialPetugasFilter={riwayatFilterPetugas}
+            isAdmin={activeAccount.role === 'super_admin'}
+            onDeleteReport={handleDeleteReport}
           />
         )}
 
@@ -949,6 +955,17 @@ export default function App() {
         onClose={() => setIsUbahPasswordOpen(false)}
         activeAccount={activeAccount}
         onSuccess={(msg) => showToast(msg, 'success')}
+      />
+
+      {/* Edit Profil Modal */}
+      <EditProfileModal
+        isOpen={isEditProfileOpen}
+        onClose={() => setIsEditProfileOpen(false)}
+        activeAccount={activeAccount}
+        onProfileUpdated={(updatedAccount) => {
+          setActiveAccount(updatedAccount);
+          showToast(`Profil ${updatedAccount.nama} berhasil diperbarui.`, 'success');
+        }}
       />
 
       {/* Detail Laporan Modal (No WhatsApp) */}
