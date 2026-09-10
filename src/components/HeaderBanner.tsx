@@ -72,12 +72,12 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
             />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl sm:text-3xl font-black tracking-tight text-white uppercase drop-shadow-xs">
-                SI KEPLING MANGGA
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              <span className="text-lg sm:text-xl font-black tracking-tight text-white drop-shadow-xs max-w-lg leading-tight uppercase">
+                SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA
               </span>
               <span
-                className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md shadow-xs ${
+                className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md shadow-xs self-start sm:self-auto ${
                   activeAccount.role === 'super_admin'
                     ? 'bg-amber-400 text-slate-950'
                     : 'bg-emerald-950 text-emerald-200 border border-emerald-600'
@@ -102,14 +102,14 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               type="button"
               onClick={onOpenInstallModal}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer shrink-0"
-              title="Pasang aplikasi SI KEPLING MANGGA di HP Android / iOS"
+              title="Pasang aplikasi SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA di HP Android / iOS"
             >
               <Smartphone className="w-4 h-4 text-emerald-950" />
               <div className="flex flex-col text-left">
                 <span className="text-[9px] uppercase tracking-wider text-emerald-950/80 font-black leading-none">
                   APK Android
                 </span>
-                <span className="leading-tight">Pasang SI KEPLING MANGGA</span>
+                <span className="leading-tight">Pasang Aplikasi</span>
               </div>
             </button>
           )}

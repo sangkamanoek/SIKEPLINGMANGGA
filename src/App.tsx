@@ -73,7 +73,7 @@ export default function App() {
       const stored = localStorage.getItem('google_sheet_metadata');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed?.title === 'SI KEPLING MANGGA') return parsed;
+        if (parsed?.title === 'SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA') return parsed;
       }
     } catch (e) {
       return null;

@@ -32,7 +32,7 @@ export const db: Firestore = activeConfig.firestoreDatabaseId
 export async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'SIKEPLINGMANGGA', 'info'));
-    console.log('Firebase Firestore SI KEPLING MANGGA online and ready.');
+    console.log('Firebase Firestore SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA online and ready.');
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
       console.warn('Firebase Firestore client is offline, fallback caching active.');

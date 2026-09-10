@@ -1010,7 +1010,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
         {/* FOOTER RESMI DOKUMEN */}
         <div className="mt-2 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic">
-          <span>SI KEPLING MANGGA • Sistem Informasi Pelaporan Kinerja Harian Kepling</span>
+          <span>SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA • Sistem Informasi Pelaporan Kinerja Harian Kepling</span>
           <span>Dokumen Resmi 1 Lembar • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
         </div>
       </div>

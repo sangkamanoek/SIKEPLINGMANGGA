@@ -23,9 +23,9 @@ export default defineConfig(() => {
         ],
         manifest: {
           id: '/',
-          name: 'SI KEPLING MANGGA',
-          short_name: 'SI KEPLING',
-          description: 'SI KEPLING MANGGA - Aplikasi Pelaporan Kinerja Harian & Dashboard Capaian Kepala Lingkungan Kelurahan Mangga',
+          name: 'SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA',
+          short_name: 'KINERJA KEPLING',
+          description: 'SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA - Aplikasi Pelaporan Kinerja Harian & Dashboard Capaian Kepala Lingkungan',
           theme_color: '#065f46',
           background_color: '#f8fafc',
           display: 'standalone',

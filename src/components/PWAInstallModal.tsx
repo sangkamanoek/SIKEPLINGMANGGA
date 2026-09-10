@@ -60,18 +60,18 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClos
   };
 
   const handleCopyWaText = () => {
-    const waText = `🟩 *APLIKASI SI KEPLING MANGGA - LAPORAN HARIAN KEPALA LINGKUNGAN*
+    const waText = `🟩 *APLIKASI SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA - LAPORAN HARIAN KEPALA LINGKUNGAN*
 Kelurahan Mangga - Kecamatan Medan Tuntungan
 
 Kepada Yth. Bapak/Ibu Kepala Lingkungan I s/d XXIV:
-Silakan buka dan pasang aplikasi resmi *SI KEPLING MANGGA* melalui tautan resmi berikut di browser HP Android/iPhone Anda:
+Silakan buka dan pasang aplikasi resmi *SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA* melalui tautan resmi berikut di browser HP Android/iPhone Anda:
 👉 ${shareUrl}
 
-*Petunjuk Pemasangan di HP (APK SI KEPLING MANGGA):*
+*Petunjuk Pemasangan di HP (APK SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA):*
 1. Buka link di atas di browser Google Chrome pada HP Anda.
 2. Masukkan Username resmi Anda (misal: kepling_1) dan kata sandi resmi.
 3. Ketuk menu titik tiga (⋮) di pojok kanan atas browser, lalu pilih *"Tambahkan ke Layar Utama"* / *"Instal Aplikasi"*.
-4. Ikon aplikasi SI KEPLING MANGGA (Logo Pemko Medan) akan otomatis terpasang di layar utama HP layaknya aplikasi APK.
+4. Ikon aplikasi SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA (Logo Pemko Medan) akan otomatis terpasang di layar utama HP layaknya aplikasi APK.
 5. Gunakan fitur *Dashboard Capaian* untuk memantau akumulasi PBB, Perlinsos, IKD, dan BPJS TK Anda.
 
 #SIKEPLINGMANGGA #MedanUntukSemua #SemuaUntukMedan`;
@@ -96,7 +96,7 @@ Silakan buka dan pasang aplikasi resmi *SI KEPLING MANGGA* melalui tautan resmi 
             </div>
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Pasang APK SI KEPLING MANGGA</span>
+                <span>Pasang APK SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA</span>
                 <span className="text-[10px] bg-emerald-700 text-emerald-100 px-2 py-0.5 rounded-full font-medium">
                   Resmi Android & iOS
                 </span>

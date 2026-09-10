@@ -218,10 +218,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 className="w-full h-full object-contain"
               />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-emerald-950 tracking-tight leading-tight uppercase">
-              SI KEPLING MANGGA
+            <h1 className="text-xl sm:text-2xl font-black text-emerald-950 tracking-tight leading-tight uppercase">
+              SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA
             </h1>
-            <p className="text-[11px] font-extrabold text-emerald-700 mt-1 uppercase tracking-wider">
+            <p className="text-[11px] font-extrabold text-emerald-700 mt-2 uppercase tracking-wider">
               Laporan Kegiatan Harian Kepala Lingkungan
             </p>
             <p className="text-[11px] text-slate-500 mt-0.5 font-medium">

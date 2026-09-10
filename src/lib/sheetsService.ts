@@ -2,7 +2,7 @@ import { LaporanHarianItem, SheetMetadata } from '../types';
 import { ALL_ACCOUNTS, getEffectivePassword } from '../data/keplingList';
 import { isReportBeforeSept7 } from './reportsApi';
 
-const SPREADSHEET_TITLE = 'SI KEPLING MANGGA';
+const SPREADSHEET_TITLE = 'SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA';
 export const USERNAME_SHEET_TAB_NAME = 'Username & Password';
 const SHEET_TAB_NAME = 'Laporan Harian';
 
@@ -37,7 +37,7 @@ export const USERNAME_HEADERS = [
  * Searches for existing database spreadsheet or creates a new one
  */
 export async function getOrCreateSpreadsheet(accessToken: string): Promise<SheetMetadata> {
-  // 1. Try to search Google Drive for an existing spreadsheet named SI KEPLING MANGGA
+  // 1. Try to search Google Drive for an existing spreadsheet named SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA
   const query = encodeURIComponent(`name = '${SPREADSHEET_TITLE}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`);
   const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,webViewLink)`;
 
