@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 
 const app = express();
 const PORT = 3000;
@@ -11,7 +10,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Reports Data File
-const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.join(process.cwd(), 'data');
 const REPORTS_FILE = path.join(DATA_DIR, 'reports.json');
 
 // Ensure data directory exists
@@ -93,6 +92,31 @@ const saveStoredPasswords = (passwords: Record<string, string>) => {
 };
 
 let passwordsCache = loadStoredPasswords();
+
+// Profiles Data File (Nama & Foto Profil)
+const PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
+
+const loadStoredProfiles = (): Record<string, any> => {
+  try {
+    if (fs.existsSync(PROFILES_FILE)) {
+      const content = fs.readFileSync(PROFILES_FILE, 'utf-8');
+      return JSON.parse(content) || {};
+    }
+  } catch (err) {
+    console.error('Error reading profiles file:', err);
+  }
+  return {};
+};
+
+const saveStoredProfiles = (profiles: Record<string, any>) => {
+  try {
+    fs.writeFileSync(PROFILES_FILE, JSON.stringify(profiles, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving profiles file:', err);
+  }
+};
+
+let profilesCache = loadStoredProfiles();
 
 const DEFAULT_TARGETS_LIST = [
   429, 330, 342, 298, 210, 400,
@@ -353,9 +377,51 @@ app.post('/api/passwords/reset', (req, res) => {
   }
 });
 
+// GET all custom profiles (nama & telepon)
+app.get('/api/profiles', (_req, res) => {
+  res.json({ success: true, profiles: profilesCache });
+});
+
+// POST update profile for an account (nama & telepon)
+app.post('/api/profiles', (req, res) => {
+  try {
+    const { accountId, nama, telepon, profiles } = req.body;
+
+    if (profiles && typeof profiles === 'object') {
+      profilesCache = { ...profilesCache, ...profiles };
+      saveStoredProfiles(profilesCache);
+      return res.json({ success: true, profiles: profilesCache });
+    }
+
+    if (!accountId) {
+      return res.status(400).json({ success: false, message: 'accountId wajib diisi' });
+    }
+
+    const current = profilesCache[accountId] || {};
+    profilesCache[accountId] = {
+      ...current,
+      ...(nama !== undefined ? { nama: String(nama).trim() } : {}),
+      ...(telepon !== undefined ? { telepon: String(telepon).trim() } : {}),
+      updatedAt: new Date().toISOString(),
+    };
+
+    saveStoredProfiles(profilesCache);
+    return res.json({
+      success: true,
+      profiles: profilesCache,
+      profile: profilesCache[accountId],
+      message: 'Profil berhasil diperbarui',
+    });
+  } catch (err: any) {
+    console.error('Error saving profile:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 async function startServer() {
   // Vite middleware setup
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true, host: '0.0.0.0', port: PORT },
       appType: 'spa',

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserAccount } from '../types';
-import { saveCustomProfile, getCustomProfiles } from '../data/keplingList';
-import { X, Save, UserCircle, Phone, Link as LinkIcon, Camera } from 'lucide-react';
+import { saveCustomProfile } from '../data/keplingList';
+import { X, Save, UserCircle, Phone } from 'lucide-react';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -18,7 +18,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 }) => {
   const [nama, setNama] = useState(activeAccount.nama);
   const [telepon, setTelepon] = useState(activeAccount.telepon || '');
-  const [photoUrl, setPhotoUrl] = useState(activeAccount.photoUrl || '');
   const [isSaving, setIsSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -27,7 +26,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     if (isOpen) {
       setNama(activeAccount.nama);
       setTelepon(activeAccount.telepon || '');
-      setPhotoUrl(activeAccount.photoUrl || '');
       setSuccessMsg('');
       setErrorMsg('');
     }
@@ -43,7 +41,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       const updatedAccount = await saveCustomProfile(activeAccount.id, {
         nama,
         telepon,
-        photoUrl,
       });
       setSuccessMsg('Profil berhasil diperbarui!');
       onProfileUpdated(updatedAccount);
@@ -76,7 +73,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         <div className="p-5 flex-1 overflow-y-auto bg-slate-50">
           <div className="mb-4">
             <p className="text-xs text-slate-500 italic">
-              Perbarui nama lengkap, nomor telepon, dan URL foto profil untuk akun{' '}
+              Perbarui nama lengkap dan nomor telepon untuk akun{' '}
               <strong className="text-emerald-700">{activeAccount.lingkungan || 'SUPER ADMIN'}</strong>.
             </p>
           </div>
@@ -119,36 +116,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
             </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <Camera className="w-3.5 h-3.5" /> URL Foto Profil (Opsional)
-              </label>
-              <input
-                type="url"
-                value={photoUrl}
-                onChange={(e) => setPhotoUrl(e.target.value)}
-                placeholder="Masukkan link gambar (https://...)"
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              />
-              <span className="text-[10px] text-slate-500 leading-tight">
-                Gunakan URL gambar dari internet (berakhiran .jpg / .png). Kosongkan untuk avatar default.
-              </span>
-            </div>
-
-            {photoUrl && (
-              <div className="mt-2 flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl">
-                <img
-                  src={photoUrl}
-                  alt="Preview"
-                  className="w-12 h-12 rounded-full object-cover border border-slate-300 shadow-sm bg-slate-100"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(nama || 'User') + '&background=0d9488&color=fff';
-                  }}
-                />
-                <div className="text-xs text-slate-500 flex-1">Preview Foto</div>
-              </div>
-            )}
           </div>
         </div>
 

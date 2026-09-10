@@ -282,7 +282,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
         {/* Input Bar & Dropdowns Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Keyword Search */}
-          <div className="relative lg:col-span-2">
+          <div className={`relative ${isAdmin ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
             <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
             <input
               id="input-cari-riwayat"
@@ -294,22 +294,24 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
             />
           </div>
 
-          {/* Filter by Petugas Kepling */}
-          <div>
-            <select
-              id="filter-petugas"
-              value={selectedPetugas}
-              onChange={(e) => setSelectedPetugas(e.target.value)}
-              className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
-            >
-              <option value="ALL">Semua Petugas Kepling</option>
-              {listPetugas.map((nama) => (
-                <option key={nama} value={nama}>
-                  👤 {nama}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Filter by Petugas Kepling - HANYA UNTUK ADMIN */}
+          {isAdmin && (
+            <div>
+              <select
+                id="filter-petugas"
+                value={selectedPetugas}
+                onChange={(e) => setSelectedPetugas(e.target.value)}
+                className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
+              >
+                <option value="ALL">Semua Petugas Kepling</option>
+                {listPetugas.map((nama) => (
+                  <option key={nama} value={nama}>
+                    👤 {nama}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Filter by Date */}
           <div>

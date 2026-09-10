@@ -126,21 +126,8 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               }`}
               title={activeAccount.role === 'super_admin' ? 'Klik untuk kelola akun atau lihat buku sandi' : 'Klik untuk ubah kata sandi profil'}
             >
-              {activeAccount.photoUrl ? (
-                <img
-                  src={activeAccount.photoUrl}
-                  alt={activeAccount.nama}
-                  className="w-9 h-9 rounded-lg object-cover border border-white/20 shrink-0 shadow-sm"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                  }}
-                />
-              ) : null}
               <div
                 className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
-                  activeAccount.photoUrl ? 'hidden ' : ''
-                }${
                   activeAccount.role === 'super_admin'
                     ? 'bg-amber-500 text-slate-900'
                     : 'bg-emerald-700 text-emerald-100'
@@ -179,7 +166,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                 type="button"
                 onClick={onOpenEditProfile}
                 className="px-2.5 sm:px-3 py-2 rounded-xl bg-emerald-900/80 hover:bg-emerald-700 border border-emerald-600/50 text-emerald-200 hover:text-white shadow-md transition-all cursor-pointer flex items-center gap-1.5"
-                title="Edit Nama dan Foto Profil"
+                title="Edit Profil Pengguna"
               >
                 <UserCircle className="w-4 h-4 text-emerald-300" />
                 <span className="hidden sm:inline font-bold text-xs">Edit Profil</span>

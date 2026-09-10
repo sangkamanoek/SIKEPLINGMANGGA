@@ -453,3 +453,78 @@ export async function deleteReminderFromFirestore(id: string): Promise<boolean> 
     return false;
   }
 }
+
+// ==========================================
+// 5. KEPLING PROFILES (NAMA & TELEPON) CRUD
+// ==========================================
+
+const PROFILES_COLLECTION = 'account_profiles';
+
+export async function fetchProfilesFromFirestore(): Promise<Record<string, { nama?: string; telepon?: string }>> {
+  try {
+    const colRef = collection(db, PROFILES_COLLECTION);
+    const snapshot = await getDocs(colRef);
+    const profiles: Record<string, { nama?: string; telepon?: string }> = {};
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data) {
+        profiles[docSnap.id] = {
+          nama: data.nama,
+          telepon: data.telepon,
+        };
+      }
+    });
+    return profiles;
+  } catch (err) {
+    console.warn('Gagal membaca profiles dari Firebase Firestore:', err);
+    return {};
+  }
+}
+
+export async function saveProfileToFirestore(
+  accountId: string,
+  profile: { nama?: string; telepon?: string }
+): Promise<boolean> {
+  try {
+    const docRef = doc(db, PROFILES_COLLECTION, accountId);
+    await setDoc(
+      docRef,
+      {
+        accountId,
+        ...profile,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+    return true;
+  } catch (error) {
+    console.warn('Gagal menyimpan profile ke Firebase Firestore:', error);
+    return false;
+  }
+}
+
+export function subscribeProfilesFromFirestore(
+  onData: (profiles: Record<string, { nama?: string; telepon?: string }>) => void
+): Unsubscribe {
+  const colRef = collection(db, PROFILES_COLLECTION);
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const profiles: Record<string, { nama?: string; telepon?: string }> = {};
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data) {
+          profiles[docSnap.id] = {
+            nama: data.nama,
+            telepon: data.telepon,
+          };
+        }
+      });
+      onData(profiles);
+    },
+    (err) => {
+      console.warn('Firestore onSnapshot profiles notice:', err);
+    }
+  );
+}
+

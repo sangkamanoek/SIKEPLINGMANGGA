@@ -3,6 +3,8 @@ import {
   fetchPasswordsFromFirestore,
   savePasswordToFirestore,
   resetPasswordInFirestore,
+  fetchProfilesFromFirestore,
+  saveProfileToFirestore,
 } from '../lib/firestoreService';
 
 export const SUPER_ADMIN_ACCOUNT: UserAccount = {
@@ -22,7 +24,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 1,
     lingkungan: 'Lingkungan I',
-    nama: 'Juan P. Purba',
+    nama: 'Juan Prananta Purba',
     jabatan: 'Kepala Lingkungan I',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -33,7 +35,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 2,
     lingkungan: 'Lingkungan II',
-    nama: 'Zulkarnain Tarigan',
+    nama: 'Zulkarnaen Tarigan',
     jabatan: 'Kepala Lingkungan II',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -44,7 +46,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 3,
     lingkungan: 'Lingkungan III',
-    nama: 'BENNY SEMBIRING',
+    nama: 'Benny Irwansyah Sembiring',
     jabatan: 'Kepala Lingkungan III',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -55,7 +57,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 4,
     lingkungan: 'Lingkungan IV',
-    nama: 'ANDY LOGIPA',
+    nama: 'Andi Lopiga Sembiring',
     jabatan: 'Kepala Lingkungan IV',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -66,7 +68,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 5,
     lingkungan: 'Lingkungan V',
-    nama: 'EDWARD TARIGAN',
+    nama: 'Eduard Ergunanta Tarigan',
     jabatan: 'Kepala Lingkungan V',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -77,7 +79,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 6,
     lingkungan: 'Lingkungan VI',
-    nama: 'NELLA BANGUN',
+    nama: 'Nella Diva Filola Bangun',
     jabatan: 'Kepala Lingkungan VI',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -88,7 +90,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 7,
     lingkungan: 'Lingkungan VII',
-    nama: 'SALSALINA BANGUN',
+    nama: 'Salsalina Br Bangun',
     jabatan: 'Kepala Lingkungan VII',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -99,7 +101,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 8,
     lingkungan: 'Lingkungan VIII',
-    nama: 'RENI SEPTIANI',
+    nama: 'Reni Septiana',
     jabatan: 'Kepala Lingkungan VIII',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -110,7 +112,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 9,
     lingkungan: 'Lingkungan IX',
-    nama: 'TERUNA IRAWAN',
+    nama: 'Teruna Irawan',
     jabatan: 'Kepala Lingkungan IX',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -121,7 +123,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 10,
     lingkungan: 'Lingkungan X',
-    nama: 'DINA NOVRI',
+    nama: 'Dina Novri Maulita',
     jabatan: 'Kepala Lingkungan X',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -132,7 +134,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 11,
     lingkungan: 'Lingkungan XI',
-    nama: 'ZULAIHA LUBIS',
+    nama: 'Zulaiha Lubis',
     jabatan: 'Kepala Lingkungan XI',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -143,7 +145,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 12,
     lingkungan: 'Lingkungan XII',
-    nama: 'DIKI ALIMSAR',
+    nama: 'Diki Alimsar',
     jabatan: 'Kepala Lingkungan XII',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -154,7 +156,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 13,
     lingkungan: 'Lingkungan XIII',
-    nama: 'ANTON PERWIRA',
+    nama: 'Anton Perwira Bangun',
     jabatan: 'Kepala Lingkungan XIII',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -165,7 +167,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 14,
     lingkungan: 'Lingkungan XIV',
-    nama: 'DESI NOVIANTI',
+    nama: 'Dessy Novianti Lubis',
     jabatan: 'Kepala Lingkungan XIV',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -176,7 +178,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 15,
     lingkungan: 'Lingkungan XV',
-    nama: 'RIZKY SEMBIRING',
+    nama: 'M. Rizky Dwilianto Sembiring',
     jabatan: 'Kepala Lingkungan XV',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -187,7 +189,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 16,
     lingkungan: 'Lingkungan XVI',
-    nama: 'LEO GINTING',
+    nama: 'Leo Said Eden Ginting',
     jabatan: 'Kepala Lingkungan XVI',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -198,7 +200,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 17,
     lingkungan: 'Lingkungan XVII',
-    nama: 'ROY RINALDI',
+    nama: 'Roy Rinaldi Tambunan',
     jabatan: 'Kepala Lingkungan XVII',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -209,7 +211,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 18,
     lingkungan: 'Lingkungan XVIII',
-    nama: 'YUDA PRABOWO',
+    nama: 'Yuda Prabowo',
     jabatan: 'Kepala Lingkungan XVIII',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -220,7 +222,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 19,
     lingkungan: 'Lingkungan XIX',
-    nama: 'FRIMONTA SEBAYANG',
+    nama: 'Frimonta Sebayang',
     jabatan: 'Kepala Lingkungan XIX',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -231,7 +233,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 20,
     lingkungan: 'Lingkungan XX',
-    nama: 'MARADU TUA',
+    nama: 'Maradu Tua',
     jabatan: 'Kepala Lingkungan XX',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -242,7 +244,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 21,
     lingkungan: 'Lingkungan XXI',
-    nama: 'M. SIDDIQ',
+    nama: 'Muhammad Shiddiq',
     jabatan: 'Kepala Lingkungan XXI',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -253,7 +255,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 22,
     lingkungan: 'Lingkungan XXII',
-    nama: 'DICKY DEPARI',
+    nama: 'Dicky Ardian Depari',
     jabatan: 'Kepala Lingkungan XXII',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -264,7 +266,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 23,
     lingkungan: 'Lingkungan XXIII',
-    nama: 'HASANUDDIN SITEPU',
+    nama: 'Hasanuddin Sitepu, ST',
     jabatan: 'Kepala Lingkungan XXIII',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -275,7 +277,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
     role: 'kepling',
     nomorLingkungan: 24,
     lingkungan: 'Lingkungan XXIV',
-    nama: 'DANIEL TARIGAN',
+    nama: 'Daniel Dianta Tarigan',
     jabatan: 'Kepala Lingkungan XXIV',
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
@@ -390,6 +392,114 @@ export const hasCustomPassword = (accountId: string): boolean => {
   return Boolean(current[accountId]);
 };
 
+// ==========================================
+// CUSTOM PROFILES (NAMA & TELEPON)
+// ==========================================
+
+export const STORAGE_KEY_CUSTOM_PROFILES = 'kepling_custom_profiles';
+
+export interface CustomProfileData {
+  nama?: string;
+  telepon?: string;
+  updatedAt?: string;
+}
+
+export const getCustomProfiles = (): Record<string, CustomProfileData> => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_PROFILES);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    console.warn('Gagal membaca custom profiles:', e);
+  }
+  return {};
+};
+
+export const getEffectiveAccount = (account: UserAccount): UserAccount => {
+  if (!account) return account;
+  const profiles = getCustomProfiles();
+  const custom = profiles[account.id];
+  if (!custom) return account;
+  return {
+    ...account,
+    nama: custom.nama && custom.nama.trim() ? custom.nama.trim() : account.nama,
+    telepon: custom.telepon !== undefined ? custom.telepon : account.telepon,
+  };
+};
+
+export const getEffectiveKeplingAccounts = (): UserAccount[] => {
+  return KEPLING_ACCOUNTS.map((k) => getEffectiveAccount(k));
+};
+
+export const getAllEffectiveAccounts = (): UserAccount[] => {
+  return ALL_ACCOUNTS.map((a) => getEffectiveAccount(a));
+};
+
+export const saveCustomProfile = async (
+  accountId: string,
+  data: Partial<CustomProfileData>
+): Promise<UserAccount> => {
+  const current = getCustomProfiles();
+  const existing = current[accountId] || {};
+  const updated: CustomProfileData = {
+    ...existing,
+    ...data,
+    updatedAt: new Date().toISOString(),
+  };
+  current[accountId] = updated;
+  try {
+    localStorage.setItem(STORAGE_KEY_CUSTOM_PROFILES, JSON.stringify(current));
+  } catch (e) {
+    console.warn('Gagal menyimpan profile ke localStorage:', e);
+  }
+
+  // 1. Sync ke Firebase Firestore
+  saveProfileToFirestore(accountId, updated).catch((err) =>
+    console.warn('Gagal sync profile ke Firestore:', err)
+  );
+
+  // 2. Sync ke backend server
+  fetch('/api/profiles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accountId, ...updated }),
+  }).catch((err) => console.warn('Gagal sync profile ke server:', err));
+
+  const baseAccount = ALL_ACCOUNTS.find((a) => a.id === accountId) || SUPER_ADMIN_ACCOUNT;
+  return getEffectiveAccount(baseAccount);
+};
+
+export const syncProfilesWithServer = async (): Promise<Record<string, CustomProfileData>> => {
+  let merged = getCustomProfiles();
+
+  // 1. Fetch from Firebase Firestore
+  try {
+    const firestoreProfiles = await fetchProfilesFromFirestore();
+    if (firestoreProfiles && Object.keys(firestoreProfiles).length > 0) {
+      merged = { ...merged, ...firestoreProfiles };
+      localStorage.setItem(STORAGE_KEY_CUSTOM_PROFILES, JSON.stringify(merged));
+    }
+  } catch (e) {
+    console.warn('Notice reading profiles from Firestore:', e);
+  }
+
+  // 2. Fetch from backend server
+  try {
+    const res = await fetch('/api/profiles');
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.profiles && typeof data.profiles === 'object') {
+        merged = { ...merged, ...data.profiles };
+        localStorage.setItem(STORAGE_KEY_CUSTOM_PROFILES, JSON.stringify(merged));
+      }
+    }
+  } catch (e) {
+    // Offline fallback
+  }
+  return merged;
+};
+
 export interface FixedAccountOption {
   username: string;
   nama: string;
@@ -397,7 +507,34 @@ export interface FixedAccountOption {
   role: 'super_admin' | 'kepling';
   nomorLingkungan?: number;
   defaultPasswordHint: string;
+  photoUrl?: string;
 }
+
+export const getFixedAccountsList = (): FixedAccountOption[] => {
+  const superAdmin = getEffectiveAccount(SUPER_ADMIN_ACCOUNT);
+  return [
+    {
+      username: 'super_admin',
+      nama: 'SUPER ADMIN (Lurah / Seklur)',
+      lingkungan: 'Kantor Kelurahan Mangga',
+      role: 'super_admin',
+      defaultPasswordHint: 'mangga2026',
+      photoUrl: superAdmin.photoUrl,
+    },
+    ...KEPLING_ACCOUNTS.map((k) => {
+      const eff = getEffectiveAccount(k);
+      return {
+        username: eff.id,
+        nama: eff.nama,
+        lingkungan: eff.lingkungan,
+        role: 'kepling' as const,
+        nomorLingkungan: eff.nomorLingkungan,
+        defaultPasswordHint: eff.password,
+        photoUrl: eff.photoUrl,
+      };
+    }),
+  ];
+};
 
 export const FIXED_ACCOUNTS_LIST: FixedAccountOption[] = [
   {
@@ -419,7 +556,7 @@ export const FIXED_ACCOUNTS_LIST: FixedAccountOption[] = [
 
 export const getAccountById = (id: string): UserAccount => {
   const found = ALL_ACCOUNTS.find((a) => a.id === id);
-  return found || SUPER_ADMIN_ACCOUNT;
+  return getEffectiveAccount(found || SUPER_ADMIN_ACCOUNT);
 };
 
 export const getDefaultAccount = (): UserAccount => {

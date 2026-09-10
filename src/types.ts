@@ -98,12 +98,20 @@ export interface UserAccount {
   id: string;
   role: UserRole;
   lingkungan: string; // e.g. "Lingkungan I" or "Kantor Kelurahan"
-  nama: string; // e.g. "Juan P. Purba" or "SUPER ADMIN"
+  nama: string; // e.g. "Juan Prananta Purba" or "SUPER ADMIN"
   jabatan: string; // e.g. "Kepala Lingkungan I" or "Super Admin Kelurahan Mangga"
   kelurahan: string; // "Kelurahan Mangga"
   kecamatan: string; // "Kecamatan Medan Tuntungan"
   nomorLingkungan?: number; // 1 - 24, undefined for super admin
   password: string; // Password / PIN akun
+  telepon?: string; // Optional contact number
+}
+
+export interface UserProfileCustom {
+  accountId: string;
+  nama?: string;
+  telepon?: string;
+  updatedAt?: string;
 }
 
 export interface KeplingTargetCapaian {
