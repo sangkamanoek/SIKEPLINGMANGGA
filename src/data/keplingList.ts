@@ -507,11 +507,9 @@ export interface FixedAccountOption {
   role: 'super_admin' | 'kepling';
   nomorLingkungan?: number;
   defaultPasswordHint: string;
-  photoUrl?: string;
 }
 
 export const getFixedAccountsList = (): FixedAccountOption[] => {
-  const superAdmin = getEffectiveAccount(SUPER_ADMIN_ACCOUNT);
   return [
     {
       username: 'super_admin',
@@ -519,7 +517,6 @@ export const getFixedAccountsList = (): FixedAccountOption[] => {
       lingkungan: 'Kantor Kelurahan Mangga',
       role: 'super_admin',
       defaultPasswordHint: 'mangga2026',
-      photoUrl: superAdmin.photoUrl,
     },
     ...KEPLING_ACCOUNTS.map((k) => {
       const eff = getEffectiveAccount(k);
@@ -530,7 +527,6 @@ export const getFixedAccountsList = (): FixedAccountOption[] => {
         role: 'kepling' as const,
         nomorLingkungan: eff.nomorLingkungan,
         defaultPasswordHint: eff.password,
-        photoUrl: eff.photoUrl,
       };
     }),
   ];
