@@ -10,10 +10,22 @@ import {
 import { getFirestore, Firestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// Flexible config: use environment variables if provided in Vercel, fallback to bundled config
+const activeConfig = {
+  apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string) || (firebaseConfig as any).apiKey,
+  authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string) || (firebaseConfig as any).authDomain,
+  projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string) || (firebaseConfig as any).projectId,
+  storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string) || (firebaseConfig as any).storageBucket,
+  messagingSenderId: (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string) || (firebaseConfig as any).messagingSenderId,
+  appId: (import.meta.env.VITE_FIREBASE_APP_ID as string) || (firebaseConfig as any).appId,
+  measurementId: (import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string) || (firebaseConfig as any).measurementId,
+  firestoreDatabaseId: (import.meta.env.VITE_FIREBASE_DATABASE_ID as string) || (firebaseConfig as any).firestoreDatabaseId,
+};
+
+const app = !getApps().length ? initializeApp(activeConfig) : getApp();
 export const auth = getAuth(app);
-export const db: Firestore = (firebaseConfig as any).firestoreDatabaseId
-  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
+export const db: Firestore = activeConfig.firestoreDatabaseId
+  ? getFirestore(app, activeConfig.firestoreDatabaseId)
   : getFirestore(app);
 
 export const SCOPES = [

@@ -374,4 +374,9 @@ async function startServer() {
   });
 }
 
-startServer();
+// In Vercel serverless environment, Vercel handles invocation via api/index.ts
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
