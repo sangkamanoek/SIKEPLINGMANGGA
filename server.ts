@@ -18,20 +18,8 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Helper to identify reports submitted before 7 September 2026
-const isBeforeSept7 = (r: any): boolean => {
-  if (!r) return false;
-  if (r.createdAt) {
-    const d = new Date(r.createdAt);
-    if (!isNaN(d.getTime()) && d < new Date('2026-09-07T00:00:00+07:00')) {
-      return true;
-    }
-  }
-  const tgl = (r.tanggal || '').toUpperCase();
-  if (tgl.includes('SEPTEMBER 2026') || tgl.includes('SEP 2026')) {
-    const match = tgl.match(/\b0?([1-6])\s+SEPTEMBER/i);
-    if (match) return true;
-  }
+// Helper to identify reports submitted before 7 September 2026 (Disabled to allow all reports)
+const isBeforeSept7 = (_r: any): boolean => {
   return false;
 };
 

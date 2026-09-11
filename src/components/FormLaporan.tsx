@@ -158,34 +158,74 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     setHari(e.target.value);
   };
 
-  const handleImageUpload = (
+  const compressFile = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 900;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.65));
+          } else {
+            resolve((event.target?.result as string) || '');
+          }
+        };
+        img.onerror = () => {
+          resolve((event.target?.result as string) || '');
+        };
+        img.src = (event.target?.result as string) || '';
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     kategori: 'poskamling' | 'umum' = 'umum'
   ) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          const newFoto: FotoDokumentasi = {
-            id: 'foto_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-            url: event.target.result as string,
+    const fileArray: File[] = Array.from(files);
+    e.target.value = '';
+
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
+      const compressedUrl = await compressFile(file);
+      if (compressedUrl) {
+        setFotoList((prev) => [
+          ...prev,
+          {
+            id: 'foto_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6) + '_' + i,
+            url: compressedUrl,
             name:
               kategori === 'poskamling'
                 ? `[POSKAMLING] ${file.name || 'Foto Ronda'}`
-                : file.name || `Foto ${fotoList.length + 1}`,
+                : file.name || `Foto ${prev.length + 1}`,
             timestamp: new Date().toISOString(),
             kategori,
-          };
-          setFotoList((prev) => [...prev, newFoto]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-
-    e.target.value = '';
+          },
+        ]);
+      }
+    }
   };
 
   const removePhoto = (id: string) => {
