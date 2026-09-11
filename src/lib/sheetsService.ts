@@ -20,6 +20,7 @@ const HEADERS = [
   'Poskamling / Siskamling',
   'Kegiatan Lainnya / Catatan',
   'Jumlah Dokumentasi',
+  'Link File Dokumentasi',
 ];
 
 export const USERNAME_HEADERS = [
@@ -132,7 +133,7 @@ export async function getOrCreateSpreadsheet(accessToken: string): Promise<Sheet
 }
 
 async function appendHeaderRow(accessToken: string, spreadsheetId: string, sheetId: number = 1) {
-  const range = `'${SHEET_TAB_NAME}'!A1:M1`;
+  const range = `'${SHEET_TAB_NAME}'!A1:N1`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
 
   await fetch(url, {
@@ -358,7 +359,7 @@ export async function purgePreSept7ReportsFromSheet(
   spreadsheetId: string
 ): Promise<{ removedCount: number }> {
   try {
-    const range = `'${SHEET_TAB_NAME}'!A2:M1000`;
+    const range = `'${SHEET_TAB_NAME}'!A2:N1000`;
     const getUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`;
     const res = await fetch(getUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -402,7 +403,7 @@ export async function purgePreSept7ReportsFromSheet(
       });
 
       if (validRows.length > 0) {
-        const putUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${SHEET_TAB_NAME}'!A2:M${validRows.length + 1}?valueInputOption=USER_ENTERED`;
+        const putUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${SHEET_TAB_NAME}'!A2:N${validRows.length + 1}?valueInputOption=USER_ENTERED`;
         await fetch(putUrl, {
           method: 'PUT',
           headers: {
@@ -430,7 +431,7 @@ export async function appendLaporanToSheet(
   spreadsheetId: string,
   item: LaporanHarianItem
 ): Promise<{ success: boolean; updatedRange?: string }> {
-  const range = `'${SHEET_TAB_NAME}'!A:M`;
+  const range = `'${SHEET_TAB_NAME}'!A:N`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
 
   const poskamlingSummary =
@@ -453,6 +454,7 @@ export async function appendLaporanToSheet(
     poskamlingSummary,
     item.kinerja.kegiatanLainnya || '-',
     item.jumlahDokumentasi || 0,
+    (item.jumlahDokumentasi || 0) > 0 ? `${window.location.origin}/?view-images=${item.id}` : 'Tidak ada foto',
   ];
 
   const res = await fetch(url, {
@@ -485,7 +487,7 @@ export async function fetchLaporanFromSheet(
   accessToken: string,
   spreadsheetId: string
 ): Promise<LaporanHarianItem[]> {
-  const range = `'${SHEET_TAB_NAME}'!A2:M500`;
+  const range = `'${SHEET_TAB_NAME}'!A2:N500`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`;
 
   const res = await fetch(url, {

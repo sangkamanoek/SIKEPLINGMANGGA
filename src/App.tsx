@@ -12,6 +12,7 @@ import {
   Award,
   Trophy,
 } from 'lucide-react';
+import ViewImagesPage from './components/ViewImagesPage';
 import { GoogleUser, SheetMetadata, LaporanHarianItem, TaskReminder, NotificationLog, UserAccount } from './types';
 import {
   initAuth,
@@ -59,6 +60,12 @@ import {
 const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history';
 
 export default function App() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewImagesId = urlParams.get('view-images');
+  if (viewImagesId) {
+    return <ViewImagesPage reportId={viewImagesId} />;
+  }
+
   const [user, setUser] = useState<GoogleUser | null>(null);
   const [token, setToken] = useState<string | null>(() => {
     try {
