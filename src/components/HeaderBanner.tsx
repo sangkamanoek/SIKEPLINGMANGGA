@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, ChevronDown, UserCheck, KeyRound, Smartphone, Download, LogOut, Database, UserCircle } from 'lucide-react';
+import { ShieldCheck, ChevronDown, UserCheck, KeyRound, Smartphone, Download, LogOut, Database, UserCircle, Presentation } from 'lucide-react';
 import { GoogleUser, SheetMetadata, UserAccount } from '../types';
 
 interface HeaderBannerProps {
@@ -14,6 +14,7 @@ interface HeaderBannerProps {
   onOpenUbahPassword?: () => void;
   onOpenEditProfile?: () => void;
   onLogout?: () => void;
+  onOpenPPTModal?: () => void;
 }
 
 export const HeaderBanner: React.FC<HeaderBannerProps> = ({
@@ -28,6 +29,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   onOpenUbahPassword,
   onOpenEditProfile,
   onLogout,
+  onOpenPPTModal,
 }) => {
   return (
     <header className="bg-emerald-800 text-white shadow-lg print:hidden">
@@ -90,8 +92,26 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
           </div>
         </div>
 
-        {/* Header Actions: APK Install & Active Account Switcher */}
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto">
+        {/* Header Actions: PPT Panduan, APK Install & Active Account Switcher */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto">
+          {onOpenPPTModal && (
+            <button
+              id="btn-open-ppt-modal"
+              type="button"
+              onClick={onOpenPPTModal}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-700 hover:bg-teal-600 border border-teal-500/50 text-white font-bold text-xs shadow-md transition-all cursor-pointer shrink-0"
+              title="Buka Slide Presentation & Download File PowerPoint (.pptx) Panduan Kepling"
+            >
+              <Presentation className="w-4 h-4 text-emerald-300" />
+              <div className="flex flex-col text-left">
+                <span className="text-[9px] uppercase tracking-wider text-teal-200 font-black leading-none">
+                  File PPT
+                </span>
+                <span className="leading-tight">Panduan Kepling</span>
+              </div>
+            </button>
+          )}
+
           {onOpenInstallModal && (
             <button
               id="btn-open-install-apk-modal"

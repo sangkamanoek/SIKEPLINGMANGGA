@@ -44,6 +44,7 @@ import { AccountSelectorModal } from './components/AccountSelectorModal';
 import { MonitoringSuperAdmin } from './components/MonitoringSuperAdmin';
 import { DashboardCapaianKepling } from './components/DashboardCapaianKepling';
 import { PWAInstallModal } from './components/PWAInstallModal';
+import { PanduanPPTModal } from './components/PanduanPPTModal';
 import { LoginPage } from './components/LoginPage';
 import { UbahPasswordModal } from './components/UbahPasswordModal';
 import { EditProfileModal } from './components/EditProfileModal';
@@ -115,6 +116,7 @@ export default function App() {
   const [isUbahPasswordOpen, setIsUbahPasswordOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isPPTModalOpen, setIsPPTModalOpen] = useState(false);
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
 
@@ -575,6 +577,7 @@ export default function App() {
         onOpenInstallModal={() => setIsInstallModalOpen(true)}
         onOpenUbahPassword={() => setIsUbahPasswordOpen(true)}
         onOpenEditProfile={() => setIsEditProfileOpen(true)}
+        onOpenPPTModal={() => setIsPPTModalOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -987,6 +990,12 @@ export default function App() {
         onDeleteReport={handleDeleteReport}
         onSyncToCalendar={handleSyncReportToCalendar}
         isSyncingCalendar={isSyncingCalendar}
+      />
+
+      {/* Panduan PPT Kepling Modal */}
+      <PanduanPPTModal
+        isOpen={isPPTModalOpen}
+        onClose={() => setIsPPTModalOpen(false)}
       />
 
       {/* Footer matching Professional Polish style */}
