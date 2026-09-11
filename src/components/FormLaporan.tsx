@@ -540,7 +540,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                     type="number"
                     min="0"
                     value={opsirPbbWp}
-                    onChange={(e) => setOpsirPbbWp(e.target.value)}
+                    onChange={(e) => setOpsirPbbWp(e.target.value.replace(/^0+(?=\d)/, ''))}
                     placeholder="Jml WP"
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white font-bold text-slate-800"
                   />
@@ -593,7 +593,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                     type="number"
                     min="0"
                     value={perlinsosKk}
-                    onChange={(e) => setPerlinsosKk(e.target.value)}
+                    onChange={(e) => setPerlinsosKk(e.target.value.replace(/^0+(?=\d)/, ''))}
                     placeholder="Jml KK"
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white font-bold text-slate-800"
                   />
@@ -646,7 +646,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                     type="number"
                     min="0"
                     value={ikdOrang}
-                    onChange={(e) => setIkdOrang(e.target.value)}
+                    onChange={(e) => setIkdOrang(e.target.value.replace(/^0+(?=\d)/, ''))}
                     placeholder="Jml Orang"
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white font-bold text-slate-800"
                   />
@@ -682,7 +682,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                     type="number"
                     min="0"
                     value={bpjsKetenagakerjaanOrang}
-                    onChange={(e) => setBpjsKetenagakerjaanOrang(e.target.value)}
+                    onChange={(e) => setBpjsKetenagakerjaanOrang(e.target.value.replace(/^0+(?=\d)/, ''))}
                     placeholder="Jml Orang"
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white font-bold text-slate-800"
                   />

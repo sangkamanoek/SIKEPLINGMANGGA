@@ -411,7 +411,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         type="number"
                         min="0"
                         value={editOpsirPbbWp}
-                        onChange={(e) => setEditOpsirPbbWp(e.target.value)}
+                        onChange={(e) => setEditOpsirPbbWp(e.target.value.replace(/^0+(?=\d)/, ''))}
                         className="w-24 px-2 py-1 bg-slate-50 border border-slate-300 rounded font-bold text-sm text-slate-900"
                       />
                       <span className="text-xs font-semibold text-slate-600">WP</span>
@@ -427,7 +427,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 ) : (
                   <>
                     <div className="text-lg font-black text-slate-800 my-1">
-                      {item.kinerja.opsirPbbWp || '0'} <span className="text-xs font-semibold text-slate-500">WP</span>
+                      {item.kinerja.opsirPbbWp ? String(item.kinerja.opsirPbbWp).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">WP</span>
                     </div>
                     {item.kinerja.opsirPbbKeterangan && (
                       <p className="text-xs text-slate-600 bg-slate-50 p-1.5 rounded">
@@ -448,7 +448,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         type="number"
                         min="0"
                         value={editPerlinsosKk}
-                        onChange={(e) => setEditPerlinsosKk(e.target.value)}
+                        onChange={(e) => setEditPerlinsosKk(e.target.value.replace(/^0+(?=\d)/, ''))}
                         className="w-24 px-2 py-1 bg-slate-50 border border-slate-300 rounded font-bold text-sm text-slate-900"
                       />
                       <span className="text-xs font-semibold text-slate-600">KK</span>
@@ -464,7 +464,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 ) : (
                   <>
                     <div className="text-lg font-black text-slate-800 my-1">
-                      {item.kinerja.perlinsosKk || '0'} <span className="text-xs font-semibold text-slate-500">KK</span>
+                      {item.kinerja.perlinsosKk ? String(item.kinerja.perlinsosKk).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">KK</span>
                     </div>
                     {item.kinerja.perlinsosKeterangan && (
                       <p className="text-xs text-slate-600 bg-slate-50 p-1.5 rounded">
@@ -485,7 +485,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         type="number"
                         min="0"
                         value={editIkdOrang}
-                        onChange={(e) => setEditIkdOrang(e.target.value)}
+                        onChange={(e) => setEditIkdOrang(e.target.value.replace(/^0+(?=\d)/, ''))}
                         className="w-24 px-2 py-1 bg-slate-50 border border-slate-300 rounded font-bold text-sm text-slate-900"
                       />
                       <span className="text-xs font-semibold text-slate-600">ORANG</span>
@@ -501,7 +501,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 ) : (
                   <>
                     <div className="text-lg font-black text-slate-800 my-1">
-                      {item.kinerja.ikdOrang || '0'} <span className="text-xs font-semibold text-slate-500">ORANG</span>
+                      {item.kinerja.ikdOrang ? String(item.kinerja.ikdOrang).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">ORANG</span>
                     </div>
                     {item.kinerja.ikdKeterangan && (
                       <p className="text-xs text-slate-600 bg-slate-50 p-1.5 rounded">
@@ -522,7 +522,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         type="number"
                         min="0"
                         value={editBpjsOrang}
-                        onChange={(e) => setEditBpjsOrang(e.target.value)}
+                        onChange={(e) => setEditBpjsOrang(e.target.value.replace(/^0+(?=\d)/, ''))}
                         className="w-24 px-2 py-1 bg-slate-50 border border-slate-300 rounded font-bold text-sm text-slate-900"
                       />
                       <span className="text-xs font-semibold text-slate-600">ORANG</span>
@@ -538,7 +538,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 ) : (
                   <>
                     <div className="text-lg font-black text-slate-800 my-1">
-                      {item.kinerja.bpjsKetenagakerjaanOrang || '0'} <span className="text-xs font-semibold text-slate-500">ORANG</span>
+                      {item.kinerja.bpjsKetenagakerjaanOrang ? String(item.kinerja.bpjsKetenagakerjaanOrang).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">ORANG</span>
                     </div>
                     {item.kinerja.bpjsKetenagakerjaanKeterangan && (
                       <p className="text-xs text-slate-600 bg-slate-50 p-1.5 rounded">

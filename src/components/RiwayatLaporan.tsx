@@ -549,7 +549,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-400 font-bold block uppercase">1. OPSIR PBB</span>
                   <span className="font-bold text-slate-800">
-                    {item.kinerja.opsirPbbWp ? `${item.kinerja.opsirPbbWp} WP` : '-'}
+                    {item.kinerja.opsirPbbWp ? `${String(item.kinerja.opsirPbbWp).replace(/^0+(?=\d)/, '')} WP` : '-'}
                   </span>
                   {item.kinerja.opsirPbbKeterangan && (
                     <p className="text-[10px] text-slate-500 truncate mt-0.5">
@@ -561,7 +561,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-400 font-bold block uppercase">2. PERLINSOS</span>
                   <span className="font-bold text-slate-800">
-                    {item.kinerja.perlinsosKk ? `${item.kinerja.perlinsosKk} KK` : '-'}
+                    {item.kinerja.perlinsosKk ? `${String(item.kinerja.perlinsosKk).replace(/^0+(?=\d)/, '')} KK` : '-'}
                   </span>
                   {item.kinerja.perlinsosKeterangan && (
                     <p className="text-[10px] text-slate-500 truncate mt-0.5">
@@ -573,7 +573,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-400 font-bold block uppercase">3. IKD</span>
                   <span className="font-bold text-slate-800">
-                    {item.kinerja.ikdOrang ? `${item.kinerja.ikdOrang} ORG` : '-'}
+                    {item.kinerja.ikdOrang ? `${String(item.kinerja.ikdOrang).replace(/^0+(?=\d)/, '')} ORG` : '-'}
                   </span>
                   {item.kinerja.ikdKeterangan && (
                     <p className="text-[10px] text-slate-500 truncate mt-0.5">
@@ -585,7 +585,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-400 font-bold block uppercase">4. BPJS TK</span>
                   <span className="font-bold text-slate-800">
-                    {item.kinerja.bpjsKetenagakerjaanOrang ? `${item.kinerja.bpjsKetenagakerjaanOrang} ORG` : '-'}
+                    {item.kinerja.bpjsKetenagakerjaanOrang ? `${String(item.kinerja.bpjsKetenagakerjaanOrang).replace(/^0+(?=\d)/, '')} ORG` : '-'}
                   </span>
                   {item.kinerja.bpjsKetenagakerjaanKeterangan && (
                     <p className="text-[10px] text-slate-500 truncate mt-0.5">
