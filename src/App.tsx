@@ -148,7 +148,7 @@ export default function App() {
     setIsRefreshingReports(true);
     try {
       const serverReports = await fetchAllReports();
-      if (serverReports && serverReports.length > 0) {
+      if (serverReports) {
         setReports(serverReports);
         if (showNotification) {
           showToast(`Data berhasil diperbarui (${serverReports.length} laporan tersedia)`, 'success');

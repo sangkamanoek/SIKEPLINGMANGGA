@@ -176,9 +176,13 @@ export function isReportMatchingKepling(
 ): boolean {
   if (!report || !kepling) return false;
 
-  // 1. Jika laporan memiliki keplingId, gunakan kecocokan ID eksak
-  if (report.keplingId) {
-    return report.keplingId === kepling.id;
+  // 1. Jika laporan memiliki keplingId, cek kecocokan ID terlebih dahulu
+  if (report.keplingId && kepling.id) {
+    const rId = report.keplingId.toLowerCase().replace(/_/g, '');
+    const kId = kepling.id.toLowerCase().replace(/_/g, '');
+    if (rId === kId) {
+      return true;
+    }
   }
 
   // 2. Pencocokan nama lengkap (case-insensitive & trimmed)

@@ -10,19 +10,7 @@ import {
 
 const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history';
 
-export const isReportBeforeSept7 = (r: LaporanHarianItem): boolean => {
-  if (!r) return false;
-  if (r.createdAt) {
-    const d = new Date(r.createdAt);
-    if (!isNaN(d.getTime()) && d < new Date('2026-09-07T00:00:00+07:00')) {
-      return true;
-    }
-  }
-  const tgl = (r.tanggal || '').toUpperCase();
-  if (tgl.includes('SEPTEMBER 2026') || tgl.includes('SEP 2026')) {
-    const match = tgl.match(/\b0?([1-6])\s+SEPTEMBER/i);
-    if (match) return true;
-  }
+export const isReportBeforeSept7 = (_r: LaporanHarianItem): boolean => {
   return false;
 };
 
