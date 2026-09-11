@@ -24,7 +24,6 @@ import {
 import {
   getOrCreateSpreadsheet,
   appendLaporanToSheet,
-  fetchLaporanFromSheet,
 } from './lib/sheetsService';
 import { syncReportToGoogleCalendar } from './lib/googleCalendar';
 import {
@@ -200,22 +199,6 @@ export default function App() {
     }
   };
 
-  // Fetch sheet reports using current token & sheetId
-  const loadSheetReports = useCallback(async (authToken: string, sId: string) => {
-    setIsLoadingReports(true);
-    try {
-      const fetched = await fetchLaporanFromSheet(authToken, sId);
-      if (fetched.length > 0) {
-        setReports(fetched);
-        localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(fetched));
-      }
-    } catch (err) {
-      console.warn('Error fetching reports from sheet:', err);
-    } finally {
-      setIsLoadingReports(false);
-    }
-  }, []);
-
   // Setup spreadsheet when user logs in
   const syncSpreadsheet = useCallback(async (authToken: string) => {
     try {
@@ -224,12 +207,11 @@ export default function App() {
       try {
         localStorage.setItem('google_sheet_metadata', JSON.stringify(meta));
       } catch (e) {}
-      await loadSheetReports(authToken, meta.spreadsheetId);
     } catch (err: unknown) {
       console.error('Error setting up spreadsheet:', err);
       showToast('Gagal menghubungkan Google Sheet secara otomatis', 'error');
     }
-  }, [loadSheetReports]);
+  }, []);
 
   // Initialization: Load reports from server, sync offline cache, and set auto-sync interval
   useEffect(() => {
@@ -388,8 +370,6 @@ export default function App() {
           } else {
             showToast('Laporan berhasil tersimpan di Database & Google Sheets!', 'success');
           }
-
-          await loadSheetReports(activeToken, currentSheetMeta.spreadsheetId);
         } catch (sheetErr) {
           console.warn('Google Sheets sync notice:', sheetErr);
           showToast('Laporan berhasil disimpan ke Database Aplikasi!', 'success');
