@@ -829,28 +829,30 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         className="hidden print:block page-print-single bg-white text-slate-900 w-full max-w-[195mm] mx-auto py-1 font-serif text-[8.5pt] leading-tight"
       >
         {/* KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
-        <div className="flex items-center gap-3 pb-1 border-b-[2px] border-black mb-0.5">
+        <div className="flex items-center gap-4 pb-2 border-b-4 border-black mb-3">
           <img
             src="/logo_pemko_medan.png"
             alt="Logo Pemko Medan"
-            className="w-20 h-20 object-contain shrink-0"
+            className="w-[90px] h-[110px] object-contain shrink-0 ml-2"
           />
-          <div className="text-center flex-1 pr-6">
-            <div className="text-[11pt] font-black tracking-wider uppercase font-serif">
+          <div className="text-center flex-1 pr-[100px]">
+            <div className="text-[14pt] uppercase font-sans text-black leading-tight">
               PEMERINTAH KOTA MEDAN
             </div>
-            <div className="text-[10pt] font-bold tracking-wide uppercase font-serif">
+            <div className="text-[14pt] uppercase font-sans text-black leading-tight">
               KECAMATAN MEDAN TUNTUNGAN
             </div>
-            <div className="text-[12pt] font-black tracking-wider uppercase font-serif">
+            <div className="text-[21pt] font-black uppercase font-sans text-black leading-tight mt-1 tracking-wide">
               KELURAHAN MANGGA
             </div>
-            <div className="text-[7.5pt] text-slate-700 italic font-sans">
-              Jalan Tembakau Raya No. 35 A Medan • Kode Pos: 20135
+            <div className="text-[9.5pt] text-black font-sans mt-1 leading-snug">
+              Jalan Tembakau Raya No.35 A Medan Tuntungan, Medan, Sumatera Utara 20141
+            </div>
+            <div className="text-[9.5pt] text-black font-sans leading-snug">
+              Laman kel.mangga@pemkomedan.go.id
             </div>
           </div>
         </div>
-        <div className="border-b-[0.5px] border-black mb-2" />
 
         {/* JUDUL LAPORAN */}
         <div className="text-center my-1.5">
