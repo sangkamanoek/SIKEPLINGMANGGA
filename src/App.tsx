@@ -170,6 +170,25 @@ export default function App() {
   // Load local backup reports
   const loadLocalReports = () => {
     try {
+      // One-time auto-purge for stale reports prior to Kepling 21 retention directive
+      if (!localStorage.getItem('cleaned_reports_v2_kepling21')) {
+        const stored = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
+        if (stored) {
+          const parsed: LaporanHarianItem[] = JSON.parse(stored);
+          const cleaned = parsed.filter(
+            (r) =>
+              r.id === 'lap_1789124821837' ||
+              r.keplingId === 'kepling_21' ||
+              (r.jabatan && r.jabatan.includes('XXI'))
+          );
+          localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
+          localStorage.setItem('cleaned_reports_v2_kepling21', 'true');
+          setReports(cleaned);
+          return;
+        }
+        localStorage.setItem('cleaned_reports_v2_kepling21', 'true');
+      }
+
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
       if (stored) {
         setReports(JSON.parse(stored));
@@ -219,7 +238,6 @@ export default function App() {
     syncProfilesWithServer();
     loadLocalReports();
     refreshAllReports(false);
-    syncLocalReportsToServer();
 
     // Subscribe to real-time reports directly from Firebase Firestore
     const unsubscribeFirestoreReports = subscribeReportsFromFirestore((firestoreReports) => {

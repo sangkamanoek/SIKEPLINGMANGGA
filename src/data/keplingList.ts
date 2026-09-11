@@ -698,6 +698,11 @@ export const verifyAccountPassword = (
     return true;
   }
 
+  // If password was changed by user, DO NOT allow default variants anymore
+  if (effectivePass !== account.password) {
+    return false;
+  }
+
   // Flexible Kepling default password variations (mangga01 vs mangga1 vs kepling01 etc.)
   if (account.role === 'kepling' && account.nomorLingkungan) {
     const num = account.nomorLingkungan;

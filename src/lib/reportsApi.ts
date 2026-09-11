@@ -14,53 +14,17 @@ export const isReportBeforeSept7 = (_r: LaporanHarianItem): boolean => {
   return false;
 };
 
-// Fetch all reports from Firebase Firestore (with server & localStorage fallback)
+// Fetch all reports from Firebase Firestore
 export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
-  // 1. First priority: Firebase Firestore
   try {
     const firestoreReports = await fetchReportsFromFirestore();
-    if (firestoreReports && firestoreReports.length > 0) {
-      const cleaned = firestoreReports.filter((r) => !isReportBeforeSept7(r));
-      localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
-      return cleaned;
-    }
+    const cleaned = firestoreReports.filter((r) => !isReportBeforeSept7(r));
+    localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
+    return cleaned;
   } catch (err) {
-    console.warn('Notice reading from Firebase Firestore, checking server buffer:', err);
+    console.warn('Error reading from Firebase Firestore:', err);
+    return [];
   }
-
-  // 2. Second priority: Central server buffer
-  try {
-    const res = await fetch('/api/reports');
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-        const cleaned = json.data.filter((r: LaporanHarianItem) => !isReportBeforeSept7(r));
-        localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
-        // Also sync server reports to Firestore in background
-        batchSyncReportsToFirestore(cleaned).catch((e) => console.warn('Background sync to Firestore:', e));
-        return cleaned;
-      }
-    }
-  } catch (err) {
-    console.warn('Network error fetching from /api/reports, reading from localStorage:', err);
-  }
-
-  // 3. Third priority: Local storage fallback
-  try {
-    const stored = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
-    if (stored) {
-      const parsed: LaporanHarianItem[] = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        const cleaned = parsed.filter((r) => !isReportBeforeSept7(r));
-        localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
-        return cleaned;
-      }
-    }
-  } catch (e) {
-    console.warn('Could not read local reports:', e);
-  }
-
-  return [];
 };
 
 // Save single report to Firebase Firestore, server, and local storage (Full Create/Update)
