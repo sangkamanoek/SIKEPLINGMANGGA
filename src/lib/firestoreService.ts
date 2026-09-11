@@ -107,6 +107,7 @@ export async function saveReportToFirestore(item: LaporanHarianItem): Promise<bo
  * Delete single report from Firebase Firestore
  */
 export async function deleteReportFromFirestore(id: string): Promise<boolean> {
+  if (!id) return false;
   try {
     const docRef = doc(db, REPORTS_COLLECTION, id);
     await deleteDoc(docRef);
@@ -115,6 +116,36 @@ export async function deleteReportFromFirestore(id: string): Promise<boolean> {
     } catch {
       // ignore
     }
+
+    // Query and delete any matching docs by data.id or doc.id in reports collection
+    try {
+      const colRef = collection(db, REPORTS_COLLECTION);
+      const snap = await getDocs(colRef);
+      for (const docSnap of snap.docs) {
+        const data = docSnap.data();
+        if (docSnap.id === id || data.id === id) {
+          await deleteDoc(docSnap.ref);
+        }
+      }
+    } catch (queryErr) {
+      console.warn('Notice querying reports for delete:', queryErr);
+    }
+
+    // Query and delete any matching docs in SIKEPLINGMANGGA collection
+    try {
+      const colRefOld = collection(db, 'SIKEPLINGMANGGA');
+      const snapOld = await getDocs(colRefOld);
+      for (const docSnap of snapOld.docs) {
+        if (docSnap.id === 'info' || docSnap.id === 'targets') continue;
+        const data = docSnap.data();
+        if (docSnap.id === id || data.id === id) {
+          await deleteDoc(docSnap.ref);
+        }
+      }
+    } catch (oldErr) {
+      console.warn('Notice querying SIKEPLINGMANGGA for delete:', oldErr);
+    }
+
     return true;
   } catch (error) {
     console.warn('Gagal menghapus laporan dari Firebase Firestore:', error);

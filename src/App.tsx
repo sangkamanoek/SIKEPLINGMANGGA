@@ -459,8 +459,10 @@ export default function App() {
   // Delete single report handler
   const handleDeleteReport = async (id: string) => {
     try {
-      setReports((prev) => prev.filter((r) => r.id !== id));
+      if (!id) return;
+      setIsModalOpen(false);
       setSelectedReport(null);
+      setReports((prev) => prev.filter((r) => r.id !== id));
       await deleteReportFromServer(id);
       showToast('Laporan berhasil dihapus dari sistem.', 'info');
     } catch (err) {
@@ -989,8 +991,7 @@ export default function App() {
 
       {/* Footer matching Professional Polish style */}
       <footer className="bg-white border-t border-slate-200 px-6 sm:px-8 py-3.5 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] gap-3 print:hidden">
-        <div>Sistem Pelaporan Mandiri & Pengingat Tugas • Kota Medan</div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-6 ml-auto">
           <span className="text-emerald-700 font-bold">#MedanUntukSemua</span>
           <span className="text-slate-600 font-bold">#SemuaUntukMedan</span>
         </div>

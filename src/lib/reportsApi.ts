@@ -91,7 +91,7 @@ export const deleteReportFromServer = async (id: string): Promise<boolean> => {
 
   // 3. Delete from server buffer
   try {
-    const res = await fetch(`/api/reports/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/reports/${encodeURIComponent(id)}`, { method: 'DELETE' });
     return res.ok;
   } catch (err) {
     console.warn('Error deleting report on server:', err);

@@ -48,12 +48,8 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
           </span>
         </div>
 
-        {/* Indikator Status Resmi Aplikasi & Firebase Database */}
+        {/* Indikator Status Resmi Aplikasi */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-200 bg-amber-950/60 border border-amber-600/40 px-2.5 py-1 rounded-full shadow-xs">
-            <Database className="w-3 h-3 text-amber-400" />
-            Database: Firebase Firestore
-          </span>
           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-200 bg-emerald-900/60 border border-emerald-600/40 px-2.5 py-1 rounded-full shadow-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             Sistem Aktif & Terhubung
