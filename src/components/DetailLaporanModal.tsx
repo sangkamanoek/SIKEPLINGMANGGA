@@ -833,7 +833,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           <img
             src="/logo_pemko_medan.png"
             alt="Logo Pemko Medan"
-            className="w-14 h-14 object-contain shrink-0"
+            className="w-20 h-20 object-contain shrink-0"
           />
           <div className="text-center flex-1 pr-6">
             <div className="text-[11pt] font-black tracking-wider uppercase font-serif">
@@ -846,7 +846,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               KELURAHAN MANGGA
             </div>
             <div className="text-[7.5pt] text-slate-700 italic font-sans">
-              Jalan Bunga Sedap Malam IX No. 1 Medan • Kode Pos: 20135
+              Jalan Tembakau Raya No. 35 A Medan • Kode Pos: 20135
             </div>
           </div>
         </div>
