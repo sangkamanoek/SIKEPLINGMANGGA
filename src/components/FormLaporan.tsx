@@ -164,7 +164,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
         img.onload = () => {
           let width = img.width;
           let height = img.height;
-          const maxDim = 900;
+          const maxDim = 720;
           if (width > maxDim || height > maxDim) {
             if (width > height) {
               height = Math.round((height * maxDim) / width);
@@ -180,7 +180,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.65));
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
           } else {
             resolve((event.target?.result as string) || '');
           }
@@ -205,24 +205,27 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     const fileArray: File[] = Array.from(files);
     e.target.value = '';
 
-    for (let i = 0; i < fileArray.length; i++) {
-      const file = fileArray[i];
-      const compressedUrl = await compressFile(file);
-      if (compressedUrl) {
-        setFotoList((prev) => [
-          ...prev,
-          {
-            id: 'foto_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6) + '_' + i,
-            url: compressedUrl,
-            name:
-              kategori === 'poskamling'
-                ? `[POSKAMLING] ${file.name || 'Foto Ronda'}`
-                : file.name || `Foto ${prev.length + 1}`,
-            timestamp: new Date().toISOString(),
-            kategori,
-          },
-        ]);
-      }
+    // Parallel compress all uploaded files for maximum speed
+    const compressedResults = await Promise.all(
+      fileArray.map(async (file, i) => {
+        const compressedUrl = await compressFile(file);
+        if (!compressedUrl) return null;
+        return {
+          id: 'foto_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6) + '_' + i,
+          url: compressedUrl,
+          name:
+            kategori === 'poskamling'
+              ? `[POSKAMLING] ${file.name || 'Foto Ronda'}`
+              : file.name || `Foto ${i + 1}`,
+          timestamp: new Date().toISOString(),
+          kategori,
+        };
+      })
+    );
+
+    const validPhotos = compressedResults.filter((p): p is NonNullable<typeof p> => p !== null);
+    if (validPhotos.length > 0) {
+      setFotoList((prev) => [...prev, ...validPhotos]);
     }
   };
 

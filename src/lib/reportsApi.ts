@@ -87,26 +87,23 @@ export const saveReportToServer = async (item: LaporanHarianItem): Promise<boole
     console.warn('LocalStorage save warning:', e);
   }
 
-  // 2. Save directly to Firebase Firestore
-  let firestoreSuccess = false;
-  try {
-    firestoreSuccess = await saveReportToFirestore(item);
-  } catch (err) {
+  // 2. Concurrently save to Firebase Firestore and Server Buffer in parallel
+  const firestorePromise = saveReportToFirestore(item).catch((err) => {
     console.warn('Notice saving report to Firebase Firestore:', err);
-  }
+    return false;
+  });
 
-  // 3. Also sync to server buffer
-  try {
-    await fetch('/api/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(item),
-    });
-  } catch (err) {
+  const serverPromise = fetch('/api/reports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(item),
+  }).catch((err) => {
     console.warn('Error syncing to server /api/reports:', err);
-  }
+    return null;
+  });
 
-  return firestoreSuccess || true;
+  const [firestoreRes] = await Promise.all([firestorePromise, serverPromise]);
+  return Boolean(firestoreRes);
 };
 
 // Delete single report from Firebase Firestore, server, and local storage (Full Delete)

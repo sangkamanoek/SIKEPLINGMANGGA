@@ -290,55 +290,49 @@ export default function App() {
   const handleSaveReport = async (item: LaporanHarianItem) => {
     setIsSaving(true);
     try {
-      // 1. ALWAYS save to local database immediately FIRST so data is guaranteed safe
+      // 1. ALWAYS save to local database immediately FIRST so data is guaranteed safe (0ms)
       saveLocalReport(item);
 
-      // 2. Save to central server so Super Admin & other devices can see it in real-time
-      await saveReportToServer(item);
-
-      // 3. If Google account is connected, sync to Google Sheets
-      const activeToken = token || (await getAccessToken());
-      if (activeToken) {
-        try {
-          let currentSheetMeta = sheetMeta;
-          if (!currentSheetMeta) {
-            try {
-              const stored = localStorage.getItem('google_sheet_metadata');
-              if (stored) currentSheetMeta = JSON.parse(stored);
-            } catch (e) {}
-          }
-          if (!currentSheetMeta) {
-            currentSheetMeta = await getOrCreateSpreadsheet(activeToken);
-            setSheetMeta(currentSheetMeta);
-            try {
-              localStorage.setItem('google_sheet_metadata', JSON.stringify(currentSheetMeta));
-            } catch (e) {}
-          }
-
-          await appendLaporanToSheet(activeToken, currentSheetMeta.spreadsheetId, item);
-          showToast('Laporan berhasil tersimpan di Database & Google Sheets!', 'success');
-        } catch (sheetErr) {
-          console.warn('Google Sheets sync notice:', sheetErr);
-          showToast('Laporan berhasil disimpan ke Database Aplikasi!', 'success');
-        }
-      } else {
-        // Report is saved in the app's persistent database
-        showToast('Laporan berhasil disimpan ke Database Kelurahan & Monitoring!', 'success');
-      }
-
-      // Refresh list to include newly saved report from server
-      await refreshAllReports(false);
-
-      // Open detail modal for confirmation
+      // 2. Open confirmation modal right away with the saved report
       setSelectedReport(item);
       setIsModalOpen(true);
+
+      // 3. Save to Firebase Firestore and Server buffer in parallel
+      await saveReportToServer(item);
+
+      // 4. If Google account is connected, sync to Google Sheets in background/parallel
+      const activeToken = token || (await getAccessToken());
+      if (activeToken) {
+        (async () => {
+          try {
+            let currentSheetMeta = sheetMeta;
+            if (!currentSheetMeta) {
+              try {
+                const stored = localStorage.getItem('google_sheet_metadata');
+                if (stored) currentSheetMeta = JSON.parse(stored);
+              } catch (e) {}
+            }
+            if (!currentSheetMeta) {
+              currentSheetMeta = await getOrCreateSpreadsheet(activeToken);
+              setSheetMeta(currentSheetMeta);
+              try {
+                localStorage.setItem('google_sheet_metadata', JSON.stringify(currentSheetMeta));
+              } catch (e) {}
+            }
+
+            await appendLaporanToSheet(activeToken, currentSheetMeta.spreadsheetId, item);
+            showToast('Laporan berhasil tersimpan di Database & Google Sheets!', 'success');
+          } catch (sheetErr) {
+            console.warn('Google Sheets sync notice:', sheetErr);
+          }
+        })();
+      } else {
+        showToast('Laporan berhasil disimpan ke Database Kelurahan & Monitoring!', 'success');
+      }
     } catch (err: unknown) {
       console.error('Error in handleSaveReport:', err);
       saveLocalReport(item);
-      await saveReportToServer(item);
-      showToast('Laporan berhasil disimpan ke Database Kelurahan!', 'success');
-      setSelectedReport(item);
-      setIsModalOpen(true);
+      showToast('Laporan berhasil disimpan ke Database Lokal!', 'success');
     } finally {
       setIsSaving(false);
     }
