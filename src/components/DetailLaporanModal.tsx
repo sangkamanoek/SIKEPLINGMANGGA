@@ -957,11 +957,11 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
         {/* DOKUMENTASI FOTO KEGIATAN (SEMUA FOTO DITAMPILKAN DALAM GRID) */}
         {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
-          <div className="mb-2 avoid-break">
-            <div className="text-[8pt] font-bold uppercase tracking-wider mb-1 text-slate-900">
+          <div className="mb-1.5 avoid-break">
+            <div className="text-[7.5pt] font-bold uppercase tracking-wider mb-1 text-slate-900">
               B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className={`grid ${item.dokumentasiFoto.length > 3 ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5`}>
               {item.dokumentasiFoto.map((foto, idx) => (
                 <div
                   key={foto.id || idx}
@@ -972,7 +972,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     alt={foto.name}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[7pt] px-1 py-0.5 truncate text-center">
+                  <div className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[6pt] px-1 py-0.5 truncate text-center">
                     {foto.name}
                   </div>
                 </div>
@@ -982,23 +982,23 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         )}
 
         {/* TANDA TANGAN RESMI PENGESAHAN DOKUMEN */}
-        <div className="mt-3 pt-1 avoid-break text-[8.5pt]">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center">
+        <div className="mt-2 pt-1 avoid-break text-[8pt]">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="text-center flex flex-col items-center justify-end">
               <div>Mengetahui,</div>
-              <div className="font-bold uppercase">LURAH KELURAHAN MANGGA</div>
-              <div className="h-12" />
-              <div className="font-bold underline">( ............................................................ )</div>
-              <div className="text-[7.5pt] text-slate-700 mt-0.5">NIP. ....................................................</div>
+              <div className="font-bold uppercase whitespace-nowrap">LURAH KELURAHAN MANGGA</div>
+              <div className="h-10" />
+              <div className="font-bold underline whitespace-nowrap">( ............................................................ )</div>
+              <div className="text-[7pt] text-slate-700 mt-0.5">NIP. ....................................................</div>
             </div>
 
-            <div className="text-center">
+            <div className="text-center flex flex-col items-center justify-end">
               <div>Medan, {displayTanggal}</div>
               <div>Yang Melaporkan,</div>
-              <div className="font-bold uppercase">{item.jabatan}</div>
-              <div className="h-12" />
-              <div className="font-bold underline uppercase">( {item.namaKepling} )</div>
-              <div className="text-[7.5pt] text-slate-700 mt-0.5">Kepala Lingkungan</div>
+              <div className="font-bold uppercase whitespace-nowrap">{item.jabatan}</div>
+              <div className="h-10" />
+              <div className="font-bold underline uppercase whitespace-nowrap">( {item.namaKepling} )</div>
+              <div className="text-[7pt] text-slate-700 mt-0.5">Kepala Lingkungan</div>
             </div>
           </div>
         </div>

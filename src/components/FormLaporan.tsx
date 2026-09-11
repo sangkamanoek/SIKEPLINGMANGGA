@@ -710,7 +710,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                 rows={2}
                 value={kegiatanLainnya}
                 onChange={(e) => setKegiatanLainnya(e.target.value)}
-                placeholder="Misal: Gotong royong, monitoring posyandu, ketertiban umum..."
+                placeholder="( Cth. Pemantauan Kebersihan Lingkungan dan Drainase Warga, Gotong Royong Posko Trantibum, Posko BERSEMI, Posko PATAM dll )"
                 className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-emerald-500 text-slate-800"
               />
             </div>
