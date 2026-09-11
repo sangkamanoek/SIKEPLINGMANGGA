@@ -12,16 +12,35 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Reports Data File
 const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.join(process.cwd(), 'data');
 const REPORTS_FILE = path.join(DATA_DIR, 'reports.json');
+const DELETED_REPORTS_FILE = path.join(DATA_DIR, 'deleted_reports.json');
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Helper to identify reports submitted before 7 September 2026 (Disabled to allow all reports)
-const isBeforeSept7 = (_r: any): boolean => {
-  return false;
+const loadStoredDeletedReports = (): string[] => {
+  try {
+    if (fs.existsSync(DELETED_REPORTS_FILE)) {
+      const content = fs.readFileSync(DELETED_REPORTS_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.error('Error reading deleted reports file:', err);
+  }
+  return [];
 };
+
+const saveStoredDeletedReports = (deletedIds: string[]) => {
+  try {
+    fs.writeFileSync(DELETED_REPORTS_FILE, JSON.stringify(deletedIds, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving deleted reports file:', err);
+  }
+};
+
+let deletedReportsCache: string[] = loadStoredDeletedReports();
 
 const loadStoredReports = (): any[] => {
   try {
@@ -29,8 +48,8 @@ const loadStoredReports = (): any[] => {
       const content = fs.readFileSync(REPORTS_FILE, 'utf-8');
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed)) {
-        // Filter out all reports before 7 September 2026 per official instruction
-        const cleaned = parsed.filter((r) => !isBeforeSept7(r));
+        const deletedSet = new Set(deletedReportsCache);
+        const cleaned = parsed.filter((r) => r && r.id && !deletedSet.has(r.id));
         if (cleaned.length !== parsed.length) {
           saveStoredReports(cleaned);
         }
@@ -45,7 +64,8 @@ const loadStoredReports = (): any[] => {
 
 const saveStoredReports = (reports: any[]) => {
   try {
-    const cleaned = reports.filter((r) => !isBeforeSept7(r));
+    const deletedSet = new Set(deletedReportsCache);
+    const cleaned = reports.filter((r) => r && r.id && !deletedSet.has(r.id));
     fs.writeFileSync(REPORTS_FILE, JSON.stringify(cleaned, null, 2), 'utf-8');
   } catch (err) {
     console.error('Error saving reports file:', err);
@@ -177,7 +197,14 @@ app.get('/api/health', (_req, res) => {
 
 // GET all reports
 app.get('/api/reports', (_req, res) => {
-  res.json({ success: true, count: reportsCache.length, data: reportsCache });
+  const deletedSet = new Set(deletedReportsCache);
+  const activeReports = reportsCache.filter((r) => r && r.id && !deletedSet.has(r.id));
+  res.json({ success: true, count: activeReports.length, data: activeReports });
+});
+
+// GET all deleted report IDs (Tombstones)
+app.get('/api/deleted-reports', (_req, res) => {
+  res.json({ success: true, count: deletedReportsCache.length, data: deletedReportsCache });
 });
 
 // POST save single report
@@ -186,6 +213,14 @@ app.post('/api/reports', (req, res) => {
     const item = req.body;
     if (!item || !item.namaKepling) {
       return res.status(400).json({ success: false, message: 'Data laporan tidak lengkap' });
+    }
+
+    // Reject if item has been marked as deleted by Admin
+    if (item.id && deletedReportsCache.includes(item.id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Laporan ini telah dihapus oleh Admin dan tidak dapat disimpan kembali.',
+      });
     }
 
     // Ensure item has an ID and timestamp
@@ -228,9 +263,10 @@ app.post('/api/reports/batch', (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid reports array' });
     }
 
+    const deletedSet = new Set(deletedReportsCache);
     let addedCount = 0;
     for (const item of items) {
-      if (!item || !item.namaKepling) continue;
+      if (!item || !item.namaKepling || (item.id && deletedSet.has(item.id))) continue;
       const exists = reportsCache.some(
         (r) =>
           r.id === item.id ||
@@ -254,11 +290,17 @@ app.post('/api/reports/batch', (req, res) => {
   }
 });
 
-// DELETE report
+// DELETE report (registers permanent tombstone)
 app.delete('/api/reports/:id', (req, res) => {
   const { id } = req.params;
-  reportsCache = reportsCache.filter((r) => r.id !== id);
-  saveStoredReports(reportsCache);
+  if (id) {
+    if (!deletedReportsCache.includes(id)) {
+      deletedReportsCache.push(id);
+      saveStoredDeletedReports(deletedReportsCache);
+    }
+    reportsCache = reportsCache.filter((r) => r.id !== id);
+    saveStoredReports(reportsCache);
+  }
   res.json({ success: true, total: reportsCache.length });
 });
 

@@ -3,7 +3,6 @@ import {
   Camera,
   Trash2,
   FileSpreadsheet,
-  Calendar,
   Check,
   Copy,
   Layers,
@@ -28,7 +27,7 @@ import {
 import { SUPER_ADMIN_ACCOUNT, KEPLING_ACCOUNTS, ALL_ACCOUNTS } from '../data/keplingList';
 
 interface FormLaporanProps {
-  onSaveReport: (item: LaporanHarianItem, syncToCalendar: boolean) => Promise<void>;
+  onSaveReport: (item: LaporanHarianItem) => Promise<void>;
   isSaving: boolean;
   hasGoogleAuth: boolean;
   onConnectGoogle: () => void;
@@ -99,7 +98,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   // Dokumentasi Foto state
   const [fotoList, setFotoList] = useState<FotoDokumentasi[]>([]);
   const [copiedPreview, setCopiedPreview] = useState(false);
-  const [syncToCalendar, setSyncToCalendar] = useState(true);
 
   // Load saved profile info from localStorage
   useEffect(() => {
@@ -272,7 +270,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     try {
       savePersistentProfile();
       const item = constructReportItem();
-      await onSaveReport(item, syncToCalendar && hasGoogleAuth);
+      await onSaveReport(item);
       // Reset daily performance fields to 0 as instructed
       setOpsirPbbWp('0');
       setOpsirPbbKeterangan('');
@@ -330,7 +328,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     // Otomatis simpan juga ke database agar tidak terlewatkan saat dikirim ke WA
     try {
       savePersistentProfile();
-      await onSaveReport(report, syncToCalendar && hasGoogleAuth);
+      await onSaveReport(report);
     } catch (saveErr) {
       console.error('Auto-save on copy error:', saveErr);
     }
@@ -1013,37 +1011,31 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
               <div className="pt-2 border-t border-slate-800 text-slate-400">
                 <p>📷 (Dokumentasi Terlampir: {fotoList.length} Foto)</p>
-                <p className="text-emerald-500 font-semibold mt-1">#MedanUntukSemua<br />#SemuaUntukMedan</p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  <span className="bg-[#991B1B] text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-xs">
+                    #MedanUntukSemua
+                  </span>
+                  <span className="bg-[#1E3A8A] text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-xs">
+                    #SemuaUntukMedan
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Google Calendar & Database Sync Settings */}
+            {/* Google Sheets & Database Sync Settings */}
             <div className="p-4 bg-slate-50 space-y-3">
-              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={syncToCalendar}
-                  onChange={(e) => setSyncToCalendar(e.target.checked)}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
-                />
-                <span className="flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                  Otomatis munculkan di Google Calendar pengguna
-                </span>
-              </label>
-
               {!hasGoogleAuth && (
                 <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-lg text-xs text-emerald-950 flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold block">Penyimpanan Database Langsung:</span>
-                    <span>Laporan otomatis disimpan aman ke Database Aplikasi. Anda juga dapat menghubungkan Google jika ingin sinkronisasi ke Google Sheets & Calendar.</span>
+                    <span>Laporan otomatis disimpan aman ke Database Aplikasi. Anda juga dapat menghubungkan Google jika ingin sinkronisasi ke Google Sheets Kelurahan.</span>
                     <button
                       type="button"
                       onClick={onConnectGoogle}
                       className="mt-1 inline-block font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
                     >
-                      Hubungkan Google Sheets & Calendar →
+                      Hubungkan Google Sheets →
                     </button>
                   </div>
                 </div>

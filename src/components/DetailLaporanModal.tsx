@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   X,
   FileSpreadsheet,
-  Calendar,
   ExternalLink,
   Printer,
   CheckCircle,
@@ -13,6 +12,8 @@ import {
   Trash2,
   AlertTriangle,
   Shield,
+  Download,
+  Eye,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata } from '../types';
 import { formatTanggalIndonesia } from '../lib/formatter';
@@ -26,8 +27,6 @@ interface DetailLaporanModalProps {
   isAdmin?: boolean;
   onUpdateReport?: (updatedItem: LaporanHarianItem) => Promise<void>;
   onDeleteReport?: (id: string) => Promise<void>;
-  onSyncToCalendar?: (item: LaporanHarianItem) => Promise<void>;
-  isSyncingCalendar?: boolean;
 }
 
 export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
@@ -39,16 +38,46 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   isAdmin = true,
   onUpdateReport,
   onDeleteReport,
-  onSyncToCalendar,
-  isSyncingCalendar,
 }) => {
-  const [calendarSyncSuccess, setCalendarSyncSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+  const [previewPhoto, setPreviewPhoto] = useState<{ url: string; name: string } | null>(null);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
+  // Helper download photo
+  const handleDownloadPhoto = (url: string, filename: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    const link = document.createElement('a');
+    link.href = url;
+    const cleanName = filename.toLowerCase().match(/\.(jpg|jpeg|png|webp)$/)
+      ? filename
+      : `${filename}.jpg`;
+    link.download = cleanName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDownloadAllPhotos = () => {
+    if (!item?.dokumentasiFoto || item.dokumentasiFoto.length === 0) return;
+    setIsDownloadingAll(true);
+    item.dokumentasiFoto.forEach((foto, idx) => {
+      setTimeout(() => {
+        const safeName = `${item.lingkungan || 'Kepling'}_${item.tanggal}_foto_${idx + 1}.jpg`;
+        handleDownloadPhoto(foto.url, foto.name || safeName);
+        if (idx === (item.dokumentasiFoto?.length || 1) - 1) {
+          setTimeout(() => setIsDownloadingAll(false), 1000);
+        }
+      }, idx * 400);
+    });
+  };
 
   // Editable Form States
   const [editHari, setEditHari] = useState('');
@@ -230,18 +259,6 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     }
   };
 
-  const handleSyncCalendarClick = async () => {
-    if (onSyncToCalendar) {
-      try {
-        await onSyncToCalendar(item);
-        setCalendarSyncSuccess(true);
-        setTimeout(() => setCalendarSyncSuccess(false), 4000);
-      } catch (e) {
-        console.error('Failed to sync report to Google Calendar:', e);
-      }
-    }
-  };
-
   if (!isOpen || !item) return null;
 
   return (
@@ -308,13 +325,6 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl flex items-center gap-2 text-xs font-semibold">
               <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{saveSuccessMsg}</span>
-            </div>
-          )}
-
-          {calendarSyncSuccess && (
-            <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl flex items-center gap-2 text-xs font-semibold animate-fade-in">
-              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Laporan berhasil disinkronkan ke jadwal Google Calendar Anda!</span>
             </div>
           )}
 
@@ -662,15 +672,29 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
           {/* Attached photos */}
           {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
-            <div className="space-y-2 pt-2 border-t border-slate-200">
-              <span className="text-xs font-bold text-slate-700 block">
-                📷 Dokumentasi Lapangan Terlampir ({item.dokumentasiFoto.length} foto)
-              </span>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
-                {item.dokumentasiFoto.map((foto) => (
+            <div className="space-y-3 pt-3 border-t border-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  📷 <span>Dokumentasi Lapangan Terlampir ({item.dokumentasiFoto.length} foto)</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDownloadAllPhotos}
+                  disabled={isDownloadingAll}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                  title="Unduh seluruh file foto ke komputer / HP"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>{isDownloadingAll ? 'Mengunduh...' : `Unduh Semua Foto (${item.dokumentasiFoto.length})`}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {item.dokumentasiFoto.map((foto, idx) => (
                   <div
-                    key={foto.id}
-                    className="aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs group relative"
+                    key={foto.id || idx}
+                    className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs group relative cursor-pointer"
+                    onClick={() => setPreviewPhoto({ url: foto.url, name: foto.name || `Foto ${idx + 1}` })}
                   >
                     <img
                       src={foto.url}
@@ -678,12 +702,36 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
                     {(foto.kategori === 'poskamling' || foto.name.includes('[POSKAMLING]')) && (
-                      <span className="absolute top-1 left-1 bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1">
+                      <span className="absolute top-1.5 left-1.5 bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1 z-10">
                         <Shield className="w-2.5 h-2.5" />
                         POSKAMLING
                       </span>
                     )}
-                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] px-1 py-0.5 truncate text-center">
+
+                    {/* Hover Overlay with Action Buttons */}
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2 z-10">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewPhoto({ url: foto.url, name: foto.name || `Foto ${idx + 1}` });
+                        }}
+                        className="p-1.5 bg-white/90 hover:bg-white text-slate-900 rounded-lg shadow-sm hover:scale-110 transition-transform cursor-pointer"
+                        title="Lihat foto penuh"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDownloadPhoto(foto.url, foto.name || `Foto_${idx + 1}.jpg`, e)}
+                        className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm hover:scale-110 transition-transform cursor-pointer"
+                        title="Download file foto ini"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <span className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[9px] px-1.5 py-0.5 truncate text-center pointer-events-none">
                       {foto.name}
                     </span>
                   </div>
@@ -806,18 +854,6 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copied ? 'Tersalin' : 'Salin Teks'}</span>
                   </button>
-
-                  {hasGoogleAuth && onSyncToCalendar && (
-                    <button
-                      type="button"
-                      onClick={handleSyncCalendarClick}
-                      disabled={isSyncingCalendar}
-                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      <Calendar className="w-4 h-4" />
-                      <span>{isSyncingCalendar ? 'Menyinkronkan...' : 'Sinkron ke Google Calendar'}</span>
-                    </button>
-                  )}
                 </div>
               </>
             )}
@@ -890,16 +926,16 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           </table>
         </div>
 
-        {/* TABEL 4 PILAR KINERJA & TUGAS HARIAN */}
+        {/* TABEL REKAPITULASI KINERJA & TUGAS HARIAN */}
         <div className="mb-2">
           <div className="text-[8pt] font-bold uppercase tracking-wider mb-1 text-slate-900">
-            A. REKAPITULASI CAPAIAN 4 PILAR & KEGIATAN HARIAN:
+            A. REKAPITULASI CAPAIAN & KEGIATAN HARIAN:
           </div>
           <table className="print-table w-full text-left text-[8pt] border border-black">
             <thead>
               <tr className="bg-slate-100 text-slate-900 font-bold">
                 <th className="w-7 text-center py-1">NO</th>
-                <th className="w-52 py-1">URAIAN KEGIATAN / PILAR KINERJA</th>
+                <th className="w-52 py-1">URAIAN KEGIATAN KINERJA</th>
                 <th className="w-28 text-center py-1">REALISASI</th>
                 <th className="py-1">KETERANGAN / RINCIAN LAPANGAN</th>
               </tr>
@@ -986,21 +1022,13 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         )}
 
         {/* TANDA TANGAN RESMI PENGESAHAN DOKUMEN */}
-        <div className="mt-2 pt-1 avoid-break text-[8pt]">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="text-center flex flex-col items-center justify-end">
-              <div>Mengetahui,</div>
-              <div className="font-bold uppercase whitespace-nowrap">LURAH KELURAHAN MANGGA</div>
-              <div className="h-10" />
-              <div className="font-bold underline whitespace-nowrap">( ............................................................ )</div>
-              <div className="text-[7pt] text-slate-700 mt-0.5">NIP. ....................................................</div>
-            </div>
-
-            <div className="text-center flex flex-col items-center justify-end">
+        <div className="mt-3 pt-1 avoid-break text-[8pt]">
+          <div className="flex justify-end pr-4">
+            <div className="text-center flex flex-col items-center min-w-[220px]">
               <div>Medan, {displayTanggal}</div>
-              <div>Yang Melaporkan,</div>
+              <div className="mt-0.5">Yang Melaporkan,</div>
               <div className="font-bold uppercase whitespace-nowrap">{item.jabatan}</div>
-              <div className="h-10" />
+              <div className="h-12" />
               <div className="font-bold underline uppercase whitespace-nowrap">( {item.namaKepling} )</div>
               <div className="text-[7pt] text-slate-700 mt-0.5">Kepala Lingkungan</div>
             </div>
@@ -1013,6 +1041,47 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           <span>Dokumen Resmi 1 Lembar • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
         </div>
       </div>
+
+      {/* Lightbox / Pratinjau & Download Foto Modal */}
+      {previewPhoto && (
+        <div
+          className="fixed inset-0 z-60 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 print:hidden"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div
+            className="relative max-w-3xl w-full bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-700 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-white">
+              <span className="font-bold text-xs truncate max-w-[70%]">{previewPhoto.name}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPhoto(previewPhoto.url, previewPhoto.name)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-sm"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Gambar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewPhoto(null)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-3 max-h-[75vh] flex items-center justify-center bg-black/90 overflow-auto">
+              <img
+                src={previewPhoto.url}
+                alt={previewPhoto.name}
+                className="max-h-[70vh] max-w-full object-contain rounded-lg shadow-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

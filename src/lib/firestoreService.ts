@@ -12,8 +12,27 @@ import { db } from './firebase';
 import { LaporanHarianItem, KeplingTargetCapaian, TargetsCapaianMap, TaskReminder, NotificationLog } from '../types';
 import { getDefaultTargetsCapaianMap } from '../data/targetsData';
 
-// Helper to filter out pre-7 Sept 2026 reports (Disabled to allow all new user test reports)
-export const isBeforeSept7 = (_r: any): boolean => {
+// Timestamp cutoff for data reset requested by user (11 Sept 2026 16:30 UTC)
+export const RESET_CUTOFF_MS = 1789144000000;
+
+// Local in-memory cache of deleted report IDs to prevent re-emergence
+const deletedReportIdsMemory = new Set<string>();
+
+export const isBeforeSept7 = (report: any): boolean => {
+  if (!report) return true;
+  if (report.id && deletedReportIdsMemory.has(report.id)) return true;
+  if (typeof report.id === 'string' && report.id.startsWith('lap_')) {
+    const rawTs = parseInt(report.id.replace('lap_', ''), 10);
+    if (!isNaN(rawTs) && rawTs < RESET_CUTOFF_MS) return true;
+  }
+  if (report.createdAt) {
+    const time = new Date(report.createdAt).getTime();
+    if (!isNaN(time) && time < RESET_CUTOFF_MS) return true;
+  }
+  if (report.updatedAt) {
+    const time = new Date(report.updatedAt).getTime();
+    if (!isNaN(time) && time < RESET_CUTOFF_MS) return true;
+  }
   return false;
 };
 
@@ -22,22 +41,52 @@ export const isBeforeSept7 = (_r: any): boolean => {
 // ==========================================
 
 const REPORTS_COLLECTION = 'reports';
+const DELETED_REPORTS_COLLECTION = 'deleted_reports';
+
+/**
+ * Fetch all registered deleted report IDs (Tombstones)
+ */
+export async function fetchDeletedReportIdsFromFirestore(): Promise<Set<string>> {
+  try {
+    const delCol = collection(db, DELETED_REPORTS_COLLECTION);
+    const snap = await getDocs(delCol);
+    snap.forEach((docSnap) => {
+      deletedReportIdsMemory.add(docSnap.id);
+      const data = docSnap.data();
+      if (data.id) deletedReportIdsMemory.add(data.id);
+    });
+  } catch (err) {
+    console.warn('Notice reading deleted_reports tombstones:', err);
+  }
+  return deletedReportIdsMemory;
+}
 
 /**
  * Fetch all reports from Firebase Firestore
  */
 export async function fetchReportsFromFirestore(): Promise<LaporanHarianItem[]> {
   try {
+    // 1. Sync deleted report IDs
+    await fetchDeletedReportIdsFromFirestore();
+
     const colRef = collection(db, REPORTS_COLLECTION);
     const snapshot = await getDocs(colRef);
     const reports: LaporanHarianItem[] = [];
 
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as LaporanHarianItem;
+      const reportId = docSnap.id || data.id;
       const report: LaporanHarianItem = {
         ...data,
-        id: docSnap.id || data.id,
+        id: reportId,
       };
+
+      // If document was previously deleted, remove it immediately from Firestore
+      if (deletedReportIdsMemory.has(reportId) || deletedReportIdsMemory.has(data.id)) {
+        deleteDoc(docSnap.ref).catch(() => {});
+        return;
+      }
+
       if (!isBeforeSept7(report)) {
         reports.push(report);
       }
@@ -65,6 +114,13 @@ export async function saveReportToFirestore(item: LaporanHarianItem): Promise<bo
     if (!item.id) {
       item.id = 'lap_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     }
+    
+    // Check if this item was marked as deleted by Admin
+    if (deletedReportIdsMemory.has(item.id)) {
+      console.warn(`Laporan ${item.id} sudah dihapus oleh Admin dan ditolak untuk disimpan.`);
+      return false;
+    }
+
     if (!item.createdAt) {
       item.createdAt = new Date().toISOString();
     }
@@ -72,13 +128,6 @@ export async function saveReportToFirestore(item: LaporanHarianItem): Promise<bo
 
     const docRef = doc(db, REPORTS_COLLECTION, item.id);
     await setDoc(docRef, item, { merge: true });
-
-    // Simpan juga salinan langsung di koleksi SIKEPLINGMANGGA
-    try {
-      await setDoc(doc(db, 'SIKEPLINGMANGGA', item.id), item, { merge: true });
-    } catch (err) {
-      console.warn('Simpan ke koleksi SIKEPLINGMANGGA:', err);
-    }
 
     return true;
   } catch (error) {
@@ -104,20 +153,31 @@ export async function saveReportToFirestore(item: LaporanHarianItem): Promise<bo
 }
 
 /**
- * Delete single report from Firebase Firestore
+ * Delete single report from Firebase Firestore and register permanent tombstone
  */
 export async function deleteReportFromFirestore(id: string): Promise<boolean> {
   if (!id) return false;
   try {
-    const docRef = doc(db, REPORTS_COLLECTION, id);
-    await deleteDoc(docRef);
+    // 1. Mark in in-memory blacklist immediately
+    deletedReportIdsMemory.add(id);
+
+    // 2. Write permanent tombstone in deleted_reports collection
     try {
-      await deleteDoc(doc(db, 'SIKEPLINGMANGGA', id));
-    } catch {
-      // ignore
+      const delDocRef = doc(db, DELETED_REPORTS_COLLECTION, id);
+      await setDoc(delDocRef, {
+        id,
+        deletedAt: new Date().toISOString(),
+        deletedBy: 'admin',
+      });
+    } catch (delErr) {
+      console.warn('Notice writing tombstone to deleted_reports:', delErr);
     }
 
-    // Query and delete any matching docs by data.id or doc.id in reports collection
+    // 3. Delete directly from reports collection
+    const docRef = doc(db, REPORTS_COLLECTION, id);
+    await deleteDoc(docRef);
+
+    // 4. Query and delete any matching docs by data.id or doc.id in reports collection
     try {
       const colRef = collection(db, REPORTS_COLLECTION);
       const snap = await getDocs(colRef);
@@ -129,21 +189,6 @@ export async function deleteReportFromFirestore(id: string): Promise<boolean> {
       }
     } catch (queryErr) {
       console.warn('Notice querying reports for delete:', queryErr);
-    }
-
-    // Query and delete any matching docs in SIKEPLINGMANGGA collection
-    try {
-      const colRefOld = collection(db, 'SIKEPLINGMANGGA');
-      const snapOld = await getDocs(colRefOld);
-      for (const docSnap of snapOld.docs) {
-        if (docSnap.id === 'info' || docSnap.id === 'targets') continue;
-        const data = docSnap.data();
-        if (docSnap.id === id || data.id === id) {
-          await deleteDoc(docSnap.ref);
-        }
-      }
-    } catch (oldErr) {
-      console.warn('Notice querying SIKEPLINGMANGGA for delete:', oldErr);
     }
 
     return true;
@@ -167,7 +212,7 @@ export async function batchSyncReportsToFirestore(items: LaporanHarianItem[]): P
       const batch = writeBatch(db);
 
       for (const item of chunk) {
-        if (!item || !item.namaKepling || isBeforeSept7(item)) continue;
+        if (!item || !item.namaKepling || isBeforeSept7(item) || (item.id && deletedReportIdsMemory.has(item.id))) continue;
         const id = item.id || ('lap_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6));
         const docRef = doc(db, REPORTS_COLLECTION, id);
         batch.set(docRef, { ...item, id }, { merge: true });
@@ -221,10 +266,16 @@ export function subscribeReportsFromFirestore(
       const reports: LaporanHarianItem[] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as LaporanHarianItem;
+        const reportId = docSnap.id || data.id;
         const report: LaporanHarianItem = {
           ...data,
-          id: docSnap.id || data.id,
+          id: reportId,
         };
+        if (deletedReportIdsMemory.has(reportId) || deletedReportIdsMemory.has(data.id)) {
+          // If deleted, ignore and clean up in background
+          deleteDoc(docSnap.ref).catch(() => {});
+          return;
+        }
         if (!isBeforeSept7(report)) {
           reports.push(report);
         }

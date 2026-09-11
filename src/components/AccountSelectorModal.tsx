@@ -563,7 +563,7 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
                 <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
                   <tr>
                     <th className="p-2.5">No / Wilayah</th>
-                    <th className="p-2.5">Username Tetap</th>
+                    <th className="p-2.5">Username</th>
                     <th className="p-2.5">Nama Pejabat / Kepling</th>
                     <th className="p-2.5">Password Masuk</th>
                     <th className="p-2.5 text-right">Aksi</th>

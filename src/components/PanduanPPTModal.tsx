@@ -168,7 +168,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
             <FileText className="w-6 h-6 text-indigo-700 shrink-0" />
             <div>
               <h4 className="font-bold text-indigo-950 text-sm">Cetak Laporan Format Resmi</h4>
-              <p className="text-xs text-indigo-800">Dokumen otomatis diformat lengkap dengan Kop Surat, Foto Dokumentasi 2 kolom, dan Tanda Tangan Lurah & Kepling.</p>
+              <p className="text-xs text-indigo-800">Dokumen otomatis diformat lengkap dengan Kop Surat, Foto Dokumentasi 2 kolom, dan Tanda Tangan Kepala Lingkungan.</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 text-xs">
@@ -227,9 +227,9 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
             <Sparkles className="w-8 h-8" />
           </div>
           <p className="text-emerald-800 font-bold text-lg">"Satu Laporan Nyata untuk Pelayanan Masyarakat Kelurahan Mangga"</p>
-          <div className="flex gap-4 text-xs font-bold uppercase tracking-wider text-slate-500">
-            <span className="bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">#MedanUntukSemua</span>
-            <span className="bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">#SemuaUntukMedan</span>
+          <div className="flex gap-2 text-xs font-bold uppercase tracking-wider">
+            <span className="bg-[#991B1B] text-white px-3 py-1.5 rounded-full shadow-xs">#MedanUntukSemua</span>
+            <span className="bg-[#1E3A8A] text-white px-3 py-1.5 rounded-full shadow-xs">#SemuaUntukMedan</span>
           </div>
         </div>
       )

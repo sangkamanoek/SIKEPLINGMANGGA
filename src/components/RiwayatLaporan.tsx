@@ -11,7 +11,6 @@ import {
   CheckCircle,
   X,
   Eye,
-  CalendarPlus,
   Shield,
   Trash2,
   AlertTriangle,
@@ -26,7 +25,6 @@ interface RiwayatLaporanProps {
   onRefresh: () => void;
   sheetMeta: SheetMetadata | null;
   onSelectReport: (item: LaporanHarianItem) => void;
-  onSyncToCalendar?: (item: LaporanHarianItem) => Promise<void>;
   hasGoogleAuth: boolean;
   initialPetugasFilter?: string;
   isAdmin?: boolean;
@@ -41,7 +39,6 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   onRefresh,
   sheetMeta,
   onSelectReport,
-  onSyncToCalendar,
   hasGoogleAuth,
   initialPetugasFilter,
   isAdmin = false,
@@ -51,7 +48,6 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   const [selectedPetugas, setSelectedPetugas] = useState(initialPetugasFilter || 'ALL');
   const [selectedKegiatan, setSelectedKegiatan] = useState<FilterKegiatanType>('ALL');
   const [selectedDate, setSelectedDate] = useState('');
-  const [syncingId, setSyncingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
@@ -202,16 +198,6 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     selectedPetugas !== 'ALL' ||
     selectedKegiatan !== 'ALL' ||
     selectedDate !== '';
-
-  const handleSyncItemToCalendar = async (item: LaporanHarianItem) => {
-    if (!onSyncToCalendar) return;
-    try {
-      setSyncingId(item.id);
-      await onSyncToCalendar(item);
-    } finally {
-      setSyncingId(null);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -495,19 +481,6 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                     >
                       <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                       <span>Hapus</span>
-                    </button>
-                  )}
-
-                  {hasGoogleAuth && onSyncToCalendar && (
-                    <button
-                      type="button"
-                      onClick={() => handleSyncItemToCalendar(item)}
-                      disabled={syncingId === item.id}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
-                      title="Sinkronkan laporan ini ke Google Calendar"
-                    >
-                      <CalendarPlus className="w-3.5 h-3.5" />
-                      <span>{syncingId === item.id ? 'Menyinkronkan...' : 'Ke Kalender'}</span>
                     </button>
                   )}
                 </div>

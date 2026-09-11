@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileText,
-  Calendar,
   History,
-  Bell,
   FileSpreadsheet,
   AlertCircle,
   CheckCircle,
@@ -13,7 +11,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import ViewImagesPage from './components/ViewImagesPage';
-import { GoogleUser, SheetMetadata, LaporanHarianItem, TaskReminder, NotificationLog, UserAccount } from './types';
+import { GoogleUser, SheetMetadata, LaporanHarianItem, UserAccount } from './types';
 import {
   initAuth,
   googleSignIn,
@@ -25,20 +23,10 @@ import {
   getOrCreateSpreadsheet,
   appendLaporanToSheet,
 } from './lib/sheetsService';
-import { syncReportToGoogleCalendar } from './lib/googleCalendar';
-import {
-  loadReminders,
-  saveReminders,
-  loadNotificationLogs,
-  saveNotificationLogs,
-  sendNotification,
-} from './lib/notifications';
 import { SUPER_ADMIN_ACCOUNT, getAccountById, syncPasswordsWithServer, syncProfilesWithServer } from './data/keplingList';
 import { HeaderBanner } from './components/HeaderBanner';
 import { FormLaporan } from './components/FormLaporan';
-import { KalenderJadwal } from './components/KalenderJadwal';
 import { RiwayatLaporan } from './components/RiwayatLaporan';
-import { NotifikasiPengingat } from './components/NotifikasiPengingat';
 import { DetailLaporanModal } from './components/DetailLaporanModal';
 import { AccountSelectorModal } from './components/AccountSelectorModal';
 import { MonitoringSuperAdmin } from './components/MonitoringSuperAdmin';
@@ -51,13 +39,13 @@ import { EditProfileModal } from './components/EditProfileModal';
 import {
   fetchAllReports,
   saveReportToServer,
-  syncLocalReportsToServer,
   deleteReportFromServer,
   resetAllReportsOnServer,
   subscribeReportsFromFirestore,
+  getLocalDeletedReportIds,
 } from './lib/reportsApi';
 
-const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history';
+const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
 
 export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -120,9 +108,9 @@ export default function App() {
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
 
-  // Active view tab: form | capaian | monitoring | capaian_admin | kalender | riwayat | notifikasi
+  // Active view tab: form | capaian | monitoring | capaian_admin | riwayat
   const [activeTab, setActiveTab] = useState<
-    'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'kalender' | 'riwayat' | 'notifikasi'
+    'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat'
   >(() => {
     return activeAccount.role === 'super_admin' ? 'monitoring' : 'form';
   });
@@ -132,16 +120,10 @@ export default function App() {
   const [isLoadingReports, setIsLoadingReports] = useState(false);
   const [isRefreshingReports, setIsRefreshingReports] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
 
   // Modal detail view
   const [selectedReport, setSelectedReport] = useState<LaporanHarianItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Task Reminders & Notifications
-  const [reminders, setReminders] = useState<TaskReminder[]>(loadReminders());
-  const [notificationLogs, setNotificationLogs] = useState<NotificationLog[]>(loadNotificationLogs());
-  const lastFiredMinuteRef = useRef<string>('');
 
   // Floating Toast notification
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -172,28 +154,15 @@ export default function App() {
   // Load local backup reports
   const loadLocalReports = () => {
     try {
-      // One-time auto-purge for stale reports prior to Kepling 21 retention directive
-      if (!localStorage.getItem('cleaned_reports_v2_kepling21')) {
-        const stored = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
-        if (stored) {
-          const parsed: LaporanHarianItem[] = JSON.parse(stored);
-          const cleaned = parsed.filter(
-            (r) =>
-              r.id === 'lap_1789124821837' ||
-              r.keplingId === 'kepling_21' ||
-              (r.jabatan && r.jabatan.includes('XXI'))
-          );
-          localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
-          localStorage.setItem('cleaned_reports_v2_kepling21', 'true');
-          setReports(cleaned);
-          return;
-        }
-        localStorage.setItem('cleaned_reports_v2_kepling21', 'true');
-      }
-
+      const deletedIds = getLocalDeletedReportIds();
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
       if (stored) {
-        setReports(JSON.parse(stored));
+        const parsed: LaporanHarianItem[] = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const active = parsed.filter((r) => r && r.id && !deletedIds.has(r.id));
+          setReports(active);
+          localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(active));
+        }
       }
     } catch (e) {
       console.warn('Could not read local reports:', e);
@@ -202,6 +171,9 @@ export default function App() {
 
   const saveLocalReport = (item: LaporanHarianItem) => {
     try {
+      const deletedIds = getLocalDeletedReportIds();
+      if (item.id && deletedIds.has(item.id)) return;
+
       setReports((prev) => {
         const existingIndex = prev.findIndex((r) => r.id === item.id);
         let updated: LaporanHarianItem[];
@@ -212,8 +184,9 @@ export default function App() {
         } else {
           updated = [item, ...prev];
         }
-        localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(updated));
-        return updated;
+        const filtered = updated.filter((r) => r && r.id && !deletedIds.has(r.id));
+        localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(filtered));
+        return filtered;
       });
     } catch (e) {
       console.warn('Could not save to local storage:', e);
@@ -280,40 +253,6 @@ export default function App() {
     };
   }, [syncSpreadsheet, refreshAllReports]);
 
-  // Notification Timer Loop: Checks every 30s for scheduled tasks
-  useEffect(() => {
-    const checkSchedule = () => {
-      const now = new Date();
-      const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      const currentHH = String(now.getHours()).padStart(2, '0');
-      const currentMM = String(now.getMinutes()).padStart(2, '0');
-      const currentTimeStr = `${currentHH}:${currentMM}`;
-      const minuteKey = `${now.toDateString()}_${currentTimeStr}`;
-
-      if (lastFiredMinuteRef.current === minuteKey) {
-        return;
-      }
-
-      reminders.forEach((r) => {
-        if (r.enabled && r.daysOfWeek.includes(currentDay) && r.time === currentTimeStr) {
-          lastFiredMinuteRef.current = minuteKey;
-          const log = sendNotification(
-            `Pengingat Tugas: ${r.title} ⏰`,
-            `${r.description} (Waktu: ${r.time} WIB)`,
-            r.category
-          );
-          setNotificationLogs((prev) => [log, ...prev]);
-          showToast(`⏰ Pengingat Tugas: ${r.title}`, 'info');
-        }
-      });
-    };
-
-    const interval = setInterval(checkSchedule, 30000);
-    checkSchedule(); // initial check
-
-    return () => clearInterval(interval);
-  }, [reminders]);
-
   // Connect Google account
   const handleConnectGoogle = async () => {
     setIsConnecting(true);
@@ -347,8 +286,8 @@ export default function App() {
     showToast('Koneksi akun Google diputuskan', 'info');
   };
 
-  // Save report to database (Local Storage & Central Server) & Google Sheets / Calendar if connected
-  const handleSaveReport = async (item: LaporanHarianItem, syncToCalendar: boolean) => {
+  // Save report to database (Local Storage & Central Server) & Google Sheets if connected
+  const handleSaveReport = async (item: LaporanHarianItem) => {
     setIsSaving(true);
     try {
       // 1. ALWAYS save to local database immediately FIRST so data is guaranteed safe
@@ -377,19 +316,7 @@ export default function App() {
           }
 
           await appendLaporanToSheet(activeToken, currentSheetMeta.spreadsheetId, item);
-
-          // Also sync to Google Calendar if requested
-          if (syncToCalendar) {
-            try {
-              await syncReportToGoogleCalendar(activeToken, item);
-              showToast('Laporan berhasil tersimpan di Database & Google Sheets & Calendar!', 'success');
-            } catch (calErr) {
-              console.warn('Calendar sync error:', calErr);
-              showToast('Laporan tersimpan di Database & Google Sheets!', 'success');
-            }
-          } else {
-            showToast('Laporan berhasil tersimpan di Database & Google Sheets!', 'success');
-          }
+          showToast('Laporan berhasil tersimpan di Database & Google Sheets!', 'success');
         } catch (sheetErr) {
           console.warn('Google Sheets sync notice:', sheetErr);
           showToast('Laporan berhasil disimpan ke Database Aplikasi!', 'success');
@@ -415,34 +342,6 @@ export default function App() {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  // Sync a single report to Google Calendar manually
-  const handleSyncReportToCalendar = async (item: LaporanHarianItem) => {
-    let currentToken = token;
-    if (!currentToken) {
-      const res = await googleSignIn();
-      if (!res) return;
-      currentToken = res.accessToken;
-      setToken(currentToken);
-    }
-
-    setIsSyncingCalendar(true);
-    try {
-      await syncReportToGoogleCalendar(currentToken, item);
-      showToast(`Laporan tanggal ${item.tanggal} berhasil ditambahkan ke Google Calendar!`, 'success');
-    } catch (err) {
-      console.error(err);
-      showToast('Gagal menyinkronkan laporan ke Google Calendar.', 'error');
-    } finally {
-      setIsSyncingCalendar(false);
-    }
-  };
-
-  const handleClearNotificationLogs = () => {
-    setNotificationLogs([]);
-    saveNotificationLogs([]);
-    showToast('Riwayat notifikasi telah dibersihkan', 'info');
   };
 
   // Update report handler (Super Admin modifying or correcting Kepling data)
@@ -530,6 +429,7 @@ export default function App() {
         <LoginPage
           onLoginSuccess={handleLoginSuccess}
           onOpenInstallModal={() => setIsInstallModalOpen(true)}
+          onOpenPPTModal={() => setIsPPTModalOpen(true)}
         />
 
         {/* Floating Toast Notification on Login */}
@@ -558,6 +458,12 @@ export default function App() {
         <PWAInstallModal
           isOpen={isInstallModalOpen}
           onClose={() => setIsInstallModalOpen(false)}
+        />
+
+        {/* Panduan PPT Kepling Modal */}
+        <PanduanPPTModal
+          isOpen={isPPTModalOpen}
+          onClose={() => setIsPPTModalOpen(false)}
         />
       </>
     );
@@ -659,21 +565,6 @@ export default function App() {
                   <History className="w-4 h-4 text-emerald-700" />
                   <span>Riwayat Laporan Saya</span>
                 </button>
-
-                {/* Kepling Tab 4: Kalender & Jadwal */}
-                <button
-                  id="tab-kalender-jadwal"
-                  type="button"
-                  onClick={() => setActiveTab('kalender')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                    activeTab === 'kalender'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <Calendar className="w-4 h-4 text-emerald-700" />
-                  <span>Kalender & Agenda</span>
-                </button>
               </>
             ) : (
               <>
@@ -736,22 +627,7 @@ export default function App() {
                   )}
                 </button>
 
-                {/* Super Admin Tab 4: Kalender Kegiatan */}
-                <button
-                  id="tab-kalender-jadwal"
-                  type="button"
-                  onClick={() => setActiveTab('kalender')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                    activeTab === 'kalender'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <Calendar className="w-4 h-4 text-emerald-700" />
-                  <span>Kalender Kegiatan</span>
-                </button>
-
-                {/* Super Admin Tab 5: Input Formulir (Bantuan/Asistensi) */}
+                {/* Super Admin Tab 4: Input Formulir (Bantuan/Asistensi) */}
                 <button
                   id="tab-input-laporan"
                   type="button"
@@ -764,26 +640,6 @@ export default function App() {
                 >
                   <FileText className="w-4 h-4 text-emerald-700" />
                   <span>Input Laporan</span>
-                </button>
-
-                {/* Super Admin Tab 6: Pengingat & Notifikasi */}
-                <button
-                  id="tab-notifikasi-pengingat"
-                  type="button"
-                  onClick={() => setActiveTab('notifikasi')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                    activeTab === 'notifikasi'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <Bell className="w-4 h-4 text-emerald-700" />
-                  <span>Pengingat</span>
-                  {reminders.filter((r) => r.enabled).length > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
-                      {reminders.filter((r) => r.enabled).length}
-                    </span>
-                  )}
                 </button>
               </>
             )}
@@ -879,21 +735,6 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'kalender' && (
-          <KalenderJadwal
-            reports={reports}
-            reminders={reminders}
-            hasGoogleAuth={Boolean(token)}
-            googleToken={token}
-            onConnectGoogle={handleConnectGoogle}
-            onSelectReport={(report) => {
-              setSelectedReport(report);
-              setIsModalOpen(true);
-            }}
-            onTriggerToast={showToast}
-          />
-        )}
-
         {activeTab === 'riwayat' && (
           <RiwayatLaporan
             items={reports}
@@ -904,27 +745,10 @@ export default function App() {
               setSelectedReport(item);
               setIsModalOpen(true);
             }}
-            onSyncToCalendar={handleSyncReportToCalendar}
             hasGoogleAuth={Boolean(token)}
             initialPetugasFilter={riwayatFilterPetugas}
             isAdmin={activeAccount.role === 'super_admin'}
             onDeleteReport={handleDeleteReport}
-          />
-        )}
-
-        {activeTab === 'notifikasi' && (
-          <NotifikasiPengingat
-            reminders={reminders}
-            onUpdateReminders={(updated) => {
-              setReminders(updated);
-              saveReminders(updated);
-            }}
-            notificationLogs={notificationLogs}
-            onClearLogs={handleClearNotificationLogs}
-            hasGoogleAuth={Boolean(token)}
-            googleToken={token}
-            onConnectGoogle={handleConnectGoogle}
-            onTriggerToast={showToast}
           />
         )}
       </main>
@@ -988,8 +812,6 @@ export default function App() {
         isAdmin={activeAccount.role === 'super_admin'}
         onUpdateReport={handleUpdateReport}
         onDeleteReport={handleDeleteReport}
-        onSyncToCalendar={handleSyncReportToCalendar}
-        isSyncingCalendar={isSyncingCalendar}
       />
 
       {/* Panduan PPT Kepling Modal */}
@@ -1000,9 +822,13 @@ export default function App() {
 
       {/* Footer matching Professional Polish style */}
       <footer className="bg-white border-t border-slate-200 px-6 sm:px-8 py-3.5 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] gap-3 print:hidden">
-        <div className="flex items-center gap-6 ml-auto">
-          <span className="text-emerald-700 font-bold">#MedanUntukSemua</span>
-          <span className="text-slate-600 font-bold">#SemuaUntukMedan</span>
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="bg-[#991B1B] text-white px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider">
+            #MedanUntukSemua
+          </span>
+          <span className="bg-[#1E3A8A] text-white px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider">
+            #SemuaUntukMedan
+          </span>
         </div>
       </footer>
     </div>

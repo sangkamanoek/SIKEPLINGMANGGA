@@ -14,6 +14,7 @@ import {
   X,
   RotateCcw,
   Sparkles,
+  Presentation,
 } from 'lucide-react';
 import { UserAccount } from '../types';
 import {
@@ -30,11 +31,13 @@ import {
 interface LoginPageProps {
   onLoginSuccess: (account: UserAccount, remember: boolean) => void;
   onOpenInstallModal?: () => void;
+  onOpenPPTModal?: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({
   onLoginSuccess,
   onOpenInstallModal,
+  onOpenPPTModal,
 }) => {
   const [usernameInput, setUsernameInput] = useState<string>('');
   const [passwordInput, setPasswordInput] = useState<string>('');
@@ -96,7 +99,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
       if (!targetAccount) {
         setErrorMessage(
-          `Username "${trimmedUser}" tidak terdaftar. Gunakan format username tetap: kepling_1 s/d kepling_24 atau super_admin.`
+          `Username "${trimmedUser}" tidak terdaftar. Gunakan format username: kepling_1 s/d kepling_24 atau super_admin.`
         );
         setIsLoading(false);
         return;
@@ -194,16 +197,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </span>
         </div>
 
-        {onOpenInstallModal && (
-          <button
-            type="button"
-            onClick={onOpenInstallModal}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer"
-          >
-            <Smartphone className="w-4 h-4" />
-            <span>Pasang APK SI KEPLING</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {onOpenPPTModal && (
+            <button
+              id="btn-open-ppt-login"
+              type="button"
+              onClick={onOpenPPTModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-600 text-white font-bold text-xs shadow-md transition-all cursor-pointer border border-teal-500/40"
+              title="Download & Lihat Panduan PPT Kepling"
+            >
+              <Presentation className="w-4 h-4 text-emerald-300" />
+              <span>File PPT Panduan</span>
+            </button>
+          )}
+
+          {onOpenInstallModal && (
+            <button
+              type="button"
+              onClick={onOpenInstallModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer"
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>Pasang APK</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Center Login Box */}
@@ -218,8 +236,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 className="w-full h-full object-contain"
               />
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-emerald-950 tracking-tight leading-tight uppercase">
-              SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA
+            <h1 className="text-2xl sm:text-3xl font-black text-emerald-950 tracking-tight leading-tight uppercase">
+              SI-KEPLING MANGGA
             </h1>
             <p className="text-[11px] font-extrabold text-emerald-700 mt-2 uppercase tracking-wider">
               Laporan Kegiatan Harian Kepala Lingkungan
@@ -245,19 +263,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
             )}
 
-            {/* Fixed Username Selector & Input */}
+            {/* Username Selector & Input */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Username Tetap Akun</span>
-                </span>
-                <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-200">
-                  Fixed Usernames
+                  <span>Username Akun</span>
                 </span>
               </label>
 
-              {/* Dropdown Pilihan Username Tetap */}
+              {/* Dropdown Pilihan Username */}
               <select
                 id="select-login-fixed-username"
                 value={detectedAccount ? detectedAccount.id : ''}
@@ -306,7 +321,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               ) : (
                 <p className="text-[10.5px] text-slate-500 leading-tight">
-                  Format tetap resmi: <strong className="text-slate-700">kepling_1</strong> s/d <strong className="text-slate-700">kepling_24</strong>, atau <strong className="text-slate-700">super_admin</strong>.
+                  Format resmi: <strong className="text-slate-700">kepling_1</strong> s/d <strong className="text-slate-700">kepling_24</strong>, atau <strong className="text-slate-700">super_admin</strong>.
                 </p>
               )}
             </div>
@@ -398,14 +413,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <span>{isLoading ? 'Memverifikasi...' : 'Masuk ke Aplikasi'}</span>
             </button>
           </form>
-
-          {/* Card Footer */}
-          <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-            <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
-              <Info className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-              <span>Username tetap telah distandarkan dan kata sandi dapat diubah sewaktu-waktu.</span>
-            </p>
-          </div>
         </div>
       </div>
 
@@ -445,7 +452,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               )}
 
-              {/* Pilih Akun Tetap */}
+              {/* Pilih Akun Resmi */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700">Pilih Akun Resmi yang Ingin Diubah</label>
                 <select
@@ -571,10 +578,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 space-y-1.5">
                 <p className="font-bold flex items-center gap-1.5 text-xs">
                   <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
-                  Username Tetap Resmi (Fixed)
+                  Username Akun Resmi
                 </p>
                 <p className="text-[11px] leading-relaxed text-amber-800">
-                  Aplikasi telah menggunakan format username tetap untuk mempermudah identifikasi dan mencegah kesalahan login.
+                  Aplikasi menggunakan format username resmi untuk mempermudah identifikasi dan akses akun.
                 </p>
               </div>
 

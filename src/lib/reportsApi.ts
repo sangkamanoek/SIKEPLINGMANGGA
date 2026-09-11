@@ -3,22 +3,55 @@ import {
   fetchReportsFromFirestore,
   saveReportToFirestore,
   deleteReportFromFirestore,
-  batchSyncReportsToFirestore,
   resetAllReportsInFirestore,
   subscribeReportsFromFirestore,
+  isBeforeSept7,
 } from './firestoreService';
 
-const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history';
+const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
+const LOCAL_STORAGE_KEY_DELETED = 'kepling_deleted_reports_v1';
 
-export const isReportBeforeSept7 = (_r: LaporanHarianItem): boolean => {
-  return false;
+// Clear obsolete previous caches to free browser memory
+try {
+  localStorage.removeItem('kepling_local_laporan_history');
+  localStorage.removeItem('cleaned_reports_v2_kepling21');
+} catch {}
+
+/**
+ * Get locally known deleted report IDs
+ */
+export const getLocalDeletedReportIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY_DELETED);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch {}
+  return new Set();
 };
 
-// Fetch all reports from Firebase Firestore
+/**
+ * Register deleted report ID to local blacklist
+ */
+export const addLocalDeletedReportId = (id: string) => {
+  try {
+    const set = getLocalDeletedReportIds();
+    set.add(id);
+    localStorage.setItem(LOCAL_STORAGE_KEY_DELETED, JSON.stringify(Array.from(set)));
+  } catch {}
+};
+
+export const isReportBeforeSept7 = (r: LaporanHarianItem): boolean => {
+  return isBeforeSept7(r);
+};
+
+// Fetch all reports from Firebase Firestore (filtered against deleted IDs)
 export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   try {
+    const deletedIds = getLocalDeletedReportIds();
     const firestoreReports = await fetchReportsFromFirestore();
-    const cleaned = firestoreReports.filter((r) => !isReportBeforeSept7(r));
+    const cleaned = firestoreReports.filter((r) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
     localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
     return cleaned;
   } catch (err) {
@@ -29,6 +62,12 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
 
 // Save single report to Firebase Firestore, server, and local storage (Full Create/Update)
 export const saveReportToServer = async (item: LaporanHarianItem): Promise<boolean> => {
+  const deletedIds = getLocalDeletedReportIds();
+  if (item.id && deletedIds.has(item.id)) {
+    console.warn(`Laporan ${item.id} telah dihapus oleh Admin dan tidak dapat disimpan.`);
+    return false;
+  }
+
   // 1. Update local storage immediately
   try {
     const existingRaw = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
@@ -41,7 +80,9 @@ export const saveReportToServer = async (item: LaporanHarianItem): Promise<boole
     } else {
       updated = [item, ...existing];
     }
-    localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(updated));
+    // Filter out any deleted items before saving
+    const sanitized = updated.filter((r) => !deletedIds.has(r.id));
+    localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(sanitized));
   } catch (e) {
     console.warn('LocalStorage save warning:', e);
   }
@@ -70,7 +111,12 @@ export const saveReportToServer = async (item: LaporanHarianItem): Promise<boole
 
 // Delete single report from Firebase Firestore, server, and local storage (Full Delete)
 export const deleteReportFromServer = async (id: string): Promise<boolean> => {
-  // 1. Remove from local storage
+  if (!id) return false;
+
+  // 1. Register to local deleted blacklist tombstone
+  addLocalDeletedReportId(id);
+
+  // 2. Remove immediately from local storage
   try {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
     if (stored) {
@@ -82,42 +128,20 @@ export const deleteReportFromServer = async (id: string): Promise<boolean> => {
     console.warn(e);
   }
 
-  // 2. Delete from Firebase Firestore
+  // 3. Delete from Firebase Firestore with permanent tombstone
   try {
     await deleteReportFromFirestore(id);
   } catch (err) {
     console.warn('Notice deleting from Firebase Firestore:', err);
   }
 
-  // 3. Delete from server buffer
+  // 4. Delete from server buffer & add server tombstone
   try {
     const res = await fetch(`/api/reports/${encodeURIComponent(id)}`, { method: 'DELETE' });
     return res.ok;
   } catch (err) {
     console.warn('Error deleting report on server:', err);
     return true;
-  }
-};
-
-// Batch sync reports to Firebase Firestore and server
-export const syncLocalReportsToServer = async (): Promise<void> => {
-  try {
-    const stored = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
-    if (!stored) return;
-    const reports: LaporanHarianItem[] = JSON.parse(stored);
-    if (!Array.isArray(reports) || reports.length === 0) return;
-
-    // Sync to Firestore
-    await batchSyncReportsToFirestore(reports);
-
-    // Sync to server
-    await fetch('/api/reports/batch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reports }),
-    });
-  } catch (err) {
-    console.warn('Error syncing local reports to Firebase and server:', err);
   }
 };
 
