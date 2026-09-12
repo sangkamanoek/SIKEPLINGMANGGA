@@ -110,10 +110,10 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
       const rep = keplingReportMap.get(k.id);
       if (rep) {
         submittedCount++;
-        totalPbb += Number(rep.kinerja.opsirPbbWp) || 0;
-        totalPerlinsos += Number(rep.kinerja.perlinsosKk) || 0;
-        totalIkd += Number(rep.kinerja.ikdOrang) || 0;
-        totalBpjs += Number(rep.kinerja.bpjsKetenagakerjaanOrang) || 0;
+        totalPbb += Number(rep.kinerja?.opsirPbbWp) || 0;
+        totalPerlinsos += Number(rep.kinerja?.perlinsosKk) || 0;
+        totalIkd += Number(rep.kinerja?.ikdOrang) || 0;
+        totalBpjs += Number(rep.kinerja?.bpjsKetenagakerjaanOrang) || 0;
       }
     });
 
@@ -463,22 +463,22 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                     <div className="grid grid-cols-2 gap-1 text-[11px] bg-emerald-50/60 p-2 rounded-lg border border-emerald-100">
                       <div>
                         <span className="text-slate-500">Opsir PBB: </span>
-                        <strong className="text-emerald-900">{report.kinerja.opsirPbbWp} WP</strong>
+                        <strong className="text-emerald-900">{report.kinerja?.opsirPbbWp || '0'} WP</strong>
                       </div>
                       <div>
                         <span className="text-slate-500">Perlinsos: </span>
-                        <strong className="text-emerald-900">{report.kinerja.perlinsosKk} KK</strong>
+                        <strong className="text-emerald-900">{report.kinerja?.perlinsosKk || '0'} KK</strong>
                       </div>
                       <div>
                         <span className="text-slate-500">IKD: </span>
-                        <strong className="text-emerald-900">{report.kinerja.ikdOrang} Jiwa</strong>
+                        <strong className="text-emerald-900">{report.kinerja?.ikdOrang || '0'} Jiwa</strong>
                       </div>
                       <div>
                         <span className="text-slate-500">BPJS: </span>
-                        <strong className="text-emerald-900">{report.kinerja.bpjsKetenagakerjaanOrang} Jiwa</strong>
+                        <strong className="text-emerald-900">{report.kinerja?.bpjsKetenagakerjaanOrang || '0'} Jiwa</strong>
                       </div>
                     </div>
-                    {report.kinerja.kegiatanLainnya && (
+                    {report.kinerja?.kegiatanLainnya && (
                       <p className="text-[11px] text-slate-600 italic line-clamp-1">
                         "{report.kinerja.kegiatanLainnya}"
                       </p>

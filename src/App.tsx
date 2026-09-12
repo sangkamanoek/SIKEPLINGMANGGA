@@ -36,6 +36,7 @@ import { PanduanPPTModal } from './components/PanduanPPTModal';
 import { LoginPage } from './components/LoginPage';
 import { UbahPasswordModal } from './components/UbahPasswordModal';
 import { EditProfileModal } from './components/EditProfileModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import {
   fetchAllReports,
   saveReportToServer,
@@ -705,28 +706,30 @@ export default function App() {
         )}
 
         {activeTab === 'monitoring' && (
-          <MonitoringSuperAdmin
-            reports={reports}
-            onSelectReport={(report) => {
-              setSelectedReport(report);
-              setIsModalOpen(true);
-            }}
-            onDraftForKepling={(kepling) => {
-              setPreselectedKepling(kepling);
-              setActiveTab('form');
-              showToast(`Formulir disiapkan untuk ${kepling.lingkungan} (${kepling.nama})`, 'info');
-            }}
-            onSwitchToRiwayat={(keplingName) => {
-              setRiwayatFilterPetugas(keplingName);
-              setActiveTab('riwayat');
-            }}
-            onOpenCredentialBook={() => setIsAccountModalOpen(true)}
-            onRefresh={() => refreshAllReports(true)}
-            isRefreshing={isRefreshingReports}
-            onResetReports={handleResetAllReports}
-            onOpenCapaianDashboard={() => setActiveTab('capaian_admin')}
-            sheetMeta={sheetMeta}
-          />
+          <ErrorBoundary fallbackTitle="Gagal Memuat Monitoring Admin">
+            <MonitoringSuperAdmin
+              reports={reports}
+              onSelectReport={(report) => {
+                setSelectedReport(report);
+                setIsModalOpen(true);
+              }}
+              onDraftForKepling={(kepling) => {
+                setPreselectedKepling(kepling);
+                setActiveTab('form');
+                showToast(`Formulir disiapkan untuk ${kepling.lingkungan} (${kepling.nama})`, 'info');
+              }}
+              onSwitchToRiwayat={(keplingName) => {
+                setRiwayatFilterPetugas(keplingName);
+                setActiveTab('riwayat');
+              }}
+              onOpenCredentialBook={() => setIsAccountModalOpen(true)}
+              onRefresh={() => refreshAllReports(true)}
+              isRefreshing={isRefreshingReports}
+              onResetReports={handleResetAllReports}
+              onOpenCapaianDashboard={() => setActiveTab('capaian_admin')}
+              sheetMeta={sheetMeta}
+            />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'riwayat' && (
@@ -797,16 +800,18 @@ export default function App() {
       />
 
       {/* Detail Laporan Modal (No WhatsApp) */}
-      <DetailLaporanModal
-        item={selectedReport}
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        sheetMeta={sheetMeta}
-        hasGoogleAuth={Boolean(token)}
-        isAdmin={activeAccount.role === 'super_admin'}
-        onUpdateReport={handleUpdateReport}
-        onDeleteReport={handleDeleteReport}
-      />
+      <ErrorBoundary fallbackTitle="Gagal Memuat Detail Laporan">
+        <DetailLaporanModal
+          item={selectedReport}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          sheetMeta={sheetMeta}
+          hasGoogleAuth={Boolean(token)}
+          isAdmin={activeAccount.role === 'super_admin'}
+          onUpdateReport={handleUpdateReport}
+          onDeleteReport={handleDeleteReport}
+        />
+      </ErrorBoundary>
 
       {/* Panduan PPT Kepling Modal */}
       <PanduanPPTModal

@@ -99,38 +99,40 @@ export function generateLaporanWhatsAppText(item: LaporanHarianItem): string {
   lines.push('');
   lines.push('📋 *KINERJA HARIAN:*');
 
+  const kin = item.kinerja || ({} as Record<string, any>);
+
   // 1. Opsir PBB
-  const pbbValue = item.kinerja.opsirPbbWp ? `${item.kinerja.opsirPbbWp} WP` : '-';
-  const pbbKet = item.kinerja.opsirPbbKeterangan ? ` (${item.kinerja.opsirPbbKeterangan})` : '';
+  const pbbValue = kin.opsirPbbWp ? `${kin.opsirPbbWp} WP` : '-';
+  const pbbKet = kin.opsirPbbKeterangan ? ` (${kin.opsirPbbKeterangan})` : '';
   lines.push(`1. OPSIR PBB : ${pbbValue}${pbbKet}`);
 
   // 2. Perlinsos
-  const perlinsosVal = item.kinerja.perlinsosKk ? `${item.kinerja.perlinsosKk} KK` : '-';
-  const perlinsosKet = item.kinerja.perlinsosKeterangan ? ` (${item.kinerja.perlinsosKeterangan})` : '';
+  const perlinsosVal = kin.perlinsosKk ? `${kin.perlinsosKk} KK` : '-';
+  const perlinsosKet = kin.perlinsosKeterangan ? ` (${kin.perlinsosKeterangan})` : '';
   lines.push(`2. PERLINSOS : ${perlinsosVal}${perlinsosKet}`);
 
   // 3. IKD
-  const ikdVal = item.kinerja.ikdOrang ? `${item.kinerja.ikdOrang} ORANG` : '-';
-  const ikdKet = item.kinerja.ikdKeterangan ? ` (${item.kinerja.ikdKeterangan})` : '';
+  const ikdVal = kin.ikdOrang ? `${kin.ikdOrang} ORANG` : '-';
+  const ikdKet = kin.ikdKeterangan ? ` (${kin.ikdKeterangan})` : '';
   lines.push(`3. IDENTITAS KEPENDUDUKAN DIGITAL : ${ikdVal}${ikdKet}`);
 
   // 4. BPJS Ketenagakerjaan
-  const bpjsVal = item.kinerja.bpjsKetenagakerjaanOrang ? `${item.kinerja.bpjsKetenagakerjaanOrang} ORANG` : '-';
-  const bpjsKet = item.kinerja.bpjsKetenagakerjaanKeterangan ? ` (${item.kinerja.bpjsKetenagakerjaanKeterangan})` : '';
+  const bpjsVal = kin.bpjsKetenagakerjaanOrang ? `${kin.bpjsKetenagakerjaanOrang} ORANG` : '-';
+  const bpjsKet = kin.bpjsKetenagakerjaanKeterangan ? ` (${kin.bpjsKetenagakerjaanKeterangan})` : '';
   lines.push(`4. BPJS KETENAGAKERJAAN : ${bpjsVal}${bpjsKet}`);
 
   // 5. Poskamling / Siskamling if active
-  if (item.kinerja.poskamlingStatus && item.kinerja.poskamlingStatus !== 'Tidak Ada Giat') {
-    const pStatus = item.kinerja.poskamlingStatus;
-    const pLokasi = item.kinerja.poskamlingLokasi ? ` (${item.kinerja.poskamlingLokasi})` : '';
-    const pPetugas = item.kinerja.poskamlingPetugas ? ` - Petugas: ${item.kinerja.poskamlingPetugas}` : '';
-    const pKet = item.kinerja.poskamlingKeterangan ? ` [${item.kinerja.poskamlingKeterangan}]` : '';
+  if (kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat') {
+    const pStatus = kin.poskamlingStatus;
+    const pLokasi = kin.poskamlingLokasi ? ` (${kin.poskamlingLokasi})` : '';
+    const pPetugas = kin.poskamlingPetugas ? ` - Petugas: ${kin.poskamlingPetugas}` : '';
+    const pKet = kin.poskamlingKeterangan ? ` [${kin.poskamlingKeterangan}]` : '';
     lines.push(`5. POSKAMLING / SISKAMLING : ${pStatus}${pLokasi}${pPetugas}${pKet}`);
   }
 
   // 6. Kegiatan Tambahan / Lainnya if any
-  if (item.kinerja.kegiatanLainnya && item.kinerja.kegiatanLainnya.trim()) {
-    lines.push(`6. KEGIATAN LAINNYA : ${item.kinerja.kegiatanLainnya.trim()}`);
+  if (kin.kegiatanLainnya && kin.kegiatanLainnya.trim()) {
+    lines.push(`6. KEGIATAN LAINNYA : ${kin.kegiatanLainnya.trim()}`);
   }
 
   lines.push('');

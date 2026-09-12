@@ -219,28 +219,30 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         }
       : item;
 
+    const kin = activeItem?.kinerja || {};
+
     const text = [
       `*🟩 LAPORAN KEGIATAN HARIAN*`,
-      `*${activeItem.jabatan.toUpperCase()}*`,
-      `*${activeItem.kelurahan.toUpperCase()}*`,
-      `*${activeItem.kecamatan.toUpperCase()}*`,
+      `*${(activeItem?.jabatan || '').toUpperCase()}*`,
+      `*${(activeItem?.kelurahan || 'Kelurahan Mangga').toUpperCase()}*`,
+      `*${(activeItem?.kecamatan || 'Medan Tuntungan').toUpperCase()}*`,
       `----------------------------------------`,
-      `Hari     : ${activeItem.hari}`,
-      `Tanggal  : ${activeItem.tanggal}`,
-      `Nama     : ${activeItem.namaKepling}`,
-      `Jabatan  : ${activeItem.jabatan}`,
+      `Hari     : ${activeItem?.hari || ''}`,
+      `Tanggal  : ${activeItem?.tanggal || ''}`,
+      `Nama     : ${activeItem?.namaKepling || ''}`,
+      `Jabatan  : ${activeItem?.jabatan || ''}`,
       `----------------------------------------`,
       `KINERJA HARIAN:`,
-      `1. OPSIR PBB : ${activeItem.kinerja.opsirPbbWp || '0'} WP ${activeItem.kinerja.opsirPbbKeterangan ? `(${activeItem.kinerja.opsirPbbKeterangan})` : ''}`,
-      `2. PERLINSOS : ${activeItem.kinerja.perlinsosKk || '0'} KK ${activeItem.kinerja.perlinsosKeterangan ? `(${activeItem.kinerja.perlinsosKeterangan})` : ''}`,
-      `3. IDENTITAS KEPENDUDUKAN DIGITAL : ${activeItem.kinerja.ikdOrang || '0'} ORANG ${activeItem.kinerja.ikdKeterangan ? `(${activeItem.kinerja.ikdKeterangan})` : ''}`,
-      `4. BPJS KETENAGAKERJAAN : ${activeItem.kinerja.bpjsKetenagakerjaanOrang || '0'} ORANG ${activeItem.kinerja.bpjsKetenagakerjaanKeterangan ? `(${activeItem.kinerja.bpjsKetenagakerjaanKeterangan})` : ''}`,
-      activeItem.kinerja.poskamlingStatus && activeItem.kinerja.poskamlingStatus !== 'Tidak Ada Giat'
-        ? `5. POSKAMLING / SISKAMLING : ${activeItem.kinerja.poskamlingStatus}${activeItem.kinerja.poskamlingLokasi ? ` (${activeItem.kinerja.poskamlingLokasi})` : ''}${activeItem.kinerja.poskamlingPetugas ? ` - Petugas: ${activeItem.kinerja.poskamlingPetugas}` : ''}${activeItem.kinerja.poskamlingKeterangan ? ` [${activeItem.kinerja.poskamlingKeterangan}]` : ''}`
+      `1. OPSIR PBB : ${kin.opsirPbbWp || '0'} WP ${kin.opsirPbbKeterangan ? `(${kin.opsirPbbKeterangan})` : ''}`,
+      `2. PERLINSOS : ${kin.perlinsosKk || '0'} KK ${kin.perlinsosKeterangan ? `(${kin.perlinsosKeterangan})` : ''}`,
+      `3. IDENTITAS KEPENDUDUKAN DIGITAL : ${kin.ikdOrang || '0'} ORANG ${kin.ikdKeterangan ? `(${kin.ikdKeterangan})` : ''}`,
+      `4. BPJS KETENAGAKERJAAN : ${kin.bpjsKetenagakerjaanOrang || '0'} ORANG ${kin.bpjsKetenagakerjaanKeterangan ? `(${kin.bpjsKetenagakerjaanKeterangan})` : ''}`,
+      kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat'
+        ? `5. POSKAMLING / SISKAMLING : ${kin.poskamlingStatus}${kin.poskamlingLokasi ? ` (${kin.poskamlingLokasi})` : ''}${kin.poskamlingPetugas ? ` - Petugas: ${kin.poskamlingPetugas}` : ''}${kin.poskamlingKeterangan ? ` [${kin.poskamlingKeterangan}]` : ''}`
         : '',
-      activeItem.kinerja.kegiatanLainnya ? `6. KEGIATAN LAINNYA : ${activeItem.kinerja.kegiatanLainnya}` : '',
+      kin.kegiatanLainnya ? `6. KEGIATAN LAINNYA : ${kin.kegiatanLainnya}` : '',
       `----------------------------------------`,
-      `Dokumentasi : ${activeItem.jumlahDokumentasi} Foto Terlampir`,
+      `Dokumentasi : ${activeItem?.jumlahDokumentasi || (activeItem?.dokumentasiFoto ? activeItem.dokumentasiFoto.length : 0)} Foto Terlampir`,
       `#MedanUntukSemua #SemuaUntukMedan`,
     ].filter(Boolean).join('\n');
 
@@ -486,9 +488,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 ) : (
                   <>
                     <div className="text-lg font-black text-slate-800 my-1">
-                      {item.kinerja.opsirPbbWp ? String(item.kinerja.opsirPbbWp).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">WP</span>
+                      {item.kinerja?.opsirPbbWp ? String(item.kinerja.opsirPbbWp).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">WP</span>
                     </div>
-                    {item.kinerja.opsirPbbKeterangan && (
+                    {item.kinerja?.opsirPbbKeterangan && (
                       <p className="text-xs text-slate-600 bg-slate-50 p-1.5 rounded">
                         {item.kinerja.opsirPbbKeterangan}
                       </p>
@@ -523,9 +525,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 ) : (
                   <>
                     <div className="text-lg font-black text-slate-800 my-1">
-                      {item.kinerja.perlinsosKk ? String(item.kinerja.perlinsosKk).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">KK</span>
+                      {item.kinerja?.perlinsosKk ? String(item.kinerja.perlinsosKk).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">KK</span>
                     </div>
-                    {item.kinerja.perlinsosKeterangan && (
+                    {item.kinerja?.perlinsosKeterangan && (
                       <p className="text-xs text-slate-600 bg-slate-50 p-1.5 rounded">
                         {item.kinerja.perlinsosKeterangan}
                       </p>
@@ -560,9 +562,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 ) : (
                   <>
                     <div className="text-lg font-black text-slate-800 my-1">
-                      {item.kinerja.ikdOrang ? String(item.kinerja.ikdOrang).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">ORANG</span>
+                      {item.kinerja?.ikdOrang ? String(item.kinerja.ikdOrang).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">ORANG</span>
                     </div>
-                    {item.kinerja.ikdKeterangan && (
+                    {item.kinerja?.ikdKeterangan && (
                       <p className="text-xs text-slate-600 bg-slate-50 p-1.5 rounded">
                         {item.kinerja.ikdKeterangan}
                       </p>
@@ -597,9 +599,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 ) : (
                   <>
                     <div className="text-lg font-black text-slate-800 my-1">
-                      {item.kinerja.bpjsKetenagakerjaanOrang ? String(item.kinerja.bpjsKetenagakerjaanOrang).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">ORANG</span>
+                      {item.kinerja?.bpjsKetenagakerjaanOrang ? String(item.kinerja.bpjsKetenagakerjaanOrang).replace(/^0+(?=\d)/, '') : '0'} <span className="text-xs font-semibold text-slate-500">ORANG</span>
                     </div>
-                    {item.kinerja.bpjsKetenagakerjaanKeterangan && (
+                    {item.kinerja?.bpjsKetenagakerjaanKeterangan && (
                       <p className="text-xs text-slate-600 bg-slate-50 p-1.5 rounded">
                         {item.kinerja.bpjsKetenagakerjaanKeterangan}
                       </p>
@@ -712,7 +714,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-emerald-500"
                 />
               ) : (
-                <p className="text-slate-600">{item.kinerja.kegiatanLainnya || 'Tidak ada kegiatan tambahan.'}</p>
+                <p className="text-slate-600">{item.kinerja?.kegiatanLainnya || 'Tidak ada kegiatan tambahan.'}</p>
               )}
             </div>
           </div>

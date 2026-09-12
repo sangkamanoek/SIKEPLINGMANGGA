@@ -434,25 +434,27 @@ export async function appendLaporanToSheet(
   const range = `'${SHEET_TAB_NAME}'!A:N`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
 
+  const kin = item.kinerja || ({} as Record<string, any>);
+
   const poskamlingSummary =
-    item.kinerja.poskamlingStatus && item.kinerja.poskamlingStatus !== 'Tidak Ada Giat'
-      ? `${item.kinerja.poskamlingStatus}${item.kinerja.poskamlingLokasi ? ` (Lokasi: ${item.kinerja.poskamlingLokasi})` : ''}${item.kinerja.poskamlingPetugas ? ` [Petugas: ${item.kinerja.poskamlingPetugas}]` : ''}${item.kinerja.poskamlingKeterangan ? ` - ${item.kinerja.poskamlingKeterangan}` : ''}`
+    kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat'
+      ? `${kin.poskamlingStatus}${kin.poskamlingLokasi ? ` (Lokasi: ${kin.poskamlingLokasi})` : ''}${kin.poskamlingPetugas ? ` [Petugas: ${kin.poskamlingPetugas}]` : ''}${kin.poskamlingKeterangan ? ` - ${kin.poskamlingKeterangan}` : ''}`
       : 'Tidak Ada Giat';
 
   const now = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
   const rowValues = [
     now,
-    item.hari,
-    item.tanggal,
-    item.namaKepling,
-    item.jabatan,
+    item.hari || '',
+    item.tanggal || '',
+    item.namaKepling || '',
+    item.jabatan || '',
     `${item.kelurahan || 'Kel. Mangga'}, ${item.kecamatan || 'Kec. Medan Tuntungan'}`,
-    item.kinerja.opsirPbbWp ? `${item.kinerja.opsirPbbWp} WP${item.kinerja.opsirPbbKeterangan ? ` (${item.kinerja.opsirPbbKeterangan})` : ''}` : '-',
-    item.kinerja.perlinsosKk ? `${item.kinerja.perlinsosKk} KK${item.kinerja.perlinsosKeterangan ? ` (${item.kinerja.perlinsosKeterangan})` : ''}` : '-',
-    item.kinerja.ikdOrang ? `${item.kinerja.ikdOrang} Orang${item.kinerja.ikdKeterangan ? ` (${item.kinerja.ikdKeterangan})` : ''}` : '-',
-    item.kinerja.bpjsKetenagakerjaanOrang ? `${item.kinerja.bpjsKetenagakerjaanOrang} Orang${item.kinerja.bpjsKetenagakerjaanKeterangan ? ` (${item.kinerja.bpjsKetenagakerjaanKeterangan})` : ''}` : '-',
+    kin.opsirPbbWp ? `${kin.opsirPbbWp} WP${kin.opsirPbbKeterangan ? ` (${kin.opsirPbbKeterangan})` : ''}` : '-',
+    kin.perlinsosKk ? `${kin.perlinsosKk} KK${kin.perlinsosKeterangan ? ` (${kin.perlinsosKeterangan})` : ''}` : '-',
+    kin.ikdOrang ? `${kin.ikdOrang} Orang${kin.ikdKeterangan ? ` (${kin.ikdKeterangan})` : ''}` : '-',
+    kin.bpjsKetenagakerjaanOrang ? `${kin.bpjsKetenagakerjaanOrang} Orang${kin.bpjsKetenagakerjaanKeterangan ? ` (${kin.bpjsKetenagakerjaanKeterangan})` : ''}` : '-',
     poskamlingSummary,
-    item.kinerja.kegiatanLainnya || '-',
+    kin.kegiatanLainnya || '-',
     item.jumlahDokumentasi || 0,
     (item.jumlahDokumentasi || 0) > 0 ? `${window.location.origin}/?view-images=${item.id}` : 'Tidak ada foto',
   ];
