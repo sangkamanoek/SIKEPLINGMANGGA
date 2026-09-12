@@ -126,32 +126,68 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
       )
     },
     {
-      title: "3. Simpan & Kirim WhatsApp",
-      subtitle: "Penyimpanan database & integrasi WhatsApp",
-      category: "Publikasi Laporan",
+      title: "3. Simpan, Edit & Kirim WhatsApp",
+      subtitle: "Penyimpanan database, fitur edit laporan, & integrasi WhatsApp",
+      category: "Publikasi & Koreksi Laporan",
       color: "from-emerald-800 to-green-950",
       content: (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
-          <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-xs flex flex-col justify-between">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 py-1">
+          <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-2xs">
+            <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-700 mb-1.5 font-bold text-xs">
+              1
+            </div>
+            <h4 className="font-bold text-slate-800 text-xs mb-1">Simpan Database</h4>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Klik <strong className="text-emerald-700">Simpan Laporan</strong>. Data langsung tersimpan di server & monitoring admin.
+            </p>
+          </div>
+          <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs">
+            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center text-amber-800 mb-1.5 font-bold text-xs">
+              2
+            </div>
+            <h4 className="font-bold text-slate-800 text-xs mb-1">Fitur Edit Laporan</h4>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Kepling dapat <strong className="text-amber-800">mengedit/memperbarui</strong> laporan harian kapan saja melalui Riwayat Laporan.
+            </p>
+          </div>
+          <div className="bg-white p-3 rounded-xl border border-green-200 shadow-2xs">
+            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-green-700 mb-1.5 font-bold text-xs">
+              3
+            </div>
+            <h4 className="font-bold text-slate-800 text-xs mb-1">Kirim WhatsApp</h4>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Bagikan rekap format resmi ke grup WhatsApp pimpinan dengan satu klik.
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "4. Perlinsos & Pendataan Khusus",
+      subtitle: "Pencatatan bansos, warga menolak, & tidak di tempat",
+      category: "Fitur Unggulan",
+      color: "from-teal-800 to-emerald-950",
+      content: (
+        <div className="space-y-3 py-1">
+          <div className="flex items-start gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
             <div>
-              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-700 mb-2 font-bold">
-                1
-              </div>
-              <h4 className="font-bold text-slate-800 text-base mb-1">Simpan ke Database</h4>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Klik tombol <strong className="text-emerald-700">Simpan Laporan</strong>. Data otomatis tersimpan di database server resmi kelurahan & monitoring Super Admin.
-              </p>
+              <p className="font-bold text-slate-800 text-sm">Pendataan & Verifikasi Bansos</p>
+              <p className="text-xs text-slate-500">Catat jumlah KK penerima perlinsos dengan keterangan kegiatan harian.</p>
             </div>
           </div>
-          <div className="bg-white p-4 rounded-xl border border-green-200 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start gap-3 bg-rose-50 p-3 rounded-xl border border-rose-200">
+            <span className="text-lg shrink-0">⚠️</span>
             <div>
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-green-700 mb-2 font-bold">
-                2
-              </div>
-              <h4 className="font-bold text-slate-800 text-base mb-1">Kirim ke WhatsApp</h4>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Klik <strong className="text-green-700">Salin & Kirim ke WhatsApp</strong>. Format laporan resmi beserta ringkasan langsung tersusun dan siap dikirim ke grup WA pimpinan.
-              </p>
+              <p className="font-bold text-rose-900 text-sm">Warga Menolak Pendataan</p>
+              <p className="text-xs text-rose-700">Catat jumlah KK serta tuliskan **Nama dan Alamat** warga yang menolak pendataan perlinsos.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 bg-amber-50 p-3 rounded-xl border border-amber-200">
+            <span className="text-lg shrink-0">🏠</span>
+            <div>
+              <p className="font-bold text-amber-900 text-sm">Warga Tidak di Tempat</p>
+              <p className="text-xs text-amber-800">Catat jumlah KK serta tuliskan **Nama dan Alamat** warga yang tidak berada di tempat.</p>
             </div>
           </div>
         </div>
@@ -281,43 +317,51 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
       ];
       s3.addText(inputItems.join('\n\n'), { x: 0.8, y: 1.5, w: 8.4, h: 3.5, fontSize: 13, color: '1E293B', lineSpacing: 22 });
 
-      // Slide 4: Simpan & Kirim WA
+      // Slide 4: Simpan & Edit & Kirim WA
       const s4 = pptx.addSlide();
-      s4.addText('3. Simpan & Kirim WhatsApp', { x: 0.8, y: 0.5, w: 8.4, h: 0.6, fontSize: 22, bold: true, color: '064E3B' });
+      s4.addText('3. Simpan, Edit & Kirim WhatsApp', { x: 0.8, y: 0.4, w: 8.4, h: 0.6, fontSize: 22, bold: true, color: '064E3B' });
       const pubItems = [
-        "1. Klik tombol 'Simpan Laporan' untuk menyimpan permanen ke database resmi kelurahan.",
-        "2. Klik 'Salin & Kirim ke WhatsApp' untuk membagikan ringkasan laporan ke grup WA Lurah/Camat.",
-        "3. Sinkronisasi Otomatis: Laporan tersimpan di sistem monitoring Super Admin Kelurahan Mangga."
+        "1. Simpan Laporan: Simpan data secara permanen ke database server.",
+        "2. Fitur Edit Laporan: Kepala Lingkungan dapat mengedit / mengoreksi laporan kapan saja melalui menu Riwayat Laporan.",
+        "3. Kirim ke WhatsApp: Bagikan rekap laporan resmi ke grup WhatsApp pimpinan dengan satu klik."
       ];
-      s4.addText(pubItems.join('\n\n'), { x: 0.8, y: 1.5, w: 8.4, h: 3.5, fontSize: 13, color: '1E293B', lineSpacing: 22 });
+      s4.addText(pubItems.join('\n\n'), { x: 0.8, y: 1.3, w: 8.4, h: 3.8, fontSize: 13, color: '1E293B', lineSpacing: 20 });
 
-      // Slide 5: Cetak PDF
+      // Slide 5: Perlinsos Khusus
       const s5 = pptx.addSlide();
-      s5.addText('4. Riwayat & Cetak Dokumen PDF', { x: 0.8, y: 0.5, w: 8.4, h: 0.6, fontSize: 22, bold: true, color: '064E3B' });
+      s5.addText('4. Perlinsos & Pendataan Khusus', { x: 0.8, y: 0.4, w: 8.4, h: 0.6, fontSize: 22, bold: true, color: '064E3B' });
+      const perlinsosItems = [
+        "• Pendataan & Verifikasi Bansos: Catat jumlah KK penerima perlinsos.",
+        "• Warga Menolak Pendataan: Catat jumlah KK serta tuliskan Nama & Alamat warga yang menolak.",
+        "• Warga Tidak di Tempat: Catat jumlah KK serta tuliskan Nama & Alamat warga yang tidak berada di tempat."
+      ];
+      s5.addText(perlinsosItems.join('\n\n'), { x: 0.8, y: 1.3, w: 8.4, h: 3.8, fontSize: 13, color: '1E293B', lineSpacing: 20 });
+
+      // Slide 6: Cetak PDF
+      const s6 = pptx.addSlide();
+      s6.addText('5. Riwayat & Cetak Dokumen PDF', { x: 0.8, y: 0.4, w: 8.4, h: 0.6, fontSize: 22, bold: true, color: '064E3B' });
       const pdfItems = [
         "• Menu Riwayat: Melihat seluruh laporan yang telah dikirim beserta foto dokumentasinya.",
-        "• Fitur Cetak PDF: Klik 'Detail Laporan' -> 'Cetak / Preview'. Format otomatis rapi lengkap dengan Kop Surat Pemko Medan, Foto 2 Kolom, dan Tanda Tangan Resmi.",
-        "• Edit Data: Kepling dapat mengedit atau memperbarui foto jika ada perbaikan."
+        "• Fitur Cetak PDF: Format otomatis rapi lengkap dengan Kop Surat Pemko Medan, Foto 2 Kolom, Rincian Perlinsos, dan Tanda Tangan Resmi."
       ];
-      s5.addText(pdfItems.join('\n\n'), { x: 0.8, y: 1.5, w: 8.4, h: 3.5, fontSize: 13, color: '1E293B', lineSpacing: 22 });
+      s6.addText(pdfItems.join('\n\n'), { x: 0.8, y: 1.4, w: 8.4, h: 3.5, fontSize: 13, color: '1E293B', lineSpacing: 22 });
 
-      // Slide 6: PWA
-      const s6 = pptx.addSlide();
-      s6.addText('5. Pasang Aplikasi di HP (PWA)', { x: 0.8, y: 0.5, w: 8.4, h: 0.6, fontSize: 22, bold: true, color: '064E3B' });
-      const pwaItems = [
-        "Aplikasi tidak perlu didownload dari Play Store / App Store, cukup pasang Pintasan PWA:",
-        "• Android (Chrome): Klik titik tiga (⋮) -> Pilih 'Tambahkan ke Layar Utama'.",
-        "• iPhone (Safari): Klik tombol Share (kotak panah) -> Pilih 'Tambah ke Layar Utama'.",
-        "• Hasilnya aplikasi akan memiliki ikon tersendiri di layar HP seperti aplikasi biasa!"
-      ];
-      s6.addText(pwaItems.join('\n\n'), { x: 0.8, y: 1.4, w: 8.4, h: 3.5, fontSize: 13, color: '1E293B', lineSpacing: 20 });
-
-      // Slide 7: Closing
+      // Slide 7: PWA
       const s7 = pptx.addSlide();
-      s7.background = { color: '064E3B' };
-      s7.addText('Terima Kasih', { x: 0.8, y: 1.8, w: 8.4, h: 0.8, fontSize: 32, bold: true, color: 'FFFFFF', align: 'center' });
-      s7.addText('"Satu Laporan Nyata untuk Pelayanan Masyarakat Kelurahan Mangga"', { x: 0.8, y: 2.8, w: 8.4, h: 0.6, fontSize: 16, italic: true, color: 'A7F3D0', align: 'center' });
-      s7.addText('#MedanUntukSemua  •  #SemuaUntukMedan', { x: 0.8, y: 4.2, w: 8.4, h: 0.4, fontSize: 13, bold: true, color: 'ECFDF5', align: 'center' });
+      s7.addText('6. Pasang Aplikasi di HP (PWA)', { x: 0.8, y: 0.4, w: 8.4, h: 0.6, fontSize: 22, bold: true, color: '064E3B' });
+      const pwaItems = [
+        "Aplikasi tidak perlu didownload dari Play Store, cukup pasang Pintasan PWA:",
+        "• Android (Chrome): Klik titik tiga (⋮) -> Pilih 'Tambahkan ke Layar Utama'.",
+        "• iPhone (Safari): Klik tombol Share (kotak panah) -> Pilih 'Tambah ke Layar Utama'."
+      ];
+      s7.addText(pwaItems.join('\n\n'), { x: 0.8, y: 1.3, w: 8.4, h: 3.8, fontSize: 13, color: '1E293B', lineSpacing: 20 });
+
+      // Slide 8: Closing
+      const s8 = pptx.addSlide();
+      s8.background = { color: '064E3B' };
+      s8.addText('Terima Kasih', { x: 0.8, y: 1.8, w: 8.4, h: 0.8, fontSize: 32, bold: true, color: 'FFFFFF', align: 'center' });
+      s8.addText('"Satu Laporan Nyata untuk Pelayanan Masyarakat Kelurahan Mangga"', { x: 0.8, y: 2.8, w: 8.4, h: 0.6, fontSize: 16, italic: true, color: 'A7F3D0', align: 'center' });
+      s8.addText('#MedanUntukSemua  •  #SemuaUntukMedan', { x: 0.8, y: 4.2, w: 8.4, h: 0.4, fontSize: 13, bold: true, color: 'ECFDF5', align: 'center' });
 
       // Download file
       await pptx.writeFile({ fileName: 'Panduan_Penggunaan_SI_KEPLING_MANGGA.pptx' });
