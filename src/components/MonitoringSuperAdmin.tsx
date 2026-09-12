@@ -31,6 +31,7 @@ import {
   getTodayLocalIso,
   isReportMatchingKepling,
   isReportMatchingDate,
+  getReportIsoDate,
 } from '../lib/formatter';
 
 interface MonitoringSuperAdminProps {
@@ -59,7 +60,37 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
   sheetMeta,
 }) => {
   const todayIso = getTodayLocalIso();
-  const [selectedDate, setSelectedDate] = useState<string>(todayIso);
+
+  // Find the latest date among all available reports
+  const latestAvailableDate = useMemo(() => {
+    if (!reports || reports.length === 0) return '';
+    for (const r of reports) {
+      const iso = getReportIsoDate(r);
+      if (iso) return iso;
+    }
+    return '';
+  }, [reports]);
+
+  // Initial date selection logic: default to today if reports exist today, otherwise default to latestAvailableDate or ''
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    if (!reports || reports.length === 0) return todayIso;
+    const hasToday = reports.some((r) => isReportMatchingDate(r, todayIso));
+    if (hasToday) return todayIso;
+    return latestAvailableDate || '';
+  });
+
+  // Auto-switch selectedDate once reports load if currently selectedDate has 0 reports but database has reports
+  const hasAutoSwitchedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!hasAutoSwitchedRef.current && reports && reports.length > 0) {
+      const hasToday = reports.some((r) => isReportMatchingDate(r, todayIso));
+      if (!hasToday && latestAvailableDate && selectedDate === todayIso) {
+        hasAutoSwitchedRef.current = true;
+        setSelectedDate(latestAvailableDate);
+      }
+    }
+  }, [reports, todayIso, latestAvailableDate, selectedDate]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'PENDING'>('ALL');
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -259,6 +290,20 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                     >
                       Hari Ini
                     </button>
+                    {latestAvailableDate && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDate(latestAvailableDate)}
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          selectedDate === latestAvailableDate
+                            ? 'bg-amber-400 text-slate-950'
+                            : 'bg-white/10 text-emerald-200 hover:bg-white/20'
+                        }`}
+                        title={`Lihat Laporan Tanggal Terbaru (${latestAvailableDate})`}
+                      >
+                        Terbaru
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setSelectedDate('')}
@@ -285,6 +330,46 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Notice Banner if selected date has 0 reports but database has reports */}
+      {stats.submittedCount === 0 && reports.length > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-2.5 text-amber-950 font-medium">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="font-bold text-amber-900">
+                Belum ada laporan Kepling yang diinput khusus untuk tanggal{' '}
+                <span className="underline">{selectedDate || 'pilihan ini'}</span>.
+              </p>
+              <p className="text-[11px] text-amber-800 mt-0.5">
+                {latestAvailableDate ? (
+                  <>Tersedia data laporan pada tanggal terbaru: <strong>{latestAvailableDate}</strong>.</>
+                ) : (
+                  <>Anda dapat menekan tombol <strong>"Semua"</strong> untuk melihat seluruh riwayat laporan.</>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+            {latestAvailableDate && latestAvailableDate !== selectedDate && (
+              <button
+                type="button"
+                onClick={() => setSelectedDate(latestAvailableDate)}
+                className="flex-1 sm:flex-none px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-xl text-xs transition-colors cursor-pointer shadow-2xs"
+              >
+                Lihat Tanggal Terbaru ({latestAvailableDate})
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSelectedDate('')}
+              className="flex-1 sm:flex-none px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-extrabold rounded-xl text-xs transition-colors cursor-pointer shadow-2xs"
+            >
+              Lihat Semua Tanggal
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* High-Level Overview Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
