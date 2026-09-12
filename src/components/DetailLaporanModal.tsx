@@ -589,7 +589,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               </div>
 
               {/* Tampilan Visual Lembar A4 di dalam Modal */}
-              <div className="bg-slate-200 p-2 sm:p-4 rounded-xl overflow-x-auto flex justify-center">
+              <div className="bg-slate-200 p-2 sm:p-4 rounded-xl overflow-x-auto flex flex-col items-center gap-4">
                 <div className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300">
                   {/* Kop Surat Pemko Medan */}
                   <div className="flex items-center gap-3.5 pt-1 pb-2 border-b-[3px] border-black mb-2.5">
@@ -733,67 +733,54 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
                   {/* Foto Dokumentasi - Adaptif & Proper Kedinasan */}
                   {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
-                    <div className="mb-2">
-                      <div className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1.5 text-slate-900 flex items-center justify-between">
-                        <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
-                        <span className="text-[7pt] text-slate-500 font-normal normal-case">Format Album Resmi Kedinasan</span>
-                      </div>
-                      <div
-                        className={`grid gap-2 ${
-                          item.dokumentasiFoto.length <= 3
-                            ? 'grid-cols-3'
-                            : item.dokumentasiFoto.length === 4
-                            ? 'grid-cols-4'
-                            : item.dokumentasiFoto.length <= 6
-                            ? 'grid-cols-3'
-                            : 'grid-cols-4'
-                        }`}
-                      >
-                        {item.dokumentasiFoto.map((foto, idx) => {
-                          const fotoCount = item.dokumentasiFoto?.length || 0;
-                          const heightClass =
-                            fotoCount <= 3
-                              ? 'h-[108px]'
-                              : fotoCount === 4
-                              ? 'h-[88px]'
-                              : fotoCount <= 6
-                              ? 'h-[74px]'
-                              : 'h-[62px]';
-
-                          return (
+                    item.dokumentasiFoto.length <= 3 ? (
+                      <div className="mb-2">
+                        <div className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1.5 text-slate-900 flex items-center justify-between">
+                          <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
+                          <span className="text-[7pt] text-slate-500 font-normal normal-case">Format Album Resmi Kedinasan</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          {item.dokumentasiFoto.map((foto, idx) => (
                             <div
                               key={foto.id || idx}
                               className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center shadow-xs"
                             >
-                              <div className={`w-full ${heightClass} rounded-md overflow-hidden bg-slate-100`}>
+                              <div className="w-full h-[190px] rounded-md overflow-hidden bg-slate-100 flex items-center justify-center">
                                 <img
                                   src={foto.url}
                                   alt={getProperFotoLabel(foto, idx)}
                                   crossOrigin="anonymous"
-                                  className="w-full h-full object-cover object-top"
+                                  className="w-full h-full object-cover object-center"
                                 />
                               </div>
                               <div
-                                className="text-[7pt] font-semibold text-slate-700 mt-1 truncate w-full text-center font-sans"
+                                className="text-[7.5pt] font-bold text-slate-800 mt-1.5 truncate w-full text-center font-sans"
                                 title={getProperFotoLabel(foto, idx)}
                               >
                                 {getProperFotoLabel(foto, idx)}
                               </div>
                             </div>
-                          );
-                        })}
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="mb-2 p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-[8pt] text-slate-700 font-sans flex items-center justify-between">
+                        <div>
+                          <strong>B. DOKUMENTASI LAPANGAN TERLAMPIR:</strong> Sebanyak <strong>{item.dokumentasiFoto.length} Foto Dokumentasi</strong> dicantumkan secara lengkap dan jelas pada <strong>Lembar Lampiran (Halaman 2)</strong>.
+                        </div>
+                        <span className="text-[7pt] bg-slate-200 px-2 py-0.5 rounded font-semibold text-slate-700 shrink-0 ml-2">2 Halaman Dokumen</span>
+                      </div>
+                    )
                   )}
 
                   {/* Pengesahan Tanda Tangan */}
-                  <div className="mt-3 pt-1 text-[8.5pt] font-sans">
+                  <div className="mt-4 pt-1 text-[8.5pt] font-sans">
                     <div className="flex justify-end pr-4">
                       <div className="text-center flex flex-col items-center min-w-[200px]">
                         <div>Medan, {displayTanggal.toUpperCase()}</div>
                         <div className="mt-0.5">Yang Melaporkan,</div>
                         <div className="font-bold uppercase whitespace-nowrap">{(item.jabatan || '').toUpperCase()}</div>
-                        <div className="h-10" />
+                        <div className="h-12" />
                         <div className="font-bold underline uppercase whitespace-nowrap">( {item.namaKepling || ''} )</div>
                         <div className="text-[7.5pt] text-slate-700 mt-0.5">Kepala Lingkungan</div>
                       </div>
@@ -801,11 +788,73 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   </div>
 
                   {/* Footer lembar */}
-                  <div className="mt-2 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic font-sans">
+                  <div className="mt-3 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic font-sans">
                     <span>SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA • Sistem Informasi Pelaporan Kinerja Harian Kepling</span>
-                    <span>Dokumen Resmi 1 Lembar • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    <span>Dokumen Resmi {item.dokumentasiFoto && item.dokumentasiFoto.length > 3 ? 'Halaman 1 dari 2' : '1 Lembar'} • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                   </div>
                 </div>
+
+                {/* TAMPILAN HALAMAN 2 JIKA FOTO > 3 DI MODAL PREVIEW */}
+                {item.dokumentasiFoto && item.dokumentasiFoto.length > 3 && (
+                  <div className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300 mt-4">
+                    {/* Header Lampiran */}
+                    <div className="text-center pb-2 border-b-[2px] border-black mb-3">
+                      <h2 className="text-[11.5pt] font-black uppercase tracking-[0.04em] font-serif">
+                        LAMPIRAN DOKUMENTASI KEGIATAN LAPANGAN
+                      </h2>
+                      <div className="text-[8.5pt] font-serif text-slate-800 mt-0.5">
+                        KEPALA LINGKUNGAN KELURAHAN MANGGA KECAMATAN MEDAN TUNTUNGAN
+                      </div>
+                      <div className="text-[8pt] text-slate-600 mt-1">
+                        <strong>Hari:</strong> {(item.hari || '').toUpperCase()} &nbsp;|&nbsp; <strong>Tanggal:</strong> {displayTanggal.toUpperCase()} &nbsp;|&nbsp; <strong>Petugas:</strong> {item.namaKepling || ''} ({(item.jabatan || '').toUpperCase()})
+                      </div>
+                    </div>
+
+                    {/* Grid Foto Lampiran Besar */}
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      {item.dokumentasiFoto.map((foto, idx) => (
+                        <div
+                          key={foto.id || idx}
+                          className="rounded-lg border border-slate-300 p-2 bg-white flex flex-col items-center shadow-xs"
+                        >
+                          <div className="w-full h-[180px] rounded-md overflow-hidden bg-slate-100 flex items-center justify-center">
+                            <img
+                              src={foto.url}
+                              alt={getProperFotoLabel(foto, idx)}
+                              crossOrigin="anonymous"
+                              className="w-full h-full object-cover object-center"
+                            />
+                          </div>
+                          <div
+                            className="text-[8pt] font-bold text-slate-800 mt-2 truncate w-full text-center font-sans"
+                            title={getProperFotoLabel(foto, idx)}
+                          >
+                            {getProperFotoLabel(foto, idx)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Tanda Tangan Pengesahan Lampiran */}
+                    <div className="mt-3 pt-2 text-[8.5pt] font-sans">
+                      <div className="flex justify-end pr-4">
+                        <div className="text-center flex flex-col items-center min-w-[200px]">
+                          <div>Medan, {displayTanggal.toUpperCase()}</div>
+                          <div className="mt-0.5">Kepala Lingkungan Pelapor,</div>
+                          <div className="font-bold uppercase whitespace-nowrap">{(item.jabatan || '').toUpperCase()}</div>
+                          <div className="h-10" />
+                          <div className="font-bold underline uppercase whitespace-nowrap">( {item.namaKepling || ''} )</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Halaman 2 */}
+                    <div className="mt-3 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic font-sans">
+                      <span>LAMPIRAN RESMI DOKUMENTASI KEGIATAN KEPALA LINGKUNGAN</span>
+                      <span>Halaman 2 dari 2 • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -1469,246 +1518,446 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
       <div
         id="lembar-cetak-laporan-kepling"
-        className="hidden print:block page-print-single bg-white text-slate-900 w-[190mm] mx-auto font-serif text-[8pt] leading-tight"
-        style={{ pageBreakAfter: 'avoid', breakAfter: 'avoid', maxHeight: '285mm', overflow: 'hidden', paddingTop: '10px', paddingLeft: '4px', paddingRight: '4px' }}
+        className="hidden print:block bg-white text-slate-900 w-[190mm] mx-auto font-serif text-[8pt] leading-tight"
+        style={{ paddingTop: '8px', paddingLeft: '4px', paddingRight: '4px' }}
       >
-        {/* KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
-        <div
-          className="flex items-center gap-3.5 pb-2 border-b-[3px] border-black mb-2.5"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            borderBottom: '3px solid #000000',
-            paddingTop: '2px',
-            paddingBottom: '8px',
-            marginBottom: '10px',
-          }}
-        >
-          <img
-            src="/logo_pemko_medan.png"
-            alt="Logo Pemko Medan"
-            crossOrigin="anonymous"
-            className="shrink-0"
-            style={{
-              width: '74px',
-              height: '89px',
-              minWidth: '74px',
-              maxWidth: '74px',
-              objectFit: 'contain',
-              display: 'block',
-            }}
-          />
-          <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '74px' }}>
+        {/* ================= HALAMAN 1 : LAPORAN UTAMA ================= */}
+        <div className="page-print-single" style={{ minHeight: '265mm', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            {/* KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
             <div
-              className="text-[12.5pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
-              style={{ fontSize: '12.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.25', marginBottom: '2px' }}
-            >
-              PEMERINTAH KOTA MEDAN
-            </div>
-            <div
-              className="text-[12.5pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
-              style={{ fontSize: '12.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.25', marginBottom: '3px' }}
-            >
-              KECAMATAN MEDAN TUNTUNGAN
-            </div>
-            <div
-              className="text-[16.5pt] font-black uppercase font-sans text-black tracking-[0.05em]"
-              style={{ fontSize: '16.5pt', fontWeight: '900', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2', marginBottom: '4px' }}
-            >
-              KELURAHAN MANGGA
-            </div>
-            <div
-              className="text-[8.5pt] text-black font-sans"
-              style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.35', marginBottom: '1.5px' }}
-            >
-              Jalan Tembakau Raya No. 35 A P. Simalingkar - Medan
-            </div>
-            <div
-              className="text-[8pt] text-slate-800 font-sans"
-              style={{ fontSize: '8pt', fontFamily: 'sans-serif', color: '#1e293b', lineHeight: '1.35' }}
-            >
-              Laman kel.mangga@pemkomedan.go.id
-            </div>
-          </div>
-        </div>
-
-        {/* JUDUL LAPORAN */}
-        <div className="text-center my-2.5" style={{ textAlign: 'center', margin: '10px 0' }}>
-          <h1
-            className="text-[11.5pt] font-black uppercase tracking-[0.04em] underline font-serif"
-            style={{ fontSize: '11.5pt', fontWeight: 'bold', textDecoration: 'underline', textTransform: 'uppercase', fontFamily: "'Times New Roman', Times, serif" }}
-          >
-            LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN
-          </h1>
-          <div
-            className="text-[8.5pt] font-serif mt-1"
-            style={{ fontSize: '8.5pt', fontFamily: "'Times New Roman', Times, serif", marginTop: '4px' }}
-          >
-            <span style={{ fontWeight: 'bold' }}>Hari:</span> {(item?.hari || '').toUpperCase()} &nbsp;&nbsp;|&nbsp;&nbsp; <span style={{ fontWeight: 'bold' }}>Tanggal:</span> {displayTanggal.toUpperCase()}
-          </div>
-        </div>
-
-        {/* DATA IDENTITAS PETUGAS */}
-        <div
-          className="mb-2 text-[8.5pt] font-sans bg-white p-2 rounded-lg border border-slate-300"
-          style={{
-            border: '1px solid #cbd5e1',
-            borderRadius: '6px',
-            padding: '6px 12px',
-            marginBottom: '8px',
-            fontFamily: 'sans-serif',
-            fontSize: '8.5pt',
-            backgroundColor: '#ffffff',
-          }}
-        >
-          <table className="w-full text-left" style={{ width: '100%', textAlign: 'left' }}>
-            <tbody>
-              <tr>
-                <td className="w-32 font-bold py-0.5 text-slate-800" style={{ width: '125px', fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Nama Petugas</td>
-                <td className="w-4 font-bold" style={{ width: '14px', fontWeight: 'bold' }}>:</td>
-                <td className="font-bold uppercase text-slate-900" style={{ fontWeight: 'bold', textTransform: 'uppercase', color: '#0f172a' }}>{item?.namaKepling || ''}</td>
-                <td className="w-24 font-bold py-0.5 text-slate-800" style={{ width: '90px', fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Kelurahan</td>
-                <td className="w-4 font-bold" style={{ width: '14px', fontWeight: 'bold' }}>:</td>
-                <td className="text-slate-900" style={{ color: '#0f172a' }}>{item?.kelurahan || 'Kelurahan Mangga'}</td>
-              </tr>
-              <tr>
-                <td className="font-bold py-0.5 text-slate-800" style={{ fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Jabatan / Wilayah</td>
-                <td className="font-bold" style={{ fontWeight: 'bold' }}>:</td>
-                <td className="font-bold text-slate-900" style={{ fontWeight: 'bold', color: '#0f172a' }}>{item?.jabatan || ''}</td>
-                <td className="font-bold py-0.5 text-slate-800" style={{ fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Kecamatan</td>
-                <td className="font-bold" style={{ fontWeight: 'bold' }}>:</td>
-                <td className="text-slate-900" style={{ color: '#0f172a' }}>{item?.kecamatan || 'Kecamatan Medan Tuntungan'}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* TABEL REKAPITULASI KINERJA & TUGAS HARIAN */}
-        <div className="mb-2" style={{ marginBottom: '8px' }}>
-          <div
-            className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900"
-            style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#0f172a' }}
-          >
-            A. REKAPITULASI CAPAIAN & KEGIATAN HARIAN:
-          </div>
-          <table
-            className="print-table w-full text-left text-[8pt] font-sans border-[1.5px] border-black"
-            style={{ width: '100%', textAlign: 'left', fontSize: '8pt', fontFamily: 'sans-serif', borderCollapse: 'collapse', border: '1.5px solid #000000' }}
-          >
-            <thead>
-              <tr style={{ backgroundColor: '#ffffff', color: '#000000', fontWeight: 'bold' }}>
-                <th style={{ border: '1px solid #000000', width: '32px', textAlign: 'center', padding: '4px 2px' }}>NO</th>
-                <th style={{ border: '1px solid #000000', width: '210px', padding: '4px 6px' }}>URAIAN KEGIATAN KINERJA</th>
-                <th style={{ border: '1px solid #000000', width: '105px', textAlign: 'center', padding: '4px 2px' }}>REALISASI</th>
-                <th style={{ border: '1px solid #000000', padding: '4px 6px' }}>KETERANGAN / RINCIAN LAPANGAN</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>1</td>
-                <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Opsir Pajak Bumi & Bangunan (PBB)</td>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
-                  {item.kinerja?.opsirPbbWp || 0} WP
-                </td>
-                <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.opsirPbbKeterangan || 'Pembayaran PBB'}</td>
-              </tr>
-              <tr>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>2</td>
-                <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Perlindungan Sosial (PERLINSOS)</td>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
-                  {item.kinerja?.perlinsosKk || 0} KK
-                </td>
-                <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>
-                  <div>{item.kinerja?.perlinsosKeterangan || 'Pendataan Perlinsos'}</div>
-                  {item.kinerja?.perlinsosMenolakKk && String(item.kinerja.perlinsosMenolakKk) !== '0' && (
-                    <div style={{ marginTop: '2px', fontSize: '7.5pt', color: '#9f1239', fontFamily: 'sans-serif', lineHeight: '1.2' }}>
-                      <strong>• Menolak ({item.kinerja.perlinsosMenolakKk} KK):</strong> {item.kinerja.perlinsosMenolakRincian || '-'}
-                    </div>
-                  )}
-                  {item.kinerja?.perlinsosTidakDiTempatKk && String(item.kinerja.perlinsosTidakDiTempatKk) !== '0' && (
-                    <div style={{ marginTop: '2px', fontSize: '7.5pt', color: '#1e293b', fontFamily: 'sans-serif', lineHeight: '1.2' }}>
-                      <strong>• Tidak Di Tempat ({item.kinerja.perlinsosTidakDiTempatKk} KK):</strong> {item.kinerja.perlinsosTidakDiTempatRincian || '-'}
-                    </div>
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>3</td>
-                <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Identitas Kependudukan Digital (IKD)</td>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
-                  {item.kinerja?.ikdOrang || 0} Orang
-                </td>
-                <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.ikdKeterangan || 'Aktivasi aplikasi IKD Dukcapil'}</td>
-              </tr>
-              <tr>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>4</td>
-                <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>BPJS Ketenagakerjaan (Pekerja Rentan)</td>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
-                  {item.kinerja?.bpjsKetenagakerjaanOrang || 0} Orang
-                </td>
-                <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.bpjsKetenagakerjaanKeterangan || 'Sosialisasi pekerja rentan'}</td>
-              </tr>
-              <tr>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>5</td>
-                <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Pos Ronda / SISKAMLING</td>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
-                  {item.kinerja?.poskamlingStatus || 'Aktif Ronda Malam'}
-                </td>
-                <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>
-                  {item.kinerja?.poskamlingLokasi ? `Lokasi: ${item.kinerja.poskamlingLokasi}. ` : ''}
-                  {item.kinerja?.poskamlingPetugas ? `Petugas: ${item.kinerja.poskamlingPetugas}. ` : ''}
-                  {item.kinerja?.poskamlingKeterangan || 'Patroli siskamling lingkungan kondusif dan aman'}
-                </td>
-              </tr>
-              <tr>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>6</td>
-                <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Kegiatan Kebersihan & Lainnya</td>
-                <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>Terlaksana</td>
-                <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.kegiatanLainnya || 'Pemantauan kebersihan lingkungan dan drainase warga'}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* DOKUMENTASI FOTO KEGIATAN - ADAPTIF & PROPER KEDINASAN */}
-        {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
-          <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '8px' }}>
-            <div
-              className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900"
-              style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            >
-              <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
-              <span style={{ fontSize: '7pt', color: '#64748b', fontWeight: 'normal', textTransform: 'none' }}>Format Album Resmi Kedinasan</span>
-            </div>
-            <div
+              className="flex items-center gap-3.5 pb-2 border-b-[3px] border-black mb-2.5"
               style={{
-                display: 'grid',
-                gridTemplateColumns:
-                  item.dokumentasiFoto.length <= 3
-                    ? 'repeat(3, 1fr)'
-                    : item.dokumentasiFoto.length === 4
-                    ? 'repeat(4, 1fr)'
-                    : item.dokumentasiFoto.length <= 6
-                    ? 'repeat(3, 1fr)'
-                    : 'repeat(4, 1fr)',
-                columnGap: '8px',
-                rowGap: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '14px',
+                borderBottom: '3px solid #000000',
+                paddingTop: '2px',
+                paddingBottom: '8px',
+                marginBottom: '10px',
               }}
             >
-              {item.dokumentasiFoto.map((foto, idx) => {
-                const fotoCount = item.dokumentasiFoto?.length || 0;
-                const heightPx =
-                  fotoCount <= 3 ? '108px' : fotoCount === 4 ? '88px' : fotoCount <= 6 ? '74px' : '62px';
+              <img
+                src="/logo_pemko_medan.png"
+                alt="Logo Pemko Medan"
+                crossOrigin="anonymous"
+                className="shrink-0"
+                style={{
+                  width: '74px',
+                  height: '89px',
+                  minWidth: '74px',
+                  maxWidth: '74px',
+                  objectFit: 'contain',
+                  display: 'block',
+                }}
+              />
+              <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '74px' }}>
+                <div
+                  className="text-[12.5pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
+                  style={{ fontSize: '12.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.25', marginBottom: '2px' }}
+                >
+                  PEMERINTAH KOTA MEDAN
+                </div>
+                <div
+                  className="text-[12.5pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
+                  style={{ fontSize: '12.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.25', marginBottom: '3px' }}
+                >
+                  KECAMATAN MEDAN TUNTUNGAN
+                </div>
+                <div
+                  className="text-[16.5pt] font-black uppercase font-sans text-black tracking-[0.05em]"
+                  style={{ fontSize: '16.5pt', fontWeight: '900', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2', marginBottom: '4px' }}
+                >
+                  KELURAHAN MANGGA
+                </div>
+                <div
+                  className="text-[8.5pt] text-black font-sans"
+                  style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.35', marginBottom: '1.5px' }}
+                >
+                  Jalan Tembakau Raya No. 35 A P. Simalingkar - Medan
+                </div>
+                <div
+                  className="text-[8pt] text-slate-800 font-sans"
+                  style={{ fontSize: '8pt', fontFamily: 'sans-serif', color: '#1e293b', lineHeight: '1.35' }}
+                >
+                  Laman kel.mangga@pemkomedan.go.id
+                </div>
+              </div>
+            </div>
 
-                return (
+            {/* JUDUL LAPORAN */}
+            <div className="text-center my-2.5" style={{ textAlign: 'center', margin: '8px 0' }}>
+              <h1
+                className="text-[11.5pt] font-black uppercase tracking-[0.04em] underline font-serif"
+                style={{ fontSize: '11.5pt', fontWeight: 'bold', textDecoration: 'underline', textTransform: 'uppercase', fontFamily: "'Times New Roman', Times, serif" }}
+              >
+                LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN
+              </h1>
+              <div
+                className="text-[8.5pt] font-serif mt-1"
+                style={{ fontSize: '8.5pt', fontFamily: "'Times New Roman', Times, serif", marginTop: '3px' }}
+              >
+                <span style={{ fontWeight: 'bold' }}>Hari:</span> {(item?.hari || '').toUpperCase()} &nbsp;&nbsp;|&nbsp;&nbsp; <span style={{ fontWeight: 'bold' }}>Tanggal:</span> {displayTanggal.toUpperCase()}
+              </div>
+            </div>
+
+            {/* DATA IDENTITAS PETUGAS */}
+            <div
+              className="mb-2 text-[8.5pt] font-sans bg-white p-2 rounded-lg border border-slate-300"
+              style={{
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                marginBottom: '8px',
+                fontFamily: 'sans-serif',
+                fontSize: '8.5pt',
+                backgroundColor: '#ffffff',
+              }}
+            >
+              <table className="w-full text-left" style={{ width: '100%', textAlign: 'left' }}>
+                <tbody>
+                  <tr>
+                    <td className="w-32 font-bold py-0.5 text-slate-800" style={{ width: '125px', fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Nama Petugas</td>
+                    <td className="w-4 font-bold" style={{ width: '14px', fontWeight: 'bold' }}>:</td>
+                    <td className="font-bold uppercase text-slate-900" style={{ fontWeight: 'bold', textTransform: 'uppercase', color: '#0f172a' }}>{item?.namaKepling || ''}</td>
+                    <td className="w-24 font-bold py-0.5 text-slate-800" style={{ width: '90px', fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Kelurahan</td>
+                    <td className="w-4 font-bold" style={{ width: '14px', fontWeight: 'bold' }}>:</td>
+                    <td className="text-slate-900" style={{ color: '#0f172a' }}>{item?.kelurahan || 'Kelurahan Mangga'}</td>
+                  </tr>
+                  <tr>
+                    <td className="font-bold py-0.5 text-slate-800" style={{ fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Jabatan / Wilayah</td>
+                    <td className="font-bold" style={{ fontWeight: 'bold' }}>:</td>
+                    <td className="font-bold text-slate-900" style={{ fontWeight: 'bold', color: '#0f172a' }}>{item?.jabatan || ''}</td>
+                    <td className="font-bold py-0.5 text-slate-800" style={{ fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Kecamatan</td>
+                    <td className="font-bold" style={{ fontWeight: 'bold' }}>:</td>
+                    <td className="text-slate-900" style={{ color: '#0f172a' }}>{item?.kecamatan || 'Kecamatan Medan Tuntungan'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* TABEL REKAPITULASI KINERJA & TUGAS HARIAN */}
+            <div className="mb-2" style={{ marginBottom: '8px' }}>
+              <div
+                className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900"
+                style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#0f172a' }}
+              >
+                A. REKAPITULASI CAPAIAN & KEGIATAN HARIAN:
+              </div>
+              <table
+                className="print-table w-full text-left text-[8pt] font-sans border-[1.5px] border-black"
+                style={{ width: '100%', textAlign: 'left', fontSize: '8pt', fontFamily: 'sans-serif', borderCollapse: 'collapse', border: '1.5px solid #000000' }}
+              >
+                <thead>
+                  <tr style={{ backgroundColor: '#ffffff', color: '#000000', fontWeight: 'bold' }}>
+                    <th style={{ border: '1px solid #000000', width: '32px', textAlign: 'center', padding: '4px 2px' }}>NO</th>
+                    <th style={{ border: '1px solid #000000', width: '210px', padding: '4px 6px' }}>URAIAN KEGIATAN KINERJA</th>
+                    <th style={{ border: '1px solid #000000', width: '105px', textAlign: 'center', padding: '4px 2px' }}>REALISASI</th>
+                    <th style={{ border: '1px solid #000000', padding: '4px 6px' }}>KETERANGAN / RINCIAN LAPANGAN</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>1</td>
+                    <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Opsir Pajak Bumi & Bangunan (PBB)</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
+                      {item.kinerja?.opsirPbbWp || 0} WP
+                    </td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.opsirPbbKeterangan || 'Pembayaran PBB'}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>2</td>
+                    <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Perlindungan Sosial (PERLINSOS)</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
+                      {item.kinerja?.perlinsosKk || 0} KK
+                    </td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>
+                      <div>{item.kinerja?.perlinsosKeterangan || 'Pendataan Perlinsos'}</div>
+                      {item.kinerja?.perlinsosMenolakKk && String(item.kinerja.perlinsosMenolakKk) !== '0' && (
+                        <div style={{ marginTop: '2px', fontSize: '7.5pt', color: '#9f1239', fontFamily: 'sans-serif', lineHeight: '1.2' }}>
+                          <strong>• Menolak ({item.kinerja.perlinsosMenolakKk} KK):</strong> {item.kinerja.perlinsosMenolakRincian || '-'}
+                        </div>
+                      )}
+                      {item.kinerja?.perlinsosTidakDiTempatKk && String(item.kinerja.perlinsosTidakDiTempatKk) !== '0' && (
+                        <div style={{ marginTop: '2px', fontSize: '7.5pt', color: '#1e293b', fontFamily: 'sans-serif', lineHeight: '1.2' }}>
+                          <strong>• Tidak Di Tempat ({item.kinerja.perlinsosTidakDiTempatKk} KK):</strong> {item.kinerja.perlinsosTidakDiTempatRincian || '-'}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>3</td>
+                    <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Identitas Kependudukan Digital (IKD)</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
+                      {item.kinerja?.ikdOrang || 0} Orang
+                    </td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.ikdKeterangan || 'Aktivasi aplikasi IKD Dukcapil'}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>4</td>
+                    <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>BPJS Ketenagakerjaan (Pekerja Rentan)</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
+                      {item.kinerja?.bpjsKetenagakerjaanOrang || 0} Orang
+                    </td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.bpjsKetenagakerjaanKeterangan || 'Sosialisasi pekerja rentan'}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>5</td>
+                    <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Pos Ronda / SISKAMLING</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
+                      {item.kinerja?.poskamlingStatus || 'Aktif Ronda Malam'}
+                    </td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>
+                      {item.kinerja?.poskamlingLokasi ? `Lokasi: ${item.kinerja.poskamlingLokasi}. ` : ''}
+                      {item.kinerja?.poskamlingPetugas ? `Petugas: ${item.kinerja.poskamlingPetugas}. ` : ''}
+                      {item.kinerja?.poskamlingKeterangan || 'Patroli siskamling lingkungan kondusif dan aman'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>6</td>
+                    <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Kegiatan Kebersihan & Lainnya</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>Terlaksana</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.kegiatanLainnya || 'Pemantauan kebersihan lingkungan dan drainase warga'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* DOKUMENTASI FOTO KEGIATAN - JIKA FOTO <= 3 (TAMPIL BESAR DI HALAMAN 1) */}
+            {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && item.dokumentasiFoto.length <= 3 && (
+              <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '10px' }}>
+                <div
+                  className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900"
+                  style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '6px', color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
+                  <span style={{ fontSize: '7pt', color: '#64748b', fontWeight: 'normal', textTransform: 'none' }}>Format Album Resmi Kedinasan</span>
+                </div>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    columnGap: '10px',
+                    rowGap: '8px',
+                  }}
+                >
+                  {item.dokumentasiFoto.map((foto, idx) => (
+                    <div
+                      key={foto.id || idx}
+                      className="rounded border border-slate-300 p-1.5 bg-white flex flex-col items-center avoid-break"
+                      style={{
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        padding: '5px',
+                        backgroundColor: '#ffffff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        pageBreakInside: 'avoid',
+                        breakInside: 'avoid',
+                      }}
+                    >
+                      <div
+                        className="w-full rounded overflow-hidden bg-slate-100 flex items-center justify-center"
+                        style={{
+                          width: '100%',
+                          height: '190px',
+                          borderRadius: '4px',
+                          overflow: 'hidden',
+                          backgroundColor: '#f1f5f9',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <img
+                          src={foto.url}
+                          alt={getProperFotoLabel(foto, idx)}
+                          crossOrigin="anonymous"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center',
+                            display: 'block',
+                          }}
+                        />
+                      </div>
+                      <div
+                        className="text-[7.5pt] text-slate-800 font-bold mt-1.5 truncate w-full text-center font-sans"
+                        style={{
+                          fontSize: '7.5pt',
+                          fontWeight: 'bold',
+                          color: '#1e293b',
+                          marginTop: '4px',
+                          overflow: 'hidden',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                          width: '100%',
+                          textAlign: 'center',
+                          fontFamily: 'sans-serif',
+                        }}
+                        title={getProperFotoLabel(foto, idx)}
+                      >
+                        {getProperFotoLabel(foto, idx)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* JIKA FOTO > 3: KETERANGAN LAMPIRAN DI HALAMAN 1 */}
+            {item.dokumentasiFoto && item.dokumentasiFoto.length > 3 && (
+              <div
+                className="mb-3 avoid-break"
+                style={{
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: '8px 12px',
+                  backgroundColor: '#f8fafc',
+                  fontSize: '8pt',
+                  fontFamily: 'sans-serif',
+                  marginBottom: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div>
+                  <strong>B. DOKUMENTASI LAPANGAN TERLAMPIR:</strong> Sebanyak <strong>{item.dokumentasiFoto.length} Foto Dokumentasi</strong> dicantumkan lengkap pada <strong>Lembar Lampiran (Halaman 2)</strong>.
+                </div>
+                <span style={{ fontSize: '7pt', backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>2 Halaman Dokumen</span>
+              </div>
+            )}
+          </div>
+
+          <div>
+            {/* TANDA TANGAN RESMI PENGESAHAN DOKUMEN */}
+            <div
+              className="mt-3 pt-1 avoid-break text-[8.5pt] font-sans"
+              style={{
+                pageBreakInside: 'avoid',
+                breakInside: 'avoid',
+                marginTop: '12px',
+                paddingTop: '2px',
+                fontFamily: 'sans-serif',
+                fontSize: '8.5pt',
+              }}
+            >
+              <div
+                className="flex justify-end pr-4"
+                style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '16px' }}
+              >
+                <div
+                  className="text-center flex flex-col items-center min-w-[220px]"
+                  style={{
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    minWidth: '220px',
+                  }}
+                >
+                  <div>Medan, {displayTanggal.toUpperCase()}</div>
+                  <div className="mt-0.5">Yang Melaporkan,</div>
+                  <div className="font-bold uppercase whitespace-nowrap" style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>
+                    {(item?.jabatan || '').toUpperCase()}
+                  </div>
+                  <div style={{ height: '42px' }} />
+                  <div className="font-bold underline uppercase whitespace-nowrap" style={{ fontWeight: 'bold', textDecoration: 'underline', textTransform: 'uppercase' }}>
+                    ( {item?.namaKepling || ''} )
+                  </div>
+                  <div className="text-[7.5pt] text-slate-700 mt-0.5" style={{ fontSize: '7.5pt', color: '#334155' }}>Kepala Lingkungan</div>
+                </div>
+              </div>
+            </div>
+
+            {/* FOOTER RESMI DOKUMEN HALAMAN 1 */}
+            <div
+              className="mt-3 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic avoid-break font-sans"
+              style={{
+                pageBreakInside: 'avoid',
+                breakInside: 'avoid',
+                borderTop: '1px solid #cbd5e1',
+                marginTop: '10px',
+                paddingTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '6.5pt',
+                color: '#64748b',
+                fontStyle: 'italic',
+                fontFamily: 'sans-serif',
+              }}
+            >
+              <span>SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA • Sistem Informasi Pelaporan Kinerja Harian Kepling</span>
+              <span>Dokumen Resmi {item.dokumentasiFoto && item.dokumentasiFoto.length > 3 ? 'Halaman 1 dari 2' : '1 Lembar'} • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ================= HALAMAN 2 : LEMBAR LAMPIRAN FOTO (JIKA FOTO > 3) ================= */}
+        {item.dokumentasiFoto && item.dokumentasiFoto.length > 3 && (
+          <div
+            className="page-print-single"
+            style={{
+              pageBreakBefore: 'always',
+              breakBefore: 'page',
+              minHeight: '265mm',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              paddingTop: '14px',
+            }}
+          >
+            <div>
+              {/* HEADER KOP LAMPIRAN RESMI */}
+              <div
+                style={{
+                  textAlign: 'center',
+                  borderBottom: '2px solid #000000',
+                  paddingBottom: '8px',
+                  marginBottom: '12px',
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: '11.5pt',
+                    fontWeight: '900',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    fontFamily: 'serif',
+                    margin: 0,
+                  }}
+                >
+                  LAMPIRAN DOKUMENTASI KEGIATAN LAPANGAN
+                </h2>
+                <div style={{ fontSize: '8.5pt', fontFamily: 'serif', color: '#1e293b', marginTop: '2px' }}>
+                  KEPALA LINGKUNGAN KELURAHAN MANGGA KECAMATAN MEDAN TUNTUNGAN
+                </div>
+                <div style={{ fontSize: '8pt', fontFamily: 'sans-serif', color: '#475569', marginTop: '4px' }}>
+                  <strong>Hari:</strong> {(item.hari || '').toUpperCase()} &nbsp;|&nbsp; <strong>Tanggal:</strong> {displayTanggal.toUpperCase()} &nbsp;|&nbsp; <strong>Petugas:</strong> {item.namaKepling || ''} ({(item.jabatan || '').toUpperCase()})
+                </div>
+              </div>
+
+              {/* GRID FOTO LAMPIRAN BESAR & UTUH */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  columnGap: '12px',
+                  rowGap: '10px',
+                  marginBottom: '14px',
+                }}
+              >
+                {item.dokumentasiFoto.map((foto, idx) => (
                   <div
                     key={foto.id || idx}
-                    className="rounded border border-slate-300 p-1 bg-white flex flex-col items-center avoid-break"
                     style={{
                       border: '1px solid #cbd5e1',
                       borderRadius: '6px',
-                      padding: '4px',
+                      padding: '6px',
                       backgroundColor: '#ffffff',
                       display: 'flex',
                       flexDirection: 'column',
@@ -1718,13 +1967,15 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     }}
                   >
                     <div
-                      className="w-full rounded overflow-hidden bg-slate-100"
                       style={{
                         width: '100%',
-                        height: heightPx,
+                        height: '185px',
                         borderRadius: '4px',
                         overflow: 'hidden',
                         backgroundColor: '#f1f5f9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
                       <img
@@ -1735,18 +1986,17 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                           width: '100%',
                           height: '100%',
                           objectFit: 'cover',
-                          objectPosition: 'center 20%',
+                          objectPosition: 'center',
                           display: 'block',
                         }}
                       />
                     </div>
                     <div
-                      className="text-[7pt] text-slate-700 font-semibold mt-1 truncate w-full text-center font-sans"
                       style={{
-                        fontSize: '7pt',
-                        fontWeight: '600',
-                        color: '#334155',
-                        marginTop: '3px',
+                        fontSize: '8pt',
+                        fontWeight: 'bold',
+                        color: '#1e293b',
+                        marginTop: '5px',
                         overflow: 'hidden',
                         whiteSpace: 'nowrap',
                         textOverflow: 'ellipsis',
@@ -1759,73 +2009,57 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                       {getProperFotoLabel(foto, idx)}
                     </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
+            </div>
+
+            <div>
+              {/* TANDA TANGAN PENGESAHAN LAMPIRAN */}
+              <div
+                style={{
+                  pageBreakInside: 'avoid',
+                  breakInside: 'avoid',
+                  marginTop: '10px',
+                  fontFamily: 'sans-serif',
+                  fontSize: '8.5pt',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '16px' }}>
+                  <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '220px' }}>
+                    <div>Medan, {displayTanggal.toUpperCase()}</div>
+                    <div style={{ marginTop: '2px' }}>Kepala Lingkungan Pelapor,</div>
+                    <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{(item?.jabatan || '').toUpperCase()}</div>
+                    <div style={{ height: '36px' }} />
+                    <div style={{ fontWeight: 'bold', textDecoration: 'underline', textTransform: 'uppercase' }}>
+                      ( {item?.namaKepling || ''} )
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* FOOTER HALAMAN 2 */}
+              <div
+                style={{
+                  pageBreakInside: 'avoid',
+                  breakInside: 'avoid',
+                  borderTop: '1px solid #cbd5e1',
+                  marginTop: '10px',
+                  paddingTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '6.5pt',
+                  color: '#64748b',
+                  fontStyle: 'italic',
+                  fontFamily: 'sans-serif',
+                }}
+              >
+                <span>LAMPIRAN RESMI DOKUMENTASI KEGIATAN KEPALA LINGKUNGAN</span>
+                <span>Halaman 2 dari 2 • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              </div>
             </div>
           </div>
         )}
-
-        {/* TANDA TANGAN RESMI PENGESAHAN DOKUMEN */}
-        <div
-          className="mt-2 pt-1 avoid-break text-[8.5pt] font-sans"
-          style={{
-            pageBreakInside: 'avoid',
-            breakInside: 'avoid',
-            marginTop: '8px',
-            paddingTop: '2px',
-            fontFamily: 'sans-serif',
-            fontSize: '8.5pt',
-          }}
-        >
-          <div
-            className="flex justify-end pr-4"
-            style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '16px' }}
-          >
-            <div
-              className="text-center flex flex-col items-center min-w-[220px]"
-              style={{
-                textAlign: 'center',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                minWidth: '220px',
-              }}
-            >
-              <div>Medan, {displayTanggal.toUpperCase()}</div>
-              <div className="mt-0.5">Yang Melaporkan,</div>
-              <div className="font-bold uppercase whitespace-nowrap" style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>
-                {(item?.jabatan || '').toUpperCase()}
-              </div>
-              <div style={{ height: '36px' }} />
-              <div className="font-bold underline uppercase whitespace-nowrap" style={{ fontWeight: 'bold', textDecoration: 'underline', textTransform: 'uppercase' }}>
-                ( {item?.namaKepling || ''} )
-              </div>
-              <div className="text-[7.5pt] text-slate-700 mt-0.5" style={{ fontSize: '7.5pt', color: '#334155' }}>Kepala Lingkungan</div>
-            </div>
-          </div>
-        </div>
-
-        {/* FOOTER RESMI DOKUMEN */}
-        <div
-          className="mt-2 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic avoid-break font-sans"
-          style={{
-            pageBreakInside: 'avoid',
-            breakInside: 'avoid',
-            borderTop: '1px solid #cbd5e1',
-            marginTop: '8px',
-            paddingTop: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '6.5pt',
-            color: '#64748b',
-            fontStyle: 'italic',
-            fontFamily: 'sans-serif',
-          }}
-        >
-          <span>SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA • Sistem Informasi Pelaporan Kinerja Harian Kepling</span>
-          <span>Dokumen Resmi 1 Lembar • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-        </div>
       </div>
 
       {/* Lightbox / Pratinjau & Download Foto Modal */}
