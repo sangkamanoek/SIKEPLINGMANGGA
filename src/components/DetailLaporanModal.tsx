@@ -563,39 +563,39 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               <div className="bg-slate-200 p-2 sm:p-4 rounded-xl overflow-x-auto flex justify-center">
                 <div className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300">
                   {/* Kop Surat Pemko Medan */}
-                  <div className="flex items-center gap-3 pb-2 border-b-[3.5px] border-black mb-2.5">
+                  <div className="flex items-center gap-3.5 pb-2.5 border-b-[3.5px] border-black mb-3">
                     <img
                       src="/logo_pemko_medan.png"
                       alt="Logo Pemko Medan"
                       crossOrigin="anonymous"
-                      className="w-[65px] h-[80px] object-contain shrink-0 ml-1"
+                      className="w-[82px] h-[98px] object-contain shrink-0 ml-1"
                     />
-                    <div className="text-center flex-1 pr-[65px]">
-                      <div className="text-[13pt] uppercase font-sans text-black leading-tight font-bold">
+                    <div className="text-center flex-1 pr-[82px]">
+                      <div className="text-[13pt] uppercase font-sans text-black leading-[1.3] font-bold tracking-[0.04em] mb-0.5">
                         PEMERINTAH KOTA MEDAN
                       </div>
-                      <div className="text-[13pt] uppercase font-sans text-black leading-tight font-bold">
+                      <div className="text-[13pt] uppercase font-sans text-black leading-[1.3] font-bold tracking-[0.04em] mb-1">
                         KECAMATAN MEDAN TUNTUNGAN
                       </div>
-                      <div className="text-[18pt] font-black uppercase font-sans text-black leading-tight my-0.5 tracking-wide">
+                      <div className="text-[17.5pt] font-black uppercase font-sans text-black leading-[1.2] tracking-[0.06em] mb-1.5">
                         KELURAHAN MANGGA
                       </div>
-                      <div className="text-[8.5pt] text-black font-sans leading-snug">
-                        Jalan Tembakau Raya No.35 A Medan Tuntungan, Medan, Sumatera Utara 20141
+                      <div className="text-[8.5pt] text-black font-sans leading-[1.4] mb-0.5">
+                        Jalan Tembakau Raya No. 35 A P. Simalingkar - Medan
                       </div>
-                      <div className="text-[8.5pt] text-black font-sans leading-snug">
+                      <div className="text-[8.5pt] text-black font-sans leading-[1.4]">
                         Laman kel.mangga@pemkomedan.go.id
                       </div>
                     </div>
                   </div>
 
                   {/* Judul Laporan */}
-                  <div className="text-center my-2">
-                    <h1 className="text-[11pt] font-black uppercase tracking-wide underline font-serif">
+                  <div className="text-center my-2.5">
+                    <h1 className="text-[11.5pt] font-black uppercase tracking-[0.04em] underline font-serif">
                       LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN
                     </h1>
-                    <div className="text-[8.5pt] font-serif mt-1">
-                      <span className="font-bold">Hari:</span> {(item.hari || '').toUpperCase()} &nbsp;|&nbsp; <span className="font-bold">Tanggal:</span> {displayTanggal.toUpperCase()}
+                    <div className="text-[8.5pt] font-serif mt-1 text-slate-900">
+                      <span className="font-bold">Hari:</span> {(item.hari || '').toUpperCase()} &nbsp;&nbsp;|&nbsp;&nbsp; <span className="font-bold">Tanggal:</span> {displayTanggal.toUpperCase()}
                     </div>
                   </div>
 
@@ -1408,14 +1408,14 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       >
         {/* KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
         <div
-          className="flex items-center gap-3 pb-2 border-b-[3.5px] border-black mb-2"
+          className="flex items-center gap-3.5 pb-2.5 border-b-[3.5px] border-black mb-3"
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
+            gap: '14px',
             borderBottom: '3.5px solid #000000',
-            paddingBottom: '8px',
-            marginBottom: '10px',
+            paddingBottom: '10px',
+            marginBottom: '12px',
           }}
         >
           <img
@@ -1423,36 +1423,36 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             alt="Logo Pemko Medan"
             crossOrigin="anonymous"
             className="object-contain shrink-0"
-            style={{ width: '65px', height: '80px', minWidth: '65px', display: 'block' }}
+            style={{ width: '82px', height: '98px', minWidth: '82px', display: 'block' }}
           />
-          <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '65px' }}>
+          <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '82px' }}>
             <div
-              className="text-[13pt] uppercase font-sans text-black leading-tight font-bold"
-              style={{ fontSize: '12.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000' }}
+              className="text-[13pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
+              style={{ fontSize: '13pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.3', marginBottom: '2px' }}
             >
               PEMERINTAH KOTA MEDAN
             </div>
             <div
-              className="text-[13pt] uppercase font-sans text-black leading-tight font-bold"
-              style={{ fontSize: '12.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000' }}
+              className="text-[13pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
+              style={{ fontSize: '13pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.3', marginBottom: '4px' }}
             >
               KECAMATAN MEDAN TUNTUNGAN
             </div>
             <div
-              className="text-[18pt] font-black uppercase font-sans text-black leading-tight my-0.5 tracking-wide"
-              style={{ fontSize: '17pt', fontWeight: '900', fontFamily: 'sans-serif', color: '#000000', margin: '2px 0' }}
+              className="text-[17.5pt] font-black uppercase font-sans text-black tracking-[0.06em]"
+              style={{ fontSize: '17.5pt', fontWeight: '900', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2', marginBottom: '5px' }}
             >
               KELURAHAN MANGGA
             </div>
             <div
-              className="text-[8.5pt] text-black font-sans leading-snug"
-              style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000' }}
+              className="text-[8.5pt] text-black font-sans"
+              style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.4', marginBottom: '2px' }}
             >
-              Jalan Tembakau Raya No.35 A Medan Tuntungan, Medan, Sumatera Utara 20141
+              Jalan Tembakau Raya No. 35 A P. Simalingkar - Medan
             </div>
             <div
-              className="text-[8.5pt] text-black font-sans leading-snug"
-              style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000' }}
+              className="text-[8.5pt] text-black font-sans"
+              style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.4' }}
             >
               Laman kel.mangga@pemkomedan.go.id
             </div>
@@ -1460,10 +1460,10 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         </div>
 
         {/* JUDUL LAPORAN */}
-        <div className="text-center my-2" style={{ textAlign: 'center', margin: '8px 0' }}>
+        <div className="text-center my-2.5" style={{ textAlign: 'center', margin: '10px 0' }}>
           <h1
-            className="text-[11pt] font-black uppercase tracking-wide underline font-serif"
-            style={{ fontSize: '11pt', fontWeight: 'bold', textDecoration: 'underline', textTransform: 'uppercase', fontFamily: "'Times New Roman', Times, serif" }}
+            className="text-[11.5pt] font-black uppercase tracking-[0.04em] underline font-serif"
+            style={{ fontSize: '11.5pt', fontWeight: 'bold', textDecoration: 'underline', textTransform: 'uppercase', fontFamily: "'Times New Roman', Times, serif" }}
           >
             LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN
           </h1>
@@ -1471,7 +1471,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             className="text-[8.5pt] font-serif mt-1"
             style={{ fontSize: '8.5pt', fontFamily: "'Times New Roman', Times, serif", marginTop: '4px' }}
           >
-            <span style={{ fontWeight: 'bold' }}>Hari:</span> {(item?.hari || '').toUpperCase()} &nbsp;|&nbsp; <span style={{ fontWeight: 'bold' }}>Tanggal:</span> {displayTanggal.toUpperCase()}
+            <span style={{ fontWeight: 'bold' }}>Hari:</span> {(item?.hari || '').toUpperCase()} &nbsp;&nbsp;|&nbsp;&nbsp; <span style={{ fontWeight: 'bold' }}>Tanggal:</span> {displayTanggal.toUpperCase()}
           </div>
         </div>
 
