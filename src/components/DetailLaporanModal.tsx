@@ -1402,34 +1402,31 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         )}
       </div>
 
-      {/* 2. LEMBAR CETAK RESMI KEDINASAN PEMKO MEDAN (DIJAMIN PAS 1 LEMBAR A4 / PDF) */}
       <div
         id="lembar-cetak-laporan-kepling"
-        className="hidden print:block page-print-single bg-white text-slate-900 w-full max-w-[195mm] mx-auto py-1 font-serif text-[8.5pt] leading-tight"
+        className="hidden print:block bg-white text-slate-900 w-[190mm] mx-auto p-1 font-serif text-[8pt] leading-tight"
+        style={{ pageBreakAfter: 'avoid', breakAfter: 'avoid', maxHeight: '285mm', overflow: 'hidden' }}
       >
         {/* KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
-        <div className="flex items-center gap-4 pb-2 border-b-4 border-black mb-3">
+        <div className="flex items-center gap-3 pb-1.5 border-b-4 border-black mb-2">
           <img
             src="/logo_pemko_medan.png"
             alt="Logo Pemko Medan"
             crossOrigin="anonymous"
-            className="w-[90px] h-[110px] object-contain shrink-0 ml-2"
+            className="w-[70px] h-[85px] object-contain shrink-0 ml-1"
           />
-          <div className="text-center flex-1 pr-[100px]">
-            <div className="text-[14pt] uppercase font-sans text-black leading-tight">
+          <div className="text-center flex-1 pr-[70px]">
+            <div className="text-[12pt] uppercase font-sans text-black leading-tight font-bold">
               PEMERINTAH KOTA MEDAN
             </div>
-            <div className="text-[14pt] uppercase font-sans text-black leading-tight">
+            <div className="text-[12pt] uppercase font-sans text-black leading-tight font-bold">
               KECAMATAN MEDAN TUNTUNGAN
             </div>
-            <div className="text-[21pt] font-black uppercase font-sans text-black leading-tight mt-1 tracking-wide">
+            <div className="text-[16pt] font-black uppercase font-sans text-black leading-tight mt-0.5 tracking-wide">
               KELURAHAN MANGGA
             </div>
-            <div className="text-[9.5pt] text-black font-sans mt-1 leading-snug">
+            <div className="text-[8pt] text-black font-sans mt-0.5 leading-snug">
               Jalan Tembakau Raya No.35 A Medan Tuntungan, Medan, Sumatera Utara 20141
-            </div>
-            <div className="text-[9.5pt] text-black font-sans leading-snug">
-              Laman kel.mangga@pemkomedan.go.id
             </div>
           </div>
         </div>
