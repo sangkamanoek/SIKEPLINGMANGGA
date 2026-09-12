@@ -140,8 +140,55 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
   if (!isOpen || !item) return null;
 
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    if (!item) return;
+    setIsExportingPDF(true);
+    const element = document.getElementById('lembar-cetak-laporan-kepling');
+    if (!element) {
+      window.print();
+      setIsExportingPDF(false);
+      return;
+    }
+
+    try {
+      const html2pdfModule = await import('html2pdf.js');
+      const html2pdfFunc = (html2pdfModule as any).default || html2pdfModule;
+
+      const originalClass = element.className;
+      element.className = 'block page-print-single bg-white text-slate-900 w-[190mm] mx-auto p-4 font-serif text-[8.5pt] leading-tight';
+
+      const safeJabatan = (item.jabatan || 'Kepling').replace(/[^a-zA-Z0-9]/g, '_');
+      const safeTanggal = (displayTanggal || item.tanggal || 'Laporan').replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `Laporan_${safeJabatan}_${safeTanggal}.pdf`;
+
+      const opt = {
+        margin: [4, 4, 4, 4],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      };
+
+      await html2pdfFunc().set(opt).from(element).save();
+      element.className = originalClass;
+    } catch (err) {
+      console.warn('PDF export notice, using print fallback:', err);
+      try {
+        window.print();
+      } catch (e) {}
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
   const handlePrint = () => {
-    window.print();
+    try {
+      window.print();
+    } catch (e) {
+      handleDownloadPDF();
+    }
   };
 
   const handleCopyText = () => {
@@ -836,12 +883,23 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
                   <button
                     type="button"
+                    onClick={handleDownloadPDF}
+                    disabled={isExportingPDF}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                    title="Unduh file PDF secara langsung (Sangat cocok untuk Android & HP)"
+                  >
+                    <Download className="w-3.5 h-3.5 text-white" />
+                    <span>{isExportingPDF ? 'Mengunduh PDF...' : 'Unduh PDF (Android & HP)'}</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={handlePrint}
                     className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                    title="Cetak Laporan Resmi Kedinasan 1 Lembar A4 / Simpan PDF"
+                    title="Cetak Laporan Resmi Kedinasan 1 Lembar A4 / Simpan PDF Browser"
                   >
                     <Printer className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>Cetak PDF (1 Lembar)</span>
+                    <span>Cetak PDF (Browser)</span>
                   </button>
                 </div>
 

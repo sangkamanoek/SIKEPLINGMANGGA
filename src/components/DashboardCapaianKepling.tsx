@@ -36,7 +36,7 @@ import {
   resetTargetsCapaianToDefaults,
 } from '../lib/targetsApi';
 import { ModalEditTargetCapaian } from './ModalEditTargetCapaian';
-import { isReportMatchingKepling } from '../lib/formatter';
+import { isReportMatchingKepling, getReportIsoDate } from '../lib/formatter';
 
 interface DashboardCapaianKeplingProps {
   reports: LaporanHarianItem[];
@@ -107,7 +107,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   // Filter reports by selected period
   const filteredReportsByPeriod = useMemo(() => {
     return reports.filter((r) => {
-      const dateIso = r.createdAt ? r.createdAt.split('T')[0] : '';
+      const dateIso = getReportIsoDate(r);
       if (period === 'TODAY') {
         return dateIso === todayIso;
       }
@@ -115,7 +115,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         return dateIso >= sevenDaysAgo;
       }
       if (period === 'THIS_MONTH') {
-        return dateIso.startsWith(currentYearMonth);
+        return dateIso ? dateIso.startsWith(currentYearMonth) : true;
       }
       return true; // ALL
     });

@@ -12,27 +12,12 @@ import { db } from './firebase';
 import { LaporanHarianItem, KeplingTargetCapaian, TargetsCapaianMap, TaskReminder, NotificationLog } from '../types';
 import { getDefaultTargetsCapaianMap } from '../data/targetsData';
 
-// Timestamp cutoff for data reset requested by user (11 Sept 2026 16:30 UTC)
-export const RESET_CUTOFF_MS = 1789144000000;
-
 // Local in-memory cache of deleted report IDs to prevent re-emergence
 const deletedReportIdsMemory = new Set<string>();
 
 export const isBeforeSept7 = (report: any): boolean => {
   if (!report) return true;
   if (report.id && deletedReportIdsMemory.has(report.id)) return true;
-  if (typeof report.id === 'string' && report.id.startsWith('lap_')) {
-    const rawTs = parseInt(report.id.replace('lap_', ''), 10);
-    if (!isNaN(rawTs) && rawTs < RESET_CUTOFF_MS) return true;
-  }
-  if (report.createdAt) {
-    const time = new Date(report.createdAt).getTime();
-    if (!isNaN(time) && time < RESET_CUTOFF_MS) return true;
-  }
-  if (report.updatedAt) {
-    const time = new Date(report.updatedAt).getTime();
-    if (!isNaN(time) && time < RESET_CUTOFF_MS) return true;
-  }
   return false;
 };
 

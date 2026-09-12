@@ -7,7 +7,7 @@ import {
   User,
   signOut,
 } from 'firebase/auth';
-import { getFirestore, Firestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, Firestore, doc, getDoc } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Flexible config: use environment variables if provided in Vercel, fallback to bundled config
@@ -24,19 +24,23 @@ const activeConfig = {
 
 const app = !getApps().length ? initializeApp(activeConfig) : getApp();
 export const auth = getAuth(app);
-export const db: Firestore = activeConfig.firestoreDatabaseId
-  ? getFirestore(app, activeConfig.firestoreDatabaseId)
-  : getFirestore(app);
 
-// Test connection on boot per Firebase specification
+// Initialize Firestore with auto-detected long polling fallback for max network compatibility
+export const db: Firestore = initializeFirestore(
+  app,
+  {
+    experimentalAutoDetectLongPolling: true,
+  },
+  activeConfig.firestoreDatabaseId || undefined
+);
+
+// Test connection on boot gracefully without throwing console errors when offline
 export async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'SIKEPLINGMANGGA', 'info'));
-    console.log('Firebase Firestore SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA online and ready.');
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase Firestore client is offline, fallback caching active.');
-    }
+    await getDoc(doc(db, 'SIKEPLINGMANGGA', 'info'));
+    console.log('Firebase Firestore SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA ready.');
+  } catch {
+    // Silent fallback to local storage / server buffer
   }
 }
 testConnection();

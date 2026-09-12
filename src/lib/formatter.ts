@@ -43,6 +43,37 @@ export function formatTanggalIndonesia(d: Date): string {
   return `${tgl} ${bulan} ${tahun}`;
 }
 
+/**
+ * Normalisasi tanggal laporan ke format ISO YYYY-MM-DD
+ * Mendukung format string "01 SEPTEMBER 2026", "1 September 2026", "2026-09-01", maupun r.createdAt ISO.
+ */
+export function getReportIsoDate(r: LaporanHarianItem | any): string {
+  if (!r) return '';
+  if (r.createdAt && typeof r.createdAt === 'string' && r.createdAt.includes('T')) {
+    const iso = r.createdAt.split('T')[0];
+    if (iso.match(/^\d{4}-\d{2}-\d{2}$/)) return iso;
+  }
+  if (r.createdAt && typeof r.createdAt === 'string' && r.createdAt.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return r.createdAt;
+  }
+  if (r.tanggal) {
+    const t = String(r.tanggal).trim();
+    if (t.match(/^\d{4}-\d{2}-\d{2}$/)) return t;
+    const match = t.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+    if (match) {
+      const day = match[1].padStart(2, '0');
+      const monthName = match[2].toUpperCase();
+      const year = match[3];
+      const monthIdx = NAMA_BULAN.indexOf(monthName);
+      if (monthIdx >= 0) {
+        const month = String(monthIdx + 1).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+    }
+  }
+  return '';
+}
+
 export function cleanPhoneNumber(phone: string): string {
   let cleaned = phone.replace(/[^0-9]/g, '');
   if (cleaned.startsWith('0')) {
