@@ -733,20 +733,22 @@ export default function App() {
         )}
 
         {activeTab === 'riwayat' && (
-          <RiwayatLaporan
-            items={reports}
-            isLoading={isLoadingReports || isRefreshingReports}
-            onRefresh={() => refreshAllReports(true)}
-            sheetMeta={sheetMeta}
-            onSelectReport={(item) => {
-              setSelectedReport(item);
-              setIsModalOpen(true);
-            }}
-            hasGoogleAuth={Boolean(token)}
-            initialPetugasFilter={riwayatFilterPetugas}
-            isAdmin={activeAccount.role === 'super_admin'}
-            onDeleteReport={handleDeleteReport}
-          />
+          <ErrorBoundary fallbackTitle="Gagal Memuat Riwayat Laporan">
+            <RiwayatLaporan
+              items={reports}
+              isLoading={isLoadingReports || isRefreshingReports}
+              onRefresh={() => refreshAllReports(true)}
+              sheetMeta={sheetMeta}
+              onSelectReport={(item) => {
+                setSelectedReport(item);
+                setIsModalOpen(true);
+              }}
+              hasGoogleAuth={Boolean(token)}
+              initialPetugasFilter={riwayatFilterPetugas}
+              isAdmin={activeAccount.role === 'super_admin'}
+              onDeleteReport={handleDeleteReport}
+            />
+          </ErrorBoundary>
         )}
       </main>
 

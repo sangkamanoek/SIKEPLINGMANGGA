@@ -47,6 +47,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; name: string } | null>(null);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   // Helper download photo
   const handleDownloadPhoto = (url: string, filename: string, e?: React.MouseEvent) => {
@@ -138,10 +139,6 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     return item.tanggal;
   }, [item?.tanggal]);
 
-  if (!isOpen || !item) return null;
-
-  const [isExportingPDF, setIsExportingPDF] = useState(false);
-
   const handleDownloadPDF = async () => {
     if (!item) return;
     setIsExportingPDF(true);
@@ -195,8 +192,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     const activeItem = isEditing
       ? {
           jabatan: editJabatan,
-          kelurahan: item.kelurahan,
-          kecamatan: item.kecamatan,
+          kelurahan: item?.kelurahan || '',
+          kecamatan: item?.kecamatan || '',
           hari: editHari,
           tanggal: editTanggal,
           namaKepling: editNamaKepling,
@@ -215,7 +212,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             poskamlingKeterangan: editPoskamlingKet,
             kegiatanLainnya: editKegiatanLainnya,
           },
-          jumlahDokumentasi: item.jumlahDokumentasi,
+          jumlahDokumentasi: item?.jumlahDokumentasi || 0,
         }
       : item;
 
@@ -958,7 +955,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN
           </h1>
           <div className="text-[8pt] font-semibold text-slate-800 mt-0.5">
-            Hari: {item.hari.toUpperCase()} &nbsp;|&nbsp; Tanggal: {displayTanggal}
+            Hari: {(item?.hari || '').toUpperCase()} &nbsp;|&nbsp; Tanggal: {displayTanggal}
           </div>
         </div>
 
@@ -969,18 +966,18 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               <tr>
                 <td className="w-28 font-bold py-0.5">Nama Petugas</td>
                 <td className="w-3">:</td>
-                <td className="font-bold uppercase">{item.namaKepling}</td>
+                <td className="font-bold uppercase">{item?.namaKepling || ''}</td>
                 <td className="w-24 font-bold py-0.5">Kelurahan</td>
                 <td className="w-3">:</td>
-                <td>{item.kelurahan}</td>
+                <td>{item?.kelurahan || ''}</td>
               </tr>
               <tr>
                 <td className="font-bold py-0.5">Jabatan / Wilayah</td>
                 <td>:</td>
-                <td className="font-bold">{item.jabatan}</td>
+                <td className="font-bold">{item?.jabatan || ''}</td>
                 <td className="font-bold py-0.5">Kecamatan</td>
                 <td>:</td>
-                <td>{item.kecamatan}</td>
+                <td>{item?.kecamatan || ''}</td>
               </tr>
             </tbody>
           </table>
@@ -1087,9 +1084,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             <div className="text-center flex flex-col items-center min-w-[220px]">
               <div>Medan, {displayTanggal}</div>
               <div className="mt-0.5">Yang Melaporkan,</div>
-              <div className="font-bold uppercase whitespace-nowrap">{item.jabatan}</div>
+              <div className="font-bold uppercase whitespace-nowrap">{item?.jabatan || ''}</div>
               <div className="h-12" />
-              <div className="font-bold underline uppercase whitespace-nowrap">( {item.namaKepling} )</div>
+              <div className="font-bold underline uppercase whitespace-nowrap">( {item?.namaKepling || ''} )</div>
               <div className="text-[7pt] text-slate-700 mt-0.5">Kepala Lingkungan</div>
             </div>
           </div>

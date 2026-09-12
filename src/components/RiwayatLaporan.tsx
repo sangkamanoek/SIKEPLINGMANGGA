@@ -93,15 +93,15 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
       // 1. Keyword search (tanggal, hari, nama, jabatan, keterangan, catatan)
       const matchesKeyword =
         !searchTerm ||
-        item.tanggal.toLowerCase().includes(term) ||
-        item.hari.toLowerCase().includes(term) ||
-        item.namaKepling.toLowerCase().includes(term) ||
-        item.jabatan.toLowerCase().includes(term) ||
-        (item.kinerja.opsirPbbKeterangan || '').toLowerCase().includes(term) ||
-        (item.kinerja.perlinsosKeterangan || '').toLowerCase().includes(term) ||
-        (item.kinerja.ikdKeterangan || '').toLowerCase().includes(term) ||
-        (item.kinerja.bpjsKetenagakerjaanKeterangan || '').toLowerCase().includes(term) ||
-        (item.kinerja.kegiatanLainnya || '').toLowerCase().includes(term);
+        (item.tanggal || '').toLowerCase().includes(term) ||
+        (item.hari || '').toLowerCase().includes(term) ||
+        (item.namaKepling || '').toLowerCase().includes(term) ||
+        (item.jabatan || '').toLowerCase().includes(term) ||
+        (item.kinerja?.opsirPbbKeterangan || '').toLowerCase().includes(term) ||
+        (item.kinerja?.perlinsosKeterangan || '').toLowerCase().includes(term) ||
+        (item.kinerja?.ikdKeterangan || '').toLowerCase().includes(term) ||
+        (item.kinerja?.bpjsKetenagakerjaanKeterangan || '').toLowerCase().includes(term) ||
+        (item.kinerja?.kegiatanLainnya || '').toLowerCase().includes(term);
 
       if (!matchesKeyword) return false;
 
@@ -125,7 +125,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
       if (selectedDate) {
         const itemCreatedDate = item.createdAt ? item.createdAt.split('T')[0] : '';
         const dateInput = selectedDate; // YYYY-MM-DD
-        const formattedDatePart = item.tanggal.toLowerCase();
+        const formattedDatePart = (item.tanggal || '').toLowerCase();
         
         const matchesDate =
           itemCreatedDate === dateInput ||
@@ -136,19 +136,19 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
 
       // 4. Filter by Jenis Kegiatan (4 Pilar)
       if (selectedKegiatan === 'PBB') {
-        const val = parseFloat(String(item.kinerja.opsirPbbWp || 0));
+        const val = parseFloat(String(item.kinerja?.opsirPbbWp || 0));
         return !isNaN(val) && val > 0;
       }
       if (selectedKegiatan === 'PERLINSOS') {
-        const val = parseFloat(String(item.kinerja.perlinsosKk || 0));
+        const val = parseFloat(String(item.kinerja?.perlinsosKk || 0));
         return !isNaN(val) && val > 0;
       }
       if (selectedKegiatan === 'IKD') {
-        const val = parseFloat(String(item.kinerja.ikdOrang || 0));
+        const val = parseFloat(String(item.kinerja?.ikdOrang || 0));
         return !isNaN(val) && val > 0;
       }
       if (selectedKegiatan === 'BPJS') {
-        const val = parseFloat(String(item.kinerja.bpjsKetenagakerjaanOrang || 0));
+        const val = parseFloat(String(item.kinerja?.bpjsKetenagakerjaanOrang || 0));
         return !isNaN(val) && val > 0;
       }
       if (selectedKegiatan === 'POSKAMLING') {
@@ -158,7 +158,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
         );
       }
       if (selectedKegiatan === 'LAINNYA') {
-        return Boolean(item.kinerja.kegiatanLainnya?.trim());
+        return Boolean(item.kinerja?.kegiatanLainnya?.trim());
       }
 
       return true;
@@ -174,10 +174,10 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     let totalPoskamling = 0;
 
     filtered.forEach((i) => {
-      totalPbbWp += parseFloat(String(i.kinerja.opsirPbbWp || 0)) || 0;
-      totalPerlinsosKk += parseFloat(String(i.kinerja.perlinsosKk || 0)) || 0;
-      totalIkdOrang += parseFloat(String(i.kinerja.ikdOrang || 0)) || 0;
-      totalBpjsOrang += parseFloat(String(i.kinerja.bpjsKetenagakerjaanOrang || 0)) || 0;
+      totalPbbWp += parseFloat(String(i.kinerja?.opsirPbbWp || 0)) || 0;
+      totalPerlinsosKk += parseFloat(String(i.kinerja?.perlinsosKk || 0)) || 0;
+      totalIkdOrang += parseFloat(String(i.kinerja?.ikdOrang || 0)) || 0;
+      totalBpjsOrang += parseFloat(String(i.kinerja?.bpjsKetenagakerjaanOrang || 0)) || 0;
       if (i.kinerja?.poskamlingStatus && i.kinerja.poskamlingStatus !== 'Tidak Ada Giat') {
         totalPoskamling += 1;
       }
@@ -522,9 +522,9 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-400 font-bold block uppercase">1. OPSIR PBB</span>
                   <span className="font-bold text-slate-800">
-                    {item.kinerja.opsirPbbWp ? `${String(item.kinerja.opsirPbbWp).replace(/^0+(?=\d)/, '')} WP` : '-'}
+                    {item.kinerja?.opsirPbbWp ? `${String(item.kinerja.opsirPbbWp).replace(/^0+(?=\d)/, '')} WP` : '-'}
                   </span>
-                  {item.kinerja.opsirPbbKeterangan && (
+                  {item.kinerja?.opsirPbbKeterangan && (
                     <p className="text-[10px] text-slate-500 truncate mt-0.5">
                       {item.kinerja.opsirPbbKeterangan}
                     </p>
@@ -534,9 +534,9 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-400 font-bold block uppercase">2. PERLINSOS</span>
                   <span className="font-bold text-slate-800">
-                    {item.kinerja.perlinsosKk ? `${String(item.kinerja.perlinsosKk).replace(/^0+(?=\d)/, '')} KK` : '-'}
+                    {item.kinerja?.perlinsosKk ? `${String(item.kinerja.perlinsosKk).replace(/^0+(?=\d)/, '')} KK` : '-'}
                   </span>
-                  {item.kinerja.perlinsosKeterangan && (
+                  {item.kinerja?.perlinsosKeterangan && (
                     <p className="text-[10px] text-slate-500 truncate mt-0.5">
                       {item.kinerja.perlinsosKeterangan}
                     </p>
@@ -546,9 +546,9 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-400 font-bold block uppercase">3. IKD</span>
                   <span className="font-bold text-slate-800">
-                    {item.kinerja.ikdOrang ? `${String(item.kinerja.ikdOrang).replace(/^0+(?=\d)/, '')} ORG` : '-'}
+                    {item.kinerja?.ikdOrang ? `${String(item.kinerja.ikdOrang).replace(/^0+(?=\d)/, '')} ORG` : '-'}
                   </span>
-                  {item.kinerja.ikdKeterangan && (
+                  {item.kinerja?.ikdKeterangan && (
                     <p className="text-[10px] text-slate-500 truncate mt-0.5">
                       {item.kinerja.ikdKeterangan}
                     </p>
@@ -558,9 +558,9 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                   <span className="text-[10px] text-slate-400 font-bold block uppercase">4. BPJS TK</span>
                   <span className="font-bold text-slate-800">
-                    {item.kinerja.bpjsKetenagakerjaanOrang ? `${String(item.kinerja.bpjsKetenagakerjaanOrang).replace(/^0+(?=\d)/, '')} ORG` : '-'}
+                    {item.kinerja?.bpjsKetenagakerjaanOrang ? `${String(item.kinerja.bpjsKetenagakerjaanOrang).replace(/^0+(?=\d)/, '')} ORG` : '-'}
                   </span>
-                  {item.kinerja.bpjsKetenagakerjaanKeterangan && (
+                  {item.kinerja?.bpjsKetenagakerjaanKeterangan && (
                     <p className="text-[10px] text-slate-500 truncate mt-0.5">
                       {item.kinerja.bpjsKetenagakerjaanKeterangan}
                     </p>
@@ -592,7 +592,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 </div>
               )}
 
-              {item.kinerja.kegiatanLainnya && (
+              {item.kinerja?.kegiatanLainnya && (
                 <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">
                   <span className="font-semibold text-slate-700">Kegiatan Lainnya:</span> {item.kinerja.kegiatanLainnya}
                 </p>
