@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
-import { isReportMatchingKepling } from '../lib/formatter';
+import { isReportMatchingKepling, isReportMatchingDate } from '../lib/formatter';
 
 interface RiwayatLaporanProps {
   items: LaporanHarianItem[];
@@ -123,15 +123,9 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
 
       // 3. Filter by Specific Date
       if (selectedDate) {
-        const itemCreatedDate = item.createdAt ? item.createdAt.split('T')[0] : '';
-        const dateInput = selectedDate; // YYYY-MM-DD
-        const formattedDatePart = (item.tanggal || '').toLowerCase();
-        
-        const matchesDate =
-          itemCreatedDate === dateInput ||
-          formattedDatePart.includes(dateInput);
-
-        if (!matchesDate) return false;
+        if (!isReportMatchingDate(item, selectedDate)) {
+          return false;
+        }
       }
 
       // 4. Filter by Jenis Kegiatan (4 Pilar)

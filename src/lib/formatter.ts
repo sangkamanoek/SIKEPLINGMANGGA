@@ -45,33 +45,102 @@ export function formatTanggalIndonesia(d: Date): string {
 
 /**
  * Normalisasi tanggal laporan ke format ISO YYYY-MM-DD
- * Mendukung format string "01 SEPTEMBER 2026", "1 September 2026", "2026-09-01", maupun r.createdAt ISO.
+ * Mendukung format string "01 SEPTEMBER 2026", "1 September 2026", "SABTU, 1 SEPTEMBER 2026", "2026-09-01", maupun r.createdAt ISO.
  */
 export function getReportIsoDate(r: LaporanHarianItem | any): string {
   if (!r) return '';
-  if (r.createdAt && typeof r.createdAt === 'string' && r.createdAt.includes('T')) {
-    const iso = r.createdAt.split('T')[0];
-    if (iso.match(/^\d{4}-\d{2}-\d{2}$/)) return iso;
-  }
-  if (r.createdAt && typeof r.createdAt === 'string' && r.createdAt.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    return r.createdAt;
-  }
+
+  // 1. Prioritas Utama: Ekstraksi dari r.tanggal (input resmi dari form kepling)
   if (r.tanggal) {
     const t = String(r.tanggal).trim();
+
+    // Format YYYY-MM-DD
     if (t.match(/^\d{4}-\d{2}-\d{2}$/)) return t;
-    const match = t.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
-    if (match) {
-      const day = match[1].padStart(2, '0');
-      const monthName = match[2].toUpperCase();
-      const year = match[3];
-      const monthIdx = NAMA_BULAN.indexOf(monthName);
+
+    // Format DD-MM-YYYY atau DD/MM/YYYY
+    const ddmmyyyy = t.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (ddmmyyyy) {
+      const day = ddmmyyyy[1].padStart(2, '0');
+      const month = ddmmyyyy[2].padStart(2, '0');
+      const year = ddmmyyyy[3];
+      return `${year}-${month}-${day}`;
+    }
+
+    // Format Nama Bulan (contoh: "01 SEPTEMBER 2026", "1 SEPTEMBER 2026", "SABTU, 1 SEPTEMBER 2026", "1 Sept 2026")
+    const monthNameMatch = t.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+    if (monthNameMatch) {
+      const day = monthNameMatch[1].padStart(2, '0');
+      const monthStr = monthNameMatch[2].toUpperCase();
+      const year = monthNameMatch[3];
+
+      let monthIdx = NAMA_BULAN.findIndex(
+        (b) => b.startsWith(monthStr) || monthStr.startsWith(b.slice(0, 3))
+      );
       if (monthIdx >= 0) {
         const month = String(monthIdx + 1).padStart(2, '0');
         return `${year}-${month}-${day}`;
       }
     }
   }
+
+  // 2. Fallback: Ekstraksi dari r.createdAt
+  if (r.createdAt && typeof r.createdAt === 'string') {
+    if (r.createdAt.includes('T')) {
+      const iso = r.createdAt.split('T')[0];
+      if (iso.match(/^\d{4}-\d{2}-\d{2}$/)) return iso;
+    }
+    if (r.createdAt.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return r.createdAt;
+    }
+  }
+
   return '';
+}
+
+/**
+ * Memeriksa apakah laporan sesuai dengan tanggal target ISO YYYY-MM-DD.
+ * Menangani fleksibilitas format (misal "1 SEPTEMBER 2026" vs "01 SEPTEMBER 2026", "2026-09-01").
+ */
+export function isReportMatchingDate(r: LaporanHarianItem | any, targetDateIso: string): boolean {
+  if (!r || !targetDateIso) return true;
+
+  const reportIso = getReportIsoDate(r);
+  if (reportIso && reportIso === targetDateIso) {
+    return true;
+  }
+
+  // Fallback: Cek r.createdAt split
+  if (r.createdAt && typeof r.createdAt === 'string') {
+    const createdIso = r.createdAt.split('T')[0];
+    if (createdIso === targetDateIso) {
+      return true;
+    }
+  }
+
+  // Fallback: Match string tanggal
+  if (r.tanggal) {
+    const tglLower = String(r.tanggal).toLowerCase();
+    const parts = targetDateIso.split('-');
+    if (parts.length === 3) {
+      const selYear = parts[0];
+      const selMonthIdx = parseInt(parts[1], 10) - 1;
+      const selDay = parseInt(parts[2], 10);
+      const selDayPadded = String(selDay).padStart(2, '0');
+      const monthName = NAMA_BULAN[selMonthIdx]?.toLowerCase() || '';
+
+      const hasYear = tglLower.includes(selYear);
+      const hasMonth = monthName && (tglLower.includes(monthName) || tglLower.includes(monthName.slice(0, 3)));
+      const hasDay =
+        new RegExp(`\\b${selDay}\\b`).test(tglLower) ||
+        new RegExp(`\\b${selDayPadded}\\b`).test(tglLower);
+
+      if (hasYear && hasMonth && hasDay) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 export function cleanPhoneNumber(phone: string): string {

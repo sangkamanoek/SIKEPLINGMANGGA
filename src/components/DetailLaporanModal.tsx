@@ -139,22 +139,81 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     return item.tanggal;
   }, [item?.tanggal]);
 
+  const openPrintableWindow = () => {
+    if (!item) return;
+    const element = document.getElementById('lembar-cetak-laporan-kepling');
+    const contentHtml = element ? element.innerHTML : '';
+    const safeJabatan = (item.jabatan || 'Kepling').replace(/[^a-zA-Z0-9]/g, '_');
+    const safeTanggal = (displayTanggal || item.tanggal || 'Laporan').replace(/[^a-zA-Z0-9]/g, '_');
+    const titleStr = `Laporan_${safeJabatan}_${safeTanggal}`;
+
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      // If popup blocked, attempt direct window.print
+      try {
+        window.print();
+      } catch (e) {}
+      return;
+    }
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${titleStr}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @media print {
+              .no-print { display: none !important; }
+              body { background: white !important; margin: 0 !important; padding: 0 !important; }
+              @page { size: A4 portrait; margin: 8mm; }
+            }
+            body { font-family: 'Times New Roman', Times, serif; background-color: #f8fafc; color: #0f172a; padding: 12px; }
+            .print-table { border-collapse: collapse; width: 100%; }
+            .print-table th, .print-table td { border: 1px solid #000; padding: 4px 6px; font-size: 8pt; }
+          </style>
+        </head>
+        <body>
+          <div class="no-print" style="position: sticky; top: 0; background: #064e3b; color: white; padding: 10px; border-radius: 8px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+            <span style="font-weight: bold; font-size: 12px;">📄 Lembar Cetak Resmi Laporan Kepling (A4)</span>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="window.print()" style="background: #f59e0b; color: #000; font-weight: bold; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px;">🖨️ Cetak / Simpan PDF</button>
+              <button onclick="window.close()" style="background: rgba(255,255,255,0.2); color: white; font-weight: bold; padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px;">Tutup</button>
+            </div>
+          </div>
+          <div style="background: white; max-width: 195mm; margin: 0 auto; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            ${contentHtml}
+          </div>
+          <script>
+            setTimeout(function() {
+              try {
+                window.print();
+              } catch (e) {}
+            }, 800);
+          </script>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
+  };
+
   const handleDownloadPDF = async () => {
     if (!item) return;
     setIsExportingPDF(true);
     const element = document.getElementById('lembar-cetak-laporan-kepling');
     if (!element) {
-      window.print();
+      openPrintableWindow();
       setIsExportingPDF(false);
       return;
     }
 
+    const originalClass = element.className;
     try {
+      element.className = 'block page-print-single bg-white text-slate-900 w-[190mm] mx-auto p-4 font-serif text-[8.5pt] leading-tight';
+
       const html2pdfModule = await import('html2pdf.js');
       const html2pdfFunc = (html2pdfModule as any).default || html2pdfModule;
-
-      const originalClass = element.className;
-      element.className = 'block page-print-single bg-white text-slate-900 w-[190mm] mx-auto p-4 font-serif text-[8.5pt] leading-tight';
 
       const safeJabatan = (item.jabatan || 'Kepling').replace(/[^a-zA-Z0-9]/g, '_');
       const safeTanggal = (displayTanggal || item.tanggal || 'Laporan').replace(/[^a-zA-Z0-9]/g, '_');
@@ -164,28 +223,22 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         margin: [4, 4, 4, 4],
         filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
+        html2canvas: { scale: 1.5, useCORS: true, allowTaint: true, logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
 
       await html2pdfFunc().set(opt).from(element).save();
-      element.className = originalClass;
     } catch (err) {
-      console.warn('PDF export notice, using print fallback:', err);
-      try {
-        window.print();
-      } catch (e) {}
+      console.warn('PDF export notice, using print fallback window:', err);
+      openPrintableWindow();
     } finally {
+      element.className = originalClass;
       setIsExportingPDF(false);
     }
   };
 
   const handlePrint = () => {
-    try {
-      window.print();
-    } catch (e) {
-      handleDownloadPDF();
-    }
+    openPrintableWindow();
   };
 
   const handleCopyText = () => {

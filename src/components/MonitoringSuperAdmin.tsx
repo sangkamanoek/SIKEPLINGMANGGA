@@ -30,6 +30,7 @@ import {
   getNamaHariIndonesia,
   getTodayLocalIso,
   isReportMatchingKepling,
+  isReportMatchingDate,
 } from '../lib/formatter';
 
 interface MonitoringSuperAdminProps {
@@ -74,16 +75,10 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
   // Reports matching the selected date
   const reportsOnDate = useMemo(() => {
     return reports.filter((r) => {
-      if (!selectedDate) return true;
-      const createdDate = r.createdAt ? r.createdAt.split('T')[0] : '';
-      const tglLower = r.tanggal.toLowerCase();
-      return (
-        createdDate === selectedDate ||
-        tglLower.includes(selectedDateFormatted) ||
-        tglLower.includes(selectedDate)
-      );
+      if (!selectedDate) return true; // Empty string = show ALL dates
+      return isReportMatchingDate(r, selectedDate);
     });
-  }, [reports, selectedDate, selectedDateFormatted]);
+  }, [reports, selectedDate]);
 
   // Map of kepling ID to their report on the selected date
   const keplingReportMap = useMemo(() => {
@@ -247,15 +242,43 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
             <div className="flex items-center gap-2 bg-white/10 backdrop-blur-xs px-3 py-2 rounded-xl border border-white/15">
               <Calendar className="w-4 h-4 text-emerald-300 shrink-0" />
               <div className="flex flex-col">
-                <span className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wider">
-                  Tanggal Pantauan
-                </span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wider">
+                    Tanggal Pantauan
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDate(todayIso)}
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                        selectedDate === todayIso
+                          ? 'bg-amber-400 text-slate-950'
+                          : 'bg-white/10 text-emerald-200 hover:bg-white/20'
+                      }`}
+                      title="Lihat Laporan Hari Ini"
+                    >
+                      Hari Ini
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDate('')}
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                        !selectedDate
+                          ? 'bg-amber-400 text-slate-950'
+                          : 'bg-white/10 text-emerald-200 hover:bg-white/20'
+                      }`}
+                      title="Lihat Seluruh Tanggal"
+                    >
+                      Semua
+                    </button>
+                  </div>
+                </div>
                 <input
                   id="input-monitor-date"
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer"
+                  className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer mt-0.5"
                 />
               </div>
             </div>
