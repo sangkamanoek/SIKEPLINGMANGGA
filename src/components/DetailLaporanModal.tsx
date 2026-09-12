@@ -152,6 +152,35 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     return item.tanggal;
   }, [item?.tanggal]);
 
+  const getProperFotoLabel = (foto: { name?: string }, idx: number) => {
+    if (!foto?.name) return `Dokumentasi Lapangan ${idx + 1}`;
+    const raw = foto.name.trim();
+    const lower = raw.toLowerCase();
+    if (lower.includes('poskamling') || lower.includes('ronda') || lower.includes('siskamling')) {
+      return 'Dokumentasi Pos Ronda / Siskamling';
+    }
+    if (lower.includes('pbb') || lower.includes('pajak')) {
+      return 'Dokumentasi Penagihan PBB';
+    }
+    if (lower.includes('perlinsos') || lower.includes('bansos') || lower.includes('bantuan')) {
+      return 'Dokumentasi Verifikasi Perlinsos';
+    }
+    if (lower.includes('ikd') || lower.includes('ktp') || lower.includes('kependudukan')) {
+      return 'Dokumentasi Aktivasi IKD';
+    }
+    if (lower.includes('bpjs') || lower.includes('rentan') || lower.includes('ketenagakerjaan')) {
+      return 'Dokumentasi BPJS Ketenagakerjaan';
+    }
+    if (lower.includes('bersih') || lower.includes('gotong') || lower.includes('drainase')) {
+      return 'Dokumentasi Kebersihan Lingkungan';
+    }
+    if (lower.includes('whatsapp') || lower.startsWith('img_') || lower.startsWith('image')) {
+      return `Dokumentasi Lapangan ${idx + 1}`;
+    }
+    const clean = raw.replace(/\.[^/.]+$/, '').replace(/^[\[\(].*?[\]\)]\s*/, '').trim();
+    return clean.length > 28 ? `Dokumentasi Lapangan ${idx + 1}` : clean;
+  };
+
   const openPrintableWindow = () => {
     if (!item) return;
     const element = document.getElementById('lembar-cetak-laporan-kepling');
@@ -237,7 +266,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     tempContainer.style.maxWidth = '794px';
     tempContainer.style.backgroundColor = '#ffffff';
     tempContainer.style.color = '#000000';
-    tempContainer.style.padding = '8px 14px';
+    tempContainer.style.padding = '14px 18px 12px 18px';
     tempContainer.style.zIndex = '-999';
     tempContainer.style.boxSizing = 'border-box';
     tempContainer.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
@@ -265,7 +294,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       const filename = `Laporan_${safeJabatan}_${safeTanggal}.pdf`;
 
       const opt = {
-        margin: [3, 4, 3, 4],
+        margin: [5, 6, 5, 6],
         filename: filename,
         image: { type: 'jpeg', quality: 0.96 },
         html2canvas: {
@@ -563,27 +592,35 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               <div className="bg-slate-200 p-2 sm:p-4 rounded-xl overflow-x-auto flex justify-center">
                 <div className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300">
                   {/* Kop Surat Pemko Medan */}
-                  <div className="flex items-center gap-3.5 pb-2.5 border-b-[3.5px] border-black mb-3">
+                  <div className="flex items-center gap-3.5 pt-1 pb-2 border-b-[3px] border-black mb-2.5">
                     <img
                       src="/logo_pemko_medan.png"
                       alt="Logo Pemko Medan"
                       crossOrigin="anonymous"
-                      className="w-[82px] h-[98px] object-contain shrink-0 ml-1"
+                      className="shrink-0 ml-1"
+                      style={{
+                        width: '74px',
+                        height: '89px',
+                        minWidth: '74px',
+                        maxWidth: '74px',
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
                     />
-                    <div className="text-center flex-1 pr-[82px]">
-                      <div className="text-[13pt] uppercase font-sans text-black leading-[1.3] font-bold tracking-[0.04em] mb-0.5">
+                    <div className="text-center flex-1 pr-[74px]">
+                      <div className="text-[12.5pt] uppercase font-sans text-black leading-tight font-bold tracking-[0.04em] mb-0.5">
                         PEMERINTAH KOTA MEDAN
                       </div>
-                      <div className="text-[13pt] uppercase font-sans text-black leading-[1.3] font-bold tracking-[0.04em] mb-1">
+                      <div className="text-[12.5pt] uppercase font-sans text-black leading-tight font-bold tracking-[0.04em] mb-1">
                         KECAMATAN MEDAN TUNTUNGAN
                       </div>
-                      <div className="text-[17.5pt] font-black uppercase font-sans text-black leading-[1.2] tracking-[0.06em] mb-1.5">
+                      <div className="text-[16.5pt] font-black uppercase font-sans text-black leading-tight tracking-[0.05em] mb-1">
                         KELURAHAN MANGGA
                       </div>
-                      <div className="text-[8.5pt] text-black font-sans leading-[1.4] mb-0.5">
+                      <div className="text-[8.5pt] text-black font-sans leading-snug mb-0.5">
                         Jalan Tembakau Raya No. 35 A P. Simalingkar - Medan
                       </div>
-                      <div className="text-[8.5pt] text-black font-sans leading-[1.4]">
+                      <div className="text-[8pt] text-slate-800 font-sans leading-snug">
                         Laman kel.mangga@pemkomedan.go.id
                       </div>
                     </div>
@@ -694,28 +731,57 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     </table>
                   </div>
 
-                  {/* Foto Dokumentasi - Tepat 4 Foto Per Baris Sesuai Foto Laporan */}
+                  {/* Foto Dokumentasi - Adaptif & Proper Kedinasan */}
                   {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
                     <div className="mb-2">
-                      <div className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900">
-                        B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):
+                      <div className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1.5 text-slate-900 flex items-center justify-between">
+                        <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
+                        <span className="text-[7pt] text-slate-500 font-normal normal-case">Format Album Resmi Kedinasan</span>
                       </div>
-                      <div className="grid grid-cols-4 gap-2">
-                        {item.dokumentasiFoto.map((foto, idx) => (
-                          <div key={foto.id || idx} className="rounded border border-slate-300 p-1 bg-white flex flex-col items-center shadow-none">
-                            <div className="w-full h-16 rounded overflow-hidden bg-slate-100">
-                              <img
-                                src={foto.url}
-                                alt={foto.name}
-                                crossOrigin="anonymous"
-                                className="w-full h-full object-cover"
-                              />
+                      <div
+                        className={`grid gap-2 ${
+                          item.dokumentasiFoto.length <= 3
+                            ? 'grid-cols-3'
+                            : item.dokumentasiFoto.length === 4
+                            ? 'grid-cols-4'
+                            : item.dokumentasiFoto.length <= 6
+                            ? 'grid-cols-3'
+                            : 'grid-cols-4'
+                        }`}
+                      >
+                        {item.dokumentasiFoto.map((foto, idx) => {
+                          const fotoCount = item.dokumentasiFoto?.length || 0;
+                          const heightClass =
+                            fotoCount <= 3
+                              ? 'h-[108px]'
+                              : fotoCount === 4
+                              ? 'h-[88px]'
+                              : fotoCount <= 6
+                              ? 'h-[74px]'
+                              : 'h-[62px]';
+
+                          return (
+                            <div
+                              key={foto.id || idx}
+                              className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center shadow-xs"
+                            >
+                              <div className={`w-full ${heightClass} rounded-md overflow-hidden bg-slate-100`}>
+                                <img
+                                  src={foto.url}
+                                  alt={getProperFotoLabel(foto, idx)}
+                                  crossOrigin="anonymous"
+                                  className="w-full h-full object-cover object-top"
+                                />
+                              </div>
+                              <div
+                                className="text-[7pt] font-semibold text-slate-700 mt-1 truncate w-full text-center font-sans"
+                                title={getProperFotoLabel(foto, idx)}
+                              >
+                                {getProperFotoLabel(foto, idx)}
+                              </div>
                             </div>
-                            <div className="text-[6.5pt] text-slate-500 mt-1 truncate w-full text-center font-sans">
-                              {foto.name}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1403,56 +1469,64 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
       <div
         id="lembar-cetak-laporan-kepling"
-        className="hidden print:block page-print-single bg-white text-slate-900 w-[190mm] mx-auto p-1 font-serif text-[8pt] leading-tight"
-        style={{ pageBreakAfter: 'avoid', breakAfter: 'avoid', maxHeight: '285mm', overflow: 'hidden' }}
+        className="hidden print:block page-print-single bg-white text-slate-900 w-[190mm] mx-auto font-serif text-[8pt] leading-tight"
+        style={{ pageBreakAfter: 'avoid', breakAfter: 'avoid', maxHeight: '285mm', overflow: 'hidden', paddingTop: '10px', paddingLeft: '4px', paddingRight: '4px' }}
       >
         {/* KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
         <div
-          className="flex items-center gap-3.5 pb-2.5 border-b-[3.5px] border-black mb-3"
+          className="flex items-center gap-3.5 pb-2 border-b-[3px] border-black mb-2.5"
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '14px',
-            borderBottom: '3.5px solid #000000',
-            paddingBottom: '10px',
-            marginBottom: '12px',
+            borderBottom: '3px solid #000000',
+            paddingTop: '2px',
+            paddingBottom: '8px',
+            marginBottom: '10px',
           }}
         >
           <img
             src="/logo_pemko_medan.png"
             alt="Logo Pemko Medan"
             crossOrigin="anonymous"
-            className="object-contain shrink-0"
-            style={{ width: '82px', height: '98px', minWidth: '82px', display: 'block' }}
+            className="shrink-0"
+            style={{
+              width: '74px',
+              height: '89px',
+              minWidth: '74px',
+              maxWidth: '74px',
+              objectFit: 'contain',
+              display: 'block',
+            }}
           />
-          <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '82px' }}>
+          <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '74px' }}>
             <div
-              className="text-[13pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
-              style={{ fontSize: '13pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.3', marginBottom: '2px' }}
+              className="text-[12.5pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
+              style={{ fontSize: '12.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.25', marginBottom: '2px' }}
             >
               PEMERINTAH KOTA MEDAN
             </div>
             <div
-              className="text-[13pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
-              style={{ fontSize: '13pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.3', marginBottom: '4px' }}
+              className="text-[12.5pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
+              style={{ fontSize: '12.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.25', marginBottom: '3px' }}
             >
               KECAMATAN MEDAN TUNTUNGAN
             </div>
             <div
-              className="text-[17.5pt] font-black uppercase font-sans text-black tracking-[0.06em]"
-              style={{ fontSize: '17.5pt', fontWeight: '900', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2', marginBottom: '5px' }}
+              className="text-[16.5pt] font-black uppercase font-sans text-black tracking-[0.05em]"
+              style={{ fontSize: '16.5pt', fontWeight: '900', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2', marginBottom: '4px' }}
             >
               KELURAHAN MANGGA
             </div>
             <div
               className="text-[8.5pt] text-black font-sans"
-              style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.4', marginBottom: '2px' }}
+              style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.35', marginBottom: '1.5px' }}
             >
               Jalan Tembakau Raya No. 35 A P. Simalingkar - Medan
             </div>
             <div
-              className="text-[8.5pt] text-black font-sans"
-              style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.4' }}
+              className="text-[8pt] text-slate-800 font-sans"
+              style={{ fontSize: '8pt', fontFamily: 'sans-serif', color: '#1e293b', lineHeight: '1.35' }}
             >
               Laman kel.mangga@pemkomedan.go.id
             </div>
@@ -1597,81 +1671,96 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           </table>
         </div>
 
-        {/* DOKUMENTASI FOTO KEGIATAN - TEPAT 4 FOTO PER BARIS SESUAI FOTO LAPORAN */}
+        {/* DOKUMENTASI FOTO KEGIATAN - ADAPTIF & PROPER KEDINASAN */}
         {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
           <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '8px' }}>
             <div
               className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900"
-              style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#0f172a' }}
+              style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
             >
-              B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):
+              <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
+              <span style={{ fontSize: '7pt', color: '#64748b', fontWeight: 'normal', textTransform: 'none' }}>Format Album Resmi Kedinasan</span>
             </div>
             <div
-              className="grid grid-cols-4 gap-2"
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
+                gridTemplateColumns:
+                  item.dokumentasiFoto.length <= 3
+                    ? 'repeat(3, 1fr)'
+                    : item.dokumentasiFoto.length === 4
+                    ? 'repeat(4, 1fr)'
+                    : item.dokumentasiFoto.length <= 6
+                    ? 'repeat(3, 1fr)'
+                    : 'repeat(4, 1fr)',
                 columnGap: '8px',
                 rowGap: '6px',
               }}
             >
-              {item.dokumentasiFoto.map((foto, idx) => (
-                <div
-                  key={foto.id || idx}
-                  className="rounded border border-slate-300 p-1 bg-white flex flex-col items-center avoid-break"
-                  style={{
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    padding: '3px',
-                    backgroundColor: '#ffffff',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    pageBreakInside: 'avoid',
-                    breakInside: 'avoid',
-                  }}
-                >
+              {item.dokumentasiFoto.map((foto, idx) => {
+                const fotoCount = item.dokumentasiFoto?.length || 0;
+                const heightPx =
+                  fotoCount <= 3 ? '108px' : fotoCount === 4 ? '88px' : fotoCount <= 6 ? '74px' : '62px';
+
+                return (
                   <div
-                    className="w-full rounded overflow-hidden bg-slate-100"
+                    key={foto.id || idx}
+                    className="rounded border border-slate-300 p-1 bg-white flex flex-col items-center avoid-break"
                     style={{
-                      width: '100%',
-                      height: '58px',
-                      borderRadius: '2px',
-                      overflow: 'hidden',
-                      backgroundColor: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      padding: '4px',
+                      backgroundColor: '#ffffff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      pageBreakInside: 'avoid',
+                      breakInside: 'avoid',
                     }}
                   >
-                    <img
-                      src={foto.url}
-                      alt={foto.name}
-                      crossOrigin="anonymous"
-                      className="w-full h-full object-cover"
+                    <div
+                      className="w-full rounded overflow-hidden bg-slate-100"
                       style={{
                         width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        display: 'block',
+                        height: heightPx,
+                        borderRadius: '4px',
+                        overflow: 'hidden',
+                        backgroundColor: '#f1f5f9',
                       }}
-                    />
+                    >
+                      <img
+                        src={foto.url}
+                        alt={getProperFotoLabel(foto, idx)}
+                        crossOrigin="anonymous"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          objectPosition: 'center 20%',
+                          display: 'block',
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="text-[7pt] text-slate-700 font-semibold mt-1 truncate w-full text-center font-sans"
+                      style={{
+                        fontSize: '7pt',
+                        fontWeight: '600',
+                        color: '#334155',
+                        marginTop: '3px',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis',
+                        width: '100%',
+                        textAlign: 'center',
+                        fontFamily: 'sans-serif',
+                      }}
+                      title={getProperFotoLabel(foto, idx)}
+                    >
+                      {getProperFotoLabel(foto, idx)}
+                    </div>
                   </div>
-                  <div
-                    className="text-[6.5pt] text-slate-500 mt-1 truncate w-full text-center font-sans"
-                    style={{
-                      fontSize: '6.5pt',
-                      color: '#64748b',
-                      marginTop: '2px',
-                      overflow: 'hidden',
-                      whiteSpace: 'nowrap',
-                      textOverflow: 'ellipsis',
-                      width: '100%',
-                      textAlign: 'center',
-                      fontFamily: 'sans-serif',
-                    }}
-                  >
-                    {foto.name}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
