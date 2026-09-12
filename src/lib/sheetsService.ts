@@ -450,7 +450,17 @@ export async function appendLaporanToSheet(
     item.jabatan || '',
     `${item.kelurahan || 'Kel. Mangga'}, ${item.kecamatan || 'Kec. Medan Tuntungan'}`,
     kin.opsirPbbWp ? `${kin.opsirPbbWp} WP${kin.opsirPbbKeterangan ? ` (${kin.opsirPbbKeterangan})` : ''}` : '-',
-    kin.perlinsosKk ? `${kin.perlinsosKk} KK${kin.perlinsosKeterangan ? ` (${kin.perlinsosKeterangan})` : ''}` : '-',
+    kin.perlinsosKk || kin.perlinsosMenolakKk || kin.perlinsosTidakDiTempatKk
+      ? `${kin.perlinsosKk || '0'} KK${kin.perlinsosKeterangan ? ` (${kin.perlinsosKeterangan})` : ''}${
+          kin.perlinsosMenolakKk && String(kin.perlinsosMenolakKk) !== '0'
+            ? ` | Menolak: ${kin.perlinsosMenolakKk} KK${kin.perlinsosMenolakRincian ? ` [${kin.perlinsosMenolakRincian.replace(/\n/g, '; ')}]` : ''}`
+            : ''
+        }${
+          kin.perlinsosTidakDiTempatKk && String(kin.perlinsosTidakDiTempatKk) !== '0'
+            ? ` | Tidak Di Tempat: ${kin.perlinsosTidakDiTempatKk} KK${kin.perlinsosTidakDiTempatRincian ? ` [${kin.perlinsosTidakDiTempatRincian.replace(/\n/g, '; ')}]` : ''}`
+            : ''
+        }`
+      : '-',
     kin.ikdOrang ? `${kin.ikdOrang} Orang${kin.ikdKeterangan ? ` (${kin.ikdKeterangan})` : ''}` : '-',
     kin.bpjsKetenagakerjaanOrang ? `${kin.bpjsKetenagakerjaanOrang} Orang${kin.bpjsKetenagakerjaanKeterangan ? ` (${kin.bpjsKetenagakerjaanKeterangan})` : ''}` : '-',
     poskamlingSummary,

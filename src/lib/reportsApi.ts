@@ -46,18 +46,47 @@ export const isReportBeforeSept7 = (r: LaporanHarianItem): boolean => {
   return isBeforeSept7(r);
 };
 
-// Fetch all reports from Firebase Firestore (filtered against deleted IDs)
+// Fetch all reports from Firebase Firestore (with automatic fallback to Server Buffer and LocalStorage)
 export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
+  const deletedIds = getLocalDeletedReportIds();
   try {
-    const deletedIds = getLocalDeletedReportIds();
     const firestoreReports = await fetchReportsFromFirestore();
-    const cleaned = firestoreReports.filter((r) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
-    localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
-    return cleaned;
+    if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
+      const cleaned = firestoreReports.filter((r) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
+      localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
+      return cleaned;
+    }
   } catch (err) {
     console.warn('Error reading from Firebase Firestore:', err);
-    return [];
   }
+
+  // Multi-tier Fallback 1: Internal Node API Buffer
+  try {
+    const res = await fetch('/api/reports');
+    if (res.ok) {
+      const serverReports = await res.json();
+      if (Array.isArray(serverReports) && serverReports.length > 0) {
+        const cleaned = serverReports.filter((r) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
+        localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
+        return cleaned;
+      }
+    }
+  } catch (e) {
+    console.warn('Server fallback /api/reports notice:', e);
+  }
+
+  // Multi-tier Fallback 2: Local Storage
+  try {
+    const localRaw = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
+    if (localRaw) {
+      const parsed = JSON.parse(localRaw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((r) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
+      }
+    }
+  } catch (e) {}
+
+  return [];
 };
 
 // Save single report to Firebase Firestore, server, and local storage (Full Create/Update)

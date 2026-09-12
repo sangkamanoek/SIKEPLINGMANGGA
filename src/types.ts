@@ -3,6 +3,12 @@ export interface KinerjaHarian {
   opsirPbbKeterangan?: string;
   perlinsosKk: number | string;
   perlinsosKeterangan?: string;
+  // Pendataan Perlinsos (Pengecekan, Verifikasi, Menolak, Tidak di Tempat)
+  perlinsosKategoriKegiatan?: string; // e.g. 'Pendataan', 'Pengecekan', 'Verifikasi', 'Menolak', 'Tidak di Tempat'
+  perlinsosMenolakKk?: number | string; // Jumlah KK / warga menolak
+  perlinsosMenolakRincian?: string; // Nama & Alamat warga yang menolak
+  perlinsosTidakDiTempatKk?: number | string; // Jumlah KK / warga tidak di tempat
+  perlinsosTidakDiTempatRincian?: string; // Nama & Alamat warga yang tidak di tempat
   ikdOrang: number | string;
   ikdKeterangan?: string;
   bpjsKetenagakerjaanOrang: number | string;

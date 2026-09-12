@@ -178,7 +178,14 @@ export function generateLaporanWhatsAppText(item: LaporanHarianItem): string {
   // 2. Perlinsos
   const perlinsosVal = kin.perlinsosKk ? `${kin.perlinsosKk} KK` : '-';
   const perlinsosKet = kin.perlinsosKeterangan ? ` (${kin.perlinsosKeterangan})` : '';
-  lines.push(`2. PERLINSOS : ${perlinsosVal}${perlinsosKet}`);
+  let perlinsosText = `2. PERLINSOS : ${perlinsosVal}${perlinsosKet}`;
+  if (kin.perlinsosMenolakKk && String(kin.perlinsosMenolakKk) !== '0') {
+    perlinsosText += `\n   - ⚠️ Menolak Pendataan: ${kin.perlinsosMenolakKk} KK${kin.perlinsosMenolakRincian ? ` (Nama & Alamat: ${kin.perlinsosMenolakRincian.replace(/\n/g, ', ')})` : ''}`;
+  }
+  if (kin.perlinsosTidakDiTempatKk && String(kin.perlinsosTidakDiTempatKk) !== '0') {
+    perlinsosText += `\n   - 🏠 Tidak Di Tempat: ${kin.perlinsosTidakDiTempatKk} KK${kin.perlinsosTidakDiTempatRincian ? ` (Nama & Alamat: ${kin.perlinsosTidakDiTempatRincian.replace(/\n/g, ', ')})` : ''}`;
+  }
+  lines.push(perlinsosText);
 
   // 3. IKD
   const ikdVal = kin.ikdOrang ? `${kin.ikdOrang} ORANG` : '-';

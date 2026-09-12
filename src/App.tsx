@@ -822,13 +822,13 @@ export default function App() {
       />
 
       {/* Footer matching Professional Polish style */}
-      <footer className="bg-white border-t border-slate-200 px-6 sm:px-8 py-3.5 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] gap-3 print:hidden">
-        <div className="flex items-center gap-2 ml-auto">
-          <span className="bg-[#991B1B] text-white px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider">
-            #MedanUntukSemua
+      <footer className="bg-white border-t border-slate-200 px-4 py-3.5 flex items-center justify-center text-center w-full print:hidden">
+        <div className="flex items-center justify-center gap-2.5 mx-auto">
+          <span className="bg-[#991B1B] text-white px-3 py-1.5 rounded-md text-[11px] font-bold tracking-wider uppercase shadow-xs">
+            #MEDANUNTUKSEMUA
           </span>
-          <span className="bg-[#1E3A8A] text-white px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider">
-            #SemuaUntukMedan
+          <span className="bg-[#1E3A8A] text-white px-3 py-1.5 rounded-md text-[11px] font-bold tracking-wider uppercase shadow-xs">
+            #SEMUAUNTUKMEDAN
           </span>
         </div>
       </footer>

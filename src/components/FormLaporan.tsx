@@ -67,6 +67,13 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
   const [perlinsosKk, setPerlinsosKk] = useState<string>('0');
   const [perlinsosKeterangan, setPerlinsosKeterangan] = useState<string>('Pendataan Perlinsos');
+  // Pendataan Perlinsos: Menolak & Tidak di Tempat
+  const [perlinsosKategoriKegiatan, setPerlinsosKategoriKegiatan] = useState<string>('Pendataan Perlinsos');
+  const [perlinsosMenolakKk, setPerlinsosMenolakKk] = useState<string>('0');
+  const [perlinsosMenolakRincian, setPerlinsosMenolakRincian] = useState<string>('');
+  const [perlinsosTidakDiTempatKk, setPerlinsosTidakDiTempatKk] = useState<string>('0');
+  const [perlinsosTidakDiTempatRincian, setPerlinsosTidakDiTempatRincian] = useState<string>('');
+  const [showPerlinsosRincianKhusus, setShowPerlinsosRincianKhusus] = useState<boolean>(false);
 
   const [ikdOrang, setIkdOrang] = useState<string>('0');
   const [ikdKeterangan, setIkdKeterangan] = useState<string>('Aktivasi aplikasi IKD Dukcapil');
@@ -78,6 +85,10 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   const handleResetKinerjaToZero = () => {
     setOpsirPbbWp('0');
     setPerlinsosKk('0');
+    setPerlinsosMenolakKk('0');
+    setPerlinsosMenolakRincian('');
+    setPerlinsosTidakDiTempatKk('0');
+    setPerlinsosTidakDiTempatRincian('');
     setIkdOrang('0');
     setBpjsKetenagakerjaanOrang('0');
   };
@@ -239,6 +250,11 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       opsirPbbKeterangan: opsirPbbKeterangan.trim(),
       perlinsosKk: perlinsosKk.trim() || '0',
       perlinsosKeterangan: perlinsosKeterangan.trim(),
+      perlinsosKategoriKegiatan: perlinsosKategoriKegiatan.trim(),
+      perlinsosMenolakKk: perlinsosMenolakKk.trim() || '0',
+      perlinsosMenolakRincian: perlinsosMenolakRincian.trim(),
+      perlinsosTidakDiTempatKk: perlinsosTidakDiTempatKk.trim() || '0',
+      perlinsosTidakDiTempatRincian: perlinsosTidakDiTempatRincian.trim(),
       ikdOrang: ikdOrang.trim() || '0',
       ikdKeterangan: ikdKeterangan.trim(),
       bpjsKetenagakerjaanOrang: bpjsKetenagakerjaanOrang.trim() || '0',
@@ -306,7 +322,13 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       ``,
       `📋 KINERJA HARIAN:`,
       `1. OPSIR PBB : ${report.kinerja.opsirPbbWp || '0'} WP ${report.kinerja.opsirPbbKeterangan ? `(${report.kinerja.opsirPbbKeterangan})` : ''}`,
-      `2. PERLINSOS : ${report.kinerja.perlinsosKk || '0'} KK ${report.kinerja.perlinsosKeterangan ? `(${report.kinerja.perlinsosKeterangan})` : ''}`,
+      `2. PERLINSOS : ${report.kinerja.perlinsosKk || '0'} KK ${report.kinerja.perlinsosKeterangan ? `(${report.kinerja.perlinsosKeterangan})` : ''}` +
+        (report.kinerja.perlinsosMenolakKk && String(report.kinerja.perlinsosMenolakKk) !== '0'
+          ? `\n   - ⚠️ Menolak Pendataan: ${report.kinerja.perlinsosMenolakKk} KK${report.kinerja.perlinsosMenolakRincian ? `\n     Nama & Alamat: ${report.kinerja.perlinsosMenolakRincian.replace(/\n/g, ', ')}` : ''}`
+          : '') +
+        (report.kinerja.perlinsosTidakDiTempatKk && String(report.kinerja.perlinsosTidakDiTempatKk) !== '0'
+          ? `\n   - 🏠 Tidak Di Tempat: ${report.kinerja.perlinsosTidakDiTempatKk} KK${report.kinerja.perlinsosTidakDiTempatRincian ? `\n     Nama & Alamat: ${report.kinerja.perlinsosTidakDiTempatRincian.replace(/\n/g, ', ')}` : ''}`
+          : ''),
       `3. IDENTITAS KEPENDUDUKAN DIGITAL : ${report.kinerja.ikdOrang || '0'} ORANG ${report.kinerja.ikdKeterangan ? `(${report.kinerja.ikdKeterangan})` : ''}`,
       `4. BPJS KETENAGAKERJAAN : ${report.kinerja.bpjsKetenagakerjaanOrang || '0'} ORANG ${report.kinerja.bpjsKetenagakerjaanKeterangan ? `(${report.kinerja.bpjsKetenagakerjaanKeterangan})` : ''}`,
       report.kinerja.poskamlingStatus && report.kinerja.poskamlingStatus !== 'Tidak Ada Giat'
@@ -577,7 +599,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
             </div>
 
             {/* Pilar 2: PERLINSOS */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[10px] font-black">
@@ -587,8 +609,54 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                 </span>
                 <span className="text-[11px] font-semibold text-slate-500">Satuan: KK</span>
               </div>
+
+              {/* Status / Kategori Aktivitas Perlinsos */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Aktivitas:</span>
+                {[
+                  'Pendataan Perlinsos',
+                  'Pengecekan Data',
+                  'Verifikasi Bansos',
+                  'Menolak Pendataan Perlinsos',
+                  'Tidak Di Tempat',
+                ].map((opt) => {
+                  const isMenolak = opt === 'Menolak Pendataan Perlinsos';
+                  const isTidakDiTempat = opt === 'Tidak Di Tempat';
+                  const isActive = perlinsosKeterangan === opt || perlinsosKategoriKegiatan === opt;
+
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => {
+                        setPerlinsosKeterangan(opt);
+                        setPerlinsosKategoriKegiatan(opt);
+                        if (isMenolak || isTidakDiTempat) {
+                          setShowPerlinsosRincianKhusus(true);
+                        }
+                      }}
+                      className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer font-bold ${
+                        isActive
+                          ? isMenolak
+                            ? 'bg-rose-100 border-rose-400 text-rose-800 shadow-2xs'
+                            : isTidakDiTempat
+                            ? 'bg-amber-100 border-amber-400 text-amber-900 shadow-2xs'
+                            : 'bg-emerald-100 border-emerald-400 text-emerald-800 shadow-2xs'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {isMenolak ? '⚠️ ' : isTidakDiTempat ? '🏠 ' : ''}{opt}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Baris Input Realisasi & Keterangan Utama */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">
+                    Realisasi (KK)
+                  </label>
                   <input
                     id="input-perlinsos-kk"
                     type="number"
@@ -600,32 +668,113 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                   />
                 </div>
                 <div className="col-span-2">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">
+                    Keterangan Kegiatan Perlinsos
+                  </label>
                   <input
                     id="input-perlinsos-ket"
                     type="text"
                     value={perlinsosKeterangan}
                     onChange={(e) => setPerlinsosKeterangan(e.target.value)}
                     placeholder="Contoh: Pendataan Perlinsos"
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700"
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 font-medium"
                   />
-                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                    <span className="text-[10px] text-slate-400 font-medium">Pilihan:</span>
-                    {['Pendataan Perlinsos', 'Pengecekan data penerima bansos', 'Verifikasi Bansos'].map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => setPerlinsosKeterangan(opt)}
-                        className={`text-[10px] px-2 py-0.5 rounded-md border transition-colors cursor-pointer ${
-                          perlinsosKeterangan === opt
-                            ? 'bg-emerald-100 border-emerald-300 text-emerald-800 font-bold'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
                 </div>
+              </div>
+
+              {/* Toggle Khusus Menolak / Tidak Di Tempat */}
+              <div className="pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowPerlinsosRincianKhusus(!showPerlinsosRincianKhusus)}
+                  className="w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span>⚠️</span>
+                    <span>Pencatatan Warga Menolak & Tidak Di Tempat</span>
+                    {(Number(perlinsosMenolakKk) > 0 || Number(perlinsosTidakDiTempatKk) > 0) && (
+                      <span className="ml-1.5 px-1.5 py-0.5 bg-rose-500 text-white rounded-full text-[9px]">
+                        Terisi
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {showPerlinsosRincianKhusus ? 'Tutup ▲' : 'Buka Form ▼'}
+                  </span>
+                </button>
+
+                {/* Sub-form Warga Menolak & Tidak di Tempat */}
+                {(showPerlinsosRincianKhusus || Number(perlinsosMenolakKk) > 0 || Number(perlinsosTidakDiTempatKk) > 0) && (
+                  <div className="mt-2.5 space-y-3 p-3 bg-white border border-slate-200 rounded-xl">
+                    {/* 1. Warga Menolak Pendataan Perlinsos */}
+                    <div className="p-2.5 rounded-lg border border-rose-200 bg-rose-50/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+                          <span>⚠️</span>
+                          <span>1. Warga Menolak Pendataan Perlinsos</span>
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-rose-700">Jumlah:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={perlinsosMenolakKk}
+                            onChange={(e) => setPerlinsosMenolakKk(e.target.value.replace(/^0+(?=\d)/, ''))}
+                            placeholder="0"
+                            className="w-16 px-2 py-1 text-xs border border-rose-300 rounded-md bg-white font-bold text-rose-900 text-center"
+                          />
+                          <span className="text-[10px] font-bold text-rose-700">KK</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-rose-800 uppercase block mb-1">
+                          Nama & Alamat Warga Yang Menolak:
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={perlinsosMenolakRincian}
+                          onChange={(e) => setPerlinsosMenolakRincian(e.target.value)}
+                          placeholder="Tuliskan nama & alamat lengkap warga yang menolak pendataan, contoh:&#10;1. Bpk. Sitorus - Jl. Tembakau No. 14 (Menolak didata bansos)&#10;2. Ibu Farida - Jl. Bunga Raya No. 5"
+                          className="w-full px-2.5 py-1.5 text-xs border border-rose-200 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-rose-500 font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 2. Warga Tidak Di Tempat */}
+                    <div className="p-2.5 rounded-lg border border-amber-200 bg-amber-50/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                          <span>🏠</span>
+                          <span>2. Warga Tidak Di Tempat</span>
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-amber-800">Jumlah:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={perlinsosTidakDiTempatKk}
+                            onChange={(e) => setPerlinsosTidakDiTempatKk(e.target.value.replace(/^0+(?=\d)/, ''))}
+                            placeholder="0"
+                            className="w-16 px-2 py-1 text-xs border border-amber-300 rounded-md bg-white font-bold text-amber-900 text-center"
+                          />
+                          <span className="text-[10px] font-bold text-amber-800">KK</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-amber-800 uppercase block mb-1">
+                          Nama & Alamat Warga Yang Tidak Di Tempat:
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={perlinsosTidakDiTempatRincian}
+                          onChange={(e) => setPerlinsosTidakDiTempatRincian(e.target.value)}
+                          placeholder="Tuliskan nama & alamat lengkap warga yang sedang tidak di tempat, contoh:&#10;1. Ibu Nurmala - Jl. Tembakau No. 22 (Rumah terkunci / sedang kerja)&#10;2. Bpk. Hendra - Jl. Melati No. 9 (Luar kota)"
+                          className="w-full px-2.5 py-1.5 text-xs border border-amber-200 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-amber-500 font-medium"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -997,6 +1146,16 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                 <p className="font-bold text-amber-300 mb-1">📋 KINERJA HARIAN:</p>
                 <p>1. OPSIR PBB : <span className="text-emerald-300 font-bold">{opsirPbbWp || 0} WP</span> {opsirPbbKeterangan && `(${opsirPbbKeterangan})`}</p>
                 <p>2. PERLINSOS : <span className="text-emerald-300 font-bold">{perlinsosKk || 0} KK</span> {perlinsosKeterangan && `(${perlinsosKeterangan})`}</p>
+                {perlinsosMenolakKk && String(perlinsosMenolakKk) !== '0' && (
+                  <p className="text-rose-300 text-[11px] pl-3">
+                    ⚠️ Menolak: <span className="font-bold">{perlinsosMenolakKk} KK</span> {perlinsosMenolakRincian && `(${perlinsosMenolakRincian})`}
+                  </p>
+                )}
+                {perlinsosTidakDiTempatKk && String(perlinsosTidakDiTempatKk) !== '0' && (
+                  <p className="text-sky-300 text-[11px] pl-3">
+                    🏠 Tidak Di Tempat: <span className="font-bold">{perlinsosTidakDiTempatKk} KK</span> {perlinsosTidakDiTempatRincian && `(${perlinsosTidakDiTempatRincian})`}
+                  </p>
+                )}
                 <p>3. IKD       : <span className="text-emerald-300 font-bold">{ikdOrang || 0} ORANG</span> {ikdKeterangan && `(${ikdKeterangan})`}</p>
                 <p>4. BPJS TK   : <span className="text-emerald-300 font-bold">{bpjsKetenagakerjaanOrang || 0} ORANG</span> {bpjsKetenagakerjaanKeterangan && `(${bpjsKetenagakerjaanKeterangan})`}</p>
                 {poskamlingAdaGiat && poskamlingStatus && (

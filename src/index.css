@@ -3,7 +3,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 8mm 10mm 6mm 10mm;
+    margin: 6mm 8mm 6mm 8mm;
   }
 
   html, body {
@@ -12,9 +12,19 @@
     background: #ffffff !important;
     color: #000000 !important;
     width: 100% !important;
-    height: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Hilangkan backdrop gelap modal dan scrollbar saat cetak */
+  .fixed.inset-0 {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
   }
 
   /* Hilangkan efek blur, shadow, background yang tidak diinginkan */
@@ -25,16 +35,30 @@
     text-shadow: none !important;
   }
 
-  /* Sembunyikan elemen navigasi dan tombol interaktif saat cetak */
+  /* Sembunyikan elemen non-cetak */
   .no-print,
+  .print\:hidden,
   nav,
-  header.print\:hidden,
-  footer.print\:hidden,
+  header,
+  footer,
+  aside,
   button,
   input,
   textarea,
   select {
     display: none !important;
+  }
+
+  /* Tampilkan lembar cetak */
+  #lembar-cetak-laporan-kepling,
+  .print\:block {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 195mm !important;
+    margin: 0 auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   /* Kontainer wajib pas 1 lembar kertas A4 (tinggi maks ~275mm) */
@@ -64,7 +88,7 @@
 
   .print-table th,
   .print-table td {
-    border: 1px solid #334155 !important;
+    border: 1px solid #000000 !important;
     padding: 3px 6px !important;
   }
 }

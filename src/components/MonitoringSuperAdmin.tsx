@@ -22,6 +22,8 @@ import {
   X,
   Trophy,
   FileSpreadsheet,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
@@ -95,6 +97,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'PENDING'>('ALL');
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [copiedWa, setCopiedWa] = useState(false);
 
   // Compute formatted date string for matching
   const selectedDateFormatted = useMemo(() => {
@@ -177,6 +180,36 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
     });
   }, [keplingReportMap, statusFilter, searchTerm]);
 
+  const handleCopyRekapWA = () => {
+    const tglLabel = selectedDate ? formatTanggalIndonesia(new Date(selectedDate + 'T00:00:00')) : 'Semua Tanggal';
+    let text = `*REKAPITULASI PENGIRIMAN LAPORAN HARIAN KEPLING*\n`;
+    text += `*KELURAHAN MANGGA - KECAMATAN MEDAN TUNTUNGAN*\n`;
+    text += `📅 Tanggal Pantauan: ${tglLabel}\n`;
+    text += `📊 Progress: ${stats.submittedCount}/${stats.totalKepling} Lingkungan (${stats.completionPct}%)\n\n`;
+    text += `*STATUS PELAPORAN 24 LINGKUNGAN:*\n`;
+
+    KEPLING_ACCOUNTS.forEach((k) => {
+      const rep = keplingReportMap.get(k.id);
+      if (rep) {
+        text += `✅ ${k.lingkungan} (${k.nama}) - SUDAH LAPOR\n`;
+        text += `   - PBB: ${rep.kinerja?.opsirPbbWp || 0} WP | Perlinsos: ${rep.kinerja?.perlinsosKk || 0} KK | IKD: ${rep.kinerja?.ikdOrang || 0} Jiwa | BPJS: ${rep.kinerja?.bpjsKetenagakerjaanOrang || 0} Jiwa\n`;
+      } else {
+        text += `❌ ${k.lingkungan} (${k.nama}) - BELUM LAPOR\n`;
+      }
+    });
+
+    text += `\n*TOTAL REALISASI ENUMERASI:*\n`;
+    text += `- Opsir PBB: ${stats.totalPbb} WP\n`;
+    text += `- Perlinsos Bansos: ${stats.totalPerlinsos} KK\n`;
+    text += `- IKD Kependudukan: ${stats.totalIkd} Jiwa\n`;
+    text += `- BPJS Ketenagakerjaan: ${stats.totalBpjs} Jiwa\n`;
+
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedWa(true);
+      setTimeout(() => setCopiedWa(false), 3000);
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Super Admin Welcome Banner */}
@@ -219,6 +252,20 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                 <span>Dashboard Capaian Kepling</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleCopyRekapWA}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-colors cursor-pointer shadow-md ${
+                copiedWa
+                  ? 'bg-emerald-500 text-white'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              }`}
+              title="Salin ringkasan rekapitulasi status pengiriman 24 Kepling ke clipboard (siap kirim WhatsApp)"
+            >
+              {copiedWa ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              <span>{copiedWa ? 'Tersalin ke Clipboard!' : 'Salin Rekap WA'}</span>
+            </button>
 
             {onRefresh && (
               <button

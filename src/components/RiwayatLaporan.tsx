@@ -11,6 +11,7 @@ import {
   CheckCircle,
   X,
   Eye,
+  Edit3,
   Shield,
   Trash2,
   AlertTriangle,
@@ -460,10 +461,11 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                   <button
                     type="button"
                     onClick={() => onSelectReport(item)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                    title="Buka laporan untuk melihat detail, cetak PDF, atau edit isinya"
                   >
-                    <Eye className="w-3.5 h-3.5 text-slate-600" />
-                    <span>Lihat Rincian</span>
+                    <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Buka / Edit</span>
                   </button>
 
                   {isAdmin && onDeleteReport && (
@@ -534,6 +536,16 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                     <p className="text-[10px] text-slate-500 truncate mt-0.5">
                       {item.kinerja.perlinsosKeterangan}
                     </p>
+                  )}
+                  {item.kinerja?.perlinsosMenolakKk && String(item.kinerja.perlinsosMenolakKk) !== '0' && (
+                    <div className="mt-1 text-[9px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-1 py-0.5 rounded truncate" title={item.kinerja.perlinsosMenolakRincian || ''}>
+                      ⚠️ Menolak: {item.kinerja.perlinsosMenolakKk} KK
+                    </div>
+                  )}
+                  {item.kinerja?.perlinsosTidakDiTempatKk && String(item.kinerja.perlinsosTidakDiTempatKk) !== '0' && (
+                    <div className="mt-0.5 text-[9px] font-bold text-amber-900 bg-amber-50 border border-amber-200 px-1 py-0.5 rounded truncate" title={item.kinerja.perlinsosTidakDiTempatRincian || ''}>
+                      🏠 Tdk di Tempat: {item.kinerja.perlinsosTidakDiTempatKk} KK
+                    </div>
                   )}
                 </div>
 

@@ -14,6 +14,7 @@ import {
   Shield,
   Download,
   Eye,
+  FileText,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata } from '../types';
 import { formatTanggalIndonesia } from '../lib/formatter';
@@ -48,6 +49,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; name: string } | null>(null);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [pdfStatusMsg, setPdfStatusMsg] = useState('');
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
 
   // Helper download photo
   const handleDownloadPhoto = (url: string, filename: string, e?: React.MouseEvent) => {
@@ -89,6 +92,10 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   const [editOpsirPbbKet, setEditOpsirPbbKet] = useState('');
   const [editPerlinsosKk, setEditPerlinsosKk] = useState('');
   const [editPerlinsosKet, setEditPerlinsosKet] = useState('');
+  const [editPerlinsosMenolakKk, setEditPerlinsosMenolakKk] = useState('');
+  const [editPerlinsosMenolakRincian, setEditPerlinsosMenolakRincian] = useState('');
+  const [editPerlinsosTidakDiTempatKk, setEditPerlinsosTidakDiTempatKk] = useState('');
+  const [editPerlinsosTidakDiTempatRincian, setEditPerlinsosTidakDiTempatRincian] = useState('');
   const [editIkdOrang, setEditIkdOrang] = useState('');
   const [editIkdKet, setEditIkdKet] = useState('');
   const [editBpjsOrang, setEditBpjsOrang] = useState('');
@@ -110,6 +117,10 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       setEditOpsirPbbKet(item.kinerja?.opsirPbbKeterangan || '');
       setEditPerlinsosKk(item.kinerja?.perlinsosKk || '0');
       setEditPerlinsosKet(item.kinerja?.perlinsosKeterangan || '');
+      setEditPerlinsosMenolakKk(item.kinerja?.perlinsosMenolakKk ? String(item.kinerja.perlinsosMenolakKk) : '0');
+      setEditPerlinsosMenolakRincian(item.kinerja?.perlinsosMenolakRincian || '');
+      setEditPerlinsosTidakDiTempatKk(item.kinerja?.perlinsosTidakDiTempatKk ? String(item.kinerja.perlinsosTidakDiTempatKk) : '0');
+      setEditPerlinsosTidakDiTempatRincian(item.kinerja?.perlinsosTidakDiTempatRincian || '');
       setEditIkdOrang(item.kinerja?.ikdOrang || '0');
       setEditIkdKet(item.kinerja?.ikdKeterangan || '');
       setEditBpjsOrang(item.kinerja?.bpjsKetenagakerjaanOrang || '0');
@@ -121,6 +132,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       setEditKegiatanLainnya(item.kinerja?.kegiatanLainnya || '');
       setIsEditing(false);
       setShowDeleteConfirm(false);
+      setShowPrintPreview(false);
+      setPdfStatusMsg('');
       setSaveSuccessMsg('');
     }
   }, [item]);
@@ -147,71 +160,103 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     const safeTanggal = (displayTanggal || item.tanggal || 'Laporan').replace(/[^a-zA-Z0-9]/g, '_');
     const titleStr = `Laporan_${safeJabatan}_${safeTanggal}`;
 
-    const printWin = window.open('', '_blank');
-    if (!printWin) {
-      // If popup blocked, attempt direct window.print
-      try {
+    try {
+      const printWin = window.open('', '_blank');
+      if (!printWin) {
+        // Jika popup diblokir browser, cetak langsung halaman saat ini
         window.print();
-      } catch (e) {}
-      return;
-    }
+        return;
+      }
 
-    printWin.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${titleStr}</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <script src="https://cdn.tailwindcss.com"></script>
-          <style>
-            @media print {
-              .no-print { display: none !important; }
-              body { background: white !important; margin: 0 !important; padding: 0 !important; }
-              @page { size: A4 portrait; margin: 8mm; }
-            }
-            body { font-family: 'Times New Roman', Times, serif; background-color: #f8fafc; color: #0f172a; padding: 12px; }
-            .print-table { border-collapse: collapse; width: 100%; }
-            .print-table th, .print-table td { border: 1px solid #000; padding: 4px 6px; font-size: 8pt; }
-          </style>
-        </head>
-        <body>
-          <div class="no-print" style="position: sticky; top: 0; background: #064e3b; color: white; padding: 10px; border-radius: 8px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-            <span style="font-weight: bold; font-size: 12px;">📄 Lembar Cetak Resmi Laporan Kepling (A4)</span>
-            <div style="display: flex; gap: 8px;">
-              <button onclick="window.print()" style="background: #f59e0b; color: #000; font-weight: bold; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px;">🖨️ Cetak / Simpan PDF</button>
-              <button onclick="window.close()" style="background: rgba(255,255,255,0.2); color: white; font-weight: bold; padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px;">Tutup</button>
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html lang="id">
+          <head>
+            <title>${titleStr}</title>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              @media print {
+                .no-print { display: none !important; }
+                body { background: white !important; margin: 0 !important; padding: 0 !important; }
+                @page { size: A4 portrait; margin: 6mm 8mm 6mm 8mm; }
+              }
+              body { font-family: 'Times New Roman', Times, serif; background-color: #f8fafc; color: #000; padding: 12px; margin: 0; }
+              .print-table { border-collapse: collapse; width: 100%; }
+              .print-table th, .print-table td { border: 1px solid #000; padding: 3px 6px; font-size: 8pt; }
+              .avoid-break { page-break-inside: avoid; break-inside: avoid; }
+            </style>
+          </head>
+          <body>
+            <div class="no-print" style="position: sticky; top: 0; background: #064e3b; color: white; padding: 10px; border-radius: 8px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 9999;">
+              <span style="font-weight: bold; font-size: 13px;">📄 Lembar Cetak Resmi Laporan Kepling (A4)</span>
+              <div style="display: flex; gap: 8px;">
+                <button onclick="window.print()" style="background: #f59e0b; color: #000; font-weight: bold; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px;">🖨️ Cetak / Simpan PDF</button>
+                <button onclick="window.close()" style="background: rgba(255,255,255,0.2); color: white; font-weight: bold; padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px;">Tutup</button>
+              </div>
             </div>
-          </div>
-          <div style="background: white; max-width: 195mm; margin: 0 auto; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            ${contentHtml}
-          </div>
-          <script>
-            setTimeout(function() {
-              try {
-                window.print();
-              } catch (e) {}
-            }, 800);
-          </script>
-        </body>
-      </html>
-    `);
-    printWin.document.close();
+            <div style="background: white; max-width: 195mm; margin: 0 auto; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              ${contentHtml}
+            </div>
+            <script>
+              window.onload = function() {
+                setTimeout(function() {
+                  try { window.print(); } catch (e) {}
+                }, 400);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWin.document.close();
+    } catch (e) {
+      window.print();
+    }
   };
 
   const handleDownloadPDF = async () => {
     if (!item) return;
     setIsExportingPDF(true);
+    setPdfStatusMsg('Menyiapkan file PDF A4...');
+
     const element = document.getElementById('lembar-cetak-laporan-kepling');
     if (!element) {
-      openPrintableWindow();
+      handlePrint();
       setIsExportingPDF(false);
+      setPdfStatusMsg('');
       return;
     }
 
-    const originalClass = element.className;
-    try {
-      element.className = 'block page-print-single bg-white text-slate-900 w-[190mm] mx-auto p-4 font-serif text-[8.5pt] leading-tight';
+    // Buat klon elemen dengan dimensi A4 standar yang tidak tertekan oleh resolusi layar HP
+    const tempContainer = document.createElement('div');
+    tempContainer.id = 'temp-pdf-export-clone';
+    tempContainer.style.position = 'fixed';
+    tempContainer.style.left = '-9999px';
+    tempContainer.style.top = '0';
+    tempContainer.style.width = '794px';
+    tempContainer.style.maxWidth = '794px';
+    tempContainer.style.backgroundColor = '#ffffff';
+    tempContainer.style.color = '#000000';
+    tempContainer.style.padding = '18px 24px';
+    tempContainer.style.zIndex = '-999';
+    tempContainer.style.boxSizing = 'border-box';
+    tempContainer.style.fontFamily = "'Times New Roman', Times, serif";
+    tempContainer.style.visibility = 'visible';
+    tempContainer.innerHTML = element.innerHTML;
 
+    // Pastikan gambar di klon menggunakan crossOrigin anonymous
+    const imgs = tempContainer.querySelectorAll('img');
+    imgs.forEach((img) => {
+      img.crossOrigin = 'anonymous';
+      img.loading = 'eager';
+    });
+
+    document.body.appendChild(tempContainer);
+
+    // Tunggu browser mendecode layout gambar
+    await new Promise((r) => setTimeout(r, 400));
+
+    try {
       const html2pdfModule = await import('html2pdf.js');
       const html2pdfFunc = (html2pdfModule as any).default || html2pdfModule;
 
@@ -220,24 +265,52 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       const filename = `Laporan_${safeJabatan}_${safeTanggal}.pdf`;
 
       const opt = {
-        margin: [4, 4, 4, 4],
+        margin: [4, 5, 4, 5],
         filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 1.5, useCORS: true, allowTaint: true, logging: false },
+        image: { type: 'jpeg', quality: 0.96 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          letterRendering: true,
+          scrollY: 0,
+          scrollX: 0,
+          windowWidth: 794,
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
       };
 
-      await html2pdfFunc().set(opt).from(element).save();
+      setPdfStatusMsg('Mengunduh dokumen PDF...');
+      await html2pdfFunc().set(opt).from(tempContainer).save();
     } catch (err) {
-      console.warn('PDF export notice, using print fallback window:', err);
-      openPrintableWindow();
+      console.warn('PDF direct export notice, fallback to print:', err);
+      handlePrint();
     } finally {
-      element.className = originalClass;
+      if (document.body.contains(tempContainer)) {
+        document.body.removeChild(tempContainer);
+      }
       setIsExportingPDF(false);
+      setPdfStatusMsg('');
     }
   };
 
   const handlePrint = () => {
+    if (!item) return;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+    if (isMobile) {
+      // Di Android & iOS: browser memblokir window.open popup.
+      // Panggil window.print() langsung pada halaman aktif untuk memicu Android Print Spooler bawaan
+      try {
+        window.print();
+      } catch (e) {
+        console.warn('Print direct error:', e);
+      }
+      return;
+    }
+
+    // Di Desktop: buka tab/window khusus yang rapi
     openPrintableWindow();
   };
 
@@ -255,6 +328,10 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             opsirPbbKeterangan: editOpsirPbbKet,
             perlinsosKk: editPerlinsosKk,
             perlinsosKeterangan: editPerlinsosKet,
+            perlinsosMenolakKk: editPerlinsosMenolakKk,
+            perlinsosMenolakRincian: editPerlinsosMenolakRincian,
+            perlinsosTidakDiTempatKk: editPerlinsosTidakDiTempatKk,
+            perlinsosTidakDiTempatRincian: editPerlinsosTidakDiTempatRincian,
             ikdOrang: editIkdOrang,
             ikdKeterangan: editIkdKet,
             bpjsKetenagakerjaanOrang: editBpjsOrang,
@@ -284,7 +361,13 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       `----------------------------------------`,
       `KINERJA HARIAN:`,
       `1. OPSIR PBB : ${kin.opsirPbbWp || '0'} WP ${kin.opsirPbbKeterangan ? `(${kin.opsirPbbKeterangan})` : ''}`,
-      `2. PERLINSOS : ${kin.perlinsosKk || '0'} KK ${kin.perlinsosKeterangan ? `(${kin.perlinsosKeterangan})` : ''}`,
+      `2. PERLINSOS : ${kin.perlinsosKk || '0'} KK ${kin.perlinsosKeterangan ? `(${kin.perlinsosKeterangan})` : ''}` +
+        (kin.perlinsosMenolakKk && String(kin.perlinsosMenolakKk) !== '0'
+          ? `\n   - ⚠️ Menolak: ${kin.perlinsosMenolakKk} KK${kin.perlinsosMenolakRincian ? ` (Nama & Alamat: ${kin.perlinsosMenolakRincian.replace(/\n/g, ', ')})` : ''}`
+          : '') +
+        (kin.perlinsosTidakDiTempatKk && String(kin.perlinsosTidakDiTempatKk) !== '0'
+          ? `\n   - 🏠 Tidak Di Tempat: ${kin.perlinsosTidakDiTempatKk} KK${kin.perlinsosTidakDiTempatRincian ? ` (Nama & Alamat: ${kin.perlinsosTidakDiTempatRincian.replace(/\n/g, ', ')})` : ''}`
+          : ''),
       `3. IDENTITAS KEPENDUDUKAN DIGITAL : ${kin.ikdOrang || '0'} ORANG ${kin.ikdKeterangan ? `(${kin.ikdKeterangan})` : ''}`,
       `4. BPJS KETENAGAKERJAAN : ${kin.bpjsKetenagakerjaanOrang || '0'} ORANG ${kin.bpjsKetenagakerjaanKeterangan ? `(${kin.bpjsKetenagakerjaanKeterangan})` : ''}`,
       kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat'
@@ -316,6 +399,10 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           opsirPbbKeterangan: editOpsirPbbKet,
           perlinsosKk: editPerlinsosKk,
           perlinsosKeterangan: editPerlinsosKet,
+          perlinsosMenolakKk: editPerlinsosMenolakKk,
+          perlinsosMenolakRincian: editPerlinsosMenolakRincian,
+          perlinsosTidakDiTempatKk: editPerlinsosTidakDiTempatKk,
+          perlinsosTidakDiTempatRincian: editPerlinsosTidakDiTempatRincian,
           ikdOrang: editIkdOrang,
           ikdKeterangan: editIkdKet,
           bpjsKetenagakerjaanOrang: editBpjsOrang,
@@ -397,15 +484,18 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 <span>Hapus</span>
               </button>
             )}
-            {isAdmin && !isEditing && onUpdateReport && (
+            {!isEditing && onUpdateReport && (
               <button
                 type="button"
-                onClick={() => setIsEditing(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-colors cursor-pointer"
-                title="Edit data laporan ini jika ada kesalahan dari Kepling"
+                onClick={() => {
+                  setIsEditing(true);
+                  setShowPrintPreview(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                title="Edit / koreksi isi laporan ini (Kepala Lingkungan & Admin)"
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                <span>Koreksi / Edit</span>
+                <span>Edit Laporan</span>
               </button>
             )}
             <button
@@ -418,8 +508,243 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           </div>
         </div>
 
+        {/* Tab Navigasi: Form Detail vs Pratinjau Lembar A4 */}
+        {!isEditing && (
+          <div className="bg-slate-100 px-4 sm:px-6 py-2 border-b border-slate-200 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => setShowPrintPreview(false)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  !showPrintPreview
+                    ? 'bg-white text-emerald-800 shadow-xs border border-slate-200'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Form & Foto</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPrintPreview(true)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  showPrintPreview
+                    ? 'bg-white text-emerald-800 shadow-xs border border-slate-200'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Pratinjau Lembar Cetak A4</span>
+              </button>
+            </div>
+
+            {showPrintPreview && (
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 hidden sm:inline-block">
+                Standar Kertas A4 Pemko Medan
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Modal Body */}
-        <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+          {showPrintPreview && !isEditing ? (
+            <div className="space-y-3">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">📄</span>
+                  <span>
+                    Pratinjau format resmi kertas A4 kedinasan. Klik <strong>Unduh PDF</strong> atau <strong>Cetak Dokumen</strong> untuk menyimpan.
+                  </span>
+                </div>
+              </div>
+
+              {/* Tampilan Visual Lembar A4 di dalam Modal */}
+              <div className="bg-slate-200 p-2 sm:p-4 rounded-xl overflow-x-auto flex justify-center">
+                <div className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300">
+                  {/* Kop Surat Pemko */}
+                  <div className="flex items-center gap-4 pb-2 border-b-4 border-black mb-3">
+                    <img
+                      src="/logo_pemko_medan.png"
+                      alt="Logo Pemko Medan"
+                      crossOrigin="anonymous"
+                      className="w-[85px] h-[105px] object-contain shrink-0 ml-1"
+                    />
+                    <div className="text-center flex-1 pr-[90px]">
+                      <div className="text-[13pt] uppercase font-sans text-black leading-tight">
+                        PEMERINTAH KOTA MEDAN
+                      </div>
+                      <div className="text-[13pt] uppercase font-sans text-black leading-tight">
+                        KECAMATAN MEDAN TUNTUNGAN
+                      </div>
+                      <div className="text-[20pt] font-black uppercase font-sans text-black leading-tight mt-0.5 tracking-wide">
+                        KELURAHAN MANGGA
+                      </div>
+                      <div className="text-[9pt] text-black font-sans mt-0.5 leading-snug">
+                        Jalan Tembakau Raya No.35 A Medan Tuntungan, Medan, Sumatera Utara 20141
+                      </div>
+                      <div className="text-[9pt] text-black font-sans leading-snug">
+                        Laman kel.mangga@pemkomedan.go.id
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Judul Laporan */}
+                  <div className="text-center my-2">
+                    <h1 className="text-[10pt] font-black uppercase tracking-wide underline font-serif">
+                      LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN
+                    </h1>
+                    <div className="text-[8pt] font-semibold text-slate-800 mt-0.5">
+                      Hari: {(item.hari || '').toUpperCase()} &nbsp;|&nbsp; Tanggal: {displayTanggal}
+                    </div>
+                  </div>
+
+                  {/* Identitas Petugas */}
+                  <div className="mb-2 text-[8.5pt] bg-slate-50/50 p-1.5 rounded border border-slate-300">
+                    <table className="w-full text-left">
+                      <tbody>
+                        <tr>
+                          <td className="w-28 font-bold py-0.5">Nama Petugas</td>
+                          <td className="w-3">:</td>
+                          <td className="font-bold uppercase">{item.namaKepling || ''}</td>
+                          <td className="w-24 font-bold py-0.5">Kelurahan</td>
+                          <td className="w-3">:</td>
+                          <td>{item.kelurahan || ''}</td>
+                        </tr>
+                        <tr>
+                          <td className="font-bold py-0.5">Jabatan / Wilayah</td>
+                          <td>:</td>
+                          <td className="font-bold">{item.jabatan || ''}</td>
+                          <td className="font-bold py-0.5">Kecamatan</td>
+                          <td>:</td>
+                          <td>{item.kecamatan || ''}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Rekapitulasi Tugas */}
+                  <div className="mb-2">
+                    <div className="text-[8pt] font-bold uppercase tracking-wider mb-1 text-slate-900">
+                      A. REKAPITULASI CAPAIAN & KEGIATAN HARIAN:
+                    </div>
+                    <table className="print-table w-full text-left text-[8pt] border border-black">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-900 font-bold">
+                          <th className="w-7 text-center py-1">NO</th>
+                          <th className="w-52 py-1">URAIAN KEGIATAN KINERJA</th>
+                          <th className="w-28 text-center py-1">REALISASI</th>
+                          <th className="py-1">KETERANGAN / RINCIAN LAPANGAN</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="text-center font-bold">1</td>
+                          <td className="font-bold">Opsir Pajak Bumi & Bangunan (PBB)</td>
+                          <td className="text-center font-bold">{item.kinerja?.opsirPbbWp || 0} WP</td>
+                          <td>{item.kinerja?.opsirPbbKeterangan || 'Penagihan / sosialisasi pembayaran PBB warga.'}</td>
+                        </tr>
+                        <tr>
+                          <td className="text-center font-bold">2</td>
+                          <td className="font-bold">Perlindungan Sosial (PERLINSOS)</td>
+                          <td className="text-center font-bold">{item.kinerja?.perlinsosKk || 0} KK</td>
+                          <td>
+                            <div>{item.kinerja?.perlinsosKeterangan || 'Pendataan dan verifikasi warga penerima bansos.'}</div>
+                            {item.kinerja?.perlinsosMenolakKk && String(item.kinerja.perlinsosMenolakKk) !== '0' && (
+                              <div className="mt-0.5 text-[7.5pt] text-rose-900 font-sans leading-tight">
+                                <strong>• Menolak ({item.kinerja.perlinsosMenolakKk} KK):</strong> {item.kinerja.perlinsosMenolakRincian || '-'}
+                              </div>
+                            )}
+                            {item.kinerja?.perlinsosTidakDiTempatKk && String(item.kinerja.perlinsosTidakDiTempatKk) !== '0' && (
+                              <div className="mt-0.5 text-[7.5pt] text-slate-800 font-sans leading-tight">
+                                <strong>• Tidak Di Tempat ({item.kinerja.perlinsosTidakDiTempatKk} KK):</strong> {item.kinerja.perlinsosTidakDiTempatRincian || '-'}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-center font-bold">3</td>
+                          <td className="font-bold">Identitas Kependudukan Digital (IKD)</td>
+                          <td className="text-center font-bold">{item.kinerja?.ikdOrang || 0} Orang</td>
+                          <td>{item.kinerja?.ikdKeterangan || 'Fasilitasi aktivasi aplikasi IKD warga.'}</td>
+                        </tr>
+                        <tr>
+                          <td className="text-center font-bold">4</td>
+                          <td className="font-bold">BPJS Ketenagakerjaan (Pekerja Rentan)</td>
+                          <td className="text-center font-bold">{item.kinerja?.bpjsKetenagakerjaanOrang || 0} Orang</td>
+                          <td>{item.kinerja?.bpjsKetenagakerjaanKeterangan || 'Sosialisasi jaminan sosial pekerja rentan.'}</td>
+                        </tr>
+                        <tr>
+                          <td className="text-center font-bold">5</td>
+                          <td className="font-bold">Pos Ronda / SISKAMLING</td>
+                          <td className="text-center font-bold">{item.kinerja?.poskamlingStatus || 'Kondusif'}</td>
+                          <td>
+                            {item.kinerja?.poskamlingLokasi ? `Lokasi: ${item.kinerja.poskamlingLokasi}. ` : ''}
+                            {item.kinerja?.poskamlingPetugas ? `Petugas: ${item.kinerja.poskamlingPetugas}. ` : ''}
+                            {item.kinerja?.poskamlingKeterangan || 'Situasi lingkungan aman dan kondusif.'}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-center font-bold">6</td>
+                          <td className="font-bold">Kegiatan Kebersihan & Lainnya</td>
+                          <td className="text-center font-bold">Terlaksana</td>
+                          <td>{item.kinerja?.kegiatanLainnya || 'Pemantauan kebersihan, ketertiban umum, dan drainase lingkungan warga.'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Foto Dokumentasi */}
+                  {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
+                    <div className="mb-2">
+                      <div className="text-[7.5pt] font-bold uppercase tracking-wider mb-1 text-slate-900">
+                        B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):
+                      </div>
+                      <div className={`grid ${item.dokumentasiFoto.length > 3 ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5`}>
+                        {item.dokumentasiFoto.map((foto, idx) => (
+                          <div
+                            key={foto.id || idx}
+                            className="aspect-[4/3] w-full rounded border border-slate-400 overflow-hidden relative bg-slate-100"
+                          >
+                            <img
+                              src={foto.url}
+                              alt={foto.name}
+                              crossOrigin="anonymous"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[6pt] px-1 py-0.5 truncate text-center">
+                              {foto.name}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pengesahan */}
+                  <div className="mt-3 pt-1 text-[8pt]">
+                    <div className="flex justify-end pr-4">
+                      <div className="text-center flex flex-col items-center min-w-[200px]">
+                        <div>Medan, {displayTanggal}</div>
+                        <div className="mt-0.5">Yang Melaporkan,</div>
+                        <div className="font-bold uppercase whitespace-nowrap">{item.jabatan || ''}</div>
+                        <div className="h-10" />
+                        <div className="font-bold underline uppercase whitespace-nowrap">( {item.namaKepling || ''} )</div>
+                        <div className="text-[7pt] text-slate-700 mt-0.5">Kepala Lingkungan</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer lembar */}
+                  <div className="mt-2 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic">
+                    <span>SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA • SI-KEPLING</span>
+                    <span>Dokumen Resmi 1 Lembar • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
           {saveSuccessMsg && (
             <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl flex items-center gap-2 text-xs font-semibold">
               <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -571,6 +896,61 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                       onChange={(e) => setEditPerlinsosKet(e.target.value)}
                       className="w-full px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs text-slate-700"
                     />
+
+                    {/* Sub-form Edit Menolak & Tidak Di Tempat */}
+                    <div className="pt-2 border-t border-slate-100 space-y-2">
+                      <div className="p-2 rounded-lg border border-rose-200 bg-rose-50/50 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-rose-900 flex items-center gap-1">
+                            <span>⚠️</span> Menolak Pendataan:
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              value={editPerlinsosMenolakKk}
+                              onChange={(e) => setEditPerlinsosMenolakKk(e.target.value.replace(/^0+(?=\d)/, ''))}
+                              placeholder="0"
+                              className="w-14 px-1.5 py-0.5 text-xs border border-rose-300 rounded bg-white font-bold text-rose-900 text-center"
+                            />
+                            <span className="text-[10px] font-bold text-rose-700">KK</span>
+                          </div>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={editPerlinsosMenolakRincian}
+                          onChange={(e) => setEditPerlinsosMenolakRincian(e.target.value)}
+                          placeholder="Nama & Alamat warga menolak..."
+                          className="w-full px-2 py-1 text-[11px] border border-rose-200 rounded bg-white text-slate-800"
+                        />
+                      </div>
+
+                      <div className="p-2 rounded-lg border border-amber-200 bg-amber-50/50 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                            <span>🏠</span> Tidak Di Tempat:
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              value={editPerlinsosTidakDiTempatKk}
+                              onChange={(e) => setEditPerlinsosTidakDiTempatKk(e.target.value.replace(/^0+(?=\d)/, ''))}
+                              placeholder="0"
+                              className="w-14 px-1.5 py-0.5 text-xs border border-amber-300 rounded bg-white font-bold text-amber-900 text-center"
+                            />
+                            <span className="text-[10px] font-bold text-amber-800">KK</span>
+                          </div>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={editPerlinsosTidakDiTempatRincian}
+                          onChange={(e) => setEditPerlinsosTidakDiTempatRincian(e.target.value)}
+                          placeholder="Nama & Alamat warga tidak di tempat..."
+                          className="w-full px-2 py-1 text-[11px] border border-amber-200 rounded bg-white text-slate-800"
+                        />
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -581,6 +961,34 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                       <p className="text-xs text-slate-600 bg-slate-50 p-1.5 rounded">
                         {item.kinerja.perlinsosKeterangan}
                       </p>
+                    )}
+                    {/* Info Rincian Warga Menolak */}
+                    {item.kinerja?.perlinsosMenolakKk && String(item.kinerja.perlinsosMenolakKk) !== '0' && (
+                      <div className="mt-1.5 p-2 bg-rose-50 border border-rose-200 rounded-lg text-xs space-y-0.5">
+                        <div className="font-bold text-rose-800 flex items-center gap-1">
+                          <span>⚠️</span>
+                          <span>Menolak: {item.kinerja.perlinsosMenolakKk} KK</span>
+                        </div>
+                        {item.kinerja?.perlinsosMenolakRincian && (
+                          <div className="text-rose-900 whitespace-pre-line text-[11px] font-medium pl-4">
+                            {item.kinerja.perlinsosMenolakRincian}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Info Rincian Warga Tidak Di Tempat */}
+                    {item.kinerja?.perlinsosTidakDiTempatKk && String(item.kinerja.perlinsosTidakDiTempatKk) !== '0' && (
+                      <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs space-y-0.5">
+                        <div className="font-bold text-amber-900 flex items-center gap-1">
+                          <span>🏠</span>
+                          <span>Tidak Di Tempat: {item.kinerja.perlinsosTidakDiTempatKk} KK</span>
+                        </div>
+                        {item.kinerja?.perlinsosTidakDiTempatRincian && (
+                          <div className="text-amber-950 whitespace-pre-line text-[11px] font-medium pl-4">
+                            {item.kinerja.perlinsosTidakDiTempatRincian}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </>
                 )}
@@ -838,6 +1246,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               </div>
             </div>
           )}
+            </>
+          )}
         </div>
 
         {/* Modal Footer */}
@@ -933,12 +1343,19 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     </a>
                   )}
 
+                  {pdfStatusMsg && (
+                    <div className="w-full sm:w-auto px-3 py-1.5 bg-emerald-100/80 border border-emerald-300 text-emerald-900 rounded-lg flex items-center gap-2 text-xs font-bold animate-pulse">
+                      <div className="w-3 h-3 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin shrink-0" />
+                      <span>{pdfStatusMsg}</span>
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     onClick={handleDownloadPDF}
                     disabled={isExportingPDF}
                     className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-                    title="Unduh file PDF secara langsung (Sangat cocok untuk Android & HP)"
+                    title="Unduh file PDF secara langsung ke memori perangkat (Sangat cocok untuk Android & HP)"
                   >
                     <Download className="w-3.5 h-3.5 text-white" />
                     <span>{isExportingPDF ? 'Mengunduh PDF...' : 'Unduh PDF (Android & HP)'}</span>
@@ -948,14 +1365,28 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     type="button"
                     onClick={handlePrint}
                     className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                    title="Cetak Laporan Resmi Kedinasan 1 Lembar A4 / Simpan PDF Browser"
+                    title="Cetak Dokumen Resmi Kedinasan 1 Lembar A4 / Simpan PDF Browser"
                   >
                     <Printer className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>Cetak PDF (Browser)</span>
+                    <span>Cetak / Simpan PDF</span>
                   </button>
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {onUpdateReport && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditing(true);
+                        setShowPrintPreview(false);
+                      }}
+                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                      title="Edit / perbarui rincian laporan ini"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Edit Laporan</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleCopyText}
@@ -981,6 +1412,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           <img
             src="/logo_pemko_medan.png"
             alt="Logo Pemko Medan"
+            crossOrigin="anonymous"
             className="w-[90px] h-[110px] object-contain shrink-0 ml-2"
           />
           <div className="text-center flex-1 pr-[100px]">
@@ -1065,7 +1497,19 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 <td className="text-center font-bold">
                   {item.kinerja?.perlinsosKk || 0} KK
                 </td>
-                <td>{item.kinerja?.perlinsosKeterangan || 'Pendataan dan verifikasi warga penerima bansos.'}</td>
+                <td>
+                  <div>{item.kinerja?.perlinsosKeterangan || 'Pendataan dan verifikasi warga penerima bansos.'}</div>
+                  {item.kinerja?.perlinsosMenolakKk && String(item.kinerja.perlinsosMenolakKk) !== '0' && (
+                    <div className="mt-0.5 text-[7.5pt] text-rose-900 font-sans leading-tight">
+                      <strong>• Menolak ({item.kinerja.perlinsosMenolakKk} KK):</strong> {item.kinerja.perlinsosMenolakRincian || '-'}
+                    </div>
+                  )}
+                  {item.kinerja?.perlinsosTidakDiTempatKk && String(item.kinerja.perlinsosTidakDiTempatKk) !== '0' && (
+                    <div className="mt-0.5 text-[7.5pt] text-slate-800 font-sans leading-tight">
+                      <strong>• Tidak Di Tempat ({item.kinerja.perlinsosTidakDiTempatKk} KK):</strong> {item.kinerja.perlinsosTidakDiTempatRincian || '-'}
+                    </div>
+                  )}
+                </td>
               </tr>
               <tr>
                 <td className="text-center font-bold">3</td>
@@ -1120,6 +1564,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   <img
                     src={foto.url}
                     alt={foto.name}
+                    crossOrigin="anonymous"
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[6pt] px-1 py-0.5 truncate text-center">
