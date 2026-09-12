@@ -237,7 +237,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     tempContainer.style.maxWidth = '794px';
     tempContainer.style.backgroundColor = '#ffffff';
     tempContainer.style.color = '#000000';
-    tempContainer.style.padding = '18px 24px';
+    tempContainer.style.padding = '12px 18px';
     tempContainer.style.zIndex = '-999';
     tempContainer.style.boxSizing = 'border-box';
     tempContainer.style.fontFamily = "'Times New Roman', Times, serif";
@@ -563,27 +563,27 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               <div className="bg-slate-200 p-2 sm:p-4 rounded-xl overflow-x-auto flex justify-center">
                 <div className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300">
                   {/* Kop Surat Pemko */}
-                  <div className="flex items-center gap-4 pb-2 border-b-4 border-black mb-3">
+                  <div className="flex items-center gap-3 pb-1.5 border-b-[3px] border-double border-black mb-2.5">
                     <img
                       src="/logo_pemko_medan.png"
                       alt="Logo Pemko Medan"
                       crossOrigin="anonymous"
-                      className="w-[85px] h-[105px] object-contain shrink-0 ml-1"
+                      className="w-14 h-16 object-contain shrink-0 ml-1"
                     />
-                    <div className="text-center flex-1 pr-[90px]">
-                      <div className="text-[13pt] uppercase font-sans text-black leading-tight">
+                    <div className="text-center flex-1 pr-14">
+                      <div className="text-[12pt] uppercase font-sans text-black leading-tight font-bold">
                         PEMERINTAH KOTA MEDAN
                       </div>
-                      <div className="text-[13pt] uppercase font-sans text-black leading-tight">
+                      <div className="text-[12pt] uppercase font-sans text-black leading-tight font-bold">
                         KECAMATAN MEDAN TUNTUNGAN
                       </div>
-                      <div className="text-[20pt] font-black uppercase font-sans text-black leading-tight mt-0.5 tracking-wide">
+                      <div className="text-[16pt] font-black uppercase font-sans text-black leading-tight mt-0.5 tracking-wide">
                         KELURAHAN MANGGA
                       </div>
-                      <div className="text-[9pt] text-black font-sans mt-0.5 leading-snug">
-                        Jalan Tembakau Raya No.35 A Medan Tuntungan, Medan, Sumatera Utara 20141
+                      <div className="text-[8.5pt] text-black font-sans mt-0.5 leading-snug">
+                        Jalan Tembakau Raya No. 35 A P. Simalingkar - Medan
                       </div>
-                      <div className="text-[9pt] text-black font-sans leading-snug">
+                      <div className="text-[8pt] text-black font-sans leading-snug">
                         Laman kel.mangga@pemkomedan.go.id
                       </div>
                     </div>
@@ -694,29 +694,37 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     </table>
                   </div>
 
-                  {/* Foto Dokumentasi */}
+                  {/* Foto Dokumentasi - Tepat 3 Foto Per Baris */}
                   {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
                     <div className="mb-2">
                       <div className="text-[7.5pt] font-bold uppercase tracking-wider mb-1 text-slate-900">
                         B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):
                       </div>
-                      <div className={`grid ${item.dokumentasiFoto.length > 3 ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5`}>
-                        {item.dokumentasiFoto.map((foto, idx) => (
-                          <div
-                            key={foto.id || idx}
-                            className="aspect-[4/3] w-full rounded border border-slate-400 overflow-hidden relative bg-slate-100"
-                          >
-                            <img
-                              src={foto.url}
-                              alt={foto.name}
-                              crossOrigin="anonymous"
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[6pt] px-1 py-0.5 truncate text-center">
-                              {foto.name}
+                      <div className="grid grid-cols-3 gap-2">
+                        {item.dokumentasiFoto.map((foto, idx) => {
+                          const count = item.dokumentasiFoto.length;
+                          let photoH = 'h-24';
+                          if (count <= 3) photoH = 'h-24';
+                          else if (count <= 6) photoH = 'h-20';
+                          else if (count <= 9) photoH = 'h-16';
+                          else photoH = 'h-14';
+
+                          return (
+                            <div key={foto.id || idx} className="flex flex-col items-center">
+                              <div className={`w-full ${photoH} rounded border border-slate-400 overflow-hidden bg-slate-100`}>
+                                <img
+                                  src={foto.url}
+                                  alt={foto.name}
+                                  crossOrigin="anonymous"
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="text-[6.5pt] text-slate-600 mt-0.5 truncate w-full text-center font-sans">
+                                {foto.name}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1404,29 +1412,33 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
       <div
         id="lembar-cetak-laporan-kepling"
-        className="hidden print:block bg-white text-slate-900 w-[190mm] mx-auto p-1 font-serif text-[8pt] leading-tight"
+        className="hidden print:block page-print-single bg-white text-slate-900 w-[190mm] mx-auto p-1 font-serif text-[8pt] leading-tight"
         style={{ pageBreakAfter: 'avoid', breakAfter: 'avoid', maxHeight: '285mm', overflow: 'hidden' }}
       >
         {/* KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
-        <div className="flex items-center gap-3 pb-1.5 border-b-4 border-black mb-2">
+        <div className="flex items-center gap-3 pb-1.5 border-b-[3px] border-double border-black mb-2" style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '3px double #000000', paddingBottom: '6px', marginBottom: '8px' }}>
           <img
             src="/logo_pemko_medan.png"
             alt="Logo Pemko Medan"
             crossOrigin="anonymous"
-            className="w-[70px] h-[85px] object-contain shrink-0 ml-1"
+            className="object-contain shrink-0"
+            style={{ width: '55px', height: '65px', minWidth: '55px', display: 'block' }}
           />
-          <div className="text-center flex-1 pr-[70px]">
-            <div className="text-[12pt] uppercase font-sans text-black leading-tight font-bold">
+          <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '55px' }}>
+            <div className="text-[12pt] uppercase font-sans text-black leading-tight font-bold" style={{ fontSize: '11pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000' }}>
               PEMERINTAH KOTA MEDAN
             </div>
-            <div className="text-[12pt] uppercase font-sans text-black leading-tight font-bold">
+            <div className="text-[12pt] uppercase font-sans text-black leading-tight font-bold" style={{ fontSize: '11pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000' }}>
               KECAMATAN MEDAN TUNTUNGAN
             </div>
-            <div className="text-[16pt] font-black uppercase font-sans text-black leading-tight mt-0.5 tracking-wide">
+            <div className="text-[15pt] font-black uppercase font-sans text-black leading-tight mt-0.5 tracking-wide" style={{ fontSize: '14pt', fontWeight: '900', fontFamily: 'sans-serif', color: '#000000', marginTop: '2px' }}>
               KELURAHAN MANGGA
             </div>
-            <div className="text-[8pt] text-black font-sans mt-0.5 leading-snug">
-              Jalan Tembakau Raya No.35 A Medan Tuntungan, Medan, Sumatera Utara 20141
+            <div className="text-[8.5pt] text-black font-sans mt-0.5 leading-snug" style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000', marginTop: '2px' }}>
+              Jalan Tembakau Raya No. 35 A P. Simalingkar - Medan
+            </div>
+            <div className="text-[8pt] text-black font-sans leading-snug" style={{ fontSize: '8pt', fontFamily: 'sans-serif', color: '#000000' }}>
+              Laman kel.mangga@pemkomedan.go.id
             </div>
           </div>
         </div>
@@ -1437,29 +1449,29 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN
           </h1>
           <div className="text-[8pt] font-semibold text-slate-800 mt-0.5">
-            Hari: {(item?.hari || '').toUpperCase()} &nbsp;|&nbsp; Tanggal: {displayTanggal}
+            Hari: {(item?.hari || '').toUpperCase()} &nbsp;|&nbsp; Tanggal: {displayTanggal.toUpperCase()}
           </div>
         </div>
 
         {/* DATA IDENTITAS PETUGAS */}
-        <div className="mb-2 text-[8.5pt] bg-slate-50/50 p-1.5 rounded border border-slate-300">
+        <div className="mb-2 text-[8pt] bg-white p-1.5 rounded border border-slate-300">
           <table className="w-full text-left">
             <tbody>
               <tr>
-                <td className="w-28 font-bold py-0.5">Nama Petugas</td>
+                <td className="w-28 font-bold py-0.5 text-slate-700">Nama Petugas</td>
                 <td className="w-3">:</td>
-                <td className="font-bold uppercase">{item?.namaKepling || ''}</td>
-                <td className="w-24 font-bold py-0.5">Kelurahan</td>
+                <td className="font-bold uppercase text-slate-900">{item?.namaKepling || ''}</td>
+                <td className="w-24 font-bold py-0.5 text-slate-700">Kelurahan</td>
                 <td className="w-3">:</td>
-                <td>{item?.kelurahan || ''}</td>
+                <td className="text-slate-900">{item?.kelurahan || 'Kelurahan Mangga'}</td>
               </tr>
               <tr>
-                <td className="font-bold py-0.5">Jabatan / Wilayah</td>
+                <td className="font-bold py-0.5 text-slate-700">Jabatan / Wilayah</td>
                 <td>:</td>
-                <td className="font-bold">{item?.jabatan || ''}</td>
-                <td className="font-bold py-0.5">Kecamatan</td>
+                <td className="font-bold text-slate-900">{item?.jabatan || ''}</td>
+                <td className="font-bold py-0.5 text-slate-700">Kecamatan</td>
                 <td>:</td>
-                <td>{item?.kecamatan || ''}</td>
+                <td className="text-slate-900">{item?.kecamatan || 'Kecamatan Medan Tuntungan'}</td>
               </tr>
             </tbody>
           </table>
@@ -1474,8 +1486,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             <thead>
               <tr className="bg-slate-100 text-slate-900 font-bold">
                 <th className="w-7 text-center py-1">NO</th>
-                <th className="w-52 py-1">URAIAN KEGIATAN KINERJA</th>
-                <th className="w-28 text-center py-1">REALISASI</th>
+                <th className="w-60 py-1">URAIAN KEGIATAN KINERJA</th>
+                <th className="w-24 text-center py-1">REALISASI</th>
                 <th className="py-1">KETERANGAN / RINCIAN LAPANGAN</th>
               </tr>
             </thead>
@@ -1546,41 +1558,116 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           </table>
         </div>
 
-        {/* DOKUMENTASI FOTO KEGIATAN (SEMUA FOTO DITAMPILKAN DALAM GRID) */}
+        {/* DOKUMENTASI FOTO KEGIATAN - TEPAT 3 FOTO PER BARIS */}
         {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
-          <div className="mb-1.5 avoid-break">
-            <div className="text-[7.5pt] font-bold uppercase tracking-wider mb-1 text-slate-900">
+          <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+            <div className="text-[7.5pt] font-bold uppercase tracking-wider mb-1 text-slate-900" style={{ fontSize: '7.5pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }}>
               B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):
             </div>
-            <div className={`grid ${item.dokumentasiFoto.length > 3 ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5`}>
-              {item.dokumentasiFoto.map((foto, idx) => (
-                <div
-                  key={foto.id || idx}
-                  className="aspect-[4/3] w-full rounded border border-slate-400 overflow-hidden relative bg-slate-100 avoid-break"
-                >
-                  <img
-                    src={foto.url}
-                    alt={foto.name}
-                    crossOrigin="anonymous"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[6pt] px-1 py-0.5 truncate text-center">
-                    {foto.name}
+            <div
+              className="grid grid-cols-3 gap-1.5"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                columnGap: '6px',
+                rowGap: '6px',
+              }}
+            >
+              {item.dokumentasiFoto.map((foto, idx) => {
+                const count = item.dokumentasiFoto.length;
+                let photoH = '70px';
+                if (count <= 3) photoH = '92px';
+                else if (count <= 6) photoH = '72px';
+                else if (count <= 9) photoH = '58px';
+                else photoH = '46px';
+
+                return (
+                  <div
+                    key={foto.id || idx}
+                    className="flex flex-col items-center avoid-break"
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      pageBreakInside: 'avoid',
+                      breakInside: 'avoid',
+                    }}
+                  >
+                    <div
+                      className="w-full rounded border border-slate-400 overflow-hidden bg-slate-100"
+                      style={{
+                        width: '100%',
+                        height: photoH,
+                        border: '1px solid #94a3b8',
+                        borderRadius: '2px',
+                        overflow: 'hidden',
+                        backgroundColor: '#f1f5f9',
+                      }}
+                    >
+                      <img
+                        src={foto.url}
+                        alt={foto.name}
+                        crossOrigin="anonymous"
+                        className="w-full h-full object-cover"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          display: 'block',
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="text-[6pt] text-slate-600 mt-0.5 truncate w-full text-center font-sans"
+                      style={{
+                        fontSize: '6pt',
+                        color: '#475569',
+                        marginTop: '1px',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis',
+                        width: '100%',
+                        textAlign: 'center',
+                        fontFamily: 'sans-serif',
+                      }}
+                    >
+                      {foto.name}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
         {/* TANDA TANGAN RESMI PENGESAHAN DOKUMEN */}
-        <div className="mt-3 pt-1 avoid-break text-[8pt]">
-          <div className="flex justify-end pr-4">
-            <div className="text-center flex flex-col items-center min-w-[220px]">
+        <div
+          className="mt-2 pt-1 avoid-break text-[8pt]"
+          style={{
+            pageBreakInside: 'avoid',
+            breakInside: 'avoid',
+            marginTop: '8px',
+            paddingTop: '2px',
+          }}
+        >
+          <div
+            className="flex justify-end pr-4"
+            style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '16px' }}
+          >
+            <div
+              className="text-center flex flex-col items-center min-w-[220px]"
+              style={{
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: '220px',
+              }}
+            >
               <div>Medan, {displayTanggal}</div>
               <div className="mt-0.5">Yang Melaporkan,</div>
               <div className="font-bold uppercase whitespace-nowrap">{item?.jabatan || ''}</div>
-              <div className="h-12" />
+              <div style={{ height: '32px' }} />
               <div className="font-bold underline uppercase whitespace-nowrap">( {item?.namaKepling || ''} )</div>
               <div className="text-[7pt] text-slate-700 mt-0.5">Kepala Lingkungan</div>
             </div>
@@ -1588,7 +1675,22 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         </div>
 
         {/* FOOTER RESMI DOKUMEN */}
-        <div className="mt-2 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic">
+        <div
+          className="mt-2 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic avoid-break"
+          style={{
+            pageBreakInside: 'avoid',
+            breakInside: 'avoid',
+            borderTop: '1px solid #cbd5e1',
+            marginTop: '8px',
+            paddingTop: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '6.5pt',
+            color: '#64748b',
+            fontStyle: 'italic',
+          }}
+        >
           <span>SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA • Sistem Informasi Pelaporan Kinerja Harian Kepling</span>
           <span>Dokumen Resmi 1 Lembar • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
         </div>
