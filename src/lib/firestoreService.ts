@@ -6,6 +6,8 @@ import {
   deleteDoc,
   writeBatch,
   onSnapshot,
+  query,
+  limit,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -29,12 +31,12 @@ const REPORTS_COLLECTION = 'reports';
 const DELETED_REPORTS_COLLECTION = 'deleted_reports';
 
 /**
- * Fetch all registered deleted report IDs (Tombstones)
+ * Fetch all registered deleted report IDs (Tombstones) - with quota limit
  */
 export async function fetchDeletedReportIdsFromFirestore(): Promise<Set<string>> {
   try {
     const delCol = collection(db, DELETED_REPORTS_COLLECTION);
-    const snap = await getDocs(delCol);
+    const snap = await getDocs(query(delCol, limit(50)));
     snap.forEach((docSnap) => {
       deletedReportIdsMemory.add(docSnap.id);
       const data = docSnap.data();
@@ -47,15 +49,16 @@ export async function fetchDeletedReportIdsFromFirestore(): Promise<Set<string>>
 }
 
 /**
- * Fetch all reports from Firebase Firestore
+ * Fetch reports from Firebase Firestore with query limit to conserve daily free quota
  */
-export async function fetchReportsFromFirestore(): Promise<LaporanHarianItem[]> {
+export async function fetchReportsFromFirestore(maxLimit: number = 100): Promise<LaporanHarianItem[]> {
   try {
     // 1. Sync deleted report IDs
     await fetchDeletedReportIdsFromFirestore();
 
     const colRef = collection(db, REPORTS_COLLECTION);
-    const snapshot = await getDocs(colRef);
+    const q = maxLimit > 0 ? query(colRef, limit(maxLimit)) : colRef;
+    const snapshot = await getDocs(q);
     const reports: LaporanHarianItem[] = [];
 
     snapshot.forEach((docSnap) => {
@@ -85,8 +88,8 @@ export async function fetchReportsFromFirestore(): Promise<LaporanHarianItem[]> 
     });
 
     return reports;
-  } catch (error) {
-    console.warn('Gagal membaca laporan dari Firebase Firestore:', error);
+  } catch (error: any) {
+    console.warn('Firebase Firestore fetch notice (switching to server buffer):', error?.message || error);
     return [];
   }
 }
@@ -238,15 +241,17 @@ export async function resetAllReportsInFirestore(): Promise<boolean> {
 }
 
 /**
- * Real-time listener for reports in Firebase Firestore
+ * Real-time listener for reports in Firebase Firestore (with limit to conserve daily free quota)
  */
 export function subscribeReportsFromFirestore(
   onData: (reports: LaporanHarianItem[]) => void,
-  onError?: (err: any) => void
+  onError?: (err: any) => void,
+  limitCount: number = 100
 ): Unsubscribe {
   const colRef = collection(db, REPORTS_COLLECTION);
+  const q = limitCount > 0 ? query(colRef, limit(limitCount)) : colRef;
   return onSnapshot(
-    colRef,
+    q,
     (snapshot) => {
       const reports: LaporanHarianItem[] = [];
       snapshot.forEach((docSnap) => {
@@ -275,7 +280,7 @@ export function subscribeReportsFromFirestore(
       onData(reports);
     },
     (err) => {
-      console.warn('Firestore onSnapshot error reports:', err);
+      console.warn('Firestore onSnapshot error reports (switching to server fallback):', err);
       if (onError) onError(err);
     }
   );
@@ -605,10 +610,11 @@ export function subscribeProfilesFromFirestore(
 
 const ATTENDANCE_COLLECTION = 'attendance';
 
-export async function fetchAttendanceFromFirestore(): Promise<AbsenApelItem[]> {
+export async function fetchAttendanceFromFirestore(maxLimit: number = 100): Promise<AbsenApelItem[]> {
   try {
     const colRef = collection(db, ATTENDANCE_COLLECTION);
-    const snapshot = await getDocs(colRef);
+    const q = maxLimit > 0 ? query(colRef, limit(maxLimit)) : colRef;
+    const snapshot = await getDocs(q);
     const list: AbsenApelItem[] = [];
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as AbsenApelItem;
@@ -619,8 +625,8 @@ export async function fetchAttendanceFromFirestore(): Promise<AbsenApelItem[]> {
     // Sort descending by time
     list.sort((a, b) => new Date(b.waktuLengkap || b.createdAt).getTime() - new Date(a.waktuLengkap || a.createdAt).getTime());
     return list;
-  } catch (err) {
-    console.warn('Gagal membaca data absen dari Firebase Firestore:', err);
+  } catch (err: any) {
+    console.warn('Firebase Firestore attendance fetch notice (using server fallback):', err?.message || err);
     return [];
   }
 }
@@ -630,18 +636,20 @@ export async function saveAttendanceToFirestore(item: AbsenApelItem): Promise<bo
     const docRef = doc(db, ATTENDANCE_COLLECTION, item.id);
     await setDoc(docRef, item, { merge: true });
     return true;
-  } catch (err) {
-    console.warn('Gagal menyimpan data absen ke Firebase Firestore:', err);
+  } catch (err: any) {
+    console.warn('Firebase Firestore save attendance notice:', err?.message || err);
     return false;
   }
 }
 
 export function subscribeAttendanceFromFirestore(
-  onData: (items: AbsenApelItem[]) => void
+  onData: (items: AbsenApelItem[]) => void,
+  maxLimit: number = 100
 ): Unsubscribe {
   const colRef = collection(db, ATTENDANCE_COLLECTION);
+  const q = maxLimit > 0 ? query(colRef, limit(maxLimit)) : colRef;
   return onSnapshot(
-    colRef,
+    q,
     (snapshot) => {
       const list: AbsenApelItem[] = [];
       snapshot.forEach((docSnap) => {
@@ -654,7 +662,7 @@ export function subscribeAttendanceFromFirestore(
       onData(list);
     },
     (err) => {
-      console.warn('Firestore onSnapshot attendance notice:', err);
+      console.warn('Firestore onSnapshot attendance notice (using server fallback):', err?.message || err);
     }
   );
 }

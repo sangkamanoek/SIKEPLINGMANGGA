@@ -52,6 +52,7 @@ import {
   resetAllReportsOnServer,
   subscribeReportsFromFirestore,
   getLocalDeletedReportIds,
+  isReportBeforeSept7,
 } from './lib/reportsApi';
 
 const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
@@ -256,10 +257,21 @@ export default function App() {
       }
     });
 
-    // Auto-sync polling every 15 seconds as a resilient backup
-    const pollInterval = setInterval(() => {
-      refreshAllReports(false);
-    }, 15000);
+    // Auto-sync polling every 30 seconds via lightweight Server Buffer (Costs 0 Firebase quota)
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/reports');
+        if (res.ok) {
+          const json = await res.json();
+          const serverReports = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
+          if (serverReports.length > 0) {
+            const deletedIds = getLocalDeletedReportIds();
+            const cleaned = serverReports.filter((r: LaporanHarianItem) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
+            setReports((prev) => (cleaned.length > prev.length ? cleaned : prev));
+          }
+        }
+      } catch {}
+    }, 30000);
 
     const unsubscribe = initAuth(
       async (firebaseUser, accessToken) => {

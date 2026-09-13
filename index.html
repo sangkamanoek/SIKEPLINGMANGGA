@@ -1,6 +1,19 @@
 <!doctype html>
 <html lang="id">
   <head>
+    <script>
+      (function() {
+        var filterVite = function(orig) {
+          return function() {
+            if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('[vite]') !== -1) return;
+            return orig.apply(this, arguments);
+          };
+        };
+        console.warn = filterVite(console.warn);
+        console.error = filterVite(console.error);
+        console.info = filterVite(console.info);
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#065f46" />
