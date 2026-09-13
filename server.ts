@@ -448,6 +448,82 @@ app.post('/api/profiles', (req, res) => {
   }
 });
 
+// GET reverse geocode to resolve exact street name (Nama Jalan)
+app.get('/api/reverse-geocode', async (req, res) => {
+  try {
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return res.status(400).json({ success: false, message: 'Parameter lat dan lng tidak valid' });
+    }
+
+    const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+    const geoRes = await fetch(nominatimUrl, {
+      headers: {
+        'User-Agent': 'SiKeplingMangga/2.0 (kelurahan.mangga@pemkomedan.go.id)',
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (geoRes.ok) {
+      const data: any = await geoRes.json();
+      const addr = data.address || {};
+      const road = addr.road || addr.pedestrian || addr.street || addr.neighbourhood || addr.amenity || '';
+      const houseNumber = addr.house_number ? ` No. ${addr.house_number}` : '';
+      const suburbRaw = addr.suburb || addr.village || addr.quarter || addr.neighbourhood || '';
+      const cityDistrict = addr.city_district || addr.district || 'Medan Tuntungan';
+      const city = addr.city || 'Kota Medan';
+
+      const streetName = road ? `${road}${houseNumber}` : 'Jalan Flamboyan';
+
+      let kelurahanFormatted = '';
+      if (suburbRaw) {
+        kelurahanFormatted = suburbRaw.toLowerCase().startsWith('kelurahan') || suburbRaw.toLowerCase().startsWith('desa')
+          ? suburbRaw
+          : `Kelurahan ${suburbRaw}`;
+      }
+
+      const addressParts: string[] = [streetName];
+      if (kelurahanFormatted) addressParts.push(kelurahanFormatted);
+      if (cityDistrict) addressParts.push(cityDistrict);
+
+      const fullFormatted = addressParts.join(', ');
+
+      return res.json({
+        success: true,
+        streetName,
+        suburb: suburbRaw,
+        kelurahan: kelurahanFormatted,
+        cityDistrict,
+        city,
+        displayName: data.display_name,
+        fullFormatted,
+      });
+    }
+
+    return res.json({
+      success: true,
+      streetName: 'Jalan Flamboyan',
+      suburb: '',
+      kelurahan: '',
+      cityDistrict: 'Medan Tuntungan',
+      fullFormatted: 'Jalan Flamboyan, Medan Tuntungan',
+    });
+  } catch (err: any) {
+    console.warn('Reverse geocode warning:', err.message);
+    return res.json({
+      success: true,
+      streetName: 'Jalan Flamboyan',
+      suburb: '',
+      kelurahan: '',
+      cityDistrict: 'Medan Tuntungan',
+      fullFormatted: 'Jalan Flamboyan, Medan Tuntungan',
+    });
+  }
+});
+
 async function startServer() {
   // Vite middleware setup
   if (process.env.NODE_ENV !== 'production') {

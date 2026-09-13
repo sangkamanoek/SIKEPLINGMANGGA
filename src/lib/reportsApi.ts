@@ -65,9 +65,10 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   try {
     const res = await fetch('/api/reports');
     if (res.ok) {
-      const serverReports = await res.json();
-      if (Array.isArray(serverReports) && serverReports.length > 0) {
-        const cleaned = serverReports.filter((r) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
+      const json = await res.json();
+      const serverReports = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
+      if (serverReports.length > 0) {
+        const cleaned = serverReports.filter((r: LaporanHarianItem) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
         safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
         return cleaned;
       }

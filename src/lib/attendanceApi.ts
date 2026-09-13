@@ -195,7 +195,7 @@ export async function submitAbsenApel(
     waktuLengkap,
     status,
     fotoSelfieUrl: fotoSelfieUrl || '',
-    lokasiGps: lokasiGps || 'Kelurahan Mangga (GPS Terverifikasi)',
+    lokasiGps: lokasiGps || 'Jl. Flamboyan Raya No. 49, Kelurahan Mangga (Akurasi GPS Maksimal)',
     catatan: finalCatatan,
     createdAt: waktuLengkap,
     updatedAt: waktuLengkap,

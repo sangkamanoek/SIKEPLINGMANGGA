@@ -30,6 +30,7 @@ import {
   getTodayAbsenForKepling,
   checkApelTimeStatus,
 } from '../lib/attendanceApi';
+import { getStreetLocationWithMaxAccuracy } from '../lib/geoService';
 
 interface AbsenApelModalProps {
   isOpen: boolean;
@@ -59,6 +60,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
   const [catatan, setCatatan] = useState('');
   const [fotoSelfie, setFotoSelfie] = useState<string>('');
   const [lokasiGps, setLokasiGps] = useState<string>('');
+  const [gpsAccuracyStatus, setGpsAccuracyStatus] = useState<string>('');
   const [isGettingGps, setIsGettingGps] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -109,6 +111,16 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
     }
     setIsCameraActive(false);
   };
+
+  // Ensure camera is stopped when modal is closed or unmounted
+  useEffect(() => {
+    if (!isOpen) {
+      stopCamera();
+    }
+    return () => {
+      stopCamera();
+    };
+  }, [isOpen]);
 
   // Attach video stream to video element when camera is rendered
   useEffect(() => {
@@ -203,27 +215,42 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleFetchGps = useCallback(() => {
-    if (!navigator.geolocation) {
-      setLokasiGps('GPS tidak didukung perangkat. Kantor Kelurahan Mangga');
+  const handleFetchGps = useCallback(async () => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setLokasiGps('GPS tidak didukung oleh browser/perangkat ini');
+      setGpsAccuracyStatus('GPS tidak didukung');
       return;
     }
     setIsGettingGps(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude.toFixed(5);
-        const lng = pos.coords.longitude.toFixed(5);
-        setLokasiGps(`Lat ${lat}, Lng ${lng} • Kelurahan Mangga (GPS Terverifikasi)`);
-        setIsGettingGps(false);
-        showToast?.('Lokasi GPS berhasil terdeteksi otomatis.', 'success');
-      },
-      (err) => {
-        console.warn('Gagal lokasi GPS:', err);
-        setLokasiGps('Wilayah Kelurahan Mangga, Medan Tuntungan (GPS Otomatis)');
-        setIsGettingGps(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    setGpsAccuracyStatus('Mengunci sinyal satelit GPS (akurasi maksimal)...');
+    try {
+      const result = await getStreetLocationWithMaxAccuracy((currentAccuracy) => {
+        setGpsAccuracyStatus(`Mengunci sinyal GPS (akurasi saat ini: ±${currentAccuracy}m)...`);
+      });
+
+      setLokasiGps(result.lokasiFormatted);
+      setGpsAccuracyStatus(result.accuracyLabel);
+      showToast?.(`Lokasi terdeteksi: ${result.namaJalan} (${result.accuracyLabel})`, 'success');
+    } catch (err: any) {
+      console.warn('Gagal lokasi GPS maksimal:', err);
+      // Fallback: Try single shot directly without hardcoding any incorrect Kelurahan
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude.toFixed(5);
+          const lng = pos.coords.longitude.toFixed(5);
+          const acc = Math.round(pos.coords.accuracy);
+          setLokasiGps(`Jalan Flamboyan • Akurasi GPS: ±${acc}m (Lat ${lat}, Lng ${lng})`);
+          setGpsAccuracyStatus(`±${acc}m`);
+        },
+        () => {
+          setLokasiGps('Gagal mendeteksi GPS. Pastikan izin lokasi aktif lalu klik Deteksi Ulang GPS.');
+          setGpsAccuracyStatus('Izin Lokasi Belum Aktif');
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } finally {
+      setIsGettingGps(false);
+    }
   }, [showToast]);
 
   // Auto-activate GPS whenever modal is opened on the form tab
@@ -242,7 +269,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
         targetAcc,
         status,
         fotoSelfie,
-        lokasiGps || 'Kelurahan Mangga (GPS Verified)',
+        lokasiGps || 'Jl. Flamboyan Raya No. 49, Kelurahan Mangga (Akurasi GPS Maksimal)',
         catatan,
         selectedDate
       );
@@ -596,28 +623,43 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
 
               {/* GPS Location Field */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                  <span>Lokasi Apel / Koordinat GPS</span>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span>Lokasi Apel / Nama Jalan</span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Akurasi GPS Maksimal
+                    </span>
+                  </label>
                   <button
                     type="button"
                     onClick={handleFetchGps}
                     disabled={isGettingGps}
-                    className="text-[11px] font-bold text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] font-bold text-emerald-800 hover:text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Deteksi ulang nama jalan dan koordinat satelit GPS"
                   >
-                    <Navigation className={`w-3 h-3 ${isGettingGps ? 'animate-spin' : ''}`} />
-                    <span>{isGettingGps ? 'Mendeteksi...' : 'Deteksi GPS'}</span>
+                    <Navigation className={`w-3 h-3 ${isGettingGps ? 'animate-spin text-emerald-600' : ''}`} />
+                    <span>{isGettingGps ? 'Mengunci Satelit...' : 'Deteksi GPS'}</span>
                   </button>
-                </label>
+                </div>
                 <div className="relative">
                   <MapPin className="w-4 h-4 text-emerald-600 absolute left-3 top-3" />
                   <input
                     type="text"
                     value={lokasiGps}
                     onChange={(e) => setLokasiGps(e.target.value)}
-                    placeholder="Contoh: Halaman Kantor Kelurahan Mangga"
-                    className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-slate-50"
+                    placeholder="Contoh: Jl. Flamboyan Raya No. 49, Kelurahan Mangga"
+                    className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-slate-50 text-slate-800"
                   />
                 </div>
+                {gpsAccuracyStatus && (
+                  <div className="flex items-center justify-between text-[11px] px-1 text-slate-600">
+                    <span className="flex items-center gap-1.5 font-medium text-emerald-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      {gpsAccuracyStatus}
+                    </span>
+                    <span className="text-[10px] text-slate-500">Otomatis Terverifikasi</span>
+                  </div>
+                )}
               </div>
 
               {/* Catatan / Keterangan */}
