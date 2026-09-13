@@ -25,6 +25,7 @@ import {
   getOrCreateSpreadsheet,
   appendLaporanToSheet,
 } from './lib/sheetsService';
+import { uploadMakalahToGoogleDrive } from './lib/driveService';
 import { SUPER_ADMIN_ACCOUNT, getAccountById, syncPasswordsWithServer, syncProfilesWithServer } from './data/keplingList';
 import { HeaderBanner } from './components/HeaderBanner';
 import { FormLaporan } from './components/FormLaporan';
@@ -203,7 +204,7 @@ export default function App() {
     }
   };
 
-  // Setup spreadsheet when user logs in
+  // Setup spreadsheet and upload Makalah to Google Drive when user logs in
   const syncSpreadsheet = useCallback(async (authToken: string) => {
     try {
       const meta = await getOrCreateSpreadsheet(authToken);
@@ -211,6 +212,21 @@ export default function App() {
       try {
         safeSetLocalStorage('google_sheet_metadata', JSON.stringify(meta));
       } catch (e) {}
+
+      // Automatically sync Makalah .docx to Google Drive
+      try {
+        const uploaded = localStorage.getItem('google_drive_makalah_uploaded');
+        if (!uploaded) {
+          const driveFile = await uploadMakalahToGoogleDrive(authToken);
+          if (driveFile?.webViewLink) {
+            safeSetLocalStorage('google_drive_makalah_uploaded', 'true');
+            safeSetLocalStorage('google_drive_makalah_link', driveFile.webViewLink);
+            showToast('Makalah Ilmiah (.docx) berhasil disimpan ke Google Drive Anda!', 'success');
+          }
+        }
+      } catch (driveErr) {
+        console.warn('Google Drive Makalah upload note:', driveErr);
+      }
     } catch (err: unknown) {
       console.error('Error setting up spreadsheet:', err);
       showToast('Gagal menghubungkan Google Sheet secara otomatis', 'error');
