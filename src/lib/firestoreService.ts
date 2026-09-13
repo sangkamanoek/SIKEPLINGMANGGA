@@ -9,7 +9,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { LaporanHarianItem, KeplingTargetCapaian, TargetsCapaianMap, TaskReminder, NotificationLog } from '../types';
+import { LaporanHarianItem, KeplingTargetCapaian, TargetsCapaianMap, TaskReminder, NotificationLog, AbsenApelItem } from '../types';
 import { getDefaultTargetsCapaianMap } from '../data/targetsData';
 
 // Local in-memory cache of deleted report IDs to prevent re-emergence
@@ -598,4 +598,65 @@ export function subscribeProfilesFromFirestore(
     }
   );
 }
+
+// ==========================================
+// 7. ABSEN APEL PAGI (ATTENDANCE) CRUD
+// ==========================================
+
+const ATTENDANCE_COLLECTION = 'attendance';
+
+export async function fetchAttendanceFromFirestore(): Promise<AbsenApelItem[]> {
+  try {
+    const colRef = collection(db, ATTENDANCE_COLLECTION);
+    const snapshot = await getDocs(colRef);
+    const list: AbsenApelItem[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as AbsenApelItem;
+      if (data && data.id) {
+        list.push(data);
+      }
+    });
+    // Sort descending by time
+    list.sort((a, b) => new Date(b.waktuLengkap || b.createdAt).getTime() - new Date(a.waktuLengkap || a.createdAt).getTime());
+    return list;
+  } catch (err) {
+    console.warn('Gagal membaca data absen dari Firebase Firestore:', err);
+    return [];
+  }
+}
+
+export async function saveAttendanceToFirestore(item: AbsenApelItem): Promise<boolean> {
+  try {
+    const docRef = doc(db, ATTENDANCE_COLLECTION, item.id);
+    await setDoc(docRef, item, { merge: true });
+    return true;
+  } catch (err) {
+    console.warn('Gagal menyimpan data absen ke Firebase Firestore:', err);
+    return false;
+  }
+}
+
+export function subscribeAttendanceFromFirestore(
+  onData: (items: AbsenApelItem[]) => void
+): Unsubscribe {
+  const colRef = collection(db, ATTENDANCE_COLLECTION);
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const list: AbsenApelItem[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as AbsenApelItem;
+        if (data && data.id) {
+          list.push(data);
+        }
+      });
+      list.sort((a, b) => new Date(b.waktuLengkap || b.createdAt).getTime() - new Date(a.waktuLengkap || a.createdAt).getTime());
+      onData(list);
+    },
+    (err) => {
+      console.warn('Firestore onSnapshot attendance notice:', err);
+    }
+  );
+}
+
 

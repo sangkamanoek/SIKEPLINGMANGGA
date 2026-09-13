@@ -25,6 +25,7 @@ import {
   NAMA_HARI,
 } from '../lib/formatter';
 import { SUPER_ADMIN_ACCOUNT, KEPLING_ACCOUNTS, ALL_ACCOUNTS } from '../data/keplingList';
+import { safeSetLocalStorage } from '../lib/safeStorage';
 
 interface FormLaporanProps {
   onSaveReport: (item: LaporanHarianItem) => Promise<void>;
@@ -144,7 +145,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   // Save profile when changed
   const savePersistentProfile = () => {
     try {
-      localStorage.setItem(
+      safeSetLocalStorage(
         STORAGE_KEY_PROFILE,
         JSON.stringify({ namaKepling, jabatan, kelurahan, kecamatan })
       );
@@ -175,7 +176,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
         img.onload = () => {
           let width = img.width;
           let height = img.height;
-          const maxDim = 720;
+          const maxDim = 640;
           if (width > maxDim || height > maxDim) {
             if (width > height) {
               height = Math.round((height * maxDim) / width);
@@ -191,7 +192,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.6));
+            resolve(canvas.toDataURL('image/jpeg', 0.55));
           } else {
             resolve((event.target?.result as string) || '');
           }
@@ -208,7 +209,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    kategori: 'poskamling' | 'umum' = 'umum'
+    kategori: 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'poskamling' | 'lainnya' | 'umum' = 'umum'
   ) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -221,13 +222,19 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       fileArray.map(async (file, i) => {
         const compressedUrl = await compressFile(file);
         if (!compressedUrl) return null;
+
+        let categoryPrefix = '';
+        if (kategori === 'pbb') categoryPrefix = '[PBB] ';
+        else if (kategori === 'perlinsos') categoryPrefix = '[PERLINSOS] ';
+        else if (kategori === 'ikd') categoryPrefix = '[IKD] ';
+        else if (kategori === 'bpjs') categoryPrefix = '[BPJS] ';
+        else if (kategori === 'poskamling') categoryPrefix = '[POSKAMLING] ';
+        else if (kategori === 'lainnya') categoryPrefix = '[KEGIATAN LAINNYA] ';
+
         return {
           id: 'foto_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6) + '_' + i,
           url: compressedUrl,
-          name:
-            kategori === 'poskamling'
-              ? `[POSKAMLING] ${file.name || 'Foto Ronda'}`
-              : file.name || `Foto ${i + 1}`,
+          name: categoryPrefix ? `${categoryPrefix}${file.name || 'Foto Dokumentasi'}` : file.name || `Foto ${i + 1}`,
           timestamp: new Date().toISOString(),
           kategori,
         };
@@ -414,6 +421,19 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
               </div>
             </div>
 
+            {/* Information Banner: Kumulatif Harian */}
+            <div className="bg-blue-50/80 p-3.5 rounded-xl border border-blue-200 flex items-start gap-2.5 text-xs text-blue-900">
+              <span className="text-base shrink-0">📊</span>
+              <div>
+                <span className="font-bold block text-blue-950">
+                  Laporan Bersifat Kumulatif & Akumulatif Harian
+                </span>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-blue-800">
+                  Anda dapat mengisi laporan beberapa kali di jam yang berbeda dalam hari yang sama (misal: pkl 09.30 & pkl 12.00). Sistem secara otomatis mengumpulkan & menggabungkan seluruh angka kinerja, rincian catatan, serta foto menjadi <strong>1 Laporan Akhir Konsolidasi Hari Ini</strong>.
+                </p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -596,6 +616,32 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                   </div>
                 </div>
               </div>
+              <div className="mt-2 pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                  <Camera className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Foto Opsir PBB:</span>
+                  <span className="font-bold text-blue-700">
+                    {fotoList.filter(f => f.kategori === 'pbb' || f.name.includes('[PBB]')).length} Foto
+                  </span>
+                </div>
+                <div>
+                  <input
+                    id="file-input-pbb"
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, 'pbb')}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="file-input-pbb"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all cursor-pointer active:scale-95"
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>+ Unggah Foto PBB</span>
+                  </label>
+                </div>
+              </div>
             </div>
 
             {/* Pilar 2: PERLINSOS */}
@@ -776,6 +822,33 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                   </div>
                 )}
               </div>
+
+              <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                  <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Foto Perlinsos:</span>
+                  <span className="font-bold text-emerald-700">
+                    {fotoList.filter(f => f.kategori === 'perlinsos' || f.name.includes('[PERLINSOS]')).length} Foto
+                  </span>
+                </div>
+                <div>
+                  <input
+                    id="file-input-perlinsos"
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, 'perlinsos')}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="file-input-perlinsos"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all cursor-pointer active:scale-95"
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>+ Unggah Foto Perlinsos</span>
+                  </label>
+                </div>
+              </div>
             </div>
 
             {/* Pilar 3: IDENTITAS KEPENDUDUKAN DIGITAL */}
@@ -810,6 +883,32 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                     placeholder="Keterangan aktivasi IKD"
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700"
                   />
+                </div>
+              </div>
+              <div className="mt-2 pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                  <Camera className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Foto IKD Dukcapil:</span>
+                  <span className="font-bold text-purple-700">
+                    {fotoList.filter(f => f.kategori === 'ikd' || f.name.includes('[IKD]')).length} Foto
+                  </span>
+                </div>
+                <div>
+                  <input
+                    id="file-input-ikd"
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, 'ikd')}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="file-input-ikd"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all cursor-pointer active:scale-95"
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>+ Unggah Foto IKD</span>
+                  </label>
                 </div>
               </div>
             </div>
@@ -848,10 +947,36 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                   />
                 </div>
               </div>
+              <div className="mt-2 pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                  <Camera className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Foto BPJS Pekerja Rentan:</span>
+                  <span className="font-bold text-indigo-700">
+                    {fotoList.filter(f => f.kategori === 'bpjs' || f.name.includes('[BPJS]')).length} Foto
+                  </span>
+                </div>
+                <div>
+                  <input
+                    id="file-input-bpjs"
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, 'bpjs')}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="file-input-bpjs"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all cursor-pointer active:scale-95"
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>+ Unggah Foto BPJS</span>
+                  </label>
+                </div>
+              </div>
             </div>
 
             {/* Kegiatan Lainnya */}
-            <div>
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 5. Kegiatan Tambahan Lapangan (Opsional)
               </label>
@@ -861,8 +986,34 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                 value={kegiatanLainnya}
                 onChange={(e) => setKegiatanLainnya(e.target.value)}
                 placeholder="( Cth. Pemantauan Kebersihan Lingkungan dan Drainase Warga, Gotong Royong Posko Trantibum, Posko BERSEMI, Posko PATAM dll )"
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-emerald-500 text-slate-800"
+                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-500 text-slate-800 font-medium"
               />
+              <div className="mt-2 pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                  <Camera className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Foto Kebersihan / Lainnya:</span>
+                  <span className="font-bold text-teal-700">
+                    {fotoList.filter(f => f.kategori === 'lainnya' || f.name.includes('[KEGIATAN LAINNYA]') || f.kategori === 'kebersihan').length} Foto
+                  </span>
+                </div>
+                <div>
+                  <input
+                    id="file-input-lainnya"
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, 'lainnya')}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="file-input-lainnya"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all cursor-pointer active:scale-95"
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>+ Unggah Foto Kebersihan/Lainnya</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
 

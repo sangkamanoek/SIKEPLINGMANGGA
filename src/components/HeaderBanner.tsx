@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, ChevronDown, UserCheck, KeyRound, Smartphone, Download, LogOut, Database, UserCircle, Presentation } from 'lucide-react';
+import { ShieldCheck, ChevronDown, UserCheck, KeyRound, Smartphone, Download, LogOut, Database, UserCircle, Presentation, UserCheck as UserCheckIcon } from 'lucide-react';
 import { GoogleUser, SheetMetadata, UserAccount } from '../types';
 
 interface HeaderBannerProps {
@@ -15,6 +15,7 @@ interface HeaderBannerProps {
   onOpenEditProfile?: () => void;
   onLogout?: () => void;
   onOpenPPTModal?: () => void;
+  onOpenAbsenApel?: () => void;
 }
 
 export const HeaderBanner: React.FC<HeaderBannerProps> = ({
@@ -30,6 +31,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   onOpenEditProfile,
   onLogout,
   onOpenPPTModal,
+  onOpenAbsenApel,
 }) => {
   return (
     <header className="bg-emerald-800 text-white shadow-lg print:hidden">
@@ -92,8 +94,26 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
           </div>
         </div>
 
-        {/* Header Actions: PPT Panduan, APK Install & Active Account Switcher */}
+        {/* Header Actions: Absen Apel Pagi, PPT Panduan, APK Install & Active Account Switcher */}
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto">
+          {onOpenAbsenApel && (
+            <button
+              id="btn-open-absen-apel-header"
+              type="button"
+              onClick={onOpenAbsenApel}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer shrink-0 border border-amber-300 animate-pulse-subtle"
+              title="Absen Apel Pagi Kepling Kelurahan Mangga"
+            >
+              <UserCheck className="w-4 h-4 text-slate-950" />
+              <div className="flex flex-col text-left">
+                <span className="text-[9px] uppercase tracking-wider text-slate-900/80 font-black leading-none">
+                  PRESENSI
+                </span>
+                <span className="leading-tight">Absen Apel Pagi</span>
+              </div>
+            </button>
+          )}
+
           {onOpenPPTModal && (
             <button
               id="btn-open-ppt-modal"

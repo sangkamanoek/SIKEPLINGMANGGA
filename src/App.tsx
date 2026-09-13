@@ -9,9 +9,11 @@ import {
   ShieldCheck,
   Award,
   Trophy,
+  UserCheck,
 } from 'lucide-react';
 import ViewImagesPage from './components/ViewImagesPage';
 import { GoogleUser, SheetMetadata, LaporanHarianItem, UserAccount } from './types';
+import { safeSetLocalStorage, safeSetSessionStorage } from './lib/safeStorage';
 import {
   initAuth,
   googleSignIn,
@@ -36,7 +38,12 @@ import { PanduanPPTModal } from './components/PanduanPPTModal';
 import { LoginPage } from './components/LoginPage';
 import { UbahPasswordModal } from './components/UbahPasswordModal';
 import { EditProfileModal } from './components/EditProfileModal';
+import { AbsenApelModal } from './components/AbsenApelModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { AbsenApelItem } from './types';
+import { loadAllAttendance } from './lib/attendanceApi';
+import { subscribeAttendanceFromFirestore } from './lib/firestoreService';
+import { consolidateDailyReport } from './lib/reportConsolidator';
 import {
   fetchAllReports,
   saveReportToServer,
@@ -106,6 +113,8 @@ export default function App() {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isPPTModalOpen, setIsPPTModalOpen] = useState(false);
+  const [isAbsenApelModalOpen, setIsAbsenApelModalOpen] = useState(false);
+  const [attendanceList, setAttendanceList] = useState<AbsenApelItem[]>([]);
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
 
@@ -162,7 +171,7 @@ export default function App() {
         if (Array.isArray(parsed)) {
           const active = parsed.filter((r) => r && r.id && !deletedIds.has(r.id));
           setReports(active);
-          localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(active));
+          safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(active));
         }
       }
     } catch (e) {
@@ -186,7 +195,7 @@ export default function App() {
           updated = [item, ...prev];
         }
         const filtered = updated.filter((r) => r && r.id && !deletedIds.has(r.id));
-        localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(filtered));
+        safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(filtered));
         return filtered;
       });
     } catch (e) {
@@ -200,7 +209,7 @@ export default function App() {
       const meta = await getOrCreateSpreadsheet(authToken);
       setSheetMeta(meta);
       try {
-        localStorage.setItem('google_sheet_metadata', JSON.stringify(meta));
+        safeSetLocalStorage('google_sheet_metadata', JSON.stringify(meta));
       } catch (e) {}
     } catch (err: unknown) {
       console.error('Error setting up spreadsheet:', err);
@@ -214,12 +223,20 @@ export default function App() {
     syncProfilesWithServer();
     loadLocalReports();
     refreshAllReports(false);
+    loadAllAttendance().then((items) => setAttendanceList(items));
 
     // Subscribe to real-time reports directly from Firebase Firestore
     const unsubscribeFirestoreReports = subscribeReportsFromFirestore((firestoreReports) => {
       if (firestoreReports && firestoreReports.length >= 0) {
         setReports(firestoreReports);
-        localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(firestoreReports));
+        safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(firestoreReports));
+      }
+    });
+
+    // Subscribe to real-time attendance directly from Firebase Firestore
+    const unsubscribeAttendance = subscribeAttendanceFromFirestore((items) => {
+      if (items) {
+        setAttendanceList(items);
       }
     });
 
@@ -249,6 +266,7 @@ export default function App() {
 
     return () => {
       unsubscribeFirestoreReports();
+      unsubscribeAttendance();
       clearInterval(pollInterval);
       unsubscribe();
     };
@@ -291,15 +309,30 @@ export default function App() {
   const handleSaveReport = async (item: LaporanHarianItem) => {
     setIsSaving(true);
     try {
+      // Automatic Consolidation: Check if an existing report for this Kepling on the same date already exists
+      const existingReport = reports.find((r) => {
+        const sameKepling =
+          (r.keplingId && item.keplingId && r.keplingId === item.keplingId) ||
+          r.namaKepling === item.namaKepling ||
+          r.jabatan === item.jabatan;
+        const sameDate = r.tanggal === item.tanggal;
+        return sameKepling && sameDate && r.id !== item.id;
+      });
+
+      let reportToSave = item;
+      if (existingReport) {
+        reportToSave = consolidateDailyReport(existingReport, item);
+      }
+
       // 1. ALWAYS save to local database immediately FIRST so data is guaranteed safe (0ms)
-      saveLocalReport(item);
+      saveLocalReport(reportToSave);
 
       // 2. Open confirmation modal right away with the saved report
-      setSelectedReport(item);
+      setSelectedReport(reportToSave);
       setIsModalOpen(true);
 
       // 3. Save to Firebase Firestore and Server buffer in parallel
-      await saveReportToServer(item);
+      await saveReportToServer(reportToSave);
 
       // 4. If Google account is connected, sync to Google Sheets in background/parallel
       const activeToken = token || (await getAccessToken());
@@ -317,18 +350,22 @@ export default function App() {
               currentSheetMeta = await getOrCreateSpreadsheet(activeToken);
               setSheetMeta(currentSheetMeta);
               try {
-                localStorage.setItem('google_sheet_metadata', JSON.stringify(currentSheetMeta));
+                safeSetLocalStorage('google_sheet_metadata', JSON.stringify(currentSheetMeta));
               } catch (e) {}
             }
 
-            await appendLaporanToSheet(activeToken, currentSheetMeta.spreadsheetId, item);
-            showToast('Laporan berhasil tersimpan di Database & Google Sheets!', 'success');
+            await appendLaporanToSheet(activeToken, currentSheetMeta.spreadsheetId, reportToSave);
+            showToast('Laporan berhasil tersimpan & terakumulasi di Database!', 'success');
           } catch (sheetErr) {
             console.warn('Google Sheets sync notice:', sheetErr);
           }
         })();
       } else {
-        showToast('Laporan berhasil disimpan ke Database Kelurahan & Monitoring!', 'success');
+        if (existingReport) {
+          showToast('Laporan hari ini berhasil diperbarui & diakumulasikan!', 'success');
+        } else {
+          showToast('Laporan berhasil disimpan ke Database Kelurahan & Monitoring!', 'success');
+        }
       }
     } catch (err: unknown) {
       console.error('Error in handleSaveReport:', err);
@@ -394,10 +431,10 @@ export default function App() {
     }
     try {
       if (remember) {
-        localStorage.setItem('kepling_session_authenticated', 'true');
-        localStorage.setItem('kepling_active_account_id', account.id);
+        safeSetLocalStorage('kepling_session_authenticated', 'true');
+        safeSetLocalStorage('kepling_active_account_id', account.id);
       } else {
-        sessionStorage.setItem('kepling_session_authenticated', 'true');
+        safeSetSessionStorage('kepling_session_authenticated', 'true');
         localStorage.removeItem('kepling_session_authenticated');
       }
     } catch (e) {
@@ -479,6 +516,7 @@ export default function App() {
         onOpenUbahPassword={() => setIsUbahPasswordOpen(true)}
         onOpenEditProfile={() => setIsEditProfileOpen(true)}
         onOpenPPTModal={() => setIsPPTModalOpen(true)}
+        onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -510,6 +548,20 @@ export default function App() {
           <div className="flex gap-1">
             {activeAccount.role === 'kepling' ? (
               <>
+                {/* Kepling Tab 0: Presensi Apel Pagi */}
+                <button
+                  id="tab-absen-apel-kepling"
+                  type="button"
+                  onClick={() => setIsAbsenApelModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-black border-b-2 border-transparent text-amber-700 hover:text-amber-900 hover:bg-amber-50 cursor-pointer whitespace-nowrap"
+                >
+                  <UserCheck className="w-4 h-4 text-amber-600" />
+                  <span>Absen Apel Pagi</span>
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-400 text-slate-950 shadow-2xs">
+                    PRESENSI
+                  </span>
+                </button>
+
                 {/* Kepling Tab 1: Formulir Laporan */}
                 <button
                   id="tab-input-laporan"
@@ -563,6 +615,20 @@ export default function App() {
               </>
             ) : (
               <>
+                {/* Super Admin Tab 0: Absen Apel Pagi 24 Kepling */}
+                <button
+                  id="tab-absen-apel-admin"
+                  type="button"
+                  onClick={() => setIsAbsenApelModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-black border-b-2 border-transparent text-amber-900 hover:bg-amber-100/70 cursor-pointer whitespace-nowrap"
+                >
+                  <UserCheck className="w-4 h-4 text-amber-600" />
+                  <span>Absen Apel Pagi</span>
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-400 text-slate-950 shadow-2xs">
+                    REKAP 24
+                  </span>
+                </button>
+
                 {/* Super Admin Tab 1: Monitoring 24 Kepling */}
                 <button
                   id="tab-monitoring-super-admin"
@@ -819,6 +885,19 @@ export default function App() {
       <PanduanPPTModal
         isOpen={isPPTModalOpen}
         onClose={() => setIsPPTModalOpen(false)}
+      />
+
+      {/* Absen Apel Pagi Modal */}
+      <AbsenApelModal
+        isOpen={isAbsenApelModalOpen}
+        onClose={() => setIsAbsenApelModalOpen(false)}
+        activeAccount={activeAccount}
+        attendanceList={attendanceList}
+        onRefreshAttendance={async () => {
+          const fresh = await loadAllAttendance();
+          setAttendanceList(fresh);
+        }}
+        showToast={showToast}
       />
 
       {/* Footer matching Professional Polish style */}

@@ -1,4 +1,5 @@
 import { UserAccount } from '../types';
+import { safeSetLocalStorage } from '../lib/safeStorage';
 import {
   fetchPasswordsFromFirestore,
   savePasswordToFirestore,
@@ -313,7 +314,7 @@ export const syncPasswordsWithServer = async (): Promise<Record<string, string>>
     const firestorePass = await fetchPasswordsFromFirestore();
     if (firestorePass && Object.keys(firestorePass).length > 0) {
       merged = { ...merged, ...firestorePass };
-      localStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(merged));
+      safeSetLocalStorage(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(merged));
     }
   } catch (e) {
     console.warn('Notice reading passwords from Firestore:', e);
@@ -326,7 +327,7 @@ export const syncPasswordsWithServer = async (): Promise<Record<string, string>>
       const data = await res.json();
       if (data?.passwords && typeof data.passwords === 'object') {
         merged = { ...merged, ...data.passwords };
-        localStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(merged));
+        safeSetLocalStorage(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(merged));
       }
     }
   } catch (e) {
@@ -347,7 +348,7 @@ export const saveCustomPassword = (accountId: string, newPass: string): void => 
   try {
     const current = getCustomPasswords();
     current[accountId] = newPass.trim();
-    localStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(current));
+    safeSetLocalStorage(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(current));
 
     // 1. Persist directly to Firebase Firestore
     savePasswordToFirestore(accountId, newPass.trim()).catch((err) =>
@@ -369,7 +370,7 @@ export const resetCustomPassword = (accountId: string): void => {
   try {
     const current = getCustomPasswords();
     delete current[accountId];
-    localStorage.setItem(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(current));
+    safeSetLocalStorage(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(current));
 
     // 1. Reset in Firebase Firestore
     resetPasswordInFirestore(accountId).catch((err) =>
@@ -449,7 +450,7 @@ export const saveCustomProfile = async (
   };
   current[accountId] = updated;
   try {
-    localStorage.setItem(STORAGE_KEY_CUSTOM_PROFILES, JSON.stringify(current));
+    safeSetLocalStorage(STORAGE_KEY_CUSTOM_PROFILES, JSON.stringify(current));
   } catch (e) {
     console.warn('Gagal menyimpan profile ke localStorage:', e);
   }
@@ -513,7 +514,7 @@ export const getFixedAccountsList = (): FixedAccountOption[] => {
   return [
     {
       username: 'super_admin',
-      nama: 'SUPER ADMIN (Lurah / Seklur)',
+      nama: 'SUPER ADMIN',
       lingkungan: 'Kantor Kelurahan Mangga',
       role: 'super_admin',
       defaultPasswordHint: 'mangga2026',
@@ -535,7 +536,7 @@ export const getFixedAccountsList = (): FixedAccountOption[] => {
 export const FIXED_ACCOUNTS_LIST: FixedAccountOption[] = [
   {
     username: 'super_admin',
-    nama: 'SUPER ADMIN (Lurah / Seklur)',
+    nama: 'SUPER ADMIN',
     lingkungan: 'Kantor Kelurahan Mangga',
     role: 'super_admin',
     defaultPasswordHint: 'mangga2026',

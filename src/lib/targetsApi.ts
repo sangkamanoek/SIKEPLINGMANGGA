@@ -1,5 +1,6 @@
 import { KeplingTargetCapaian, TargetsCapaianMap } from '../types';
 import { getDefaultTargetsCapaianMap } from '../data/targetsData';
+import { safeSetLocalStorage } from './safeStorage';
 import {
   fetchTargetsFromFirestore,
   saveTargetToFirestore,
@@ -18,7 +19,7 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
   try {
     const firestoreMap = await fetchTargetsFromFirestore();
     if (firestoreMap && Object.keys(firestoreMap).length > 0) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(firestoreMap));
+      safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(firestoreMap));
       return firestoreMap;
     }
   } catch (err) {
@@ -34,7 +35,7 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.data && typeof json.data === 'object' && Object.keys(json.data).length > 0) {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(json.data));
+        safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(json.data));
         // Sync ke Firestore di background
         saveAllTargetsToFirestore(json.data).catch((e) => console.warn('Background sync targets to Firestore:', e));
         return json.data as TargetsCapaianMap;
@@ -59,7 +60,7 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
 
   // 4. Fallback defaults resmi
   const defaults = getDefaultTargetsCapaianMap();
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(defaults));
+  safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(defaults));
   // Simpan ke Firestore agar database Firebase langsung terisi data awal resmi
   saveAllTargetsToFirestore(defaults).catch((e) => console.warn('Init defaults to Firestore:', e));
   return defaults;
@@ -87,7 +88,7 @@ export async function saveKeplingTargetCapaian(
     updatedAt: new Date().toISOString(),
   } as KeplingTargetCapaian;
 
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentMap));
+  safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(currentMap));
 
   // 2. Simpan langsung ke Firebase Firestore
   try {
@@ -106,7 +107,7 @@ export async function saveKeplingTargetCapaian(
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.data) {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(json.data));
+        safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(json.data));
         return json.data;
       }
     }
@@ -123,7 +124,7 @@ export async function saveKeplingTargetCapaian(
 export async function saveAllTargetsCapaian(
   allTargets: TargetsCapaianMap
 ): Promise<TargetsCapaianMap> {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(allTargets));
+  safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(allTargets));
 
   // 1. Simpan ke Firebase Firestore
   try {
@@ -142,7 +143,7 @@ export async function saveAllTargetsCapaian(
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.data) {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(json.data));
+        safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(json.data));
         return json.data;
       }
     }
@@ -158,7 +159,7 @@ export async function saveAllTargetsCapaian(
  */
 export async function resetTargetsCapaianToDefaults(): Promise<TargetsCapaianMap> {
   const defaults = getDefaultTargetsCapaianMap();
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(defaults));
+  safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(defaults));
 
   // 1. Reset di Firebase Firestore
   try {

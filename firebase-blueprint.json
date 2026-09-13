@@ -92,6 +92,25 @@
         "category": "string",
         "read": "boolean"
       }
+    },
+    {
+      "name": "attendance",
+      "description": "Data presensi dan absensi Apel Pagi Kepala Lingkungan Kelurahan Mangga",
+      "fields": {
+        "id": "string",
+        "accountId": "string",
+        "namaKepling": "string",
+        "lingkungan": "string",
+        "nomorLingkungan": "number",
+        "tanggal": "string",
+        "jam": "string",
+        "waktuLengkap": "string",
+        "status": "string",
+        "fotoSelfieUrl": "string",
+        "lokasiGps": "string",
+        "catatan": "string",
+        "createdAt": "string"
+      }
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { LaporanHarianItem } from '../types';
+import { safeSetLocalStorage } from './safeStorage';
 import {
   fetchReportsFromFirestore,
   saveReportToFirestore,
@@ -38,7 +39,7 @@ export const addLocalDeletedReportId = (id: string) => {
   try {
     const set = getLocalDeletedReportIds();
     set.add(id);
-    localStorage.setItem(LOCAL_STORAGE_KEY_DELETED, JSON.stringify(Array.from(set)));
+    safeSetLocalStorage(LOCAL_STORAGE_KEY_DELETED, JSON.stringify(Array.from(set)));
   } catch {}
 };
 
@@ -53,7 +54,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     const firestoreReports = await fetchReportsFromFirestore();
     if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
       const cleaned = firestoreReports.filter((r) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
-      localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
+      safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
       return cleaned;
     }
   } catch (err) {
@@ -67,7 +68,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
       const serverReports = await res.json();
       if (Array.isArray(serverReports) && serverReports.length > 0) {
         const cleaned = serverReports.filter((r) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
-        localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
+        safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
         return cleaned;
       }
     }
@@ -111,7 +112,7 @@ export const saveReportToServer = async (item: LaporanHarianItem): Promise<boole
     }
     // Filter out any deleted items before saving
     const sanitized = updated.filter((r) => !deletedIds.has(r.id));
-    localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(sanitized));
+    safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(sanitized));
   } catch (e) {
     console.warn('LocalStorage save warning:', e);
   }
@@ -148,7 +149,7 @@ export const deleteReportFromServer = async (id: string): Promise<boolean> => {
     if (stored) {
       const reports: LaporanHarianItem[] = JSON.parse(stored);
       const filtered = reports.filter((r) => r.id !== id);
-      localStorage.setItem(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(filtered));
+      safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(filtered));
     }
   } catch (e) {
     console.warn(e);

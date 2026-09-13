@@ -181,6 +181,52 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     return clean.length > 28 ? `Dokumentasi Lapangan ${idx + 1}` : clean;
   };
 
+  const groupPhotosByActivity = (photos: Array<{ id?: string; url: string; name?: string; kategori?: string }> = []) => {
+    const groups: Record<string, Array<{ id?: string; url: string; name?: string; kategori?: string }>> = {
+      pbb: [],
+      perlinsos: [],
+      ikd: [],
+      bpjs: [],
+      poskamling: [],
+      lainnya: [],
+    };
+
+    photos.forEach((foto) => {
+      const cat = (foto.kategori || '').toLowerCase();
+      const name = (foto.name || '').toLowerCase();
+
+      if (cat === 'pbb' || name.includes('[pbb]') || name.includes('pbb') || name.includes('pajak')) {
+        groups.pbb.push(foto);
+      } else if (cat === 'perlinsos' || name.includes('[perlinsos]') || name.includes('perlinsos') || name.includes('bansos')) {
+        groups.perlinsos.push(foto);
+      } else if (cat === 'ikd' || name.includes('[ikd]') || name.includes('ikd') || name.includes('dukcapil') || name.includes('kependudukan')) {
+        groups.ikd.push(foto);
+      } else if (cat === 'bpjs' || name.includes('[bpjs]') || name.includes('bpjs') || name.includes('rentan')) {
+        groups.bpjs.push(foto);
+      } else if (cat === 'poskamling' || name.includes('[poskamling]') || name.includes('poskamling') || name.includes('ronda') || name.includes('siskamling')) {
+        groups.poskamling.push(foto);
+      } else {
+        groups.lainnya.push(foto);
+      }
+    });
+
+    const metaList = [
+      { key: 'pbb', title: '1. Dokumentasi Opsir PBB (Pajak Bumi & Bangunan)', badgeBg: 'bg-blue-100', textClr: 'text-blue-900', borderClr: 'border-blue-300' },
+      { key: 'perlinsos', title: '2. Dokumentasi PERLINSOS (Perlindungan Sosial)', badgeBg: 'bg-emerald-100', textClr: 'text-emerald-900', borderClr: 'border-emerald-300' },
+      { key: 'ikd', title: '3. Dokumentasi Aktivasi IKD Dukcapil', badgeBg: 'bg-purple-100', textClr: 'text-purple-900', borderClr: 'border-purple-300' },
+      { key: 'bpjs', title: '4. Dokumentasi BPJS Ketenagakerjaan', badgeBg: 'bg-indigo-100', textClr: 'text-indigo-900', borderClr: 'border-indigo-300' },
+      { key: 'poskamling', title: '5. Dokumentasi Pos Ronda / SISKAMLING', badgeBg: 'bg-amber-100', textClr: 'text-amber-950', borderClr: 'border-amber-300' },
+      { key: 'lainnya', title: '6. Dokumentasi Kebersihan & Kegiatan Lainnya', badgeBg: 'bg-slate-100', textClr: 'text-slate-900', borderClr: 'border-slate-300' },
+    ];
+
+    return metaList
+      .map((meta) => ({
+        ...meta,
+        photos: groups[meta.key] || [],
+      }))
+      .filter((g) => g.photos.length > 0);
+  };
+
   const openPrintableWindow = () => {
     if (!item) return;
     const element = document.getElementById('lembar-cetak-laporan-kepling');
@@ -731,7 +777,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     </table>
                   </div>
 
-                  {/* Foto Dokumentasi - Adaptif & Proper Kedinasan */}
+                  {/* Foto Dokumentasi - Terkelompok Per Kegiatan & Adaptif Kedinasan */}
                   {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
                     item.dokumentasiFoto.length <= 3 ? (
                       <div className="mb-2">
@@ -739,25 +785,34 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                           <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
                           <span className="text-[7pt] text-slate-500 font-normal normal-case">Format Album Resmi Kedinasan</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          {item.dokumentasiFoto.map((foto, idx) => (
-                            <div
-                              key={foto.id || idx}
-                              className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center shadow-xs"
-                            >
-                              <div className="w-full h-[190px] rounded-md overflow-hidden bg-slate-100 flex items-center justify-center">
-                                <img
-                                  src={foto.url}
-                                  alt={getProperFotoLabel(foto, idx)}
-                                  crossOrigin="anonymous"
-                                  className="w-full h-full object-cover object-center"
-                                />
+                        <div className="space-y-2">
+                          {groupPhotosByActivity(item.dokumentasiFoto).map((group) => (
+                            <div key={group.key}>
+                              <div className="text-[7.5pt] font-bold font-sans text-slate-800 uppercase mb-1 flex items-center justify-between border-b border-slate-200 pb-0.5">
+                                <span>• {group.title} ({group.photos.length} Foto)</span>
                               </div>
-                              <div
-                                className="text-[7.5pt] font-bold text-slate-800 mt-1.5 truncate w-full text-center font-sans"
-                                title={getProperFotoLabel(foto, idx)}
-                              >
-                                {getProperFotoLabel(foto, idx)}
+                              <div className="grid grid-cols-3 gap-2.5">
+                                {group.photos.map((foto, idx) => (
+                                  <div
+                                    key={foto.id || idx}
+                                    className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center shadow-xs"
+                                  >
+                                    <div className="w-full h-[185px] rounded-md overflow-hidden bg-slate-100 flex items-center justify-center p-0.5">
+                                      <img
+                                        src={foto.url}
+                                        alt={getProperFotoLabel(foto, idx)}
+                                        crossOrigin="anonymous"
+                                        className="w-full h-full object-contain object-center"
+                                      />
+                                    </div>
+                                    <div
+                                      className="text-[7.5pt] font-bold text-slate-800 mt-1 truncate w-full text-center font-sans"
+                                      title={getProperFotoLabel(foto, idx)}
+                                    >
+                                      {getProperFotoLabel(foto, idx)}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           ))}
@@ -766,7 +821,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     ) : (
                       <div className="mb-2 p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-[8pt] text-slate-700 font-sans flex items-center justify-between">
                         <div>
-                          <strong>B. DOKUMENTASI LAPANGAN TERLAMPIR:</strong> Sebanyak <strong>{item.dokumentasiFoto.length} Foto Dokumentasi</strong> dicantumkan secara lengkap dan jelas pada <strong>Lembar Lampiran (Halaman 2)</strong>.
+                          <strong>B. DOKUMENTASI LAPANGAN TERLAMPIR:</strong> Sebanyak <strong>{item.dokumentasiFoto.length} Foto Dokumentasi</strong> dicantumkan secara lengkap dan terkelompok per kegiatan pada <strong>Lembar Lampiran (Halaman 2)</strong>.
                         </div>
                         <span className="text-[7pt] bg-slate-200 px-2 py-0.5 rounded font-semibold text-slate-700 shrink-0 ml-2">2 Halaman Dokumen</span>
                       </div>
@@ -810,26 +865,38 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Grid Foto Lampiran Besar */}
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                      {item.dokumentasiFoto.map((foto, idx) => (
-                        <div
-                          key={foto.id || idx}
-                          className="rounded-lg border border-slate-300 p-2 bg-white flex flex-col items-center shadow-xs"
-                        >
-                          <div className="w-full h-[180px] rounded-md overflow-hidden bg-slate-100 flex items-center justify-center">
-                            <img
-                              src={foto.url}
-                              alt={getProperFotoLabel(foto, idx)}
-                              crossOrigin="anonymous"
-                              className="w-full h-full object-cover object-center"
-                            />
+                    {/* Grid Foto Lampiran Terkelompok Per Kegiatan */}
+                    <div className="space-y-4 mb-4">
+                      {groupPhotosByActivity(item.dokumentasiFoto).map((group) => (
+                        <div key={group.key} className="space-y-1.5">
+                          <div className="text-[8.5pt] font-bold font-sans text-slate-900 uppercase border-b border-slate-300 pb-1 flex items-center justify-between">
+                            <span>• {group.title} ({group.photos.length} Foto)</span>
+                            <span className={`text-[7pt] px-2 py-0.5 rounded font-bold ${group.badgeBg} ${group.textClr}`}>
+                              {group.key.toUpperCase()}
+                            </span>
                           </div>
-                          <div
-                            className="text-[8pt] font-bold text-slate-800 mt-2 truncate w-full text-center font-sans"
-                            title={getProperFotoLabel(foto, idx)}
-                          >
-                            {getProperFotoLabel(foto, idx)}
+                          <div className="grid grid-cols-2 gap-3">
+                            {group.photos.map((foto, idx) => (
+                              <div
+                                key={foto.id || idx}
+                                className="rounded-lg border border-slate-300 p-2 bg-white flex flex-col items-center shadow-xs"
+                              >
+                                <div className="w-full h-[180px] rounded-md overflow-hidden bg-slate-100 flex items-center justify-center p-1">
+                                  <img
+                                    src={foto.url}
+                                    alt={getProperFotoLabel(foto, idx)}
+                                    crossOrigin="anonymous"
+                                    className="w-full h-full object-contain object-center"
+                                  />
+                                </div>
+                                <div
+                                  className="text-[8pt] font-bold text-slate-800 mt-1.5 truncate w-full text-center font-sans"
+                                  title={getProperFotoLabel(foto, idx)}
+                                >
+                                  {getProperFotoLabel(foto, idx)}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       ))}
@@ -1310,51 +1377,62 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {item.dokumentasiFoto.map((foto, idx) => (
-                  <div
-                    key={foto.id || idx}
-                    className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs group relative cursor-pointer"
-                    onClick={() => setPreviewPhoto({ url: foto.url, name: foto.name || `Foto ${idx + 1}` })}
-                  >
-                    <img
-                      src={foto.url}
-                      alt={foto.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                    {(foto.kategori === 'poskamling' || foto.name.includes('[POSKAMLING]')) && (
-                      <span className="absolute top-1.5 left-1.5 bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1 z-10">
-                        <Shield className="w-2.5 h-2.5" />
-                        POSKAMLING
+              <div className="space-y-4">
+                {groupPhotosByActivity(item.dokumentasiFoto).map((group) => (
+                  <div key={group.key} className="space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-1">
+                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${group.badgeBg} ${group.textClr} border ${group.borderClr}`}>
+                          {group.title}
+                        </span>
+                      </h4>
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        {group.photos.length} Foto
                       </span>
-                    )}
-
-                    {/* Hover Overlay with Action Buttons */}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2 z-10">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewPhoto({ url: foto.url, name: foto.name || `Foto ${idx + 1}` });
-                        }}
-                        className="p-1.5 bg-white/90 hover:bg-white text-slate-900 rounded-lg shadow-sm hover:scale-110 transition-transform cursor-pointer"
-                        title="Lihat foto penuh"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDownloadPhoto(foto.url, foto.name || `Foto_${idx + 1}.jpg`, e)}
-                        className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm hover:scale-110 transition-transform cursor-pointer"
-                        title="Download file foto ini"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
                     </div>
 
-                    <span className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[9px] px-1.5 py-0.5 truncate text-center pointer-events-none">
-                      {foto.name}
-                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {group.photos.map((foto, idx) => (
+                        <div
+                          key={foto.id || idx}
+                          className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs group relative cursor-pointer flex items-center justify-center p-1"
+                          onClick={() => setPreviewPhoto({ url: foto.url, name: foto.name || `Foto ${idx + 1}` })}
+                        >
+                          <img
+                            src={foto.url}
+                            alt={foto.name}
+                            className="w-full h-full object-contain object-center group-hover:scale-105 transition-transform"
+                          />
+
+                          {/* Hover Overlay with Action Buttons */}
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2 z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewPhoto({ url: foto.url, name: foto.name || `Foto ${idx + 1}` });
+                              }}
+                              className="p-1.5 bg-white/90 hover:bg-white text-slate-900 rounded-lg shadow-sm hover:scale-110 transition-transform cursor-pointer"
+                              title="Lihat foto penuh"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDownloadPhoto(foto.url, foto.name || `Foto_${idx + 1}.jpg`, e)}
+                              className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm hover:scale-110 transition-transform cursor-pointer"
+                              title="Download file foto ini"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <span className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[9px] px-1.5 py-0.5 truncate text-center pointer-events-none">
+                            {foto.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1733,73 +1811,83 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
                   <span style={{ fontSize: '7pt', color: '#64748b', fontWeight: 'normal', textTransform: 'none' }}>Format Album Resmi Kedinasan</span>
                 </div>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
-                    columnGap: '10px',
-                    rowGap: '8px',
-                  }}
-                >
-                  {item.dokumentasiFoto.map((foto, idx) => (
-                    <div
-                      key={foto.id || idx}
-                      className="rounded border border-slate-300 p-1.5 bg-white flex flex-col items-center avoid-break"
-                      style={{
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        padding: '5px',
-                        backgroundColor: '#ffffff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        pageBreakInside: 'avoid',
-                        breakInside: 'avoid',
-                      }}
-                    >
-                      <div
-                        className="w-full rounded overflow-hidden bg-slate-100 flex items-center justify-center"
-                        style={{
-                          width: '100%',
-                          height: '190px',
-                          borderRadius: '4px',
-                          overflow: 'hidden',
-                          backgroundColor: '#f1f5f9',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <img
-                          src={foto.url}
-                          alt={getProperFotoLabel(foto, idx)}
-                          crossOrigin="anonymous"
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            objectPosition: 'center',
-                            display: 'block',
-                          }}
-                        />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {groupPhotosByActivity(item.dokumentasiFoto).map((group) => (
+                    <div key={group.key}>
+                      <div style={{ fontSize: '7.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: '2px' }}>
+                        • {group.title} ({group.photos.length} Foto)
                       </div>
                       <div
-                        className="text-[7.5pt] text-slate-800 font-bold mt-1.5 truncate w-full text-center font-sans"
                         style={{
-                          fontSize: '7.5pt',
-                          fontWeight: 'bold',
-                          color: '#1e293b',
-                          marginTop: '4px',
-                          overflow: 'hidden',
-                          whiteSpace: 'nowrap',
-                          textOverflow: 'ellipsis',
-                          width: '100%',
-                          textAlign: 'center',
-                          fontFamily: 'sans-serif',
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(3, 1fr)',
+                          columnGap: '10px',
+                          rowGap: '8px',
                         }}
-                        title={getProperFotoLabel(foto, idx)}
                       >
-                        {getProperFotoLabel(foto, idx)}
+                        {group.photos.map((foto, idx) => (
+                          <div
+                            key={foto.id || idx}
+                            className="rounded border border-slate-300 p-1.5 bg-white flex flex-col items-center avoid-break"
+                            style={{
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              padding: '5px',
+                              backgroundColor: '#ffffff',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              pageBreakInside: 'avoid',
+                              breakInside: 'avoid',
+                            }}
+                          >
+                            <div
+                              className="w-full rounded overflow-hidden bg-slate-100 flex items-center justify-center"
+                              style={{
+                                width: '100%',
+                                height: '185px',
+                                borderRadius: '4px',
+                                overflow: 'hidden',
+                                backgroundColor: '#f1f5f9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '2px',
+                              }}
+                            >
+                              <img
+                                src={foto.url}
+                                alt={getProperFotoLabel(foto, idx)}
+                                crossOrigin="anonymous"
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'contain',
+                                  objectPosition: 'center',
+                                  display: 'block',
+                                }}
+                              />
+                            </div>
+                            <div
+                              className="text-[7.5pt] text-slate-800 font-bold mt-1.5 truncate w-full text-center font-sans"
+                              style={{
+                                fontSize: '7.5pt',
+                                fontWeight: 'bold',
+                                color: '#1e293b',
+                                marginTop: '4px',
+                                overflow: 'hidden',
+                                whiteSpace: 'nowrap',
+                                textOverflow: 'ellipsis',
+                                width: '100%',
+                                textAlign: 'center',
+                                fontFamily: 'sans-serif',
+                              }}
+                              title={getProperFotoLabel(foto, idx)}
+                            >
+                              {getProperFotoLabel(foto, idx)}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -1941,72 +2029,81 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 </div>
               </div>
 
-              {/* GRID FOTO LAMPIRAN BESAR & UTUH */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  columnGap: '12px',
-                  rowGap: '10px',
-                  marginBottom: '14px',
-                }}
-              >
-                {item.dokumentasiFoto.map((foto, idx) => (
-                  <div
-                    key={foto.id || idx}
-                    style={{
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      padding: '6px',
-                      backgroundColor: '#ffffff',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      pageBreakInside: 'avoid',
-                      breakInside: 'avoid',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '100%',
-                        height: '185px',
-                        borderRadius: '4px',
-                        overflow: 'hidden',
-                        backgroundColor: '#f1f5f9',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <img
-                        src={foto.url}
-                        alt={getProperFotoLabel(foto, idx)}
-                        crossOrigin="anonymous"
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          objectPosition: 'center',
-                          display: 'block',
-                        }}
-                      />
+              {/* GRID FOTO LAMPIRAN TERKELOMPOK PER KEGIATAN */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '14px' }}>
+                {groupPhotosByActivity(item.dokumentasiFoto).map((group) => (
+                  <div key={group.key} style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                    <div style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '6px', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: '3px' }}>
+                      • {group.title} ({group.photos.length} Foto)
                     </div>
                     <div
                       style={{
-                        fontSize: '8pt',
-                        fontWeight: 'bold',
-                        color: '#1e293b',
-                        marginTop: '5px',
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap',
-                        textOverflow: 'ellipsis',
-                        width: '100%',
-                        textAlign: 'center',
-                        fontFamily: 'sans-serif',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2, 1fr)',
+                        columnGap: '12px',
+                        rowGap: '10px',
                       }}
-                      title={getProperFotoLabel(foto, idx)}
                     >
-                      {getProperFotoLabel(foto, idx)}
+                      {group.photos.map((foto, idx) => (
+                        <div
+                          key={foto.id || idx}
+                          style={{
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            padding: '6px',
+                            backgroundColor: '#ffffff',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            pageBreakInside: 'avoid',
+                            breakInside: 'avoid',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: '100%',
+                              height: '185px',
+                              borderRadius: '4px',
+                              overflow: 'hidden',
+                              backgroundColor: '#f1f5f9',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '2px',
+                            }}
+                          >
+                            <img
+                              src={foto.url}
+                              alt={getProperFotoLabel(foto, idx)}
+                              crossOrigin="anonymous"
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'contain',
+                                objectPosition: 'center',
+                                display: 'block',
+                              }}
+                            />
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '8pt',
+                              fontWeight: 'bold',
+                              color: '#1e293b',
+                              marginTop: '5px',
+                              overflow: 'hidden',
+                              whiteSpace: 'nowrap',
+                              textOverflow: 'ellipsis',
+                              width: '100%',
+                              textAlign: 'center',
+                              fontFamily: 'sans-serif',
+                            }}
+                            title={getProperFotoLabel(foto, idx)}
+                          >
+                            {getProperFotoLabel(foto, idx)}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}

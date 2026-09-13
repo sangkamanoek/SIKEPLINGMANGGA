@@ -142,3 +142,22 @@ export interface KeplingTargetCapaian {
 
 export type TargetsCapaianMap = Record<string, KeplingTargetCapaian>;
 
+export type StatusAbsenApel = 'Hadir' | 'Izin' | 'Sakit' | 'Dinas Luar';
+
+export interface AbsenApelItem {
+  id: string; // e.g. "absen_kepling_1_2026-09-13" or timestamp
+  accountId: string; // e.g. "kepling_1" or "super_admin"
+  namaKepling: string;
+  lingkungan: string;
+  nomorLingkungan?: number;
+  tanggal: string; // YYYY-MM-DD
+  jam: string; // HH:mm:ss WIB
+  waktuLengkap: string; // ISO String timestamp
+  status: StatusAbsenApel;
+  fotoSelfieUrl?: string; // base64 or photo URL
+  lokasiGps?: string; // e.g. "3.5234, 98.6123 (GPS Verified)" or "Kelurahan Mangga"
+  catatan?: string; // Optional reason for Izin/Sakit/Dinas Luar
+  createdAt: string;
+  updatedAt?: string;
+}
+
