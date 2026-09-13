@@ -32,17 +32,21 @@ export function getCurrentTimeString(): string {
 
 export interface WibTimeStatus {
   formattedTime: string;
-  isWithinWindow: boolean; // 07:30 - 09:00 WIB
+  isWorkDay: boolean; // Monday - Friday
+  isWithinWindow: boolean; // 07:30 - 09:00 WIB on Monday - Friday
   isTooEarly: boolean; // Before 07:30 WIB
   isLate: boolean; // After 09:00 WIB
   statusLabel: string;
 }
 
 /**
- * Check if current time falls within official Apel Pagi window: 07:30 - 09:00 WIB
+ * Check if current time & day falls within official Apel Pagi window:
+ * Hari: Senin s/d Jumat
+ * Jam: 07:30 - 09:00 WIB
  */
 export function checkApelTimeStatus(): WibTimeStatus {
   const d = new Date();
+  const day = d.getDay(); // 0 = Minggu, 1 = Senin, ..., 5 = Jumat, 6 = Sabtu
   const hours = d.getHours();
   const minutes = d.getMinutes();
   const totalMin = hours * 60 + minutes;
@@ -54,9 +58,25 @@ export function checkApelTimeStatus(): WibTimeStatus {
   const minStr = String(minutes).padStart(2, '0');
   const formattedTime = `${hoursStr}:${minStr} WIB`;
 
+  const isWorkDay = day >= 1 && day <= 5;
+
+  if (!isWorkDay) {
+    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const currentDayName = dayNames[day];
+    return {
+      formattedTime,
+      isWorkDay: false,
+      isWithinWindow: false,
+      isTooEarly: false,
+      isLate: false,
+      statusLabel: `Libur Akhir Pekan (${currentDayName}) • Apel Pagi Hanya Senin s/d Jumat`,
+    };
+  }
+
   if (totalMin < startMin) {
     return {
       formattedTime,
+      isWorkDay: true,
       isWithinWindow: false,
       isTooEarly: true,
       isLate: false,
@@ -67,6 +87,7 @@ export function checkApelTimeStatus(): WibTimeStatus {
   if (totalMin > endMin) {
     return {
       formattedTime,
+      isWorkDay: true,
       isWithinWindow: false,
       isTooEarly: false,
       isLate: true,
@@ -76,6 +97,7 @@ export function checkApelTimeStatus(): WibTimeStatus {
 
   return {
     formattedTime,
+    isWorkDay: true,
     isWithinWindow: true,
     isTooEarly: false,
     isLate: false,

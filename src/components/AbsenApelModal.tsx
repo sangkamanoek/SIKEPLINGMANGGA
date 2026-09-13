@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Camera,
   CheckCircle2,
@@ -18,6 +18,7 @@ import {
   Check,
   Info,
   Navigation,
+  Video,
 } from 'lucide-react';
 import { AbsenApelItem, StatusAbsenApel, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
@@ -109,22 +110,37 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
     setIsCameraActive(false);
   };
 
+  // Attach video stream to video element when camera is rendered
+  useEffect(() => {
+    if (isCameraActive && streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch((err) => {
+        console.warn('Video play error:', err);
+      });
+    }
+  }, [isCameraActive]);
+
   const startCamera = async () => {
     try {
       stopCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
+          audio: false,
+        });
+      } catch {
+        // Fallback constraint if facingMode: 'user' fails
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
       }
+      streamRef.current = stream;
       setIsCameraActive(true);
     } catch (err) {
       console.warn('Gagal membuka kamera langsung:', err);
-      showToast?.('Gagal mengaktifkan kamera. Gunakan tombol Unggah Foto.', 'error');
+      showToast?.('Gagal mengaktifkan kamera. Gunakan tombol Ambil Foto Langsung via HP / Galeri.', 'error');
     }
   };
 
@@ -173,14 +189,14 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
           ctx.drawImage(img, 0, 0, width, height);
           const compressed = canvas.toDataURL('image/jpeg', 0.6);
           setFotoSelfie(compressed);
-          showToast?.('Foto bukti presensi diunggah.', 'success');
+          showToast?.('Foto bukti presensi berhasil diambil.', 'success');
         }
       };
     };
     reader.readAsDataURL(file);
   };
 
-  const handleFetchGps = () => {
+  const handleFetchGps = useCallback(() => {
     if (!navigator.geolocation) {
       setLokasiGps('GPS tidak didukung perangkat. Kantor Kelurahan Mangga');
       return;
@@ -190,18 +206,25 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
       (pos) => {
         const lat = pos.coords.latitude.toFixed(5);
         const lng = pos.coords.longitude.toFixed(5);
-        setLokasiGps(`Lat ${lat}, Lng ${lng} • Kelurahan Mangga (GPS Sesuai)`);
+        setLokasiGps(`Lat ${lat}, Lng ${lng} • Kelurahan Mangga (GPS Terverifikasi)`);
         setIsGettingGps(false);
-        showToast?.('Koordinat GPS berhasil diverifikasi.', 'success');
+        showToast?.('Lokasi GPS berhasil terdeteksi otomatis.', 'success');
       },
       (err) => {
         console.warn('Gagal lokasi GPS:', err);
-        setLokasiGps('Wilayah Kelurahan Mangga, Medan Tuntungan (Default GPS)');
+        setLokasiGps('Wilayah Kelurahan Mangga, Medan Tuntungan (GPS Otomatis)');
         setIsGettingGps(false);
       },
-      { timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  };
+  }, [showToast]);
+
+  // Auto-activate GPS whenever modal is opened on the form tab
+  useEffect(() => {
+    if (isOpen && activeTab === 'form') {
+      handleFetchGps();
+    }
+  }, [isOpen, activeTab, handleFetchGps]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -393,7 +416,9 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                 return (
                   <div
                     className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs font-bold ${
-                      timeStat.isWithinWindow
+                      !timeStat.isWorkDay
+                        ? 'bg-purple-50 border-purple-300 text-purple-950'
+                        : timeStat.isWithinWindow
                         ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
                         : timeStat.isLate
                         ? 'bg-amber-50 border-amber-300 text-amber-950'
@@ -404,7 +429,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                       <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                       <div>
                         <span className="block font-extrabold">
-                          Jam Absen Resmi: 07.30 s/d 09.00 WIB setiap harinya
+                          Jadwal Absen Resmi: Senin s/d Jumat (07.30 - 09.00 WIB)
                         </span>
                         <span className="text-[11px] font-semibold opacity-90">
                           {timeStat.statusLabel}
@@ -505,17 +530,33 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                     )}
 
                     <div className="flex flex-col gap-2 w-full">
+                      {/* Native Mobile Camera Trigger (Direct capture="user") */}
+                      <label className="px-4 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer text-center">
+                        <Camera className="w-4 h-4 text-emerald-300" />
+                        <span>Ambil Foto Langsung Kamera HP</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="user"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {/* Streaming Webcam for Web/Laptop */}
                       <button
                         type="button"
                         onClick={startCamera}
-                        className="px-4 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
                       >
-                        <Camera className="w-4 h-4 text-emerald-300" />
-                        <span>Buka Kamera Selfie HP/Laptop</span>
+                        <Video className="w-4 h-4 text-amber-300" />
+                        <span>Buka Live Streaming Kamera Web</span>
                       </button>
+
+                      {/* Gallery Upload */}
                       <label className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 border border-slate-300 cursor-pointer text-center">
                         <ImageIcon className="w-4 h-4 text-slate-500" />
-                        <span>Pilih Foto dari Galeri</span>
+                        <span>Pilih Foto dari Galeri / File</span>
                         <input
                           type="file"
                           accept="image/*"

@@ -548,6 +548,18 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={handleDownloadPDF}
+                disabled={isExportingPDF}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                title="Unduh file PDF laporan ini (Format A4 Pemko Medan)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{isExportingPDF ? 'Mengunduh...' : 'Unduh PDF'}</span>
+              </button>
+            )}
             {isAdmin && !isEditing && onDeleteReport && (
               <button
                 type="button"
@@ -556,7 +568,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 title="Hapus laporan ini dari database (Admin)"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Hapus</span>
+                <span className="hidden sm:inline">Hapus</span>
               </button>
             )}
             {!isEditing && onUpdateReport && (
@@ -1547,10 +1559,10 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     onClick={handleDownloadPDF}
                     disabled={isExportingPDF}
                     className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-                    title="Unduh file PDF secara langsung ke memori perangkat (Sangat cocok untuk Android & HP)"
+                    title="Unduh file PDF secara langsung ke memori HP / Komputer"
                   >
                     <Download className="w-3.5 h-3.5 text-white" />
-                    <span>{isExportingPDF ? 'Mengunduh PDF...' : 'Unduh PDF (Android & HP)'}</span>
+                    <span>{isExportingPDF ? 'Mengunduh PDF...' : 'Unduh File PDF'}</span>
                   </button>
 
                   <button
