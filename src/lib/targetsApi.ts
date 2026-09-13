@@ -1,5 +1,5 @@
 import { KeplingTargetCapaian, TargetsCapaianMap } from '../types';
-import { getDefaultTargetsCapaianMap } from '../data/targetsData';
+import { getDefaultTargetsCapaianMap, DEFAULT_PERLINSOS_BASELINES } from '../data/targetsData';
 import { safeSetLocalStorage } from './safeStorage';
 import {
   fetchTargetsFromFirestore,
@@ -9,61 +9,101 @@ import {
   subscribeTargetsFromFirestore,
 } from './firestoreService';
 
-const LOCAL_STORAGE_KEY = 'manggajuara_targets_capaian_v1';
+const LOCAL_STORAGE_KEY = 'manggajuara_targets_capaian_v2';
+const OVERRIDE_VERSION_KEY = 'manggajuara_perlinsos_override_v2_applied';
 
 /**
  * Baca target & capaian dari Firebase Firestore (dengan fallback ke server buffer, localStorage, dan defaults)
  */
 export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
+  const needsMigration = localStorage.getItem(OVERRIDE_VERSION_KEY) !== 'true';
+
+  let resultMap: TargetsCapaianMap | null = null;
+
   // 1. Prioritas utama: Firebase Firestore
   try {
     const firestoreMap = await fetchTargetsFromFirestore();
     if (firestoreMap && Object.keys(firestoreMap).length > 0) {
-      safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(firestoreMap));
-      return firestoreMap;
+      resultMap = firestoreMap;
     }
   } catch (err) {
     console.warn('Notice reading targets from Firebase Firestore, checking server buffer:', err);
   }
 
   // 2. Prioritas kedua: Server API buffer
-  try {
-    const res = await fetch('/api/targets-capaian', {
-      headers: { 'Accept': 'application/json' },
-      cache: 'no-cache',
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && json.data && typeof json.data === 'object' && Object.keys(json.data).length > 0) {
-        safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(json.data));
-        // Sync ke Firestore di background
-        saveAllTargetsToFirestore(json.data).catch((e) => console.warn('Background sync targets to Firestore:', e));
-        return json.data as TargetsCapaianMap;
+  if (!resultMap) {
+    try {
+      const res = await fetch('/api/targets-capaian', {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-cache',
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data && typeof json.data === 'object' && Object.keys(json.data).length > 0) {
+          resultMap = json.data as TargetsCapaianMap;
+        }
       }
+    } catch (err) {
+      console.warn('Gagal fetch /api/targets-capaian, menggunakan cache lokal:', err);
     }
-  } catch (err) {
-    console.warn('Gagal fetch /api/targets-capaian, menggunakan cache lokal:', err);
   }
 
   // 3. Fallback localStorage
-  try {
-    const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (local) {
-      const parsed = JSON.parse(local);
-      if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-        return parsed as TargetsCapaianMap;
+  if (!resultMap) {
+    try {
+      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+          resultMap = parsed as TargetsCapaianMap;
+        }
       }
+    } catch (err) {
+      console.error('Error parsing local targets:', err);
     }
-  } catch (err) {
-    console.error('Error parsing local targets:', err);
   }
 
   // 4. Fallback defaults resmi
-  const defaults = getDefaultTargetsCapaianMap();
-  safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(defaults));
-  // Simpan ke Firestore agar database Firebase langsung terisi data awal resmi
-  saveAllTargetsToFirestore(defaults).catch((e) => console.warn('Init defaults to Firestore:', e));
-  return defaults;
+  if (!resultMap || Object.keys(resultMap).length === 0) {
+    resultMap = getDefaultTargetsCapaianMap();
+  }
+
+  // Jika belum menerapkan pembaruan capaian perlinsos kepling terbaru (v2), terapkan ke seluruh 24 Kepling
+  if (needsMigration) {
+    const updatedMap: TargetsCapaianMap = { ...resultMap };
+    for (let i = 1; i <= 24; i++) {
+      const kId = `kepling_${i}`;
+      const newOverride = DEFAULT_PERLINSOS_BASELINES[i - 1];
+      if (newOverride !== undefined) {
+        updatedMap[kId] = {
+          ...updatedMap[kId],
+          keplingId: kId,
+          nomorLingkungan: i,
+          overridePerlinsos: newOverride,
+          catatanPenyesuaian: 'Override Capaian Perlinsos Kelurahan Mangga',
+          updatedAt: new Date().toISOString(),
+          updatedBy: 'Super Admin',
+        } as KeplingTargetCapaian;
+      }
+    }
+
+    resultMap = updatedMap;
+    safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(resultMap));
+    safeSetLocalStorage(OVERRIDE_VERSION_KEY, 'true');
+
+    // Simpan ke Firestore & Server API
+    saveAllTargetsToFirestore(resultMap).catch((e) => console.warn('Sync override to Firestore:', e));
+    fetch('/api/targets-capaian', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ allTargets: resultMap }),
+    }).catch((e) => console.warn('Sync override to server:', e));
+
+    return resultMap;
+  }
+
+  safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(resultMap));
+  return resultMap;
 }
 
 /**

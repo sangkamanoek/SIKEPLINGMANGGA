@@ -37,13 +37,13 @@ export const DEFAULT_PERLINSOS_TARGETS: number[] = [
 ];
 
 /**
- * Baseline Capaian Perlinsos awal per 7 September 2026 berturut-turut Lk 1 s/d 24:
+ * Baseline Capaian Perlinsos awal/override berturut-turut Lk 1 s/d 24:
  */
 export const DEFAULT_PERLINSOS_BASELINES: number[] = [
-  250, 263, 304, 239, 186, 212,
-  161, 141, 186, 200, 174, 157,
-  245, 154,  94, 179, 208, 143,
-  234, 128, 210, 202, 207, 113
+  252, 265, 310, 241, 189, 213,
+  163, 147, 189, 213, 179, 162,
+  246, 159, 111, 180, 222, 145,
+  239, 131, 220, 206, 215, 119
 ];
 
 /**
