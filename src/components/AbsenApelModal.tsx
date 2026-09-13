@@ -292,10 +292,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
-                <span>PRESENSI APEL PAGI KEPLING</span>
-                <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-md uppercase">
-                  OFFICIAL
-                </span>
+                <span>PRESENSI APEL PAGI KEPALA LINGKUNGAN</span>
               </h2>
               <p className="text-xs text-emerald-100 font-medium">
                 Kelurahan Mangga • Kecamatan Medan Tuntungan
@@ -331,21 +328,23 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
               <span>Input Absen Apel</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab('monitoring')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'monitoring'
-                  ? 'bg-emerald-800 text-white shadow-md'
-                  : 'bg-white text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4 text-amber-400" />
-              <span>Rekap 24 Kepling</span>
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-950 text-emerald-200">
-                {summary.totalHadir}/24
-              </span>
-            </button>
+            {activeAccount.role === 'super_admin' && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('monitoring')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'monitoring'
+                    ? 'bg-emerald-800 text-white shadow-md'
+                    : 'bg-white text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <span>Rekap 24 Kepala Lingkungan</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-950 text-emerald-200">
+                  {summary.totalHadir}/24
+                </span>
+              </button>
+            )}
           </div>
 
           {/* Date Picker */}

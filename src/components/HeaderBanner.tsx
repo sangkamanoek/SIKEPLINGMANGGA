@@ -83,7 +83,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                     : 'bg-emerald-950 text-emerald-200 border border-emerald-600'
                 }`}
               >
-                {activeAccount.role === 'super_admin' ? 'PORTAL SUPER ADMIN' : 'APLIKASI KEPLING'}
+                {activeAccount.role === 'super_admin' ? 'PORTAL SUPER ADMIN' : 'APLIKASI KEPALA LINGKUNGAN'}
               </span>
             </div>
             <p className="text-emerald-100 text-[11px] sm:text-xs uppercase tracking-widest font-semibold mt-0.5">
