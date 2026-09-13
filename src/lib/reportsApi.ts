@@ -133,8 +133,8 @@ export const saveReportToServer = async (item: LaporanHarianItem): Promise<boole
     return null;
   });
 
-  const [firestoreRes] = await Promise.all([firestorePromise, serverPromise]);
-  return Boolean(firestoreRes);
+  const [firestoreRes, serverRes] = await Promise.all([firestorePromise, serverPromise]);
+  return Boolean(firestoreRes || (serverRes && serverRes.ok));
 };
 
 // Delete single report from Firebase Firestore, server, and local storage (Full Delete)

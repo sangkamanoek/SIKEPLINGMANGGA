@@ -149,11 +149,33 @@ export async function loadAllAttendance(): Promise<AbsenApelItem[]> {
     const firestoreData = await fetchAttendanceFromFirestore();
     if (firestoreData && firestoreData.length > 0) {
       setStoredAttendanceLocal(firestoreData);
+      // Sync to server buffer in background
+      fetch('/api/attendance/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: firestoreData }),
+      }).catch(() => {});
       return firestoreData;
     }
   } catch (e) {
-    console.warn('Fallback to local storage for attendance:', e);
+    console.warn('Fallback from Firestore for attendance:', e);
   }
+
+  // Backup Tier 1: Internal Server Buffer API
+  try {
+    const res = await fetch('/api/attendance');
+    if (res.ok) {
+      const json = await res.json();
+      const serverItems = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
+      if (serverItems && serverItems.length > 0) {
+        setStoredAttendanceLocal(serverItems);
+        return serverItems;
+      }
+    }
+  } catch (e) {
+    console.warn('Fallback from server /api/attendance:', e);
+  }
+
   return getStoredAttendanceLocal();
 }
 
@@ -201,7 +223,7 @@ export async function submitAbsenApel(
     updatedAt: waktuLengkap,
   };
 
-  // Update local storage
+  // 1. Update local storage
   const currentLocal = getStoredAttendanceLocal();
   const index = currentLocal.findIndex((a) => a.id === docId);
   if (index >= 0) {
@@ -211,9 +233,17 @@ export async function submitAbsenApel(
   }
   setStoredAttendanceLocal(currentLocal);
 
-  // Sync to Firebase Firestore
+  // 2. Concurrently sync to Firebase Firestore and Server Buffer
   saveAttendanceToFirestore(item).catch((err) => {
     console.warn('Gagal menyinkronkan absen ke Firestore:', err);
+  });
+
+  fetch('/api/attendance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(item),
+  }).catch((err) => {
+    console.warn('Gagal menyinkronkan absen ke server buffer:', err);
   });
 
   return item;

@@ -126,6 +126,31 @@ const saveStoredProfiles = (profiles: Record<string, any>) => {
 
 let profilesCache = loadStoredProfiles();
 
+// Attendance Data File (Presensi Apel Pagi Buffer)
+const ATTENDANCE_FILE = path.join(DATA_DIR, 'attendance.json');
+
+const loadStoredAttendance = (): any[] => {
+  try {
+    if (fs.existsSync(ATTENDANCE_FILE)) {
+      const content = fs.readFileSync(ATTENDANCE_FILE, 'utf-8');
+      return JSON.parse(content) || [];
+    }
+  } catch (err) {
+    console.error('Error reading attendance file:', err);
+  }
+  return [];
+};
+
+const saveStoredAttendance = (attendance: any[]) => {
+  try {
+    fs.writeFileSync(ATTENDANCE_FILE, JSON.stringify(attendance, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving attendance file:', err);
+  }
+};
+
+let attendanceCache = loadStoredAttendance();
+
 const DEFAULT_TARGETS_LIST = [
   429, 330, 342, 298, 210, 400,
   398, 255, 367, 465, 498, 373,
@@ -444,6 +469,62 @@ app.post('/api/profiles', (req, res) => {
     });
   } catch (err: any) {
     console.error('Error saving profile:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET all attendance records
+app.get('/api/attendance', (_req, res) => {
+  res.json({ success: true, data: attendanceCache });
+});
+
+// POST save single attendance record
+app.post('/api/attendance', (req, res) => {
+  try {
+    const item = req.body;
+    if (!item || !item.id) {
+      return res.status(400).json({ success: false, message: 'Data presensi tidak lengkap' });
+    }
+
+    const index = attendanceCache.findIndex((a) => a.id === item.id);
+    if (index >= 0) {
+      attendanceCache[index] = item;
+    } else {
+      attendanceCache = [item, ...attendanceCache];
+    }
+    saveStoredAttendance(attendanceCache);
+
+    return res.json({ success: true, data: item, total: attendanceCache.length });
+  } catch (err: any) {
+    console.error('Error saving attendance buffer:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST batch sync attendance records
+app.post('/api/attendance/batch', (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ success: false, message: 'items harus berupa array' });
+    }
+
+    let addedCount = 0;
+    for (const item of items) {
+      if (!item || !item.id) continue;
+      const index = attendanceCache.findIndex((a) => a.id === item.id);
+      if (index >= 0) {
+        attendanceCache[index] = item;
+      } else {
+        attendanceCache = [item, ...attendanceCache];
+        addedCount++;
+      }
+    }
+
+    saveStoredAttendance(attendanceCache);
+    return res.json({ success: true, addedCount, total: attendanceCache.length, data: attendanceCache });
+  } catch (err: any) {
+    console.error('Error batch syncing attendance:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
