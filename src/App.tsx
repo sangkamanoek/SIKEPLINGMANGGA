@@ -242,22 +242,67 @@ export default function App() {
     refreshAllReports(false);
     loadAllAttendance().then((items) => setAttendanceList(items));
 
-    // Subscribe to real-time reports directly from Firebase Firestore
+    // Subscribe to real-time reports directly from Firebase Firestore with safe non-destructive merge
     const unsubscribeFirestoreReports = subscribeReportsFromFirestore((firestoreReports) => {
-      if (firestoreReports && firestoreReports.length >= 0) {
-        setReports(firestoreReports);
-        safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(firestoreReports));
+      if (Array.isArray(firestoreReports)) {
+        setReports((prev) => {
+          // Guard: If Firestore returns empty list, never wipe out active user-submitted reports
+          if (firestoreReports.length === 0 && prev.length > 0) {
+            return prev;
+          }
+
+          const deletedIds = getLocalDeletedReportIds();
+          const reportMap = new Map<string, LaporanHarianItem>();
+
+          // 1. First add all Firestore incoming reports
+          firestoreReports.forEach((r) => {
+            if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+              reportMap.set(r.id, r);
+            }
+          });
+
+          // 2. Retain any freshly saved reports from local memory that may not have arrived in Firestore yet
+          prev.forEach((r) => {
+            if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+              if (!reportMap.has(r.id)) {
+                reportMap.set(r.id, r);
+              }
+            }
+          });
+
+          const merged = Array.from(reportMap.values());
+          merged.sort((a, b) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return timeB - timeA;
+          });
+
+          safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(merged));
+          return merged;
+        });
       }
     });
 
-    // Subscribe to real-time attendance directly from Firebase Firestore
+    // Subscribe to real-time attendance directly from Firebase Firestore with safe merge
     const unsubscribeAttendance = subscribeAttendanceFromFirestore((items) => {
-      if (items) {
-        setAttendanceList(items);
+      if (Array.isArray(items)) {
+        setAttendanceList((prev) => {
+          if (items.length === 0 && prev.length > 0) return prev;
+          const attMap = new Map<string, AbsenApelItem>();
+          items.forEach((it) => {
+            if (it && it.id) attMap.set(it.id, it);
+          });
+          prev.forEach((it) => {
+            if (it && it.id && !attMap.has(it.id)) attMap.set(it.id, it);
+          });
+          const merged = Array.from(attMap.values());
+          merged.sort((a, b) => new Date(b.waktuLengkap || b.createdAt).getTime() - new Date(a.waktuLengkap || a.createdAt).getTime());
+          return merged;
+        });
       }
     });
 
-    // Auto-sync polling every 30 seconds via lightweight Server Buffer (Costs 0 Firebase quota)
+    // Auto-sync polling every 30 seconds via lightweight Server Buffer with safe merge
     const pollInterval = setInterval(async () => {
       try {
         const res = await fetch('/api/reports');
@@ -267,7 +312,23 @@ export default function App() {
           if (serverReports.length > 0) {
             const deletedIds = getLocalDeletedReportIds();
             const cleaned = serverReports.filter((r: LaporanHarianItem) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
-            setReports((prev) => (cleaned.length > prev.length ? cleaned : prev));
+            setReports((prev) => {
+              const map = new Map<string, LaporanHarianItem>();
+              prev.forEach((r) => {
+                if (r && r.id && !deletedIds.has(r.id)) map.set(r.id, r);
+              });
+              cleaned.forEach((r: LaporanHarianItem) => {
+                if (r && r.id && !deletedIds.has(r.id)) map.set(r.id, r);
+              });
+              const merged = Array.from(map.values());
+              merged.sort((a, b) => {
+                const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return timeB - timeA;
+              });
+              safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(merged));
+              return merged;
+            });
           }
         }
       } catch {}

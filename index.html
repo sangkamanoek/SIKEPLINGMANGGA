@@ -3,15 +3,108 @@
   <head>
     <script>
       (function() {
+        // 1. WebSocket stub for Vite HMR/ping to prevent connection failure errors
+        if (typeof window !== 'undefined' && window.WebSocket) {
+          var NativeWebSocket = window.WebSocket;
+          window.WebSocket = function(url, protocols) {
+            var urlStr = String(url || '');
+            if (
+              urlStr.indexOf('vite') !== -1 ||
+              urlStr.indexOf('/@vite') !== -1 ||
+              protocols === 'vite-ping' ||
+              urlStr.indexOf('localhost:3000') !== -1 ||
+              urlStr.indexOf(window.location.host) !== -1
+            ) {
+              var stub = {
+                readyState: 1,
+                binaryType: 'blob',
+                bufferedAmount: 0,
+                extensions: '',
+                protocol: protocols || '',
+                url: urlStr,
+                send: function() {},
+                close: function() {},
+                addEventListener: function(event, handler) {
+                  if (event === 'open') {
+                    setTimeout(function() {
+                      try { handler({ type: 'open', target: stub }); } catch (e) {}
+                    }, 0);
+                  }
+                },
+                removeEventListener: function() {},
+                dispatchEvent: function() { return true; },
+                onopen: null,
+                onclose: null,
+                onmessage: null,
+                onerror: null,
+              };
+              setTimeout(function() {
+                if (typeof stub.onopen === 'function') {
+                  try { stub.onopen({ type: 'open', target: stub }); } catch (e) {}
+                }
+              }, 0);
+              return stub;
+            }
+            return new NativeWebSocket(url, protocols);
+          };
+          window.WebSocket.prototype = NativeWebSocket.prototype;
+          window.WebSocket.CONNECTING = 0;
+          window.WebSocket.OPEN = 1;
+          window.WebSocket.CLOSING = 2;
+          window.WebSocket.CLOSED = 3;
+        }
+
+        // 2. Comprehensive console and error filter for [vite] / [hmr]
+        function isViteMessage(args) {
+          if (!args || !args.length) return false;
+          for (var i = 0; i < args.length; i++) {
+            var arg = args[i];
+            if (!arg) continue;
+            var str = '';
+            if (typeof arg === 'string') {
+              str = arg;
+            } else if (typeof arg === 'object') {
+              try { str = (arg.message || arg.stack || '') + ' ' + String(arg); } catch (e) {}
+            }
+            str = str.toLowerCase();
+            if (
+              str.indexOf('[vite]') !== -1 ||
+              str.indexOf('failed to connect to websocket') !== -1 ||
+              str.indexOf('[hmr]') !== -1 ||
+              str.indexOf('websocket closed without opened') !== -1
+            ) {
+              return true;
+            }
+          }
+          return false;
+        }
+
         var filterVite = function(orig) {
           return function() {
-            if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('[vite]') !== -1) return;
-            return orig.apply(this, arguments);
+            if (isViteMessage(arguments)) return;
+            return orig ? orig.apply(this, arguments) : undefined;
           };
         };
+
         console.warn = filterVite(console.warn);
         console.error = filterVite(console.error);
         console.info = filterVite(console.info);
+        console.log = filterVite(console.log);
+        console.debug = filterVite(console.debug);
+
+        window.addEventListener('error', function(e) {
+          if (e && isViteMessage([e.message, e.error])) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+          if (e && (isViteMessage([e.reason]) || (e.reason && isViteMessage([e.reason.message])))) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+        }, true);
       })();
     </script>
     <meta charset="UTF-8" />

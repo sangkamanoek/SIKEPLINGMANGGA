@@ -49,16 +49,15 @@ export async function fetchDeletedReportIdsFromFirestore(): Promise<Set<string>>
 }
 
 /**
- * Fetch reports from Firebase Firestore with query limit to conserve daily free quota
+ * Fetch reports from Firebase Firestore
  */
-export async function fetchReportsFromFirestore(maxLimit: number = 100): Promise<LaporanHarianItem[]> {
+export async function fetchReportsFromFirestore(): Promise<LaporanHarianItem[]> {
   try {
     // 1. Sync deleted report IDs
     await fetchDeletedReportIdsFromFirestore();
 
     const colRef = collection(db, REPORTS_COLLECTION);
-    const q = maxLimit > 0 ? query(colRef, limit(maxLimit)) : colRef;
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(colRef);
     const reports: LaporanHarianItem[] = [];
 
     snapshot.forEach((docSnap) => {
@@ -241,17 +240,15 @@ export async function resetAllReportsInFirestore(): Promise<boolean> {
 }
 
 /**
- * Real-time listener for reports in Firebase Firestore (with limit to conserve daily free quota)
+ * Real-time listener for reports in Firebase Firestore
  */
 export function subscribeReportsFromFirestore(
   onData: (reports: LaporanHarianItem[]) => void,
-  onError?: (err: any) => void,
-  limitCount: number = 100
+  onError?: (err: any) => void
 ): Unsubscribe {
   const colRef = collection(db, REPORTS_COLLECTION);
-  const q = limitCount > 0 ? query(colRef, limit(limitCount)) : colRef;
   return onSnapshot(
-    q,
+    colRef,
     (snapshot) => {
       const reports: LaporanHarianItem[] = [];
       snapshot.forEach((docSnap) => {
@@ -610,11 +607,10 @@ export function subscribeProfilesFromFirestore(
 
 const ATTENDANCE_COLLECTION = 'attendance';
 
-export async function fetchAttendanceFromFirestore(maxLimit: number = 100): Promise<AbsenApelItem[]> {
+export async function fetchAttendanceFromFirestore(): Promise<AbsenApelItem[]> {
   try {
     const colRef = collection(db, ATTENDANCE_COLLECTION);
-    const q = maxLimit > 0 ? query(colRef, limit(maxLimit)) : colRef;
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(colRef);
     const list: AbsenApelItem[] = [];
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as AbsenApelItem;
@@ -643,13 +639,11 @@ export async function saveAttendanceToFirestore(item: AbsenApelItem): Promise<bo
 }
 
 export function subscribeAttendanceFromFirestore(
-  onData: (items: AbsenApelItem[]) => void,
-  maxLimit: number = 100
+  onData: (items: AbsenApelItem[]) => void
 ): Unsubscribe {
   const colRef = collection(db, ATTENDANCE_COLLECTION);
-  const q = maxLimit > 0 ? query(colRef, limit(maxLimit)) : colRef;
   return onSnapshot(
-    q,
+    colRef,
     (snapshot) => {
       const list: AbsenApelItem[] = [];
       snapshot.forEach((docSnap) => {

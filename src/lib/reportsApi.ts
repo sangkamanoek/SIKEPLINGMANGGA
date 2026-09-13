@@ -47,48 +47,70 @@ export const isReportBeforeSept7 = (r: LaporanHarianItem): boolean => {
   return isBeforeSept7(r);
 };
 
-// Fetch all reports from Firebase Firestore (with automatic fallback to Server Buffer and LocalStorage)
+// Fetch all reports with resilient multi-tier merge (LocalStorage + Firestore + Server Buffer)
 export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   const deletedIds = getLocalDeletedReportIds();
-  try {
-    const firestoreReports = await fetchReportsFromFirestore();
-    if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
-      const cleaned = firestoreReports.filter((r) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
-      safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
-      return cleaned;
-    }
-  } catch (err) {
-    console.warn('Error reading from Firebase Firestore:', err);
-  }
+  const map = new Map<string, LaporanHarianItem>();
 
-  // Multi-tier Fallback 1: Internal Node API Buffer
-  try {
-    const res = await fetch('/api/reports');
-    if (res.ok) {
-      const json = await res.json();
-      const serverReports = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
-      if (serverReports.length > 0) {
-        const cleaned = serverReports.filter((r: LaporanHarianItem) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
-        safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(cleaned));
-        return cleaned;
-      }
-    }
-  } catch (e) {
-    console.warn('Server fallback /api/reports notice:', e);
-  }
-
-  // Multi-tier Fallback 2: Local Storage
+  // 1. Include locally cached items first so freshly inputted reports are never lost
   try {
     const localRaw = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
     if (localRaw) {
       const parsed = JSON.parse(localRaw);
       if (Array.isArray(parsed)) {
-        return parsed.filter((r) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
+        parsed.forEach((r) => {
+          if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+            map.set(r.id, r);
+          }
+        });
       }
     }
-  } catch (e) {}
+  } catch {}
 
-  return [];
+  // 2. Fetch from Firebase Firestore
+  try {
+    const firestoreReports = await fetchReportsFromFirestore();
+    if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
+      firestoreReports.forEach((r) => {
+        if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+          map.set(r.id, r);
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('Notice reading from Firebase Firestore:', err);
+  }
+
+  // 3. Merge with Server Buffer
+  try {
+    const res = await fetch('/api/reports');
+    if (res.ok) {
+      const json = await res.json();
+      const serverReports = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
+      if (Array.isArray(serverReports) && serverReports.length > 0) {
+        serverReports.forEach((r: LaporanHarianItem) => {
+          if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+            map.set(r.id, r);
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('Notice reading server buffer /api/reports:', e);
+  }
+
+  const merged = Array.from(map.values());
+  merged.sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return timeB - timeA;
+  });
+
+  if (merged.length > 0) {
+    safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(merged));
+  }
+
+  return merged;
 };
 
 // Save single report to Firebase Firestore, server, and local storage (Full Create/Update)
