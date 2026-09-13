@@ -113,8 +113,12 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
   // Attach video stream to video element when camera is rendered
   useEffect(() => {
     if (isCameraActive && streamRef.current && videoRef.current) {
-      videoRef.current.srcObject = streamRef.current;
-      videoRef.current.play().catch((err) => {
+      const video = videoRef.current;
+      video.srcObject = streamRef.current;
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('muted', 'true');
+      video.muted = true;
+      video.play().catch((err) => {
         console.warn('Video play error:', err);
       });
     }
@@ -126,11 +130,11 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
       let stream: MediaStream | null = null;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
+          video: { facingMode: { ideal: 'user' } },
           audio: false,
         });
       } catch {
-        // Fallback constraint if facingMode: 'user' fails
+        // Fallback constraint if ideal facingMode fails
         stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false,
@@ -140,19 +144,22 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
       setIsCameraActive(true);
     } catch (err) {
       console.warn('Gagal membuka kamera langsung:', err);
-      showToast?.('Gagal mengaktifkan kamera. Gunakan tombol Ambil Foto Langsung via HP / Galeri.', 'error');
+      showToast?.('Gagal mengaktifkan streaming kamera. Gunakan tombol Buka Kamera HP di bawah ini.', 'error');
     }
   };
 
   const capturePhoto = () => {
     if (videoRef.current) {
+      const video = videoRef.current;
+      const w = video.videoWidth || 640;
+      const h = video.videoHeight || 480;
       const canvas = document.createElement('canvas');
-      canvas.width = 480;
-      canvas.height = 480;
+      canvas.width = w;
+      canvas.height = h;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        ctx.drawImage(video, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
         setFotoSelfie(dataUrl);
         stopCamera();
         showToast?.('Foto selfie apel berhasil diambil!', 'success');
@@ -482,9 +489,15 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                   <div className="bg-slate-950 rounded-2xl p-2 relative overflow-hidden flex flex-col items-center">
                     <video
                       ref={videoRef}
-                      className="w-full max-h-64 object-cover rounded-xl"
+                      className="w-full max-h-64 object-cover rounded-xl bg-slate-900"
                       autoPlay
                       playsInline
+                      muted
+                      onLoadedMetadata={() => {
+                        if (videoRef.current) {
+                          videoRef.current.play().catch((err) => console.warn('Video play error on loadedmetadata:', err));
+                        }
+                      }}
                     />
                     <div className="flex items-center gap-3 mt-3">
                       <button
@@ -529,14 +542,27 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                     )}
 
                     <div className="flex flex-col gap-2 w-full">
-                      {/* Native Mobile Camera Trigger (Direct capture="user") */}
-                      <label className="px-4 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer text-center">
+                      {/* Native Mobile Camera Trigger (Selfie / Front Camera) */}
+                      <label className="px-4 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 active:bg-emerald-900 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer text-center">
                         <Camera className="w-4 h-4 text-emerald-300" />
-                        <span>Ambil Foto Langsung Kamera HP</span>
+                        <span>📷 Ambil Foto Kamera HP (Selfie Depan)</span>
                         <input
                           type="file"
                           accept="image/*"
                           capture="user"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {/* Native Mobile Camera Trigger (Rear Camera) */}
+                      <label className="px-4 py-2 rounded-xl bg-emerald-900 hover:bg-emerald-800 active:bg-emerald-950 text-emerald-100 font-bold text-xs flex items-center justify-center gap-2 shadow-2xs cursor-pointer text-center">
+                        <Camera className="w-4 h-4 text-emerald-400" />
+                        <span>📷 Ambil Foto Kamera HP (Kamera Belakang)</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
                           onChange={handleFileUpload}
                           className="hidden"
                         />
@@ -549,13 +575,13 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                         className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <Video className="w-4 h-4 text-amber-300" />
-                        <span>Buka Live Streaming Kamera Web</span>
+                        <span>📹 Live Streaming Kamera Web (Laptop)</span>
                       </button>
 
                       {/* Gallery Upload */}
                       <label className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 border border-slate-300 cursor-pointer text-center">
                         <ImageIcon className="w-4 h-4 text-slate-500" />
-                        <span>Pilih Foto dari Galeri / File</span>
+                        <span>🖼️ Pilih Foto dari Galeri HP</span>
                         <input
                           type="file"
                           accept="image/*"
