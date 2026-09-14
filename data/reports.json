@@ -1,1 +1,38 @@
-[]
+[
+  {
+    "id": "lap_test_hasanuddin_1409",
+    "keplingId": "kepling_23",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "HASANUDDIN SITEPU, ST",
+    "jabatan": "Kepala Lingkungan XXIII",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "0",
+      "opsirPbbKeterangan": "Pembayaran PBB",
+      "perlinsosKk": "1",
+      "perlinsosKeterangan": "Pendataan Perlinsos",
+      "ikdOrang": "0",
+      "ikdKeterangan": "Aktivasi aplikasi IKD Dukcapil",
+      "bpjsKetenagakerjaanOrang": "0",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi pekerja rentan",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Ronda Lingkungan XXIII",
+      "poskamlingPetugas": "Kepling & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling lingkungan kondusif dan aman",
+      "kegiatanLainnya": "Pemantauan kebersihan lingkungan dan drainase warga"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_1",
+        "url": "data:image/jpeg;base64,123",
+        "name": "Dokumentasi Verifikasi Perlinsos",
+        "timestamp": "2026-09-14T10:56:52.266Z"
+      }
+    ],
+    "createdAt": "2026-09-14T12:00:00.000Z"
+  }
+]

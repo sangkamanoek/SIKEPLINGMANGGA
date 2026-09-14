@@ -82,6 +82,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   }
 
   // 3. Merge with Server Buffer
+  let serverReportIds = new Set<string>();
   try {
     const res = await fetch('/api/reports');
     if (res.ok) {
@@ -91,6 +92,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
         serverReports.forEach((r: LaporanHarianItem) => {
           if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
             map.set(r.id, r);
+            serverReportIds.add(r.id);
           }
         });
       }
@@ -110,7 +112,40 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(merged));
   }
 
+  // 4. Two-Way Sync: If we have reports locally that the server doesn't have yet, push them via batch sync!
+  const unsyncedReports = merged.filter((r) => r && r.id && !serverReportIds.has(r.id));
+  if (unsyncedReports.length > 0) {
+    fetch('/api/reports/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reports: unsyncedReports }),
+    }).catch((err) => {
+      console.warn('Notice pushing unsynced reports to server batch:', err);
+    });
+  }
+
   return merged;
+};
+
+// Sync all local reports to server buffer explicitly
+export const syncLocalReportsToServer = async (): Promise<void> => {
+  try {
+    const localRaw = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
+    if (!localRaw) return;
+    const items = JSON.parse(localRaw);
+    if (!Array.isArray(items) || items.length === 0) return;
+    const deletedIds = getLocalDeletedReportIds();
+    const validItems = items.filter((r: LaporanHarianItem) => r && r.id && !deletedIds.has(r.id));
+    if (validItems.length > 0) {
+      await fetch('/api/reports/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reports: validItems }),
+      });
+    }
+  } catch (err) {
+    console.warn('Error during syncLocalReportsToServer:', err);
+  }
 };
 
 // Save single report to Firebase Firestore, server, and local storage (Full Create/Update)
@@ -146,14 +181,28 @@ export const saveReportToServer = async (item: LaporanHarianItem): Promise<boole
     return false;
   });
 
-  const serverPromise = fetch('/api/reports', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(item),
-  }).catch((err) => {
-    console.warn('Error syncing to server /api/reports:', err);
+  // Helper function to send to server with automatic retry
+  const sendToServerWithRetry = async (payload: LaporanHarianItem, retries = 2): Promise<Response | null> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await fetch('/api/reports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) return res;
+      } catch (err) {
+        if (attempt === retries) {
+          console.warn('Final retry failed syncing to server /api/reports:', err);
+          return null;
+        }
+        await new Promise((r) => setTimeout(r, 800));
+      }
+    }
     return null;
-  });
+  };
+
+  const serverPromise = sendToServerWithRetry(item);
 
   const [firestoreRes, serverRes] = await Promise.all([firestorePromise, serverPromise]);
   return Boolean(firestoreRes || (serverRes && serverRes.ok));

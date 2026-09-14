@@ -9,6 +9,7 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Building2,
   ShieldCheck,
   Shield,
@@ -110,6 +111,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   // Dokumentasi Foto state
   const [fotoList, setFotoList] = useState<FotoDokumentasi[]>([]);
   const [copiedPreview, setCopiedPreview] = useState(false);
+  const [showPhotoValidationModal, setShowPhotoValidationModal] = useState<boolean>(false);
 
   // Load saved profile info from localStorage
   useEffect(() => {
@@ -251,6 +253,81 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     setFotoList((prev) => prev.filter((p) => p.id !== id));
   };
 
+  const changePhotoCategory = (id: string, newKategori: string) => {
+    setFotoList((prev) =>
+      prev.map((f) => {
+        if (f.id !== id) return f;
+        const cleanName = f.name.replace(/^\[(PBB|PERLINSOS|IKD|BPJS|POSKAMLING|KEGIATAN LAINNYA|UMUM)\]\s*/i, '');
+        let prefix = '';
+        if (newKategori === 'pbb') prefix = '[PBB] ';
+        else if (newKategori === 'perlinsos') prefix = '[PERLINSOS] ';
+        else if (newKategori === 'ikd') prefix = '[IKD] ';
+        else if (newKategori === 'bpjs') prefix = '[BPJS] ';
+        else if (newKategori === 'poskamling') prefix = '[POSKAMLING] ';
+        else if (newKategori === 'lainnya') prefix = '[KEGIATAN LAINNYA] ';
+
+        return {
+          ...f,
+          kategori: newKategori as any,
+          name: prefix ? `${prefix}${cleanName}` : cleanName,
+        };
+      })
+    );
+  };
+
+  // Helper untuk mengubah foto umum menjadi PBB atau Perlinsos
+  const tagUncategorizedPhotos = (targetKat: 'pbb' | 'perlinsos', count: number) => {
+    let tagged = 0;
+    setFotoList((prev) =>
+      prev.map((f) => {
+        const isUncat =
+          f.kategori === 'umum' ||
+          (!f.kategori && !f.name.includes('[PBB]') && !f.name.includes('[PERLINSOS]'));
+        if (isUncat && tagged < count) {
+          tagged++;
+          const cleanName = f.name.replace(/^\[(UMUM)\]\s*/i, '');
+          const prefix = targetKat === 'pbb' ? '[PBB] ' : '[PERLINSOS] ';
+          return {
+            ...f,
+            kategori: targetKat,
+            name: `${prefix}${cleanName}`,
+          };
+        }
+        return f;
+      })
+    );
+  };
+
+  // Perhitungan Validasi Foto vs Angka Input WP dan KK
+  const pbbWpNumber = Math.max(0, parseInt(opsirPbbWp, 10) || 0);
+  const perlinsosKkNumber = Math.max(0, parseInt(perlinsosKk, 10) || 0);
+
+  const pbbPhotos = fotoList.filter(
+    (f) =>
+      f.kategori === 'pbb' ||
+      f.name.toUpperCase().includes('[PBB]') ||
+      f.name.toLowerCase().includes('pbb')
+  );
+  const pbbPhotosCount = pbbPhotos.length;
+
+  const perlinsosPhotos = fotoList.filter(
+    (f) =>
+      f.kategori === 'perlinsos' ||
+      f.name.toUpperCase().includes('[PERLINSOS]') ||
+      f.name.toLowerCase().includes('perlinsos')
+  );
+  const perlinsosPhotosCount = perlinsosPhotos.length;
+
+  const uncategorizedPhotos = fotoList.filter(
+    (f) =>
+      f.kategori === 'umum' ||
+      (!f.kategori && !f.name.includes('[PBB]') && !f.name.includes('[PERLINSOS]'))
+  );
+
+  const pbbDeficit = pbbWpNumber > pbbPhotosCount ? pbbWpNumber - pbbPhotosCount : 0;
+  const perlinsosDeficit = perlinsosKkNumber > perlinsosPhotosCount ? perlinsosKkNumber - perlinsosPhotosCount : 0;
+  const hasPhotoDeficit = pbbDeficit > 0 || perlinsosDeficit > 0;
+
   const constructReportItem = (): LaporanHarianItem => {
     const kinerja: KinerjaHarian = {
       opsirPbbWp: opsirPbbWp.trim() || '0',
@@ -291,8 +368,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     };
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const doSaveReport = async () => {
     try {
       savePersistentProfile();
       const item = constructReportItem();
@@ -309,9 +385,19 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       setPoskamlingKeterangan('');
       setKegiatanLainnya('');
       setFotoList([]);
+      setShowPhotoValidationModal(false);
     } catch (err) {
       console.error('Submit report error:', err);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (hasPhotoDeficit) {
+      setShowPhotoValidationModal(true);
+      return;
+    }
+    await doSaveReport();
   };
 
   const handleCopyPreview = async () => {
@@ -642,6 +728,75 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                   </label>
                 </div>
               </div>
+
+              {/* Peringatan & Notifikasi Kesesuaian Foto PBB */}
+              {pbbWpNumber > 0 && (
+                <div
+                  className={`mt-2.5 p-2.5 rounded-lg border text-xs transition-all ${
+                    pbbDeficit > 0
+                      ? 'bg-amber-50/95 border-amber-300 text-amber-950 shadow-2xs'
+                      : 'bg-emerald-50/95 border-emerald-300 text-emerald-950 shadow-2xs'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {pbbDeficit > 0 ? (
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <span className="font-bold">
+                          {pbbDeficit > 0
+                            ? '⚠️ Peringatan: Foto PBB Belum Sesuai Jumlah WP'
+                            : '✅ Jumlah Foto PBB Sudah Sesuai'}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                            pbbDeficit > 0
+                              ? 'bg-amber-200 text-amber-900'
+                              : 'bg-emerald-200 text-emerald-900'
+                          }`}
+                        >
+                          {pbbPhotosCount} / {pbbWpNumber} Foto ({pbbDeficit > 0 ? `Kurang ${pbbDeficit} Foto` : 'Lengkap'})
+                        </span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed">
+                        {pbbDeficit > 0 ? (
+                          <>
+                            Anda menginput <strong>{pbbWpNumber} WP</strong>. Jumlah foto dokumentasi yang dilampirkan <strong>harus sesuai jumlah angka yang diinput ({pbbWpNumber} Foto)</strong>. Saat ini baru terunggah <strong>{pbbPhotosCount} foto</strong> (masih kurang <strong>{pbbDeficit} foto</strong>).
+                          </>
+                        ) : (
+                          <>
+                            Dokumentasi foto PBB telah sesuai dengan jumlah <strong>{pbbWpNumber} WP</strong> yang diinput (<strong>{pbbPhotosCount} foto</strong> terlampir).
+                          </>
+                        )}
+                      </p>
+                      {pbbDeficit > 0 && (
+                        <div className="pt-1 flex items-center gap-2 flex-wrap">
+                          <label
+                            htmlFor="file-input-pbb"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[10px] font-bold cursor-pointer transition-colors active:scale-95"
+                          >
+                            <Camera className="w-3 h-3" />
+                            <span>+ Ambil / Unggah {pbbDeficit} Foto PBB Lagi</span>
+                          </label>
+                          {uncategorizedPhotos.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => tagUncategorizedPhotos('pbb', pbbDeficit)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-300 rounded-md text-[10px] font-bold cursor-pointer transition-colors"
+                              title="Gunakan foto umum yang sudah diunggah sebagai foto PBB"
+                            >
+                              <span>🔄 Tandai {Math.min(uncategorizedPhotos.length, pbbDeficit)} Foto Umum sbg PBB</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Pilar 2: PERLINSOS */}
@@ -849,6 +1004,75 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                   </label>
                 </div>
               </div>
+
+              {/* Peringatan & Notifikasi Kesesuaian Foto Perlinsos */}
+              {perlinsosKkNumber > 0 && (
+                <div
+                  className={`mt-2.5 p-2.5 rounded-lg border text-xs transition-all ${
+                    perlinsosDeficit > 0
+                      ? 'bg-amber-50/95 border-amber-300 text-amber-950 shadow-2xs'
+                      : 'bg-emerald-50/95 border-emerald-300 text-emerald-950 shadow-2xs'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {perlinsosDeficit > 0 ? (
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <span className="font-bold">
+                          {perlinsosDeficit > 0
+                            ? '⚠️ Peringatan: Foto Perlinsos Belum Sesuai Jumlah KK'
+                            : '✅ Jumlah Foto Perlinsos Sudah Sesuai'}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                            perlinsosDeficit > 0
+                              ? 'bg-amber-200 text-amber-900'
+                              : 'bg-emerald-200 text-emerald-900'
+                          }`}
+                        >
+                          {perlinsosPhotosCount} / {perlinsosKkNumber} Foto ({perlinsosDeficit > 0 ? `Kurang ${perlinsosDeficit} Foto` : 'Lengkap'})
+                        </span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed">
+                        {perlinsosDeficit > 0 ? (
+                          <>
+                            Anda menginput <strong>{perlinsosKkNumber} KK</strong>. Jumlah foto dokumentasi yang dilampirkan <strong>harus sesuai jumlah angka yang diinput ({perlinsosKkNumber} Foto)</strong>. Saat ini baru terunggah <strong>{perlinsosPhotosCount} foto</strong> (masih kurang <strong>{perlinsosDeficit} foto</strong>).
+                          </>
+                        ) : (
+                          <>
+                            Dokumentasi foto Perlinsos telah sesuai dengan jumlah <strong>{perlinsosKkNumber} KK</strong> yang diinput (<strong>{perlinsosPhotosCount} foto</strong> terlampir).
+                          </>
+                        )}
+                      </p>
+                      {perlinsosDeficit > 0 && (
+                        <div className="pt-1 flex items-center gap-2 flex-wrap">
+                          <label
+                            htmlFor="file-input-perlinsos"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[10px] font-bold cursor-pointer transition-colors active:scale-95"
+                          >
+                            <Camera className="w-3 h-3" />
+                            <span>+ Ambil / Unggah {perlinsosDeficit} Foto Perlinsos Lagi</span>
+                          </label>
+                          {uncategorizedPhotos.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => tagUncategorizedPhotos('perlinsos', perlinsosDeficit)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-md text-[10px] font-bold cursor-pointer transition-colors"
+                              title="Gunakan foto umum yang sudah diunggah sebagai foto Perlinsos"
+                            >
+                              <span>🔄 Tandai {Math.min(uncategorizedPhotos.length, perlinsosDeficit)} Foto Umum sbg Perlinsos</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Pilar 3: IDENTITAS KEPENDUDUKAN DIGITAL */}
@@ -1226,16 +1450,50 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                       alt={foto.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
-                    {(foto.kategori === 'poskamling' || foto.name.includes('[POSKAMLING]')) && (
-                      <span className="absolute top-1 left-1 bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow-xs flex items-center gap-1">
-                        <Shield className="w-2.5 h-2.5" />
-                        POSKAMLING
-                      </span>
-                    )}
+
+                    {/* Category Selector Badge */}
+                    <div className="absolute top-1 left-1 z-10">
+                      <select
+                        value={
+                          foto.kategori ||
+                          (foto.name.includes('[PBB]')
+                            ? 'pbb'
+                            : foto.name.includes('[PERLINSOS]')
+                            ? 'perlinsos'
+                            : foto.name.includes('[POSKAMLING]')
+                            ? 'poskamling'
+                            : foto.name.includes('[IKD]')
+                            ? 'ikd'
+                            : foto.name.includes('[BPJS]')
+                            ? 'bpjs'
+                            : 'umum')
+                        }
+                        onChange={(e) => changePhotoCategory(foto.id, e.target.value)}
+                        className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-xs border cursor-pointer focus:outline-none ${
+                          foto.kategori === 'pbb' || foto.name.includes('[PBB]')
+                            ? 'bg-blue-700 text-white border-blue-400'
+                            : foto.kategori === 'perlinsos' || foto.name.includes('[PERLINSOS]')
+                            ? 'bg-emerald-700 text-white border-emerald-400'
+                            : foto.kategori === 'poskamling' || foto.name.includes('[POSKAMLING]')
+                            ? 'bg-amber-500 text-slate-950 border-amber-300'
+                            : 'bg-black/75 text-white border-white/20'
+                        }`}
+                        title="Klik untuk mengubah kategori foto ini"
+                      >
+                        <option value="pbb" className="text-slate-900 bg-white">PBB</option>
+                        <option value="perlinsos" className="text-slate-900 bg-white">Perlinsos</option>
+                        <option value="poskamling" className="text-slate-900 bg-white">Poskamling</option>
+                        <option value="ikd" className="text-slate-900 bg-white">IKD</option>
+                        <option value="bpjs" className="text-slate-900 bg-white">BPJS</option>
+                        <option value="lainnya" className="text-slate-900 bg-white">Keg. Lain</option>
+                        <option value="umum" className="text-slate-900 bg-white">Umum</option>
+                      </select>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => removePhoto(foto.id)}
-                      className="absolute top-1 right-1 p-1 bg-red-600/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-red-700 shadow-sm"
+                      className="absolute top-1 right-1 p-1 bg-red-600/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-red-700 shadow-sm z-10"
                       title="Hapus foto"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -1354,6 +1612,54 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                 </div>
               )}
 
+              {/* Status Kesesuaian Foto Sebelum Simpan */}
+              {hasPhotoDeficit ? (
+                <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-xl text-xs text-amber-950 space-y-2 animate-in fade-in duration-200">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block text-amber-900">
+                        Peringatan: Jumlah Foto Belum Sesuai Angka Inputan!
+                      </span>
+                      <span className="text-[11px] text-amber-800">
+                        Foto bukti harus sama dengan jumlah WP / KK yang diinput:
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 pt-1">
+                    {pbbDeficit > 0 && (
+                      <div className="flex items-center justify-between bg-white/90 px-2.5 py-1.5 rounded-lg border border-amber-200 text-[11px]">
+                        <div>
+                          <span className="font-bold text-slate-800">Opsir PBB: </span>
+                          <span className="text-slate-600">{pbbWpNumber} WP</span>
+                        </div>
+                        <span className="font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          Baru {pbbPhotosCount} Foto (Kurang {pbbDeficit})
+                        </span>
+                      </div>
+                    )}
+                    {perlinsosDeficit > 0 && (
+                      <div className="flex items-center justify-between bg-white/90 px-2.5 py-1.5 rounded-lg border border-amber-200 text-[11px]">
+                        <div>
+                          <span className="font-bold text-slate-800">Perlinsos: </span>
+                          <span className="text-slate-600">{perlinsosKkNumber} KK</span>
+                        </div>
+                        <span className="font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          Baru {perlinsosPhotosCount} Foto (Kurang {perlinsosDeficit})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (pbbWpNumber > 0 || perlinsosKkNumber > 0) ? (
+                <div className="p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-950 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-[11px] font-medium text-emerald-900">
+                    Jumlah foto bukti dokumentasi telah <strong>sesuai</strong> dengan angka WP ({pbbPhotosCount}/{pbbWpNumber}) dan KK ({perlinsosPhotosCount}/{perlinsosKkNumber}).
+                  </span>
+                </div>
+              ) : null}
+
               {/* Primary Action Button */}
               <button
                 id="btn-simpan-laporan-database"
@@ -1381,6 +1687,134 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Modal Peringatan Foto Harus Sesuai Jumlah Angka Inputan */}
+      {showPhotoValidationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Peringatan: Jumlah Foto Belum Sesuai Angka Yang Diinput!
+                </h3>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  Jika mengisi jumlah KK atau WP (misalnya 1, 2, atau lebih), jumlah foto bukti kegiatan <strong>harus sesuai dengan jumlah angka yang diinput</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                Rincian Kekurangan Foto Bukti:
+              </span>
+
+              {pbbDeficit > 0 && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-bold text-amber-950">1. OPSIR PBB (Pajak Bumi & Bangunan)</div>
+                      <div className="text-[11px] text-amber-800 mt-0.5">
+                        Input: <strong>{pbbWpNumber} WP</strong> ➔ Foto terlampir: <strong>{pbbPhotosCount} Foto</strong>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 bg-rose-600 text-white font-extrabold text-[10px] rounded-lg shadow-2xs">
+                      Kurang {pbbDeficit} Foto
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 flex-wrap">
+                    <label
+                      htmlFor="file-input-pbb"
+                      onClick={() => setShowPhotoValidationModal(false)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>+ Upload {pbbDeficit} Foto PBB</span>
+                    </label>
+                    {uncategorizedPhotos.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          tagUncategorizedPhotos('pbb', pbbDeficit);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-300 rounded-lg text-[11px] font-bold cursor-pointer"
+                      >
+                        <span>🔄 Tandai Foto Umum sbg PBB</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {perlinsosDeficit > 0 && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-bold text-amber-950">2. PERLINSOS (Perlindungan Sosial / Bansos)</div>
+                      <div className="text-[11px] text-amber-800 mt-0.5">
+                        Input: <strong>{perlinsosKkNumber} KK</strong> ➔ Foto terlampir: <strong>{perlinsosPhotosCount} Foto</strong>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 bg-rose-600 text-white font-extrabold text-[10px] rounded-lg shadow-2xs">
+                      Kurang {perlinsosDeficit} Foto
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 flex-wrap">
+                    <label
+                      htmlFor="file-input-perlinsos"
+                      onClick={() => setShowPhotoValidationModal(false)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>+ Upload {perlinsosDeficit} Foto Perlinsos</span>
+                    </label>
+                    {uncategorizedPhotos.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          tagUncategorizedPhotos('perlinsos', perlinsosDeficit);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-lg text-[11px] font-bold cursor-pointer"
+                      >
+                        <span>🔄 Tandai Foto Umum sbg Perlinsos</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPhotoValidationModal(false);
+                  if (pbbDeficit > 0) {
+                    document.getElementById('input-opsir-pbb-wp')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  } else if (perlinsosDeficit > 0) {
+                    document.getElementById('input-perlinsos-kk')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }}
+                className="w-full sm:w-auto px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all text-center"
+              >
+                Lengkapi Foto Sekarang
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  doSaveReport();
+                }}
+                className="w-full sm:w-auto px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-all text-center border border-slate-200"
+              >
+                Tetap Simpan (Jika Foto Digabung)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 };

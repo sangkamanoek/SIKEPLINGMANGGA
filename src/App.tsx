@@ -53,6 +53,7 @@ import {
   subscribeReportsFromFirestore,
   getLocalDeletedReportIds,
   isReportBeforeSept7,
+  syncLocalReportsToServer,
 } from './lib/reportsApi';
 
 const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
@@ -239,6 +240,7 @@ export default function App() {
     syncPasswordsWithServer();
     syncProfilesWithServer();
     loadLocalReports();
+    syncLocalReportsToServer();
     refreshAllReports(false);
     loadAllAttendance().then((items) => setAttendanceList(items));
 
@@ -302,9 +304,10 @@ export default function App() {
       }
     });
 
-    // Auto-sync polling every 30 seconds via lightweight Server Buffer with safe merge
+    // Auto-sync polling every 15 seconds via lightweight Server Buffer with safe merge
     const pollInterval = setInterval(async () => {
       try {
+        syncLocalReportsToServer();
         const res = await fetch('/api/reports');
         if (res.ok) {
           const json = await res.json();
@@ -332,7 +335,7 @@ export default function App() {
           }
         }
       } catch {}
-    }, 30000);
+    }, 15000);
 
     const unsubscribe = initAuth(
       async (firebaseUser, accessToken) => {

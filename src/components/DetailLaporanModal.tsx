@@ -791,53 +791,49 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
                   {/* Foto Dokumentasi - Terkelompok Per Kegiatan & Adaptif Kedinasan */}
                   {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
-                    item.dokumentasiFoto.length <= 3 ? (
-                      <div className="mb-2">
-                        <div className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1.5 text-slate-900 flex items-center justify-between">
-                          <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
-                          <span className="text-[7pt] text-slate-500 font-normal normal-case">Format Album Resmi Kedinasan</span>
-                        </div>
-                        <div className="space-y-2">
-                          {groupPhotosByActivity(item.dokumentasiFoto).map((group) => (
-                            <div key={group.key}>
-                              <div className="text-[7.5pt] font-bold font-sans text-slate-800 uppercase mb-1 flex items-center justify-between border-b border-slate-200 pb-0.5">
-                                <span>• {group.title} ({group.photos.length} Foto)</span>
-                              </div>
-                              <div className="grid grid-cols-3 gap-2.5">
-                                {group.photos.map((foto, idx) => (
-                                  <div
-                                    key={foto.id || idx}
-                                    className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center shadow-xs"
-                                  >
-                                    <div className="w-full h-[185px] rounded-md overflow-hidden bg-slate-100 flex items-center justify-center p-0.5">
-                                      <img
-                                        src={foto.url}
-                                        alt={getProperFotoLabel(foto, idx)}
-                                        crossOrigin="anonymous"
-                                        className="w-full h-full object-contain object-center"
-                                      />
-                                    </div>
-                                    <div
-                                      className="text-[7.5pt] font-bold text-slate-800 mt-1 truncate w-full text-center font-sans"
-                                      title={getProperFotoLabel(foto, idx)}
-                                    >
-                                      {getProperFotoLabel(foto, idx)}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
+                    <div className="mb-2">
+                      <div className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1.5 text-slate-900 flex items-center justify-between">
+                        <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
+                        <span className="text-[7pt] text-slate-500 font-normal normal-case">Format Album Resmi Kedinasan</span>
+                      </div>
+                      <div className="space-y-2">
+                        {groupPhotosByActivity(item.dokumentasiFoto.slice(0, 6)).map((group) => (
+                          <div key={group.key}>
+                            <div className="text-[7.5pt] font-bold font-sans text-slate-800 uppercase mb-1 flex items-center justify-between border-b border-slate-200 pb-0.5">
+                              <span>• {group.title} ({group.photos.length} Foto)</span>
                             </div>
-                          ))}
-                        </div>
+                            <div className={`grid ${group.photos.length === 1 ? 'grid-cols-1 max-w-[280px]' : group.photos.length === 2 ? 'grid-cols-2' : 'grid-cols-3'} gap-2.5`}>
+                              {group.photos.map((foto, idx) => (
+                                <div
+                                  key={foto.id || idx}
+                                  className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center shadow-xs"
+                                >
+                                  <div className={`w-full ${group.photos.length === 1 ? 'h-[150px]' : 'h-[135px]'} rounded-md overflow-hidden bg-slate-100 flex items-center justify-center p-0.5`}>
+                                    <img
+                                      src={foto.url}
+                                      alt={getProperFotoLabel(foto, idx)}
+                                      crossOrigin="anonymous"
+                                      className="w-full h-full object-contain object-center"
+                                    />
+                                  </div>
+                                  <div
+                                    className="text-[7.5pt] font-bold text-slate-800 mt-1 truncate w-full text-center font-sans"
+                                    title={getProperFotoLabel(foto, idx)}
+                                  >
+                                    {getProperFotoLabel(foto, idx)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ) : (
-                      <div className="mb-2 p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-[8pt] text-slate-700 font-sans flex items-center justify-between">
-                        <div>
-                          <strong>B. DOKUMENTASI LAPANGAN TERLAMPIR:</strong> Sebanyak <strong>{item.dokumentasiFoto.length} Foto Dokumentasi</strong> dicantumkan secara lengkap dan terkelompok per kegiatan pada <strong>Lembar Lampiran (Halaman 2)</strong>.
+                      {item.dokumentasiFoto.length > 6 && (
+                        <div className="text-[7.5pt] text-slate-500 italic mt-1.5">
+                          * 6 Foto dokumentasi utama dicantumkan pada Halaman 1, sisa foto lainnya tercantum pada Lembar Lampiran (Halaman 2).
                         </div>
-                        <span className="text-[7pt] bg-slate-200 px-2 py-0.5 rounded font-semibold text-slate-700 shrink-0 ml-2">2 Halaman Dokumen</span>
-                      </div>
-                    )
+                      )}
+                    </div>
                   )}
 
                   {/* Pengesahan Tanda Tangan */}
@@ -847,7 +843,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         <div>Medan, {displayTanggal.toUpperCase()}</div>
                         <div className="mt-0.5">Yang Melaporkan,</div>
                         <div className="font-bold uppercase whitespace-nowrap">{(item.jabatan || '').toUpperCase()}</div>
-                        <div className="h-12" />
+                        <div className="h-10" />
                         <div className="font-bold underline uppercase whitespace-nowrap">( {item.namaKepling || ''} )</div>
                         <div className="text-[7.5pt] text-slate-700 mt-0.5">Kepala Lingkungan</div>
                       </div>
@@ -857,12 +853,12 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   {/* Footer lembar */}
                   <div className="mt-3 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic font-sans">
                     <span>SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA • Sistem Informasi Pelaporan Kinerja Harian Kepling</span>
-                    <span>Dokumen Resmi {item.dokumentasiFoto && item.dokumentasiFoto.length > 3 ? 'Halaman 1 dari 2' : '1 Lembar'} • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    <span>Dokumen Resmi {item.dokumentasiFoto && item.dokumentasiFoto.length > 6 ? 'Halaman 1 dari 2' : '1 Lembar'} • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                   </div>
                 </div>
 
-                {/* TAMPILAN HALAMAN 2 JIKA FOTO > 3 DI MODAL PREVIEW */}
-                {item.dokumentasiFoto && item.dokumentasiFoto.length > 3 && (
+                {/* TAMPILAN HALAMAN 2 JIKA FOTO > 6 DI MODAL PREVIEW */}
+                {item.dokumentasiFoto && item.dokumentasiFoto.length > 6 && (
                   <div className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300 mt-4">
                     {/* Header Lampiran */}
                     <div className="text-center pb-2 border-b-[2px] border-black mb-3">
@@ -879,7 +875,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
                     {/* Grid Foto Lampiran Terkelompok Per Kegiatan */}
                     <div className="space-y-4 mb-4">
-                      {groupPhotosByActivity(item.dokumentasiFoto).map((group) => (
+                      {groupPhotosByActivity(item.dokumentasiFoto.slice(6)).map((group) => (
                         <div key={group.key} className="space-y-1.5">
                           <div className="text-[8.5pt] font-bold font-sans text-slate-900 uppercase border-b border-slate-300 pb-1 flex items-center justify-between">
                             <span>• {group.title} ({group.photos.length} Foto)</span>
@@ -1612,7 +1608,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         style={{ paddingTop: '8px', paddingLeft: '4px', paddingRight: '4px' }}
       >
         {/* ================= HALAMAN 1 : LAPORAN UTAMA ================= */}
-        <div className="page-print-single" style={{ minHeight: '265mm', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div className="page-print-single" style={{ minHeight: 'auto', display: 'flex', flexDirection: 'column' }}>
           <div>
             {/* KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
             <div
@@ -1813,18 +1809,18 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               </table>
             </div>
 
-            {/* DOKUMENTASI FOTO KEGIATAN - JIKA FOTO <= 3 (TAMPIL BESAR DI HALAMAN 1) */}
-            {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && item.dokumentasiFoto.length <= 3 && (
-              <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '10px' }}>
+            {/* DOKUMENTASI FOTO KEGIATAN - SELALU DITAMPILKAN DI HALAMAN 1 */}
+            {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
+              <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '8px' }}>
                 <div
                   className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900"
-                  style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '6px', color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '5px', color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
                   <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
                   <span style={{ fontSize: '7pt', color: '#64748b', fontWeight: 'normal', textTransform: 'none' }}>Format Album Resmi Kedinasan</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {groupPhotosByActivity(item.dokumentasiFoto).map((group) => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {groupPhotosByActivity(item.dokumentasiFoto.slice(0, 6)).map((group) => (
                     <div key={group.key}>
                       <div style={{ fontSize: '7.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: '2px' }}>
                         • {group.title} ({group.photos.length} Foto)
@@ -1832,7 +1828,12 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: 'repeat(3, 1fr)',
+                          gridTemplateColumns:
+                            group.photos.length === 1
+                              ? 'minmax(0, 260px)'
+                              : group.photos.length === 2
+                              ? 'repeat(2, 1fr)'
+                              : 'repeat(3, 1fr)',
                           columnGap: '10px',
                           rowGap: '8px',
                         }}
@@ -1857,7 +1858,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                               className="w-full rounded overflow-hidden bg-slate-100 flex items-center justify-center"
                               style={{
                                 width: '100%',
-                                height: '185px',
+                                height: group.photos.length === 1 ? '145px' : '125px',
                                 borderRadius: '4px',
                                 overflow: 'hidden',
                                 backgroundColor: '#f1f5f9',
@@ -1904,30 +1905,11 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* JIKA FOTO > 3: KETERANGAN LAMPIRAN DI HALAMAN 1 */}
-            {item.dokumentasiFoto && item.dokumentasiFoto.length > 3 && (
-              <div
-                className="mb-3 avoid-break"
-                style={{
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  padding: '8px 12px',
-                  backgroundColor: '#f8fafc',
-                  fontSize: '8pt',
-                  fontFamily: 'sans-serif',
-                  marginBottom: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <div>
-                  <strong>B. DOKUMENTASI LAPANGAN TERLAMPIR:</strong> Sebanyak <strong>{item.dokumentasiFoto.length} Foto Dokumentasi</strong> dicantumkan lengkap pada <strong>Lembar Lampiran (Halaman 2)</strong>.
-                </div>
-                <span style={{ fontSize: '7pt', backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>2 Halaman Dokumen</span>
+                {item.dokumentasiFoto.length > 6 && (
+                  <div style={{ fontSize: '7.5pt', color: '#64748b', fontStyle: 'italic', marginTop: '4px' }}>
+                    * 6 Foto dokumentasi utama dicantumkan pada Halaman 1, sisa foto lainnya tercantum lengkap pada Lembar Lampiran (Halaman 2).
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1939,7 +1921,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               style={{
                 pageBreakInside: 'avoid',
                 breakInside: 'avoid',
-                marginTop: '12px',
+                marginTop: '16px',
                 paddingTop: '2px',
                 fontFamily: 'sans-serif',
                 fontSize: '8.5pt',
@@ -1964,7 +1946,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   <div className="font-bold uppercase whitespace-nowrap" style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>
                     {(item?.jabatan || '').toUpperCase()}
                   </div>
-                  <div style={{ height: '42px' }} />
+                  <div style={{ height: '38px' }} />
                   <div className="font-bold underline uppercase whitespace-nowrap" style={{ fontWeight: 'bold', textDecoration: 'underline', textTransform: 'uppercase' }}>
                     ( {item?.namaKepling || ''} )
                   </div>
@@ -1992,22 +1974,21 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               }}
             >
               <span>SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA • Sistem Informasi Pelaporan Kinerja Harian Kepling</span>
-              <span>Dokumen Resmi {item.dokumentasiFoto && item.dokumentasiFoto.length > 3 ? 'Halaman 1 dari 2' : '1 Lembar'} • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              <span>Dokumen Resmi {item.dokumentasiFoto && item.dokumentasiFoto.length > 6 ? 'Halaman 1 dari 2' : '1 Lembar'} • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
             </div>
           </div>
         </div>
 
-        {/* ================= HALAMAN 2 : LEMBAR LAMPIRAN FOTO (JIKA FOTO > 3) ================= */}
-        {item.dokumentasiFoto && item.dokumentasiFoto.length > 3 && (
+        {/* ================= HALAMAN 2 : LEMBAR LAMPIRAN FOTO (JIKA FOTO > 6) ================= */}
+        {item.dokumentasiFoto && item.dokumentasiFoto.length > 6 && (
           <div
             className="page-print-single"
             style={{
               pageBreakBefore: 'always',
               breakBefore: 'page',
-              minHeight: '265mm',
+              minHeight: 'auto',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
               paddingTop: '14px',
             }}
           >
@@ -2031,7 +2012,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     margin: 0,
                   }}
                 >
-                  LAMPIRAN DOKUMENTASI KEGIATAN LAPANGAN
+                  LAMPIRAN DOKUMENTASI KEGIATAN LAPANGAN (LANJUTAN)
                 </h2>
                 <div style={{ fontSize: '8.5pt', fontFamily: 'serif', color: '#1e293b', marginTop: '2px' }}>
                   KEPALA LINGKUNGAN KELURAHAN MANGGA KECAMATAN MEDAN TUNTUNGAN
@@ -2043,7 +2024,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
               {/* GRID FOTO LAMPIRAN TERKELOMPOK PER KEGIATAN */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '14px' }}>
-                {groupPhotosByActivity(item.dokumentasiFoto).map((group) => (
+                {groupPhotosByActivity(item.dokumentasiFoto.slice(6)).map((group) => (
                   <div key={group.key} style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                     <div style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '6px', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: '3px' }}>
                       • {group.title} ({group.photos.length} Foto)
@@ -2074,7 +2055,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                           <div
                             style={{
                               width: '100%',
-                              height: '185px',
+                              height: '160px',
                               borderRadius: '4px',
                               overflow: 'hidden',
                               backgroundColor: '#f1f5f9',
