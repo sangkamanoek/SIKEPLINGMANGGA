@@ -210,7 +210,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
               Database Riwayat Laporan Kinerja
             </h2>
             <p className="text-xs text-slate-500 font-medium">
-              Data tersimpan otomatis di Google Sheets dan dapat dicari secara spesifik.
+              Data tersinkronisasi otomatis dengan Cloud Firestore & database server secara realtime.
             </p>
           </div>
         </div>
@@ -665,7 +665,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 text-slate-600">
               <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
-              <span>Memuat data dari Google Sheets...</span>
+              <span>Menyinkronkan data dari Cloud Firestore...</span>
             </div>
           ) : (
             <div className="space-y-2">
