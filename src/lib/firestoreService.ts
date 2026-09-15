@@ -158,23 +158,9 @@ export async function deleteReportFromFirestore(id: string): Promise<boolean> {
       console.warn('Notice writing tombstone to deleted_reports:', delErr);
     }
 
-    // 3. Delete directly from reports collection
+    // 3. Delete directly from reports collection by primary ID
     const docRef = doc(db, REPORTS_COLLECTION, id);
     await deleteDoc(docRef);
-
-    // 4. Query and delete any matching docs by data.id or doc.id in reports collection
-    try {
-      const colRef = collection(db, REPORTS_COLLECTION);
-      const snap = await getDocs(colRef);
-      for (const docSnap of snap.docs) {
-        const data = docSnap.data();
-        if (docSnap.id === id || data.id === id) {
-          await deleteDoc(docSnap.ref);
-        }
-      }
-    } catch (queryErr) {
-      console.warn('Notice querying reports for delete:', queryErr);
-    }
 
     return true;
   } catch (error) {
