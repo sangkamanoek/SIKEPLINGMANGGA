@@ -36,6 +36,7 @@ import {
   resetTargetsCapaianToDefaults,
 } from '../lib/targetsApi';
 import { ModalEditTargetCapaian } from './ModalEditTargetCapaian';
+import { GrafikTrenBulanan } from './GrafikTrenBulanan';
 import { isReportMatchingKepling, getReportIsoDate } from '../lib/formatter';
 
 interface DashboardCapaianKeplingProps {
@@ -648,6 +649,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             );
           })()}
 
+          {/* Grafik Batang Tren Laporan Bulanan (Recharts) */}
+          <GrafikTrenBulanan
+            reports={reports}
+            activeAccount={activeAccount}
+            mode="kepling"
+            title={`Tren Jumlah Laporan Selesai per Bulan (${activeAccount.lingkungan})`}
+          />
+
           {/* Riwayat Capaian Harian Kepling Terbaru */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
@@ -819,6 +828,13 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               </p>
             </div>
           </div>
+
+          {/* Grafik Batang Tren Laporan Bulanan Seluruh Lingkungan (Recharts) */}
+          <GrafikTrenBulanan
+            reports={reports}
+            activeAccount={activeAccount}
+            mode="super_admin"
+          />
 
           {/* Leaderboard & Ranking Section */}
           <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-7 shadow-sm">

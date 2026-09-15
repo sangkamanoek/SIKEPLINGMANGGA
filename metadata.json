@@ -1,6 +1,6 @@
 {
-  "name": "Remix Laporan Kegiatan Harian Kepala Lingkungan",
-  "description": "Sistem Pelaporan Kinerja Kepala Lingkungan Kelurahan Mangga Kecamatan Medan Tuntungan dengan integrasi Google Sheets, pemantauan 24 Kepling, capaian target indikator, dan rekapitulasi laporan harian.",
+  "name": "SI-KEPLING MANGGA",
+  "description": "SI-KEPLING MANGGA - Sistem Informasi & Pelaporan Kegiatan Harian Kepala Lingkungan Kelurahan Mangga Kecamatan Medan Tuntungan dengan pemantauan 24 Kepling, capaian target indikator, rekapitulasi kinerja, dan dokumentasi foto lapangan.",
   "requestFramePermissions": [
     "camera",
     "geolocation"

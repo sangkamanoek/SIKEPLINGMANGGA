@@ -163,18 +163,20 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
   const capturePhoto = () => {
     if (videoRef.current) {
       const video = videoRef.current;
-      const w = video.videoWidth || 640;
-      const h = video.videoHeight || 480;
+      const w = video.videoWidth || 960;
+      const h = video.videoHeight || 720;
       const canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(video, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
         setFotoSelfie(dataUrl);
         stopCamera();
-        showToast?.('Foto selfie apel berhasil diambil!', 'success');
+        showToast?.('Foto selfie apel berhasil diambil dengan jelas!', 'success');
       }
     }
   };
@@ -191,7 +193,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const maxDim = 600;
+        const maxDim = 1024;
         if (width > maxDim || height > maxDim) {
           if (width > height) {
             height = Math.round((height * maxDim) / width);
@@ -205,8 +207,10 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/jpeg', 0.6);
+          const compressed = canvas.toDataURL('image/jpeg', 0.8);
           setFotoSelfie(compressed);
           showToast?.('Foto bukti presensi berhasil diambil.', 'success');
         }

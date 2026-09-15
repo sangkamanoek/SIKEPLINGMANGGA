@@ -178,7 +178,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
         img.onload = () => {
           let width = img.width;
           let height = img.height;
-          const maxDim = 640;
+          // Dimensi 1280px memberikan ketajaman tinggi agar tulisan pada SPPT PBB, plang poskamling, KTP/IKD terbaca jelas
+          const maxDim = 1280;
           if (width > maxDim || height > maxDim) {
             if (width > height) {
               height = Math.round((height * maxDim) / width);
@@ -193,8 +194,11 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.55));
+            // Kualitas 0.78 menghasilkan foto jernih dan tajam dengan ukuran file efisien
+            resolve(canvas.toDataURL('image/jpeg', 0.78));
           } else {
             resolve((event.target?.result as string) || '');
           }

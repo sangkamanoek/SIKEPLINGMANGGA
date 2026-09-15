@@ -15,6 +15,13 @@ import {
   Download,
   Eye,
   FileText,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  RefreshCw,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata } from '../types';
 import { formatTanggalIndonesia } from '../lib/formatter';
@@ -47,10 +54,66 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; name: string } | null>(null);
+  const [previewPhotoIndex, setPreviewPhotoIndex] = useState<number | null>(null);
+  const [photoZoom, setPhotoZoom] = useState<number>(1);
+  const [photoRotation, setPhotoRotation] = useState<number>(0);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [pdfStatusMsg, setPdfStatusMsg] = useState('');
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+
+  // All photos array for easy lightbox flipping
+  const allDokumentasi = item?.dokumentasiFoto || [];
+
+  const handleOpenPhotoPreview = (fotoUrl: string, fallbackName: string) => {
+    const foundIdx = allDokumentasi.findIndex((p) => p.url === fotoUrl);
+    setPreviewPhotoIndex(foundIdx !== -1 ? foundIdx : 0);
+    setPreviewPhoto({ url: fotoUrl, name: fallbackName });
+    setPhotoZoom(1);
+    setPhotoRotation(0);
+  };
+
+  const handleNextPhoto = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (allDokumentasi.length <= 1 || previewPhotoIndex === null) return;
+    const nextIdx = (previewPhotoIndex + 1) % allDokumentasi.length;
+    const nextFoto = allDokumentasi[nextIdx];
+    setPreviewPhotoIndex(nextIdx);
+    setPreviewPhoto({ url: nextFoto.url, name: nextFoto.name || `Foto ${nextIdx + 1}` });
+    setPhotoZoom(1);
+    setPhotoRotation(0);
+  };
+
+  const handlePrevPhoto = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (allDokumentasi.length <= 1 || previewPhotoIndex === null) return;
+    const prevIdx = (previewPhotoIndex - 1 + allDokumentasi.length) % allDokumentasi.length;
+    const prevFoto = allDokumentasi[prevIdx];
+    setPreviewPhotoIndex(prevIdx);
+    setPreviewPhoto({ url: prevFoto.url, name: prevFoto.name || `Foto ${prevIdx + 1}` });
+    setPhotoZoom(1);
+    setPhotoRotation(0);
+  };
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (!previewPhoto) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPreviewPhoto(null);
+      } else if (e.key === 'ArrowRight') {
+        handleNextPhoto();
+      } else if (e.key === 'ArrowLeft') {
+        handlePrevPhoto();
+      } else if (e.key === '+' || e.key === '=') {
+        setPhotoZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)));
+      } else if (e.key === '-') {
+        setPhotoZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewPhoto, previewPhotoIndex, allDokumentasi.length]);
 
   // Helper download photo
   const handleDownloadPhoto = (url: string, filename: string, e?: React.MouseEvent) => {
@@ -1399,44 +1462,52 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
                       {group.photos.map((foto, idx) => (
                         <div
                           key={foto.id || idx}
-                          className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs group relative cursor-pointer flex items-center justify-center p-1"
-                          onClick={() => setPreviewPhoto({ url: foto.url, name: foto.name || `Foto ${idx + 1}` })}
+                          className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs group relative cursor-pointer flex items-center justify-center"
+                          onClick={() => handleOpenPhotoPreview(foto.url, foto.name || `Foto ${idx + 1}`)}
                         >
                           <img
                             src={foto.url}
                             alt={foto.name}
-                            className="w-full h-full object-contain object-center group-hover:scale-105 transition-transform"
+                            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-200"
+                            loading="lazy"
                           />
 
+                          {/* Category Badge on Top-Left */}
+                          {foto.kategori && (
+                            <span className="absolute top-1.5 left-1.5 z-10 bg-slate-900/80 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-md shadow-xs uppercase tracking-wider">
+                              {foto.kategori}
+                            </span>
+                          )}
+
                           {/* Hover Overlay with Action Buttons */}
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2 z-10">
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2 z-20">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setPreviewPhoto({ url: foto.url, name: foto.name || `Foto ${idx + 1}` });
+                                handleOpenPhotoPreview(foto.url, foto.name || `Foto ${idx + 1}`);
                               }}
-                              className="p-1.5 bg-white/90 hover:bg-white text-slate-900 rounded-lg shadow-sm hover:scale-110 transition-transform cursor-pointer"
-                              title="Lihat foto penuh"
+                              className="p-2 bg-white text-slate-900 rounded-lg shadow hover:bg-emerald-50 hover:text-emerald-800 hover:scale-110 transition-transform cursor-pointer"
+                              title="Perbesar & Lihat Foto Penuh"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
                             <button
                               type="button"
                               onClick={(e) => handleDownloadPhoto(foto.url, foto.name || `Foto_${idx + 1}.jpg`, e)}
-                              className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-sm hover:scale-110 transition-transform cursor-pointer"
-                              title="Download file foto ini"
+                              className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow hover:scale-110 transition-transform cursor-pointer"
+                              title="Download Foto Asli"
                             >
                               <Download className="w-4 h-4" />
                             </button>
                           </div>
 
-                          <span className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[9px] px-1.5 py-0.5 truncate text-center pointer-events-none">
-                            {foto.name}
+                          <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/60 to-transparent text-white text-[10px] font-medium px-2 py-1.5 truncate text-center pointer-events-none">
+                            {foto.name || `Foto ${idx + 1}`}
                           </span>
                         </div>
                       ))}
@@ -2152,42 +2223,146 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         )}
       </div>
 
-      {/* Lightbox / Pratinjau & Download Foto Modal */}
+      {/* Lightbox / Pratinjau & Download Foto Modal HD */}
       {previewPhoto && (
         <div
-          className="fixed inset-0 z-60 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 print:hidden"
+          className="fixed inset-0 z-60 bg-black/90 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 print:hidden select-none animate-in fade-in duration-150"
           onClick={() => setPreviewPhoto(null)}
         >
           <div
-            className="relative max-w-3xl w-full bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-700 flex flex-col"
+            className="relative max-w-5xl w-full h-[90vh] bg-slate-950 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-white">
-              <span className="font-bold text-xs truncate max-w-[70%]">{previewPhoto.name}</span>
-              <div className="flex items-center gap-2">
+            {/* Header Toolbar */}
+            <div className="p-3 sm:px-5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-white shrink-0 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {allDokumentasi.length > 1 && (
+                  <span className="px-2 py-0.5 bg-emerald-700 text-white text-[11px] font-bold rounded-md shrink-0">
+                    {previewPhotoIndex !== null ? previewPhotoIndex + 1 : 1} / {allDokumentasi.length}
+                  </span>
+                )}
+                <span className="font-bold text-xs sm:text-sm truncate text-slate-100">
+                  {previewPhoto.name}
+                </span>
+              </div>
+
+              {/* Controls Toolbar */}
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                <div className="hidden sm:flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setPhotoZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
+                    className="p-1.5 hover:bg-slate-700 text-slate-300 hover:text-white rounded transition-colors"
+                    title="Zoom Out (-)"
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </button>
+                  <span className="text-[11px] font-mono px-1.5 text-emerald-400 font-bold min-w-[42px] text-center">
+                    {Math.round(photoZoom * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
+                    className="p-1.5 hover:bg-slate-700 text-slate-300 hover:text-white rounded transition-colors"
+                    title="Zoom In (+)"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoRotation((r) => (r + 90) % 360)}
+                    className="p-1.5 hover:bg-slate-700 text-slate-300 hover:text-white rounded transition-colors"
+                    title="Putar 90°"
+                  >
+                    <RotateCw className="w-4 h-4" />
+                  </button>
+                  {(photoZoom !== 1 || photoRotation !== 0) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPhotoZoom(1);
+                        setPhotoRotation(0);
+                      }}
+                      className="px-2 py-1 text-[10px] bg-slate-700 hover:bg-slate-600 text-white rounded font-semibold transition-colors"
+                      title="Reset Tampilan"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+
                 <button
                   type="button"
                   onClick={() => handleDownloadPhoto(previewPhoto.url, previewPhoto.name)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-sm"
+                  title="Unduh file gambar ini ke perangkat"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Download Gambar</span>
+                  <span className="hidden sm:inline">Download</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setPreviewPhoto(null)}
-                  className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Tutup (Esc)"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
-            <div className="p-3 max-h-[75vh] flex items-center justify-center bg-black/90 overflow-auto">
-              <img
-                src={previewPhoto.url}
-                alt={previewPhoto.name}
-                className="max-h-[70vh] max-w-full object-contain rounded-lg shadow-lg"
-              />
+
+            {/* Viewport & Image Canvas */}
+            <div className="relative flex-1 flex items-center justify-center bg-black overflow-hidden p-4">
+              {/* Prev Button */}
+              {allDokumentasi.length > 1 && (
+                <button
+                  type="button"
+                  onClick={handlePrevPhoto}
+                  className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-full bg-black/60 hover:bg-emerald-600 text-white border border-white/20 transition-all cursor-pointer shadow-lg hover:scale-110"
+                  title="Foto Sebelumnya (Panah Kiri)"
+                >
+                  <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              )}
+
+              {/* High-Clarity Image Container */}
+              <div className="w-full h-full flex items-center justify-center overflow-auto p-2">
+                <img
+                  src={previewPhoto.url}
+                  alt={previewPhoto.name}
+                  style={{
+                    transform: `scale(${photoZoom}) rotate(${photoRotation}deg)`,
+                    transition: 'transform 0.15s ease-out',
+                  }}
+                  className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
+                />
+              </div>
+
+              {/* Next Button */}
+              {allDokumentasi.length > 1 && (
+                <button
+                  type="button"
+                  onClick={handleNextPhoto}
+                  className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-full bg-black/60 hover:bg-emerald-600 text-white border border-white/20 transition-all cursor-pointer shadow-lg hover:scale-110"
+                  title="Foto Berikutnya (Panah Kanan)"
+                >
+                  <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              )}
+            </div>
+
+            {/* Bottom Indicator & Keyboard Hint */}
+            <div className="p-2.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400 shrink-0">
+              <span className="hidden sm:inline">
+                Gunakan <kbd className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded border border-slate-700">←</kbd> <kbd className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded border border-slate-700">→</kbd> untuk berganti foto • <kbd className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded border border-slate-700">+</kbd> <kbd className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded border border-slate-700">-</kbd> zoom • <kbd className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded border border-slate-700">Esc</kbd> tutup
+              </span>
+              <span className="sm:hidden text-center w-full">
+                Ketuk panah untuk berganti foto
+              </span>
+              <span className="text-emerald-400 font-semibold hidden sm:inline">
+                Sistem Informasi Dokumentasi Resmi Kepling Mangga
+              </span>
             </div>
           </div>
         </div>
