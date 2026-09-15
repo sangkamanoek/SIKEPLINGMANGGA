@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, ChevronDown, UserCheck, KeyRound, Smartphone, Download, LogOut, Database, UserCircle, Presentation, UserCheck as UserCheckIcon, FileText } from 'lucide-react';
+import { ShieldCheck, ChevronDown, UserCheck, KeyRound, Smartphone, LogOut, UserCircle, Presentation } from 'lucide-react';
 import { GoogleUser, SheetMetadata, UserAccount } from '../types';
 
 interface HeaderBannerProps {

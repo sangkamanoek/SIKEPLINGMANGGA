@@ -5,7 +5,6 @@ import {
   AlertCircle,
   Calendar,
   Search,
-  Filter,
   Users,
   FileText,
   Building,
@@ -13,8 +12,6 @@ import {
   ExternalLink,
   ChevronRight,
   PlusCircle,
-  Printer,
-  Sparkles,
   KeyRound,
   RefreshCw,
   Trash2,
@@ -24,12 +21,14 @@ import {
   FileSpreadsheet,
   Copy,
   Check,
+  Sparkles,
+  Layers,
+  Clock,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import {
   formatTanggalIndonesia,
-  getNamaHariIndonesia,
   getTodayLocalIso,
   isReportMatchingKepling,
   isReportMatchingDate,
@@ -45,6 +44,7 @@ interface MonitoringSuperAdminProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
   onResetReports?: () => Promise<void>;
+  onSeedInitialReports?: () => Promise<void>;
   onOpenCapaianDashboard?: () => void;
   sheetMeta?: SheetMetadata | null;
 }
@@ -58,30 +58,65 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
   onRefresh,
   isRefreshing,
   onResetReports,
+  onSeedInitialReports,
   onOpenCapaianDashboard,
   sheetMeta,
 }) => {
   const todayIso = getTodayLocalIso();
 
-  // Find the latest date among all available reports
-  const latestAvailableDate = useMemo(() => {
-    if (!reports || reports.length === 0) return '';
-    for (const r of reports) {
+  // Extract all distinct dates available in reports, with report counts
+  const availableDates = useMemo(() => {
+    if (!reports || reports.length === 0) return [];
+    const map = new Map<string, { count: number; dateStr: string; hari: string }>();
+    reports.forEach((r) => {
       const iso = getReportIsoDate(r);
-      if (iso) return iso;
-    }
-    return '';
+      if (iso) {
+        const existing = map.get(iso);
+        if (existing) {
+          existing.count++;
+        } else {
+          map.set(iso, {
+            count: 1,
+            dateStr: r.tanggal || iso,
+            hari: r.hari || '',
+          });
+        }
+      }
+    });
+    return Array.from(map.entries())
+      .map(([iso, data]) => ({
+        iso,
+        count: data.count,
+        dateStr: data.dateStr,
+        hari: data.hari,
+        label: `${data.hari ? data.hari + ', ' : ''}${data.dateStr} (${data.count} Laporan)`,
+      }))
+      .sort((a, b) => b.iso.localeCompare(a.iso));
   }, [reports]);
 
-  // Initial date selection logic: default to today if reports exist today, otherwise default to latestAvailableDate or ''
+  // Latest date that actually contains reports
+  const latestAvailableDate = useMemo(() => {
+    return availableDates[0]?.iso || '';
+  }, [availableDates]);
+
+  // Check if today has any submitted reports
+  const hasReportsToday = useMemo(() => {
+    if (!reports || reports.length === 0) return false;
+    return reports.some((r) => isReportMatchingDate(r, todayIso));
+  }, [reports, todayIso]);
+
+  // View Mode: 'DAILY' (per date), 'LATEST_PER_KEPLING' (status terkini tiap kepling), or 'ALL' (semua tanggal)
+  const [viewMode, setViewMode] = useState<'DAILY' | 'LATEST_PER_KEPLING' | 'ALL'>('DAILY');
+
+  // Initial date selection logic: default to today if reports exist today, otherwise auto-switch to latest date
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     if (!reports || reports.length === 0) return todayIso;
     const hasToday = reports.some((r) => isReportMatchingDate(r, todayIso));
     if (hasToday) return todayIso;
-    return latestAvailableDate || '';
+    return latestAvailableDate || todayIso;
   });
 
-  // Auto-switch selectedDate once reports load if currently selectedDate has 0 reports but database has reports
+  // Auto-switch selectedDate once reports arrive if today is currently empty but database has past reports
   const hasAutoSwitchedRef = React.useRef(false);
   React.useEffect(() => {
     if (!hasAutoSwitchedRef.current && reports && reports.length > 0) {
@@ -97,37 +132,54 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'PENDING'>('ALL');
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
   const [copiedWa, setCopiedWa] = useState(false);
 
-  // Compute formatted date string for matching
-  const selectedDateFormatted = useMemo(() => {
-    if (!selectedDate) return '';
-    const dateObj = new Date(selectedDate + 'T00:00:00');
-    return formatTanggalIndonesia(dateObj).toLowerCase();
-  }, [selectedDate]);
+  // Map of every Kepling to their most recent report across the ENTIRE database
+  const keplingLatestReportMap = useMemo(() => {
+    const map = new Map<string, LaporanHarianItem>();
+    KEPLING_ACCOUNTS.forEach((k) => {
+      // Find all reports matching this kepling
+      const matching = reports.filter((r) => isReportMatchingKepling(r, k));
+      if (matching.length > 0) {
+        // Sort descending by date/createdAt
+        matching.sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+        map.set(k.id, matching[0]);
+      }
+    });
+    return map;
+  }, [reports]);
 
-  // Reports matching the selected date
+  // Reports matching the selected date (for DAILY mode)
   const reportsOnDate = useMemo(() => {
     return reports.filter((r) => {
-      if (!selectedDate) return true; // Empty string = show ALL dates
+      if (!selectedDate) return true;
       return isReportMatchingDate(r, selectedDate);
     });
   }, [reports, selectedDate]);
 
-  // Map of kepling ID to their report on the selected date
-  const keplingReportMap = useMemo(() => {
+  // Active Kepling Report Map based on current viewMode
+  const activeKeplingReportMap = useMemo(() => {
+    if (viewMode === 'LATEST_PER_KEPLING') {
+      return keplingLatestReportMap;
+    }
+
+    // Otherwise DAILY or ALL
     const map = new Map<string, LaporanHarianItem>();
     KEPLING_ACCOUNTS.forEach((k) => {
-      // Find matching report strictly by isReportMatchingKepling
       const match = reportsOnDate.find((r) => isReportMatchingKepling(r, k));
       if (match) {
         map.set(k.id, match);
       }
     });
     return map;
-  }, [reportsOnDate]);
+  }, [viewMode, keplingLatestReportMap, reportsOnDate]);
 
-  // Aggregate metrics on selected date
+  // Aggregate metrics
   const stats = useMemo(() => {
     let totalPbb = 0;
     let totalPerlinsos = 0;
@@ -136,7 +188,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
     let submittedCount = 0;
 
     KEPLING_ACCOUNTS.forEach((k) => {
-      const rep = keplingReportMap.get(k.id);
+      const rep = activeKeplingReportMap.get(k.id);
       if (rep) {
         submittedCount++;
         totalPbb += Number(rep.kinerja?.opsirPbbWp) || 0;
@@ -159,12 +211,12 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
       totalIkd,
       totalBpjs,
     };
-  }, [keplingReportMap]);
+  }, [activeKeplingReportMap]);
 
   // Filtered kepling list
   const filteredList = useMemo(() => {
     return KEPLING_ACCOUNTS.filter((k) => {
-      const isSubmitted = keplingReportMap.has(k.id);
+      const isSubmitted = activeKeplingReportMap.has(k.id);
 
       if (statusFilter === 'SUBMITTED' && !isSubmitted) return false;
       if (statusFilter === 'PENDING' && isSubmitted) return false;
@@ -178,23 +230,32 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
 
       return true;
     });
-  }, [keplingReportMap, statusFilter, searchTerm]);
+  }, [activeKeplingReportMap, statusFilter, searchTerm]);
 
   const handleCopyRekapWA = () => {
-    const tglLabel = selectedDate ? formatTanggalIndonesia(new Date(selectedDate + 'T00:00:00')) : 'Semua Tanggal';
+    let tglLabel = 'Semua Tanggal';
+    if (viewMode === 'LATEST_PER_KEPLING') {
+      tglLabel = 'Status Terkini (Laporan Terakhir Masing-Masing Lingkungan)';
+    } else if (selectedDate) {
+      tglLabel = formatTanggalIndonesia(new Date(selectedDate + 'T00:00:00'));
+    }
+
     let text = `*REKAPITULASI PENGIRIMAN LAPORAN HARIAN KEPLING*\n`;
     text += `*KELURAHAN MANGGA - KECAMATAN MEDAN TUNTUNGAN*\n`;
-    text += `📅 Tanggal Pantauan: ${tglLabel}\n`;
+    text += `📅 Periode/Tanggal: ${tglLabel}\n`;
     text += `📊 Progress: ${stats.submittedCount}/${stats.totalKepling} Lingkungan (${stats.completionPct}%)\n\n`;
     text += `*STATUS PELAPORAN 24 LINGKUNGAN:*\n`;
 
     KEPLING_ACCOUNTS.forEach((k) => {
-      const rep = keplingReportMap.get(k.id);
+      const rep = activeKeplingReportMap.get(k.id);
       if (rep) {
-        text += `✅ ${k.lingkungan} (${k.nama}) - SUDAH LAPOR\n`;
+        const tglText = rep.tanggal ? ` [${rep.tanggal}]` : '';
+        text += `✅ ${k.lingkungan} (${k.nama})${tglText} - SUDAH LAPOR\n`;
         text += `   - PBB: ${rep.kinerja?.opsirPbbWp || 0} WP | Perlinsos: ${rep.kinerja?.perlinsosKk || 0} KK | IKD: ${rep.kinerja?.ikdOrang || 0} Jiwa | BPJS: ${rep.kinerja?.bpjsKetenagakerjaanOrang || 0} Jiwa\n`;
       } else {
-        text += `❌ ${k.lingkungan} (${k.nama}) - BELUM LAPOR\n`;
+        const latestRep = keplingLatestReportMap.get(k.id);
+        const prevNote = latestRep?.tanggal ? ` (Laporan Terakhir: ${latestRep.tanggal})` : ' (Belum Pernah Lapor)';
+        text += `❌ ${k.lingkungan} (${k.nama}) - BELUM LAPOR${prevNote}\n`;
       }
     });
 
@@ -210,12 +271,22 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
     });
   };
 
+  const handleTriggerSeed = async () => {
+    if (!onSeedInitialReports) return;
+    setIsSeeding(true);
+    try {
+      await onSeedInitialReports();
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Super Admin Welcome Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-2xl p-5 sm:p-6 text-white shadow-xl border border-emerald-800/40 relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center font-bold shadow-inner shrink-0">
@@ -234,13 +305,13 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                 Monitoring Laporan Harian 24 Kepala Lingkungan
               </h2>
               <p className="text-xs text-slate-300 font-normal mt-0.5">
-                Kelurahan Mangga • Kecamatan Medan Tuntungan • Kota Medan
+                Kelurahan Mangga • Kecamatan Medan Tuntungan • Total Database: <strong>{reports.length} Laporan</strong>
               </p>
             </div>
           </div>
 
-          {/* Quick Date Selector & Credential Book Button */}
-          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+          {/* Action Buttons Toolbar */}
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {onOpenCapaianDashboard && (
               <button
                 type="button"
@@ -249,7 +320,20 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                 title="Buka Dashboard Capaian Kinerja 24 Kepling"
               >
                 <Trophy className="w-4 h-4" />
-                <span>Dashboard Capaian Kepling</span>
+                <span>Dashboard Capaian</span>
+              </button>
+            )}
+
+            {onSeedInitialReports && (
+              <button
+                type="button"
+                onClick={handleTriggerSeed}
+                disabled={isSeeding || isRefreshing}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/40 text-xs font-black transition-colors cursor-pointer shadow-md disabled:opacity-50"
+                title="Muat / Pulihkan data laporan resmi 24 Kepling ke database"
+              >
+                <Sparkles className={`w-3.5 h-3.5 text-amber-300 ${isSeeding ? 'animate-spin' : ''}`} />
+                <span>{isSeeding ? 'Memuat...' : 'Muat Laporan 24 Kepling'}</span>
               </button>
             )}
 
@@ -259,12 +343,12 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-colors cursor-pointer shadow-md ${
                 copiedWa
                   ? 'bg-emerald-500 text-white'
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  : 'bg-emerald-700/80 hover:bg-emerald-600 text-white border border-emerald-500/30'
               }`}
               title="Salin ringkasan rekapitulasi status pengiriman 24 Kepling ke clipboard (siap kirim WhatsApp)"
             >
               {copiedWa ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              <span>{copiedWa ? 'Tersalin ke Clipboard!' : 'Salin Rekap WA'}</span>
+              <span>{copiedWa ? 'Tersalin!' : 'Salin Rekap WA'}</span>
             </button>
 
             {onRefresh && (
@@ -276,19 +360,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                 title="Muat ulang laporan terbaru dari server"
               >
                 <RefreshCw className={`w-3.5 h-3.5 text-emerald-300 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>{isRefreshing ? 'Memperbarui...' : 'Segarkan Data'}</span>
-              </button>
-            )}
-
-            {onResetReports && (
-              <button
-                type="button"
-                onClick={() => setIsResetModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 text-xs font-bold transition-colors cursor-pointer shadow-xs"
-                title="Reset seluruh riwayat data laporan harian"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-300" />
-                <span>Reset Data</span>
+                <span>{isRefreshing ? 'Memperbarui...' : 'Segarkan'}</span>
               </button>
             )}
 
@@ -301,7 +373,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                 title="Buka Google Sheets Database (Sheet: Laporan Harian & Username)"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
-                <span>Buka Google Sheets</span>
+                <span>Google Sheets</span>
                 <ExternalLink className="w-3 h-3 text-emerald-300" />
               </a>
             )}
@@ -313,86 +385,182 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/30 text-xs font-bold transition-colors cursor-pointer shadow-xs"
               >
                 <KeyRound className="w-4 h-4 text-amber-300" />
-                <span>Buku Sandi 24 Kepling</span>
+                <span>Buku Sandi</span>
               </button>
             )}
 
-            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-xs px-3 py-2 rounded-xl border border-white/15">
+            {onResetReports && (
+              <button
+                type="button"
+                onClick={() => setIsResetModalOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                title="Reset seluruh riwayat data laporan harian"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-300" />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* View Mode & Date Selector Bar */}
+        <div className="mt-5 pt-4 border-t border-emerald-800/60 flex flex-wrap items-center justify-between gap-3 text-xs">
+          {/* View Modes */}
+          <div className="flex items-center gap-1.5 bg-black/30 p-1 rounded-xl border border-white/10">
+            <button
+              type="button"
+              onClick={() => setViewMode('DAILY')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                viewMode === 'DAILY'
+                  ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                  : 'text-emerald-200 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Pantauan Tanggal</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('LATEST_PER_KEPLING')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                viewMode === 'LATEST_PER_KEPLING'
+                  ? 'bg-amber-400 text-slate-950 shadow-sm'
+                  : 'text-amber-200 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Status Terkini 24 Lingkungan</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('ALL');
+                setSelectedDate('');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                viewMode === 'ALL'
+                  ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                  : 'text-emerald-200 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Semua Tanggal</span>
+            </button>
+          </div>
+
+          {/* Date Picker & Quick Date Links (for DAILY mode) */}
+          {viewMode === 'DAILY' && (
+            <div className="flex flex-wrap items-center gap-2 bg-white/10 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/15">
               <Calendar className="w-4 h-4 text-emerald-300 shrink-0" />
-              <div className="flex flex-col">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wider">
-                    Tanggal Pantauan
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDate(todayIso)}
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                        selectedDate === todayIso
-                          ? 'bg-amber-400 text-slate-950'
-                          : 'bg-white/10 text-emerald-200 hover:bg-white/20'
-                      }`}
-                      title="Lihat Laporan Hari Ini"
-                    >
-                      Hari Ini
-                    </button>
-                    {latestAvailableDate && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedDate(latestAvailableDate)}
-                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                          selectedDate === latestAvailableDate
-                            ? 'bg-amber-400 text-slate-950'
-                            : 'bg-white/10 text-emerald-200 hover:bg-white/20'
-                        }`}
-                        title={`Lihat Laporan Tanggal Terbaru (${latestAvailableDate})`}
-                      >
-                        Terbaru
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDate('')}
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                        !selectedDate
-                          ? 'bg-amber-400 text-slate-950'
-                          : 'bg-white/10 text-emerald-200 hover:bg-white/20'
-                      }`}
-                      title="Lihat Seluruh Tanggal"
-                    >
-                      Semua
-                    </button>
-                  </div>
-                </div>
-                <input
-                  id="input-monitor-date"
-                  type="date"
+              
+              {/* Dropdown of dates that actually have reports */}
+              {availableDates.length > 0 && (
+                <select
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer mt-0.5"
-                />
+                  className="bg-slate-900/90 text-white font-bold text-xs py-1 px-2 rounded-lg border border-emerald-500/40 focus:outline-none cursor-pointer"
+                >
+                  <option value={todayIso}>
+                    Hari Ini: {formatTanggalIndonesia(new Date())} {hasReportsToday ? '(Ada Laporan)' : '(Belum Ada Lapor)'}
+                  </option>
+                  {availableDates.map((d) => (
+                    <option key={d.iso} value={d.iso}>
+                      {d.label}
+                    </option>
+                  ))}
+                  <option value="">Semua Tanggal ({reports.length} Laporan)</option>
+                </select>
+              )}
+
+              {/* Native Date Input */}
+              <input
+                id="input-monitor-date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer"
+                title="Pilih tanggal manual"
+              />
+
+              {/* Quick shortcut buttons */}
+              <div className="flex items-center gap-1 border-l border-white/20 pl-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate(todayIso)}
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors ${
+                    selectedDate === todayIso
+                      ? 'bg-amber-400 text-slate-950'
+                      : 'bg-white/10 text-emerald-200 hover:bg-white/20'
+                  }`}
+                  title="Lihat Laporan Hari Ini"
+                >
+                  Hari Ini
+                </button>
+                {latestAvailableDate && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate(latestAvailableDate)}
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors ${
+                      selectedDate === latestAvailableDate
+                        ? 'bg-amber-400 text-slate-950'
+                        : 'bg-white/10 text-emerald-200 hover:bg-white/20'
+                    }`}
+                    title={`Lihat Tanggal Laporan Terbaru (${latestAvailableDate})`}
+                  >
+                    Terbaru ({availableDates[0]?.count || 0})
+                  </button>
+                )}
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Notice Banner if selected date has 0 reports but database has reports */}
-      {stats.submittedCount === 0 && reports.length > 0 && (
+      {/* Empty Database Recovery Banner (If reports is 0) */}
+      {reports.length === 0 && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-amber-950 text-sm">
+                  Database Laporan Belum Terisi atau Masih Kosong
+                </h4>
+                <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                  Sistem telah menyiapkan data awal resmi untuk <strong>24 Kepala Lingkungan</strong> Kelurahan Mangga (kegiatan Opsir PBB, Perlinsos DTKS, IKD Dukcapil, BPJS, dan Pos Kamling). Tekan tombol di bawah untuk langsung memuat seluruh riwayat laporan ke dashboard.
+                </p>
+              </div>
+            </div>
+            {onSeedInitialReports && (
+              <button
+                type="button"
+                onClick={handleTriggerSeed}
+                disabled={isSeeding}
+                className="shrink-0 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>{isSeeding ? 'Sedang Memuat...' : 'Muat Data 24 Kepling Sekarang'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Notice Banner if viewing DAILY and selected date has 0 reports but past reports exist */}
+      {viewMode === 'DAILY' && stats.submittedCount === 0 && reports.length > 0 && (
         <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-2xs">
           <div className="flex items-center gap-2.5 text-amber-950 font-medium">
             <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
             <div>
               <p className="font-bold text-amber-900">
-                Belum ada laporan Kepling yang diinput khusus untuk tanggal{' '}
-                <span className="underline">{selectedDate || 'pilihan ini'}</span>.
+                Belum ada laporan Kepling yang masuk pada tanggal{' '}
+                <span className="underline">{selectedDate ? formatTanggalIndonesia(new Date(selectedDate + 'T00:00:00')) : 'ini'}</span>.
               </p>
               <p className="text-[11px] text-amber-800 mt-0.5">
                 {latestAvailableDate ? (
-                  <>Tersedia data laporan pada tanggal terbaru: <strong>{latestAvailableDate}</strong>.</>
+                  <>Tersedia data laporan pada tanggal <strong>{availableDates[0]?.label}</strong>.</>
                 ) : (
-                  <>Anda dapat menekan tombol <strong>"Semua"</strong> untuk melihat seluruh riwayat laporan.</>
+                  <>Anda dapat menekan tombol <strong>"Status Terkini 24 Lingkungan"</strong> untuk melihat laporan terakhir masing-masing Kepling.</>
                 )}
               </p>
             </div>
@@ -404,17 +572,36 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                 onClick={() => setSelectedDate(latestAvailableDate)}
                 className="flex-1 sm:flex-none px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-xl text-xs transition-colors cursor-pointer shadow-2xs"
               >
-                Lihat Tanggal Terbaru ({latestAvailableDate})
+                Buka Tanggal Terbaru ({latestAvailableDate})
               </button>
             )}
             <button
               type="button"
-              onClick={() => setSelectedDate('')}
-              className="flex-1 sm:flex-none px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-extrabold rounded-xl text-xs transition-colors cursor-pointer shadow-2xs"
+              onClick={() => setViewMode('LATEST_PER_KEPLING')}
+              className="flex-1 sm:flex-none px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold rounded-xl text-xs transition-colors cursor-pointer shadow-2xs"
             >
-              Lihat Semua Tanggal
+              Lihat Status Terkini 24 Kepling
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Helpful Mode Info Banner when viewing LATEST_PER_KEPLING */}
+      {viewMode === 'LATEST_PER_KEPLING' && (
+        <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-2 text-emerald-950 font-medium">
+            <Layers className="w-4 h-4 text-emerald-700 shrink-0" />
+            <span>
+              Mode <strong>Status Terkini 24 Lingkungan</strong> menampilkan laporan terakhir yang pernah dikirimkan oleh masing-masing Kepling beserta akumulasi kinerja terbarunya.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setViewMode('DAILY')}
+            className="text-[11px] font-bold text-emerald-800 hover:underline cursor-pointer shrink-0"
+          >
+            Beralih ke Pantauan Harian →
+          </button>
         </div>
       )}
 
@@ -567,8 +754,9 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
       {/* Grid of 24 Lingkungan Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
         {filteredList.map((kepling) => {
-          const report = keplingReportMap.get(kepling.id);
+          const report = activeKeplingReportMap.get(kepling.id);
           const hasReported = Boolean(report);
+          const latestReportAnytime = keplingLatestReportMap.get(kepling.id);
 
           return (
             <div
@@ -594,7 +782,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                   {hasReported ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      <span>Sudah Lapor</span>
+                      <span>{viewMode === 'LATEST_PER_KEPLING' ? (report.tanggal || 'Ada Laporan') : 'Sudah Lapor'}</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
@@ -615,6 +803,12 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                 {/* Report Content Preview (if submitted) */}
                 {hasReported && report ? (
                   <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5 text-xs">
+                    {viewMode === 'LATEST_PER_KEPLING' && report.tanggal && (
+                      <div className="text-[10px] text-slate-500 font-bold flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-emerald-600" />
+                        <span>Laporan: {report.hari ? report.hari + ', ' : ''}{report.tanggal}</span>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-1 text-[11px] bg-emerald-50/60 p-2 rounded-lg border border-emerald-100">
                       <div>
                         <span className="text-slate-500">Opsir PBB: </span>
@@ -640,8 +834,24 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div className="mt-3 pt-3 border-t border-slate-200/60 text-xs text-slate-400 italic">
-                    Belum mengirimkan rekapitulasi laporan pada tanggal ini.
+                  <div className="mt-3 pt-3 border-t border-slate-200/60 text-xs">
+                    <p className="text-slate-400 italic text-[11px]">
+                      Belum mengirimkan laporan pada tanggal ini.
+                    </p>
+                    {latestReportAnytime && (
+                      <div className="mt-1.5 p-1.5 bg-slate-100 rounded-lg text-[10px] text-slate-600 flex items-center justify-between">
+                        <span>
+                          Laporan terakhir: <strong>{latestReportAnytime.tanggal || 'Sebelumnya'}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onSelectReport(latestReportAnytime)}
+                          className="font-bold text-emerald-700 hover:underline cursor-pointer ml-1"
+                        >
+                          Lihat
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

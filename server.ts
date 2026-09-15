@@ -336,6 +336,22 @@ app.post('/api/reports/reset', (_req, res) => {
   res.json({ success: true, total: 0, message: 'Semua data laporan berhasil direset' });
 });
 
+// POST seed initial reports for 24 Kepling
+app.post('/api/reports/seed-initial', (req, res) => {
+  try {
+    const rawData = fs.readFileSync(REPORTS_FILE, 'utf-8');
+    const items = JSON.parse(rawData);
+    if (Array.isArray(items) && items.length > 0) {
+      reportsCache = items;
+      saveStoredReports(reportsCache);
+      return res.json({ success: true, total: reportsCache.length, data: reportsCache });
+    }
+  } catch (err: any) {
+    console.error('Error seeding initial reports:', err);
+  }
+  return res.json({ success: true, total: reportsCache.length, data: reportsCache });
+});
+
 // GET all targets & capaian
 app.get('/api/targets-capaian', (_req, res) => {
   res.json({ success: true, data: targetsCache });

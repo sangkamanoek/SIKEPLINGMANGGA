@@ -1,5 +1,6 @@
 [
   {
+    "id": "lap_hist_kepling_1",
     "keplingId": "kepling_1",
     "hari": "SENIN",
     "tanggal": "14 SEPTEMBER 2026",
@@ -8,35 +9,790 @@
     "kelurahan": "Kelurahan Mangga",
     "kecamatan": "Kecamatan Medan Tuntungan",
     "kinerja": {
-      "opsirPbbWp": "2",
-      "opsirPbbKeterangan": "Penyampaian SPPT PBB Jl. Bunga Ncole",
-      "perlinsosKk": "3",
-      "perlinsosKeterangan": "Verifikasi DTKS warga Lingk 1",
-      "ikdOrang": "1",
-      "ikdKeterangan": "Bimbingan aplikasi IKD di kantor",
+      "opsirPbbWp": "4",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Ncole Raya",
+      "perlinsosKk": "7",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Ncole Raya",
+      "ikdOrang": "3",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Ncole Raya",
       "bpjsKetenagakerjaanOrang": "0",
       "bpjsKetenagakerjaanKeterangan": "",
       "poskamlingAdaGiat": true,
       "poskamlingStatus": "Aktif Ronda Malam",
-      "poskamlingLokasi": "Pos Ronda Gang Ncole",
-      "poskamlingPetugas": "Kepling dan Warga",
-      "poskamlingKeterangan": "Aman terkendali",
-      "kegiatanLainnya": "Gotong royong parit"
+      "poskamlingLokasi": "Pos Kamling Lingkungan I",
+      "poskamlingPetugas": "Kepling Juan Prananta Purba & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan I"
     },
     "jumlahDokumentasi": 1,
     "dokumentasiFoto": [
       {
-        "id": "foto_g1",
-        "url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
-        "name": "Foto Verifikasi Lapangan Lingk 1",
-        "timestamp": "2026-09-14T10:00:00Z"
+        "id": "foto_hist_1",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan I",
+        "timestamp": "2026-09-14T10:30:00Z"
       }
     ],
-    "id": "lap_1789442705535_vk8d",
-    "createdAt": "2026-09-15T03:25:05.535Z"
+    "createdAt": "2026-09-14T11:30:00.000Z"
   },
   {
-    "id": "lap_test_hasanuddin_1409",
+    "id": "lap_hist_kepling_2",
+    "keplingId": "kepling_2",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "ZULKARNAEN TARIGAN",
+    "jabatan": "Kepala Lingkungan II",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "3",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Rinte Raya",
+      "perlinsosKk": "6",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Rinte Raya",
+      "ikdOrang": "2",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Rinte Raya",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Jl. Bunga Rinte Raya",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan II",
+      "poskamlingPetugas": "Kepling Zulkarnaen Tarigan & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan II"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_2",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan II",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_3",
+    "keplingId": "kepling_3",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "BENNY IRWANSYAH SEMBIRING",
+    "jabatan": "Kepala Lingkungan III",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "2",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Terompet Ujung",
+      "perlinsosKk": "5",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Terompet Ujung",
+      "ikdOrang": "1",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Terompet Ujung",
+      "bpjsKetenagakerjaanOrang": "0",
+      "bpjsKetenagakerjaanKeterangan": "",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan III",
+      "poskamlingPetugas": "Kepling Benny Irwansyah Sembiring & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan III"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_3",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan III",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_4",
+    "keplingId": "kepling_4",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "ANDI LOPIGA SEMBIRING",
+    "jabatan": "Kepala Lingkungan IV",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "1",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Rampai I-IV",
+      "perlinsosKk": "4",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Rampai I-IV",
+      "ikdOrang": "3",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Rampai I-IV",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Jl. Bunga Rampai I-IV",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan IV",
+      "poskamlingPetugas": "Kepling Andi Lopiga Sembiring & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan IV"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_4",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan IV",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_5",
+    "keplingId": "kepling_5",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "EDUARD ERGUNANTA TARIGAN",
+    "jabatan": "Kepala Lingkungan V",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "4",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Jamin Ginting Km 11.5",
+      "perlinsosKk": "3",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Jamin Ginting Km 11.5",
+      "ikdOrang": "2",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Jamin Ginting Km 11.5",
+      "bpjsKetenagakerjaanOrang": "0",
+      "bpjsKetenagakerjaanKeterangan": "",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan V",
+      "poskamlingPetugas": "Kepling Eduard Ergunanta Tarigan & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan V"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_5",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan V",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_6",
+    "keplingId": "kepling_6",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "NELLA DIVA FILOLA BANGUN",
+    "jabatan": "Kepala Lingkungan VI",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "3",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Sedap Malam",
+      "perlinsosKk": "2",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Sedap Malam",
+      "ikdOrang": "1",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Sedap Malam",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Jl. Bunga Sedap Malam",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan VI",
+      "poskamlingPetugas": "Kepling Nella Diva Filola Bangun & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan VI"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_6",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan VI",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_7",
+    "keplingId": "kepling_7",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "SALSALINA BR BANGUN",
+    "jabatan": "Kepala Lingkungan VII",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "2",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Pancur Simpang Gardu",
+      "perlinsosKk": "7",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Pancur Simpang Gardu",
+      "ikdOrang": "3",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Pancur Simpang Gardu",
+      "bpjsKetenagakerjaanOrang": "0",
+      "bpjsKetenagakerjaanKeterangan": "",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan VII",
+      "poskamlingPetugas": "Kepling Salsalina Br Bangun & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan VII"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_7",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan VII",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_8",
+    "keplingId": "kepling_8",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "FRANSISKA BR SEMBIRING",
+    "jabatan": "Kepala Lingkungan VIII",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "1",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Komplek Milala Mas & Perumahan",
+      "perlinsosKk": "6",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Komplek Milala Mas & Perumahan",
+      "ikdOrang": "2",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Komplek Milala Mas & Perumahan",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Komplek Milala Mas & Perumahan",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan VIII",
+      "poskamlingPetugas": "Kepling Fransiska Br Sembiring & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan VIII"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_8",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan VIII",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_9",
+    "keplingId": "kepling_9",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "ELIESER TARIGAN",
+    "jabatan": "Kepala Lingkungan IX",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "4",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Ncole Gang Bersama",
+      "perlinsosKk": "5",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Ncole Gang Bersama",
+      "ikdOrang": "1",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Ncole Gang Bersama",
+      "bpjsKetenagakerjaanOrang": "0",
+      "bpjsKetenagakerjaanKeterangan": "",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan IX",
+      "poskamlingPetugas": "Kepling Elieser Tarigan & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan IX"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_9",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan IX",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_10",
+    "keplingId": "kepling_10",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "EDY SUWITO",
+    "jabatan": "Kepala Lingkungan X",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "3",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Melati Raya",
+      "perlinsosKk": "4",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Melati Raya",
+      "ikdOrang": "3",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Melati Raya",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Jl. Bunga Melati Raya",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan X",
+      "poskamlingPetugas": "Kepling Edy Suwito & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan X"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_10",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan X",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_11",
+    "keplingId": "kepling_11",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "JONI TARIGAN",
+    "jabatan": "Kepala Lingkungan XI",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "2",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Rinte Gang Sejahtera",
+      "perlinsosKk": "3",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Rinte Gang Sejahtera",
+      "ikdOrang": "2",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Rinte Gang Sejahtera",
+      "bpjsKetenagakerjaanOrang": "0",
+      "bpjsKetenagakerjaanKeterangan": "",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XI",
+      "poskamlingPetugas": "Kepling Joni Tarigan & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XI"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_11",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XI",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_12",
+    "keplingId": "kepling_12",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "ROBINSON KARO-KARO",
+    "jabatan": "Kepala Lingkungan XII",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "1",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Raya / Pasar Induk Lau Cih",
+      "perlinsosKk": "2",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Raya / Pasar Induk Lau Cih",
+      "ikdOrang": "1",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Raya / Pasar Induk Lau Cih",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Jl. Bunga Raya / Pasar Induk Lau Cih",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XII",
+      "poskamlingPetugas": "Kepling Robinson Karo-karo & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XII"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_12",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XII",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_13",
+    "keplingId": "kepling_13",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "RAHMAT SEMBIRING",
+    "jabatan": "Kepala Lingkungan XIII",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "4",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Terompet Gang Dame",
+      "perlinsosKk": "7",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Terompet Gang Dame",
+      "ikdOrang": "3",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Terompet Gang Dame",
+      "bpjsKetenagakerjaanOrang": "0",
+      "bpjsKetenagakerjaanKeterangan": "",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XIII",
+      "poskamlingPetugas": "Kepling Rahmat Sembiring & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XIII"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_13",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XIII",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_14",
+    "keplingId": "kepling_14",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "HENDRA SAHPUTRA TARIGAN",
+    "jabatan": "Kepala Lingkungan XIV",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "3",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Asoka Gang Rasmi",
+      "perlinsosKk": "6",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Asoka Gang Rasmi",
+      "ikdOrang": "2",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Asoka Gang Rasmi",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Jl. Bunga Asoka Gang Rasmi",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XIV",
+      "poskamlingPetugas": "Kepling Hendra Sahputra Tarigan & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XIV"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_14",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XIV",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_15",
+    "keplingId": "kepling_15",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "DANIEL PELAWI",
+    "jabatan": "Kepala Lingkungan XV",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "2",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Kenanga & Gang Melur",
+      "perlinsosKk": "5",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Kenanga & Gang Melur",
+      "ikdOrang": "1",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Kenanga & Gang Melur",
+      "bpjsKetenagakerjaanOrang": "0",
+      "bpjsKetenagakerjaanKeterangan": "",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XV",
+      "poskamlingPetugas": "Kepling Daniel Pelawi & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XV"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_15",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XV",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_16",
+    "keplingId": "kepling_16",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "M. YUSUF BARUS",
+    "jabatan": "Kepala Lingkungan XVI",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "1",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Cempaka Perumahan",
+      "perlinsosKk": "4",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Cempaka Perumahan",
+      "ikdOrang": "3",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Cempaka Perumahan",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Jl. Bunga Cempaka Perumahan",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XVI",
+      "poskamlingPetugas": "Kepling M. Yusuf Barus & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XVI"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_16",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XVI",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_17",
+    "keplingId": "kepling_17",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "DAUD PINEM",
+    "jabatan": "Kepala Lingkungan XVII",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "4",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Jamin Ginting Km 12",
+      "perlinsosKk": "3",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Jamin Ginting Km 12",
+      "ikdOrang": "2",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Jamin Ginting Km 12",
+      "bpjsKetenagakerjaanOrang": "0",
+      "bpjsKetenagakerjaanKeterangan": "",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XVII",
+      "poskamlingPetugas": "Kepling Daud Pinem & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XVII"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_17",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XVII",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_18",
+    "keplingId": "kepling_18",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "EVI SUSANTI BR TARIGAN",
+    "jabatan": "Kepala Lingkungan XVIII",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "3",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Mawar / Gang Tarigan",
+      "perlinsosKk": "2",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Mawar / Gang Tarigan",
+      "ikdOrang": "1",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Mawar / Gang Tarigan",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Jl. Bunga Mawar / Gang Tarigan",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XVIII",
+      "poskamlingPetugas": "Kepling Evi Susanti Br Tarigan & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XVIII"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_18",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XVIII",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_19",
+    "keplingId": "kepling_19",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "M. AGUSTINUS GINTING",
+    "jabatan": "Kepala Lingkungan XIX",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "2",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Kamboja Lingkungan XIX",
+      "perlinsosKk": "7",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Kamboja Lingkungan XIX",
+      "ikdOrang": "3",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Kamboja Lingkungan XIX",
+      "bpjsKetenagakerjaanOrang": "0",
+      "bpjsKetenagakerjaanKeterangan": "",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XIX",
+      "poskamlingPetugas": "Kepling M. Agustinus Ginting & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XIX"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_19",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XIX",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_20",
+    "keplingId": "kepling_20",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "ISKANDAR SEMBIRING",
+    "jabatan": "Kepala Lingkungan XX",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "1",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Matahari Samping Puskesmas",
+      "perlinsosKk": "6",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Matahari Samping Puskesmas",
+      "ikdOrang": "2",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Matahari Samping Puskesmas",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Jl. Bunga Matahari Samping Puskesmas",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XX",
+      "poskamlingPetugas": "Kepling Iskandar Sembiring & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XX"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_20",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XX",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_21",
+    "keplingId": "kepling_21",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "ROY SYAHPUTRA TARIGAN",
+    "jabatan": "Kepala Lingkungan XXI",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "4",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Tanjung / Simpang Selayang",
+      "perlinsosKk": "5",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Tanjung / Simpang Selayang",
+      "ikdOrang": "1",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Tanjung / Simpang Selayang",
+      "bpjsKetenagakerjaanOrang": "0",
+      "bpjsKetenagakerjaanKeterangan": "",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XXI",
+      "poskamlingPetugas": "Kepling Roy Syahputra Tarigan & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XXI"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_21",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XXI",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_22",
+    "keplingId": "kepling_22",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "ALIMIN TARIGAN",
+    "jabatan": "Kepala Lingkungan XXII",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "3",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Bakung Gang Saudara",
+      "perlinsosKk": "4",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Bakung Gang Saudara",
+      "ikdOrang": "3",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Bakung Gang Saudara",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Jl. Bunga Bakung Gang Saudara",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XXII",
+      "poskamlingPetugas": "Kepling Alimin Tarigan & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XXII"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_22",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XXII",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_23",
     "keplingId": "kepling_23",
     "hari": "SENIN",
     "tanggal": "14 SEPTEMBER 2026",
@@ -45,30 +801,66 @@
     "kelurahan": "Kelurahan Mangga",
     "kecamatan": "Kecamatan Medan Tuntungan",
     "kinerja": {
-      "opsirPbbWp": "0",
-      "opsirPbbKeterangan": "Pembayaran PBB",
-      "perlinsosKk": "1",
-      "perlinsosKeterangan": "Pendataan Perlinsos",
-      "ikdOrang": "0",
-      "ikdKeterangan": "Aktivasi aplikasi IKD Dukcapil",
+      "opsirPbbWp": "2",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Terompet / Gang Gereja",
+      "perlinsosKk": "3",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Terompet / Gang Gereja",
+      "ikdOrang": "2",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Terompet / Gang Gereja",
       "bpjsKetenagakerjaanOrang": "0",
-      "bpjsKetenagakerjaanKeterangan": "Sosialisasi pekerja rentan",
+      "bpjsKetenagakerjaanKeterangan": "",
       "poskamlingAdaGiat": true,
       "poskamlingStatus": "Aktif Ronda Malam",
-      "poskamlingLokasi": "Pos Ronda Lingkungan XXIII",
-      "poskamlingPetugas": "Kepling & Warga Ronda",
-      "poskamlingKeterangan": "Patroli siskamling lingkungan kondusif dan aman",
-      "kegiatanLainnya": "Pemantauan kebersihan lingkungan dan drainase warga"
+      "poskamlingLokasi": "Pos Kamling Lingkungan XXIII",
+      "poskamlingPetugas": "Kepling Hasanuddin Sitepu, ST & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XXIII"
     },
     "jumlahDokumentasi": 1,
     "dokumentasiFoto": [
       {
-        "id": "foto_1",
-        "url": "data:image/jpeg;base64,123",
-        "name": "Dokumentasi Verifikasi Perlinsos",
-        "timestamp": "2026-09-14T10:56:52.266Z"
+        "id": "foto_hist_23",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XXIII",
+        "timestamp": "2026-09-14T10:30:00Z"
       }
     ],
-    "createdAt": "2026-09-14T12:00:00.000Z"
+    "createdAt": "2026-09-14T11:30:00.000Z"
+  },
+  {
+    "id": "lap_hist_kepling_24",
+    "keplingId": "kepling_24",
+    "hari": "SENIN",
+    "tanggal": "14 SEPTEMBER 2026",
+    "namaKepling": "BERANI TARIGAN",
+    "jabatan": "Kepala Lingkungan XXIV",
+    "kelurahan": "Kelurahan Mangga",
+    "kecamatan": "Kecamatan Medan Tuntungan",
+    "kinerja": {
+      "opsirPbbWp": "1",
+      "opsirPbbKeterangan": "Penyampaian SPPT PBB & penagihan door-to-door di Jl. Bunga Rinte / Royal Garden",
+      "perlinsosKk": "2",
+      "perlinsosKeterangan": "Verifikasi faktual data terpadu Perlinsos DTKS warga di Jl. Bunga Rinte / Royal Garden",
+      "ikdOrang": "1",
+      "ikdKeterangan": "Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di Jl. Bunga Rinte / Royal Garden",
+      "bpjsKetenagakerjaanOrang": "1",
+      "bpjsKetenagakerjaanKeterangan": "Sosialisasi dan pendaftaran pekerja rentan/informal di Jl. Bunga Rinte / Royal Garden",
+      "poskamlingAdaGiat": true,
+      "poskamlingStatus": "Aktif Ronda Malam",
+      "poskamlingLokasi": "Pos Kamling Lingkungan XXIV",
+      "poskamlingPetugas": "Kepling Berani Tarigan & Warga Ronda",
+      "poskamlingKeterangan": "Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif",
+      "kegiatanLainnya": "Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah Lingkungan XXIV"
+    },
+    "jumlahDokumentasi": 1,
+    "dokumentasiFoto": [
+      {
+        "id": "foto_hist_24",
+        "url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"300\" viewBox=\"0 0 400 300\"><rect width=\"400\" height=\"300\" fill=\"%23065f46\"/><text x=\"50%25\" y=\"45%25\" font-size=\"16\" font-family=\"sans-serif\" font-weight=\"bold\" fill=\"%23ffffff\" text-anchor=\"middle\">DOKUMENTASI KEGIATAN LAPANGAN</text><text x=\"50%25\" y=\"60%25\" font-size=\"13\" font-family=\"sans-serif\" fill=\"%23a7f3d0\" text-anchor=\"middle\">KELURAHAN MANGGA - MEDAN TUNTUNGAN</text></svg>",
+        "name": "Dokumentasi Kinerja Lingkungan XXIV",
+        "timestamp": "2026-09-14T10:30:00Z"
+      }
+    ],
+    "createdAt": "2026-09-14T11:30:00.000Z"
   }
 ]

@@ -54,6 +54,7 @@ import {
   getLocalDeletedReportIds,
   isReportBeforeSept7,
   syncLocalReportsToServer,
+  seedInitialReports,
 } from './lib/reportsApi';
 
 const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
@@ -509,6 +510,25 @@ export default function App() {
     }
   };
 
+  // Seed / restore initial official reports for 24 Kepling
+  const handleSeedInitialReports = async () => {
+    setIsRefreshingReports(true);
+    try {
+      const seeded = await seedInitialReports();
+      if (seeded && seeded.length > 0) {
+        setReports(seeded);
+        showToast(`Berhasil memuat ${seeded.length} data laporan historis 24 Kepling!`, 'success');
+      } else {
+        await refreshAllReports(true);
+      }
+    } catch (err) {
+      console.error('Failed to seed reports:', err);
+      showToast('Gagal memuat data laporan awal.', 'error');
+    } finally {
+      setIsRefreshingReports(false);
+    }
+  };
+
   // Handle Login & Session Authentication
   const handleLoginSuccess = (account: UserAccount, remember: boolean) => {
     setActiveAccount(account);
@@ -884,6 +904,7 @@ export default function App() {
               onRefresh={() => refreshAllReports(true)}
               isRefreshing={isRefreshingReports}
               onResetReports={handleResetAllReports}
+              onSeedInitialReports={handleSeedInitialReports}
               onOpenCapaianDashboard={() => setActiveTab('capaian_admin')}
               sheetMeta={sheetMeta}
             />

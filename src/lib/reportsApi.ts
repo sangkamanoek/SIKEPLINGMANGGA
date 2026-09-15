@@ -9,6 +9,7 @@ import {
   isBeforeSept7,
 } from './firestoreService';
 import { readLaporanFromSheet } from './sheetsService';
+import { generateInitialReports24Kepling } from '../data/initialReportsData';
 
 export const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
 export const LOCAL_STORAGE_KEY_DELETED = 'kepling_deleted_reports_v1';
@@ -133,6 +134,20 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     console.warn('Notice reading server buffer /api/reports:', e);
   }
 
+  // 5. Fallback: If no reports exist at all, initialize the official 24 Kepling historical reports
+  if (map.size === 0) {
+    try {
+      const initial = generateInitialReports24Kepling();
+      initial.forEach((r) => {
+        if (!deletedIds.has(r.id)) {
+          map.set(r.id, r);
+        }
+      });
+    } catch (e) {
+      console.warn('Fallback initial reports generation notice:', e);
+    }
+  }
+
   const merged = Array.from(map.values());
   merged.sort((a, b) => {
     const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -144,7 +159,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(merged));
   }
 
-  // 5. Two-Way Sync: If we have reports locally that the server doesn't have yet, push them via batch sync!
+  // 6. Two-Way Sync: If we have reports locally that the server doesn't have yet, push them via batch sync!
   const unsyncedReports = merged.filter((r) => r && r.id && !serverReportIds.has(r.id));
   if (unsyncedReports.length > 0) {
     fetch('/api/reports/batch', {
@@ -157,6 +172,38 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   }
 
   return merged;
+};
+
+// Explicitly seed/restore the official initial reports for all 24 Kepling
+export const seedInitialReports = async (): Promise<LaporanHarianItem[]> => {
+  try {
+    const res = await fetch('/api/reports/seed-initial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const serverReports = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+      if (serverReports.length > 0) {
+        safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(serverReports));
+        return serverReports;
+      }
+    }
+  } catch (err) {
+    console.warn('Error in seedInitialReports:', err);
+  }
+
+  // Fallback to client generator if server endpoint unavailable
+  const clientGenerated = generateInitialReports24Kepling();
+  safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(clientGenerated));
+  try {
+    await fetch('/api/reports/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reports: clientGenerated }),
+    });
+  } catch {}
+  return clientGenerated;
 };
 
 // Sync all local reports to server buffer explicitly

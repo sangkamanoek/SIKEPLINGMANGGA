@@ -5,17 +5,10 @@ import {
   FileSpreadsheet,
   Check,
   Copy,
-  Layers,
-  Sparkles,
   CheckCircle2,
-  AlertCircle,
   AlertTriangle,
-  Building2,
-  ShieldCheck,
   Shield,
-  User,
   Lock,
-  KeyRound,
   RotateCcw,
 } from 'lucide-react';
 import { LaporanHarianItem, FotoDokumentasi, KinerjaHarian, UserAccount } from '../types';
@@ -25,7 +18,7 @@ import {
   getTodayLocalIso,
   NAMA_HARI,
 } from '../lib/formatter';
-import { SUPER_ADMIN_ACCOUNT, KEPLING_ACCOUNTS, ALL_ACCOUNTS } from '../data/keplingList';
+import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { safeSetLocalStorage } from '../lib/safeStorage';
 
 interface FormLaporanProps {
