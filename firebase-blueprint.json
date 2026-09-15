@@ -94,6 +94,24 @@
       }
     },
     {
+      "name": "account_profiles",
+      "description": "Profil kustom nama dan nomor telepon Kepala Lingkungan",
+      "fields": {
+        "accountId": "string",
+        "nama": "string",
+        "telepon": "string",
+        "updatedAt": "string"
+      }
+    },
+    {
+      "name": "deleted_reports",
+      "description": "Daftar ID laporan yang telah dihapus permanen oleh admin",
+      "fields": {
+        "id": "string",
+        "deletedAt": "string"
+      }
+    },
+    {
       "name": "attendance",
       "description": "Data presensi dan absensi Apel Pagi Kepala Lingkungan Kelurahan Mangga",
       "fields": {

@@ -8,15 +8,19 @@ import {
   subscribeReportsFromFirestore,
   isBeforeSept7,
 } from './firestoreService';
+import { readLaporanFromSheet } from './sheetsService';
 
-const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
-const LOCAL_STORAGE_KEY_DELETED = 'kepling_deleted_reports_v1';
+export const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
+export const LOCAL_STORAGE_KEY_DELETED = 'kepling_deleted_reports_v1';
 
-// Clear obsolete previous caches to free browser memory
-try {
-  localStorage.removeItem('kepling_local_laporan_history');
-  localStorage.removeItem('cleaned_reports_v2_kepling21');
-} catch {}
+// Known storage keys from prior versions to ensure zero data loss during upgrades
+export const KNOWN_STORAGE_KEYS = [
+  'kepling_local_laporan_history_v2',
+  'kepling_local_laporan_history',
+  'laporan_kepling_local',
+  'kepling_reports',
+  'sikepling_reports',
+];
 
 /**
  * Get locally known deleted report IDs
@@ -47,27 +51,55 @@ export const isReportBeforeSept7 = (r: LaporanHarianItem): boolean => {
   return isBeforeSept7(r);
 };
 
-// Fetch all reports with resilient multi-tier merge (LocalStorage + Firestore + Server Buffer)
+// Fetch all reports with resilient multi-tier merge (LocalStorage + Google Sheets + Firestore + Server Buffer)
 export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   const deletedIds = getLocalDeletedReportIds();
   const map = new Map<string, LaporanHarianItem>();
 
-  // 1. Include locally cached items first so freshly inputted reports are never lost
+  // 1. Comprehensive Local Storage multi-key recovery
+  KNOWN_STORAGE_KEYS.forEach((key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((r) => {
+            if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+              if (!map.has(r.id)) {
+                map.set(r.id, r);
+              }
+            }
+          });
+        }
+      }
+    } catch {}
+  });
+
+  // 2. Read from connected Google Sheets if metadata & token exist
   try {
-    const localRaw = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
-    if (localRaw) {
-      const parsed = JSON.parse(localRaw);
-      if (Array.isArray(parsed)) {
-        parsed.forEach((r) => {
-          if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
-            map.set(r.id, r);
-          }
-        });
+    const sheetMetaRaw = localStorage.getItem('google_sheet_metadata');
+    const tokenRaw = localStorage.getItem('google_cached_access_token') || sessionStorage.getItem('google_cached_access_token');
+    if (sheetMetaRaw && tokenRaw) {
+      const sheetMeta = JSON.parse(sheetMetaRaw);
+      if (sheetMeta?.spreadsheetId) {
+        const sheetReports = await readLaporanFromSheet(tokenRaw, sheetMeta.spreadsheetId);
+        if (Array.isArray(sheetReports) && sheetReports.length > 0) {
+          sheetReports.forEach((r) => {
+            if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+              // Only add if not already present or if sheet has newer row
+              if (!map.has(r.id)) {
+                map.set(r.id, r);
+              }
+            }
+          });
+        }
       }
     }
-  } catch {}
+  } catch (sheetErr) {
+    console.warn('Google Sheet background read notice:', sheetErr);
+  }
 
-  // 2. Fetch from Firebase Firestore
+  // 3. Fetch from Firebase Firestore
   try {
     const firestoreReports = await fetchReportsFromFirestore();
     if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
@@ -81,7 +113,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     console.warn('Notice reading from Firebase Firestore:', err);
   }
 
-  // 3. Merge with Server Buffer
+  // 4. Merge with Server Buffer
   let serverReportIds = new Set<string>();
   try {
     const res = await fetch('/api/reports');
@@ -112,7 +144,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(merged));
   }
 
-  // 4. Two-Way Sync: If we have reports locally that the server doesn't have yet, push them via batch sync!
+  // 5. Two-Way Sync: If we have reports locally that the server doesn't have yet, push them via batch sync!
   const unsyncedReports = merged.filter((r) => r && r.id && !serverReportIds.has(r.id));
   if (unsyncedReports.length > 0) {
     fetch('/api/reports/batch', {

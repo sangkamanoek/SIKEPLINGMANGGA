@@ -16,9 +16,8 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
     if (isQuotaError) {
       console.warn(`[safeStorage] LocalStorage quota exceeded when setting "${key}". Cleaning up offline cache...`);
 
-      // 1. Remove obsolete / temporary keys
+      // 1. Remove obsolete temporary tokens only
       try {
-        localStorage.removeItem('kepling_local_laporan_history');
         localStorage.removeItem('cleaned_reports_v2_kepling21');
         localStorage.removeItem('google_cached_access_token');
       } catch {}

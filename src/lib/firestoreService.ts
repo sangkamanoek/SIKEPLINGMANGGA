@@ -120,20 +120,18 @@ export async function saveReportToFirestore(item: LaporanHarianItem): Promise<bo
   } catch (error) {
     console.error('Gagal menyimpan laporan ke Firebase Firestore:', error);
 
-    // Fallback: If payload size is too large due to heavy base64 images, save with trimmed photo placeholders so data text is NEVER lost
+    // Fallback: If payload size is too large due to heavy base64 images, attempt to save without corrupted strings
     try {
+      // Keep valid photos, and if document is still too large, reduce number of photos cleanly rather than breaking base64 string
       const safeItem: LaporanHarianItem = {
         ...item,
-        dokumentasiFoto: item.dokumentasiFoto?.map((f) => ({
-          ...f,
-          url: f.url && f.url.length > 200000 ? f.url.substring(0, 100) : f.url,
-        })),
+        dokumentasiFoto: item.dokumentasiFoto?.slice(0, 4),
       };
       const docRef = doc(db, REPORTS_COLLECTION, item.id);
       await setDoc(docRef, safeItem, { merge: true });
       return true;
     } catch (fallbackError) {
-      console.error('Fallback save to Firestore also failed:', fallbackError);
+      console.error('Fallback save to Firestore failed:', fallbackError);
       return false;
     }
   }

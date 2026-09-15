@@ -491,3 +491,90 @@ export async function appendLaporanToSheet(
     updatedRange: result.updates?.updatedRange,
   };
 }
+
+/**
+ * Reads all report rows from the Google Sheet and converts them back to LaporanHarianItem[]
+ */
+export async function readLaporanFromSheet(
+  accessToken: string,
+  spreadsheetId: string
+): Promise<LaporanHarianItem[]> {
+  try {
+    const range = `'${SHEET_TAB_NAME}'!A2:N2000`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const rows: string[][] = data.values || [];
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+
+    const reports: LaporanHarianItem[] = [];
+
+    rows.forEach((row, idx) => {
+      const createdAtRaw = row[0] || '';
+      const hari = row[1] || '';
+      const tanggal = row[2] || '';
+      const namaKepling = row[3] || '';
+      const jabatan = row[4] || '';
+
+      if (!namaKepling && !tanggal) return;
+
+      // Extract number & note from string like "2 WP (Keterangan)"
+      const parseField = (val: string) => {
+        if (!val || val === '-') return { num: '0', note: '' };
+        const match = val.match(/^(\d+)\s*[A-Za-z]*\s*(?:\((.*)\))?/);
+        if (match) {
+          return { num: match[1] || '0', note: match[2] || '' };
+        }
+        return { num: '0', note: val };
+      };
+
+      const pbb = parseField(row[6] || '');
+      const perlinsosRaw = row[7] || '';
+      const perlinsos = parseField(perlinsosRaw.split('|')[0] || '');
+      const ikd = parseField(row[8] || '');
+      const bpjs = parseField(row[9] || '');
+
+      const poskamlingRaw = row[10] || '';
+      const poskamlingAdaGiat = Boolean(poskamlingRaw && poskamlingRaw !== 'Tidak Ada Giat' && poskamlingRaw !== '-');
+      const kegiatanLainnya = row[11] && row[11] !== '-' ? row[11] : '';
+      const jumlahDokumentasi = parseInt(row[12] || '0', 10) || 0;
+
+      const reportId = `sheet_row_${idx + 2}_${namaKepling.toLowerCase().replace(/[^a-z0-9]/g, '')}_${tanggal.replace(/[^0-9]/g, '')}`;
+
+      reports.push({
+        id: reportId,
+        hari,
+        tanggal,
+        namaKepling,
+        jabatan,
+        kelurahan: 'Kelurahan Mangga',
+        kecamatan: 'Kecamatan Medan Tuntungan',
+        kinerja: {
+          opsirPbbWp: pbb.num,
+          opsirPbbKeterangan: pbb.note,
+          perlinsosKk: perlinsos.num,
+          perlinsosKeterangan: perlinsos.note,
+          ikdOrang: ikd.num,
+          ikdKeterangan: ikd.note,
+          bpjsKetenagakerjaanOrang: bpjs.num,
+          bpjsKetenagakerjaanKeterangan: bpjs.note,
+          poskamlingAdaGiat,
+          poskamlingStatus: poskamlingAdaGiat ? (poskamlingRaw.split('(')[0] || '').trim() : 'Tidak Ada Giat',
+          kegiatanLainnya,
+        },
+        jumlahDokumentasi,
+        dokumentasiFoto: [],
+        createdAt: createdAtRaw || new Date().toISOString(),
+      });
+    });
+
+    return reports;
+  } catch (err) {
+    console.warn('Error reading reports from Google Sheet:', err);
+    return [];
+  }
+}
+

@@ -24,7 +24,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata } from '../types';
-import { formatTanggalIndonesia } from '../lib/formatter';
+import { formatTanggalIndonesia, generateReportPdfFileName } from '../lib/formatter';
 
 interface DetailLaporanModalProps {
   item: LaporanHarianItem | null;
@@ -294,9 +294,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     if (!item) return;
     const element = document.getElementById('lembar-cetak-laporan-kepling');
     const contentHtml = element ? element.innerHTML : '';
-    const safeJabatan = (item.jabatan || 'Kepling').replace(/[^a-zA-Z0-9]/g, '_');
-    const safeTanggal = (displayTanggal || item.tanggal || 'Laporan').replace(/[^a-zA-Z0-9]/g, '_');
-    const titleStr = `Laporan_${safeJabatan}_${safeTanggal}`;
+    const titleStr = generateReportPdfFileName(item, displayTanggal).replace(/\.pdf$/i, '');
 
     try {
       const printWin = window.open('', '_blank');
@@ -398,9 +396,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       const html2pdfModule = await import('html2pdf.js');
       const html2pdfFunc = (html2pdfModule as any).default || html2pdfModule;
 
-      const safeJabatan = (item.jabatan || 'Kepling').replace(/[^a-zA-Z0-9]/g, '_');
-      const safeTanggal = (displayTanggal || item.tanggal || 'Laporan').replace(/[^a-zA-Z0-9]/g, '_');
-      const filename = `Laporan_${safeJabatan}_${safeTanggal}.pdf`;
+      const filename = generateReportPdfFileName(item, displayTanggal);
 
       const opt = {
         margin: [5, 6, 5, 6],
@@ -1890,23 +1886,31 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
                   <span style={{ fontSize: '7pt', color: '#64748b', fontWeight: 'normal', textTransform: 'none' }}>Format Album Resmi Kedinasan</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                    width: '100%',
+                  }}
+                >
                   {groupPhotosByActivity(item.dokumentasiFoto.slice(0, 6)).map((group) => (
-                    <div key={group.key}>
-                      <div style={{ fontSize: '7.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: '2px' }}>
+                    <div
+                      key={group.key}
+                      style={{
+                        flex: groupPhotosByActivity(item.dokumentasiFoto.slice(0, 6)).length === 1 ? '1 1 100%' : '1 1 calc(50% - 6px)',
+                        minWidth: '220px',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <div style={{ fontSize: '7.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#1e293b', borderBottom: '1px solid #cbd5e1', paddingBottom: '2px' }}>
                         • {group.title} ({group.photos.length} Foto)
                       </div>
                       <div
                         style={{
-                          display: 'grid',
-                          gridTemplateColumns:
-                            group.photos.length === 1
-                              ? 'minmax(0, 260px)'
-                              : group.photos.length === 2
-                              ? 'repeat(2, 1fr)'
-                              : 'repeat(3, 1fr)',
-                          columnGap: '10px',
-                          rowGap: '8px',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '6px',
                         }}
                       >
                         {group.photos.map((foto, idx) => (
@@ -1914,9 +1918,11 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                             key={foto.id || idx}
                             className="rounded border border-slate-300 p-1.5 bg-white flex flex-col items-center avoid-break"
                             style={{
+                              flex: group.photos.length === 1 ? '1 1 100%' : '1 1 calc(50% - 4px)',
+                              minWidth: '130px',
                               border: '1px solid #cbd5e1',
                               borderRadius: '6px',
-                              padding: '5px',
+                              padding: '4px',
                               backgroundColor: '#ffffff',
                               display: 'flex',
                               flexDirection: 'column',
@@ -1926,17 +1932,17 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                             }}
                           >
                             <div
-                              className="w-full rounded overflow-hidden bg-slate-100 flex items-center justify-center"
                               style={{
                                 width: '100%',
-                                height: group.photos.length === 1 ? '145px' : '125px',
+                                height: '115px',
+                                minHeight: '115px',
                                 borderRadius: '4px',
-                                overflow: 'hidden',
-                                backgroundColor: '#f1f5f9',
+                                backgroundColor: '#f8fafc',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 padding: '2px',
+                                border: '1px solid #e2e8f0',
                               }}
                             >
                               <img
@@ -1944,21 +1950,23 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                 alt={getProperFotoLabel(foto, idx)}
                                 crossOrigin="anonymous"
                                 style={{
-                                  width: '100%',
-                                  height: '100%',
+                                  maxWidth: '100%',
+                                  maxHeight: '110px',
+                                  width: 'auto',
+                                  height: 'auto',
                                   objectFit: 'contain',
-                                  objectPosition: 'center',
                                   display: 'block',
+                                  margin: '0 auto',
                                 }}
                               />
                             </div>
                             <div
-                              className="text-[7.5pt] text-slate-800 font-bold mt-1.5 truncate w-full text-center font-sans"
+                              className="text-[7.5pt] text-slate-800 font-bold mt-1 truncate w-full text-center font-sans"
                               style={{
                                 fontSize: '7.5pt',
                                 fontWeight: 'bold',
                                 color: '#1e293b',
-                                marginTop: '4px',
+                                marginTop: '3px',
                                 overflow: 'hidden',
                                 whiteSpace: 'nowrap',
                                 textOverflow: 'ellipsis',

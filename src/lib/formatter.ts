@@ -324,3 +324,37 @@ export function isReportMatchingKepling(
   return false;
 }
 
+const INT_TO_ROMAN: Record<number, string> = {
+  1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V',
+  6: 'VI', 7: 'VII', 8: 'VIII', 9: 'IX', 10: 'X',
+  11: 'XI', 12: 'XII', 13: 'XIII', 14: 'XIV', 15: 'XV',
+  16: 'XVI', 17: 'XVII', 18: 'XVIII', 19: 'XIX', 20: 'XX',
+  21: 'XXI', 22: 'XXII', 23: 'XXIII', 24: 'XXIV'
+};
+
+/**
+ * Format nama file otomatis sesuai standar kedinasan:
+ * "Laporan Kepling I Tgl 15 September 2026.pdf"
+ */
+export function generateReportPdfFileName(report?: LaporanHarianItem | null, customTanggal?: string): string {
+  if (!report) return 'Laporan_Kepling.pdf';
+
+  // 1. Ekstrak nomor lingkungan romawi (I - XXIV)
+  const num = extractNomorLingkungan(report.jabatan) || extractNomorLingkungan((report as any).lingkungan);
+  let keplingTag = 'Kepling';
+  if (num && INT_TO_ROMAN[num]) {
+    keplingTag = `Kepling ${INT_TO_ROMAN[num]}`;
+  } else if (report.jabatan) {
+    keplingTag = report.jabatan.replace(/Kepala\s+Lingkungan/i, 'Kepling').trim();
+  }
+
+  // 2. Ekstrak tanggal bersih
+  const rawTanggal = customTanggal || report.tanggal || '';
+  const cleanTanggal = rawTanggal
+    .replace(/^([A-Za-z]+,\s*)/i, '') // Hapus nama hari jika ada ("SELASA, 15 SEPTEMBER 2026" -> "15 SEPTEMBER 2026")
+    .trim();
+
+  const tglPart = cleanTanggal ? `Tgl ${cleanTanggal}` : 'Tgl';
+  return `Laporan ${keplingTag} ${tglPart}.pdf`.replace(/\s+/g, ' ').trim();
+}
+

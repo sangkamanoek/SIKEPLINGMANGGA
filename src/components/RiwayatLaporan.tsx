@@ -69,22 +69,29 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   React.useEffect(() => {
     if (initialPetugasFilter) {
       setSelectedPetugas(initialPetugasFilter);
+    } else {
+      setSelectedPetugas('ALL');
     }
   }, [initialPetugasFilter]);
 
-  // Extract unique officer names for the filter dropdown
+  // Extract officer names and lingukan labels for the filter dropdown
   const listPetugas = useMemo(() => {
-    const set = new Set<string>();
+    const list: { nama: string; label: string }[] = [];
     // Pre-populate with all 24 Kepling
-    KEPLING_ACCOUNTS.forEach((k) => set.add(k.nama));
-    set.add(SUPER_ADMIN_ACCOUNT.nama);
+    KEPLING_ACCOUNTS.forEach((k) => {
+      list.push({ nama: k.nama, label: `${k.lingkungan} - ${k.nama}` });
+    });
+    list.push({ nama: SUPER_ADMIN_ACCOUNT.nama, label: `Kasi Tata Pemerintahan - ${SUPER_ADMIN_ACCOUNT.nama}` });
     // Include any existing in items
     items.forEach((item) => {
       if (item.namaKepling?.trim()) {
-        set.add(item.namaKepling.trim());
+        const trimmed = item.namaKepling.trim();
+        if (!list.some((x) => x.nama.toLowerCase() === trimmed.toLowerCase())) {
+          list.push({ nama: trimmed, label: `${item.jabatan || 'Petugas'} - ${trimmed}` });
+        }
       }
     });
-    return Array.from(set);
+    return list;
   }, [items]);
 
   // Comprehensive multi-criteria filtering
