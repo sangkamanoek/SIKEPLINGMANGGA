@@ -292,9 +292,9 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
               >
                 <option value="ALL">Semua Petugas Kepling</option>
-                {listPetugas.map((nama) => (
-                  <option key={nama} value={nama}>
-                    👤 {nama}
+                {listPetugas.map((petugas) => (
+                  <option key={petugas.nama} value={petugas.nama}>
+                    👤 {petugas.label || petugas.nama}
                   </option>
                 ))}
               </select>
