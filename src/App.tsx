@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import ViewImagesPage from './components/ViewImagesPage';
 import { KunjunganHarianView } from './components/KunjunganHarianView';
-import { GoogleUser, SheetMetadata, LaporanHarianItem, UserAccount } from './types';
+import { GoogleUser, SheetMetadata, LaporanHarianItem, UserAccount, TargetsCapaianMap, isKelurahanAdmin } from './types';
 import { safeSetLocalStorage, safeSetSessionStorage } from './lib/safeStorage';
 import {
   initAuth,
@@ -36,6 +36,11 @@ import { DetailLaporanModal } from './components/DetailLaporanModal';
 import { AccountSelectorModal } from './components/AccountSelectorModal';
 import { MonitoringSuperAdmin } from './components/MonitoringSuperAdmin';
 import { DashboardCapaianKepling } from './components/DashboardCapaianKepling';
+import { DashboardPbbKasi } from './components/DashboardPbbKasi';
+import { DashboardPerlinsosKasi } from './components/DashboardPerlinsosKasi';
+import { DashboardTrantibumKasi } from './components/DashboardTrantibumKasi';
+import { getDefaultTargetsCapaianMap } from './data/targetsData';
+import { fetchTargetsCapaian } from './lib/targetsApi';
 import { PWAInstallModal } from './components/PWAInstallModal';
 import { PanduanPPTModal } from './components/PanduanPPTModal';
 import { LoginPage } from './components/LoginPage';
@@ -124,12 +129,25 @@ export default function App() {
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
 
-  // Active view tab: form | capaian | monitoring | capaian_admin | riwayat | kunjungan
+  // Active view tab: form | capaian | monitoring | capaian_admin | riwayat | kunjungan | dashboard_kasi
   const [activeTab, setActiveTab] = useState<
-    'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan'
+    'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi'
   >(() => {
-    return activeAccount.role === 'super_admin' ? 'monitoring' : 'form';
+    if (activeAccount.role === 'super_admin') return 'monitoring';
+    if (
+      activeAccount.role === 'kasi_pemerintahan' ||
+      activeAccount.role === 'kasi_pembangunan' ||
+      activeAccount.role === 'kasi_trantibum'
+    ) {
+      return 'dashboard_kasi';
+    }
+    return 'form';
   });
+
+  // Kasi Dashboard Target Mapping and Trantibum date states
+  const [targetsMap, setTargetsMap] = useState<TargetsCapaianMap>(getDefaultTargetsCapaianMap);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [trantibumDate, setTrantibumDate] = useState<string>(todayStr);
 
   // Reports data
   const [reports, setReports] = useState<LaporanHarianItem[]>([]);
@@ -246,6 +264,9 @@ export default function App() {
     syncLocalReportsToServer();
     refreshAllReports(false);
     loadAllAttendance().then((items) => setAttendanceList(items));
+    fetchTargetsCapaian().then((data) => {
+      if (data) setTargetsMap(data);
+    });
 
     // Subscribe to real-time reports directly from Firebase Firestore with safe non-destructive merge
     const unsubscribeFirestoreReports = subscribeReportsFromFirestore((firestoreReports) => {
@@ -539,6 +560,13 @@ export default function App() {
     if (account.role === 'super_admin') {
       setActiveTab('monitoring');
       setRiwayatFilterPetugas(undefined);
+    } else if (
+      account.role === 'kasi_pemerintahan' ||
+      account.role === 'kasi_pembangunan' ||
+      account.role === 'kasi_trantibum'
+    ) {
+      setActiveTab('dashboard_kasi');
+      setRiwayatFilterPetugas(undefined);
     } else {
       setActiveTab('form');
       setRiwayatFilterPetugas(account.nama);
@@ -747,6 +775,32 @@ export default function App() {
               </>
             ) : (
               <>
+                {/* Kasi Sektoral Dashboard Tab */}
+                {(activeAccount.role === 'kasi_pemerintahan' ||
+                  activeAccount.role === 'kasi_pembangunan' ||
+                  activeAccount.role === 'kasi_trantibum') && (
+                  <button
+                    id="tab-dashboard-kasi"
+                    type="button"
+                    onClick={() => setActiveTab('dashboard_kasi')}
+                    className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                      activeTab === 'dashboard_kasi'
+                        ? 'border-teal-600 text-teal-950 bg-teal-50 font-black'
+                        : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Award className="w-4 h-4 text-teal-600" />
+                    <span>Dashboard Sektoral</span>
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-teal-100 text-teal-800">
+                      {activeAccount.role === 'kasi_pemerintahan'
+                        ? 'PBB'
+                        : activeAccount.role === 'kasi_pembangunan'
+                        ? 'PERLINSOS'
+                        : 'TRANTIB'}
+                    </span>
+                  </button>
+                )}
+
                 {/* Super Admin Tab 0: Absen Apel Pagi 24 Kepling */}
                 <button
                   id="tab-absen-apel-admin"
@@ -874,6 +928,48 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className={`flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 ${isModalOpen ? 'print:hidden' : ''}`}>
+        {/* Dashboard Kasi Sektoral */}
+        {activeTab === 'dashboard_kasi' && (
+          <ErrorBoundary fallbackTitle="Gagal Memuat Dashboard Kasi">
+            {activeAccount.role === 'kasi_pemerintahan' && (
+              <DashboardPbbKasi
+                reports={reports}
+                targetsMap={targetsMap}
+                currentUser={activeAccount}
+                onSelectKeplingRiwayat={(keplingName) => {
+                  setRiwayatFilterPetugas(keplingName);
+                  setActiveTab('riwayat');
+                }}
+              />
+            )}
+            {activeAccount.role === 'kasi_pembangunan' && (
+              <DashboardPerlinsosKasi
+                reports={reports}
+                targetsMap={targetsMap}
+                currentUser={activeAccount}
+                onSelectKeplingRiwayat={(keplingName) => {
+                  setRiwayatFilterPetugas(keplingName);
+                  setActiveTab('riwayat');
+                }}
+                onOpenKunjunganWarga={() => setActiveTab('kunjungan')}
+              />
+            )}
+            {activeAccount.role === 'kasi_trantibum' && (
+              <DashboardTrantibumKasi
+                reports={reports}
+                attendanceList={attendanceList}
+                currentUser={activeAccount}
+                selectedDate={trantibumDate}
+                onDateChange={setTrantibumDate}
+                onSelectKeplingRiwayat={(keplingName) => {
+                  setRiwayatFilterPetugas(keplingName);
+                  setActiveTab('riwayat');
+                }}
+              />
+            )}
+          </ErrorBoundary>
+        )}
+
         {activeTab === 'form' && (
           <FormLaporan
             onSaveReport={handleSaveReport}
@@ -964,7 +1060,7 @@ export default function App() {
               }}
               hasGoogleAuth={Boolean(token)}
               initialPetugasFilter={riwayatFilterPetugas}
-              isAdmin={activeAccount.role === 'super_admin'}
+              isAdmin={isKelurahanAdmin(activeAccount.role)}
               onDeleteReport={handleDeleteReport}
             />
           </ErrorBoundary>
@@ -998,6 +1094,13 @@ export default function App() {
           if (acc.role === 'super_admin') {
             showToast('Beralih ke akun SUPER ADMIN (Kelurahan Mangga)', 'success');
             setActiveTab('monitoring');
+          } else if (
+            acc.role === 'kasi_pemerintahan' ||
+            acc.role === 'kasi_pembangunan' ||
+            acc.role === 'kasi_trantibum'
+          ) {
+            showToast(`Beralih ke akun ${acc.jabatan}: ${acc.nama}`, 'success');
+            setActiveTab('dashboard_kasi');
           } else {
             showToast(`Beralih ke akun ${acc.lingkungan}: ${acc.nama}`, 'success');
             setActiveTab('form');
@@ -1038,7 +1141,7 @@ export default function App() {
           onClose={() => setIsModalOpen(false)}
           sheetMeta={sheetMeta}
           hasGoogleAuth={Boolean(token)}
-          isAdmin={activeAccount.role === 'super_admin'}
+          isAdmin={isKelurahanAdmin(activeAccount.role)}
           attendanceList={attendanceList}
           onUpdateReport={handleUpdateReport}
           onDeleteReport={handleDeleteReport}

@@ -1,4 +1,4 @@
-import { UserAccount } from '../types';
+import { UserAccount, UserRole } from '../types';
 import { safeSetLocalStorage } from '../lib/safeStorage';
 import {
   fetchPasswordsFromFirestore,
