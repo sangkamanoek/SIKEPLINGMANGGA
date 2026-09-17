@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Runtime data files (rewritten by the app at runtime; app uses Firestore/tmp in production)
+data/attendance.json
+data/reports.json
+data/deleted_reports.json
+data/targets_capaian.json
+data/passwords.json
+data/profiles.json
