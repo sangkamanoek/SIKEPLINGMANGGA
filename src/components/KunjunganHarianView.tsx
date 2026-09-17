@@ -50,7 +50,15 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       const localRaw = localStorage.getItem('sikepling_kunjungan_harian_list_v1');
       if (localRaw) {
         const parsed = JSON.parse(localRaw);
-        if (Array.isArray(parsed)) setRecords(parsed);
+        if (Array.isArray(parsed)) {
+          const map = new Map<string, KunjunganWargaData>();
+          parsed.forEach((item: KunjunganWargaData) => {
+            if (item && item.id && !map.has(item.id)) {
+              map.set(item.id, item);
+            }
+          });
+          setRecords(Array.from(map.values()));
+        }
       }
     } catch {}
 
@@ -61,11 +69,14 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          const list: KunjunganWargaData[] = [];
+          const map = new Map<string, KunjunganWargaData>();
           snapshot.forEach((d) => {
             const data = d.data() as KunjunganWargaData;
-            if (data && data.id) list.push(data);
+            if (data && data.id && !map.has(data.id)) {
+              map.set(data.id, data);
+            }
           });
+          const list = Array.from(map.values());
           setRecords(list);
           localStorage.setItem('sikepling_kunjungan_harian_list_v1', JSON.stringify(list));
         },
@@ -122,7 +133,6 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       text += `${index + 1}. *${item.namaWarga}*\n`;
       text += `   - Alamat: ${item.alamat} (${item.lingkungan})\n`;
       text += `   - Kepling: ${item.namaKepling}\n`;
-      text += `   - Status Perlinsos: ${item.statusPerlinsos ? 'SUDAH' : 'BELUM'}\n`;
       text += `   - Keterangan: ${item.keterangan}\n\n`;
     });
 
@@ -243,7 +253,6 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                 <th className="py-3 px-3">NAMA WARGA</th>
                 <th className="py-3 px-3">ALAMAT LENGKAP</th>
                 <th className="py-3 px-3 text-center">LINGKUNGAN</th>
-                <th className="py-3 px-3 text-center">STATUS PERLINSOS</th>
                 <th className="py-3 px-3 text-center">KETERANGAN</th>
                 <th className="py-3 px-3 text-center">DOKUMENTASI</th>
                 <th className="py-3 px-3 text-center">AKSI</th>
@@ -252,13 +261,13 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
             <tbody className="divide-y divide-slate-200">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-slate-400 font-medium">
+                  <td colSpan={7} className="py-10 text-center text-slate-400 font-medium">
                     Belum ada catatan kunjungan pada tanggal {selectedDate}. Gunakan formulir di atas untuk menambahkan.
                   </td>
                 </tr>
               ) : (
                 filtered.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={`${item.id}_${index}`} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-3 text-center font-bold text-slate-500">{index + 1}</td>
                     <td className="py-3 px-3 font-extrabold text-slate-900">{item.namaWarga}</td>
                     <td className="py-3 px-3 text-slate-700 font-medium">
@@ -267,22 +276,6 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                     <td className="py-3 px-3 text-center font-bold text-slate-800">
                       {item.lingkungan}
                       <div className="text-[10px] text-slate-400 font-normal">{item.namaKepling}</div>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <span
-                        className={`px-2 py-0.5 rounded-md font-black text-[10px] inline-flex items-center gap-1 ${
-                          item.statusPerlinsos
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {item.statusPerlinsos ? (
-                          <CheckCircle2 className="w-3 h-3" />
-                        ) : (
-                          <XCircle className="w-3 h-3" />
-                        )}
-                        {item.statusPerlinsos ? 'SUDAH' : 'BELUM'}
-                      </span>
                     </td>
                     <td className="py-3 px-3 text-center">
                       <span

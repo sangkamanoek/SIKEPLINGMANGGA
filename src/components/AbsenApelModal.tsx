@@ -19,6 +19,7 @@ import {
   Info,
   Navigation,
   Video,
+  Lock,
 } from 'lucide-react';
 import { AbsenApelItem, StatusAbsenApel, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
@@ -266,6 +267,15 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isSuperAdmin = activeAccount.role === 'super_admin';
+    const timeStat = checkApelTimeStatus();
+    const isPresensiLocked = !isSuperAdmin && (timeStat.isLate || !timeStat.isWorkDay);
+
+    if (isPresensiLocked) {
+      showToast?.('Akses presensi apel pagi sudah ditutup (lewat pukul 08.30 WIB).', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const targetAcc = activeAccount.role === 'super_admin' ? selectedKeplingAccount : activeAccount;
@@ -315,7 +325,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
     if (statusFilter === 'izin') return item.record?.status === 'Izin';
     if (statusFilter === 'sakit') return item.record?.status === 'Sakit';
     if (statusFilter === 'dinas_luar') return item.record?.status === 'Dinas Luar';
-    if (statusFilter === 'belum') return !item.record;
+    if (statusFilter === 'belum') return !item.record || item.record.status === 'Tidak Mengikuti Apel';
     return true;
   });
 
@@ -400,7 +410,155 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
         {/* Modal Body */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5">
           {/* TAB 1: FORM INPUT ABSEN */}
-          {activeTab === 'form' && (
+          {activeTab === 'form' && (() => {
+            const isSuperAdmin = activeAccount.role === 'super_admin';
+            const timeStat = checkApelTimeStatus();
+            const isPresensiLocked = !isSuperAdmin && (timeStat.isLate || !timeStat.isWorkDay);
+
+            // Case 1: Past 08.30 WIB and Kepling did not submit attendance -> Locked
+            if (isPresensiLocked && !myTodayRecord) {
+              return (
+                <div className="space-y-5 max-w-2xl mx-auto">
+                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs text-rose-700 font-bold uppercase tracking-wider block">
+                        Status Presensi Saya ({selectedKeplingAccount.lingkungan})
+                      </span>
+                      <h3 className="text-sm font-black text-rose-950">
+                        {selectedKeplingAccount.nama}
+                      </h3>
+                    </div>
+                    <span className="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-black shadow-xs">
+                      TIDAK MENGIKUTI APEL
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl border bg-rose-50/70 border-rose-300 text-rose-950 flex items-center justify-between gap-3 text-xs font-bold">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-rose-600 shrink-0" />
+                      <div>
+                        <span className="block font-extrabold">
+                          Jadwal Absen Resmi: Senin s/d Jumat (07.30 - 08.30 WIB)
+                        </span>
+                        <span className="text-[11px] font-semibold opacity-90 text-rose-800">
+                          {timeStat.statusLabel}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-rose-200 text-rose-900 font-mono text-[11px] font-black shrink-0">
+                      {timeStat.formattedTime}
+                    </span>
+                  </div>
+
+                  <div className="bg-white border-2 border-rose-200 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-sm">
+                    <div className="w-16 h-16 bg-rose-100 border border-rose-200 rounded-2xl flex items-center justify-center mx-auto text-rose-600 shadow-inner">
+                      <Lock className="w-8 h-8" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-base sm:text-lg font-black text-rose-950 uppercase tracking-tight">
+                        Akses Presensi Apel Pagi Ditutup
+                      </h3>
+                      <p className="text-xs text-slate-600 max-w-lg mx-auto leading-relaxed">
+                        Batas waktu pengisian presensi apel pagi resmi adalah pukul <strong>07.30 s/d 08.30 WIB</strong>.
+                        Karena waktu saat ini telah melewati batas resmi ({timeStat.formattedTime}), formulir presensi telah ditutup dan dikunci secara otomatis.
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 max-w-md mx-auto space-y-1">
+                      <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider block">
+                        Status Kehadiran Hari Ini
+                      </span>
+                      <span className="text-sm sm:text-base font-black text-rose-900 block">
+                        ✕ TIDAK MENGIKUTI APEL PAGI
+                      </span>
+                      <span className="text-[10.5px] text-rose-700/80 block">
+                        Otomatis tercatat pada sistem rekapitulasi & laporan harian kelurahan
+                      </span>
+                    </div>
+
+                    <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('monitoring')}
+                        className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Users className="w-4 h-4" />
+                        <span>Lihat Monitoring 24 Kepling</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          stopCamera();
+                          onClose();
+                        }}
+                        className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // Case 2: Past 08.30 WIB and Kepling ALREADY submitted attendance -> Read-only confirmation
+            if (isPresensiLocked && myTodayRecord) {
+              return (
+                <div className="space-y-5 max-w-2xl mx-auto">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs text-emerald-700 font-bold uppercase tracking-wider block">
+                        Status Presensi Saya ({selectedKeplingAccount.lingkungan})
+                      </span>
+                      <h3 className="text-sm font-black text-emerald-950">
+                        {selectedKeplingAccount.nama}
+                      </h3>
+                    </div>
+                    <span className="px-3 py-1 rounded-full bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1 shadow-xs">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                      Sudah Absen ({myTodayRecord.status})
+                    </span>
+                  </div>
+
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Presensi Anda Telah Berhasil Dicatat Hari Ini</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                      <div>
+                        <span className="text-slate-500 block text-[11px]">Waktu Presensi:</span>
+                        <span className="font-bold text-slate-900">{myTodayRecord.jam || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[11px]">Status:</span>
+                        <span className="font-bold text-emerald-700">{myTodayRecord.status}</span>
+                      </div>
+                      {myTodayRecord.lokasiGps && (
+                        <div className="col-span-2">
+                          <span className="text-slate-500 block text-[11px]">Lokasi:</span>
+                          <span className="font-medium text-slate-800 text-[11px]">{myTodayRecord.lokasiGps}</span>
+                        </div>
+                      )}
+                      {myTodayRecord.catatan && (
+                        <div className="col-span-2">
+                          <span className="text-slate-500 block text-[11px]">Catatan:</span>
+                          <span className="italic text-slate-700 text-[11px]">"{myTodayRecord.catatan}"</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 flex items-center gap-1.5 pt-1">
+                      <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>Pengubahan data telah dikunci karena telah melewati batas resmi pukul 08.30 WIB.</span>
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
+            // Normal active form
+            return (
             <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl mx-auto">
               {/* Account Selector for Admin assistance */}
               {activeAccount.role === 'super_admin' ? (
@@ -440,8 +598,8 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                       Sudah Absen ({myTodayRecord.status})
                     </span>
                   ) : (
-                    <span className="px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-xs font-black animate-pulse shadow-xs">
-                      Belum Absen Apel Hari Ini
+                    <span className="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-black shadow-xs">
+                      TIDAK MENGIKUTI APEL (Belum Isi Presensi)
                     </span>
                   )}
                 </div>
@@ -466,7 +624,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                       <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                       <div>
                         <span className="block font-extrabold">
-                          Jadwal Absen Resmi: Senin s/d Jumat (07.30 - 09.00 WIB)
+                          Jadwal Absen Resmi: Senin s/d Jumat (07.30 - 08.30 WIB)
                         </span>
                         <span className="text-[11px] font-semibold opacity-90">
                           {timeStat.statusLabel}
@@ -485,8 +643,8 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                 <label className="text-xs font-bold text-slate-700 block">
                   Status Kehadiran Apel Pagi <span className="text-red-500">*</span>
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {(['Hadir', 'Izin', 'Sakit', 'Dinas Luar'] as StatusAbsenApel[]).map((st) => (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                  {(['Hadir', 'Izin', 'Sakit', 'Dinas Luar', 'Tidak Mengikuti Apel'] as StatusAbsenApel[]).map((st) => (
                     <button
                       key={st}
                       type="button"
@@ -499,11 +657,13 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                             ? 'bg-blue-700 text-white border-blue-800 shadow-md ring-2 ring-blue-500'
                             : st === 'Sakit'
                             ? 'bg-amber-600 text-white border-amber-700 shadow-md ring-2 ring-amber-500'
-                            : 'bg-purple-700 text-white border-purple-800 shadow-md ring-2 ring-purple-500'
+                            : st === 'Dinas Luar'
+                            ? 'bg-purple-700 text-white border-purple-800 shadow-md ring-2 ring-purple-500'
+                            : 'bg-rose-700 text-white border-rose-800 shadow-md ring-2 ring-rose-500'
                           : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
-                      <span>{st}</span>
+                      <span className="text-center">{st}</span>
                     </button>
                   ))}
                 </div>
@@ -700,7 +860,8 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                 </button>
               </div>
             </form>
-          )}
+          );
+        })()}
 
           {/* TAB 2: MONITORING 24 KEPLING */}
           {activeTab === 'monitoring' && (
@@ -749,14 +910,14 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                   <span className="text-[10px] text-purple-800 font-semibold block">Kepling</span>
                 </div>
 
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-center col-span-2 sm:col-span-1">
-                  <span className="text-[11px] text-red-700 font-bold block uppercase">
-                    BELUM ABSEN
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-center col-span-2 sm:col-span-1">
+                  <span className="text-[11px] text-rose-700 font-bold block uppercase">
+                    TIDAK MENGIKUTI APEL
                   </span>
-                  <span className="text-2xl font-black text-red-950">
+                  <span className="text-2xl font-black text-rose-950">
                     {summary.totalBelumAbsen}
                   </span>
-                  <span className="text-[10px] text-red-800 font-semibold block">Kepling</span>
+                  <span className="text-[10px] text-rose-800 font-semibold block">Kepling</span>
                 </div>
               </div>
 
@@ -780,7 +941,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                     { key: 'izin', label: 'Izin' },
                     { key: 'sakit', label: 'Sakit' },
                     { key: 'dinas_luar', label: 'Dinas Luar' },
-                    { key: 'belum', label: 'Belum Absen' },
+                    { key: 'belum', label: 'Tidak Mengikuti Apel' },
                   ].map((fl) => (
                     <button
                       key={fl.key}
@@ -812,8 +973,10 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                             ? 'bg-blue-50/50 border-blue-200'
                             : record.status === 'Sakit'
                             ? 'bg-amber-50/50 border-amber-200'
-                            : 'bg-purple-50/50 border-purple-200'
-                          : 'bg-red-50/40 border-red-200'
+                            : record.status === 'Dinas Luar'
+                            ? 'bg-purple-50/50 border-purple-200'
+                            : 'bg-rose-50/50 border-rose-200'
+                          : 'bg-rose-50/40 border-rose-200'
                       }`}
                     >
                       {/* Avatar Photo */}
@@ -855,14 +1018,16 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                                   ? 'bg-blue-700 text-white'
                                   : record.status === 'Sakit'
                                   ? 'bg-amber-600 text-white'
-                                  : 'bg-purple-700 text-white'
+                                  : record.status === 'Dinas Luar'
+                                  ? 'bg-purple-700 text-white'
+                                  : 'bg-rose-700 text-white'
                               }`}
                             >
                               {record.status}
                             </span>
                           ) : (
-                            <span className="text-[10px] font-black bg-red-600 text-white px-2 py-0.5 rounded-md">
-                              Belum Absen
+                            <span className="text-[10px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-md">
+                              TIDAK MENGIKUTI APEL
                             </span>
                           )}
                         </div>
@@ -890,8 +1055,8 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                             )}
                           </div>
                         ) : (
-                          <p className="text-[11px] text-red-600 mt-1 font-semibold">
-                            Belum mengirim presensi apel
+                          <p className="text-[11px] text-rose-600 mt-1 font-semibold">
+                            Tidak mengikuti apel pagi
                           </p>
                         )}
                       </div>

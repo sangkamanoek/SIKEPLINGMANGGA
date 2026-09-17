@@ -33,16 +33,16 @@ export function getCurrentTimeString(): string {
 export interface WibTimeStatus {
   formattedTime: string;
   isWorkDay: boolean; // Monday - Friday
-  isWithinWindow: boolean; // 07:30 - 09:00 WIB on Monday - Friday
+  isWithinWindow: boolean; // 07:30 - 08:30 WIB on Monday - Friday
   isTooEarly: boolean; // Before 07:30 WIB
-  isLate: boolean; // After 09:00 WIB
+  isLate: boolean; // After 08:30 WIB
   statusLabel: string;
 }
 
 /**
  * Check if current time & day falls within official Apel Pagi window:
  * Hari: Senin s/d Jumat
- * Jam: 07:30 - 09:00 WIB
+ * Jam: 07:30 - 08:30 WIB
  */
 export function checkApelTimeStatus(): WibTimeStatus {
   const d = new Date();
@@ -52,7 +52,7 @@ export function checkApelTimeStatus(): WibTimeStatus {
   const totalMin = hours * 60 + minutes;
 
   const startMin = 7 * 60 + 30; // 07:30 WIB = 450 min
-  const endMin = 9 * 60 + 0;   // 09:00 WIB = 540 min
+  const endMin = 8 * 60 + 30;   // 08:30 WIB = 510 min
 
   const hoursStr = String(hours).padStart(2, '0');
   const minStr = String(minutes).padStart(2, '0');
@@ -80,7 +80,7 @@ export function checkApelTimeStatus(): WibTimeStatus {
       isWithinWindow: false,
       isTooEarly: true,
       isLate: false,
-      statusLabel: 'Belum Jam Apel (Jam Resmi 07.30 - 09.00 WIB)',
+      statusLabel: 'Belum Jam Apel (Jadwal Resmi 07.30 - 08.30 WIB)',
     };
   }
 
@@ -91,7 +91,7 @@ export function checkApelTimeStatus(): WibTimeStatus {
       isWithinWindow: false,
       isTooEarly: false,
       isLate: true,
-      statusLabel: 'Terlambat Apel (Lewat Jam Resmi 09.00 WIB)',
+      statusLabel: 'Akses Presensi Ditutup (Lewat Pukul 08.30 WIB) • Otomatis Tidak Mengikuti Apel',
     };
   }
 
@@ -101,7 +101,7 @@ export function checkApelTimeStatus(): WibTimeStatus {
     isWithinWindow: true,
     isTooEarly: false,
     isLate: false,
-    statusLabel: 'Tepat Waktu (Jam Apel Resmi 07.30 - 09.00 WIB)',
+    statusLabel: 'Tepat Waktu (Jam Apel Resmi 07.30 - 08.30 WIB)',
   };
 }
 

@@ -882,6 +882,8 @@ export default function App() {
             onConnectGoogle={handleConnectGoogle}
             activeAccount={activeAccount}
             preselectedKepling={preselectedKepling}
+            attendanceList={attendanceList}
+            onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
           />
         )}
 
@@ -1037,6 +1039,7 @@ export default function App() {
           sheetMeta={sheetMeta}
           hasGoogleAuth={Boolean(token)}
           isAdmin={activeAccount.role === 'super_admin'}
+          attendanceList={attendanceList}
           onUpdateReport={handleUpdateReport}
           onDeleteReport={handleDeleteReport}
         />

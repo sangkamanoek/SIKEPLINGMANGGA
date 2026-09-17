@@ -2,8 +2,6 @@ import React, { useState, useRef } from 'react';
 import {
   Users,
   Camera,
-  CheckSquare,
-  Square,
   Upload,
   Trash2,
   Save,
@@ -26,7 +24,7 @@ export interface KunjunganWargaData {
   lingkunganNomor: number;
   namaKepling: string;
   keplingId: string;
-  statusPerlinsos: boolean; // true = Sudah, false = Belum
+  statusPerlinsos?: boolean;
   keterangan: KeteranganKunjunganType;
   fotoDokumentasi?: string;
   createdAt: string;
@@ -56,8 +54,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const [targetKeplingId, setTargetKeplingId] = useState<string>(
     isSuperAdmin ? 'kepling_1' : currentUser.id
   );
-  const [statusPerlinsos, setStatusPerlinsos] = useState<boolean>(false);
-  const [keterangan, setKeterangan] = useState<KeteranganKunjunganType>('Belum');
+  const [keterangan, setKeterangan] = useState<KeteranganKunjunganType>('Sudah');
   const [fotoDokumentasi, setFotoDokumentasi] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string>('');
@@ -121,7 +118,6 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       lingkunganNomor: selectedKepling.nomorLingkungan || 1,
       namaKepling: selectedKepling.nama,
       keplingId: selectedKepling.id,
-      statusPerlinsos,
       keterangan,
       fotoDokumentasi: fotoDokumentasi || '',
       createdAt: nowIso,
@@ -137,8 +133,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       lingkunganNomor: selectedKepling.nomorLingkungan || 1,
       namaKepling: selectedKepling.nama,
       keplingId: selectedKepling.id,
-      statusPerlinsos: Boolean(statusPerlinsos),
-      keterangan: keterangan || 'Belum',
+      keterangan: keterangan || 'Sudah',
       createdAt: nowIso,
     };
 
@@ -158,8 +153,11 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
         const localKey = 'sikepling_kunjungan_harian_list_v1';
         const existingRaw = localStorage.getItem(localKey);
         const existing = existingRaw ? JSON.parse(existingRaw) : [];
-        existing.unshift(data);
-        localStorage.setItem(localKey, JSON.stringify(existing));
+        const filteredList = Array.isArray(existing)
+          ? existing.filter((item: any) => item && item.id !== id)
+          : [];
+        filteredList.unshift(data);
+        localStorage.setItem(localKey, JSON.stringify(filteredList));
       } catch (locErr) {
         console.warn('Local storage error:', locErr);
       }
@@ -169,8 +167,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       // Reset form
       setNamaWarga('');
       setAlamat('');
-      setStatusPerlinsos(false);
-      setKeterangan('Belum');
+      setKeterangan('Sudah');
       setFotoDokumentasi('');
 
       if (onSuccess) {
@@ -270,28 +267,6 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
             onChange={(e) => setAlamat(e.target.value)}
             className="w-full p-2.5 rounded-xl border border-slate-300 font-semibold text-slate-800 focus:outline-emerald-500"
           />
-        </div>
-
-        {/* Status Perlinsos (Checkbox) */}
-        <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-200">
-          <label className="flex items-center gap-2.5 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={statusPerlinsos}
-              onChange={(e) => setStatusPerlinsos(e.target.checked)}
-              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-            />
-            <div>
-              <span className="font-black text-slate-800 block text-xs">
-                Status Perlinsos (Sudah Terdaftar / Penerima Bantuan)
-              </span>
-              <span className="text-[11px] text-slate-500 font-medium">
-                {statusPerlinsos
-                  ? '✓ SUDAH Masuk Data Perlinsos'
-                  : '✗ BELUM Terdaftar Perlinsos'}
-              </span>
-            </div>
-          </label>
         </div>
 
         {/* Dropdown Keterangan (Sudah / Belum / Menolak / Tidak Ditempat) */}

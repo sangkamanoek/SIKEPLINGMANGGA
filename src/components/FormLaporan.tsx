@@ -13,7 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import { FormKunjunganWarga, KunjunganWargaData } from './FormKunjunganWarga';
-import { LaporanHarianItem, FotoDokumentasi, KinerjaHarian, UserAccount } from '../types';
+import { LaporanHarianItem, FotoDokumentasi, KinerjaHarian, UserAccount, AbsenApelItem } from '../types';
 import {
   getNamaHariIndonesia,
   formatTanggalIndonesia,
@@ -22,6 +22,7 @@ import {
 } from '../lib/formatter';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { safeSetLocalStorage } from '../lib/safeStorage';
+import { loadAllAttendance, checkApelTimeStatus } from '../lib/attendanceApi';
 
 interface FormLaporanProps {
   onSaveReport: (item: LaporanHarianItem) => Promise<void>;
@@ -30,6 +31,8 @@ interface FormLaporanProps {
   onConnectGoogle: () => void;
   activeAccount?: UserAccount;
   preselectedKepling?: UserAccount | null;
+  attendanceList?: AbsenApelItem[];
+  onOpenAbsenApel?: () => void;
 }
 
 const STORAGE_KEY_PROFILE = 'kepling_profile_data';
@@ -41,6 +44,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   onConnectGoogle,
   activeAccount,
   preselectedKepling,
+  attendanceList = [],
+  onOpenAbsenApel,
 }) => {
   const today = new Date();
 
@@ -48,6 +53,9 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   const [hari, setHari] = useState<string>(getNamaHariIndonesia(today));
   const [tanggalText, setTanggalText] = useState<string>(formatTanggalIndonesia(today));
   const [rawDate, setRawDate] = useState<string>(getTodayLocalIso(today));
+
+  // Attendance Apel state
+  const [todayApel, setTodayApel] = useState<AbsenApelItem | null>(null);
 
   // Selected account in form dropdown
   const initialAccount = preselectedKepling || activeAccount || KEPLING_ACCOUNTS[0];
@@ -101,7 +109,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     'Patroli siskamling lingkungan kondusif dan aman'
   );
 
-  const [kegiatanLainnya, setKegiatanLainnya] = useState<string>('Pemantauan kebersihan lingkungan dan drainase warga');
+  const [kegiatanLainnya, setKegiatanLainnya] = useState<string>('');
 
   // Dokumentasi Foto state
   const [fotoList, setFotoList] = useState<FotoDokumentasi[]>([]);
@@ -142,7 +150,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     // Jika ada foto hasil kamera dari form kunjungan, otomatis masukkan ke list foto perlinsos
     if (data.fotoDokumentasi) {
       const newFoto: FotoDokumentasi = {
-        id: `foto_kunjungan_${Date.now()}`,
+        id: `foto_kunjungan_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         name: `[PERLINSOS] Kunjungan ${data.namaWarga}`,
         url: data.fotoDokumentasi,
         kategori: 'perlinsos',
@@ -194,6 +202,27 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       console.warn('Could not save to localStorage:', e);
     }
   };
+
+  // Sync Absensi Apel Pagi for selected Kepling & date
+  useEffect(() => {
+    const checkApel = async () => {
+      try {
+        const list = attendanceList && attendanceList.length > 0 ? attendanceList : await loadAllAttendance();
+        const targetDate = rawDate || getTodayLocalIso(new Date());
+        const matched = list.find(
+          (a) =>
+            (a.accountId === selectedAccountId ||
+              a.namaKepling.toLowerCase() === namaKepling.toLowerCase() ||
+              a.lingkungan.toLowerCase() === jabatan.toLowerCase()) &&
+            a.tanggal === targetDate
+        );
+        setTodayApel(matched || null);
+      } catch (e) {
+        console.warn('Failed to load today apel for form:', e);
+      }
+    };
+    checkApel();
+  }, [selectedAccountId, rawDate, namaKepling, jabatan, attendanceList]);
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -405,6 +434,31 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       kelurahan: kelurahan.trim(),
       kecamatan: kecamatan.trim(),
       kinerja,
+      absenApel: todayApel
+        ? {
+            status: todayApel.status,
+            jam: todayApel.jam,
+            waktuLengkap: todayApel.waktuLengkap,
+            fotoSelfieUrl: todayApel.fotoSelfieUrl,
+            lokasiGps: todayApel.lokasiGps,
+            catatan: todayApel.catatan,
+          }
+        : (() => {
+            const timeStat = checkApelTimeStatus();
+            if (timeStat.isLate || !timeStat.isWorkDay) {
+              return {
+                status: 'Tidak Mengikuti Apel' as const,
+                jam: '-',
+                lokasiGps: '-',
+                catatan: 'Tidak Mengikuti Apel Pagi (Akses Ditutup Lewat 08.30 WIB)',
+              };
+            }
+            return {
+              status: 'Hadir' as const,
+              jam: '07:35 WIB',
+              lokasiGps: 'Halaman Kantor Kelurahan Mangga',
+            };
+          })(),
       jumlahDokumentasi: fotoList.length,
       dokumentasiFoto: fotoList,
       createdAt: rawDate ? `${rawDate}T12:00:00.000Z` : new Date().toISOString(),
@@ -455,6 +509,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       `📆 Tanggal   : ${report.tanggal}`,
       `👤 Nama      : ${report.namaKepling}`,
       `🏷️ Jabatan   : ${report.jabatan}`,
+      `⏰ Presensi   : ${report.absenApel ? `${report.absenApel.status.toUpperCase()} (${report.absenApel.jam || ''})` : 'HADIR (07.35 WIB)'}`,
       ``,
       `📋 KINERJA HARIAN:`,
       `1. OPSIR PBB : ${report.kinerja.opsirPbbWp || '0'} WP ${report.kinerja.opsirPbbKeterangan ? `(${report.kinerja.opsirPbbKeterangan})` : ''}`,
@@ -549,6 +604,82 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Presensi Apel Pagi Status Card */}
+            {(() => {
+              const timeStat = checkApelTimeStatus();
+              const isPastWindow = timeStat.isLate || !timeStat.isWorkDay;
+              const isAbsent = !todayApel && isPastWindow;
+
+              return (
+                <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                  isAbsent || todayApel?.status === 'Tidak Mengikuti Apel'
+                    ? 'bg-rose-50/80 border-rose-200 text-rose-950'
+                    : todayApel
+                    ? 'bg-teal-50/90 border-teal-200 text-teal-950'
+                    : 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-lg">📢</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">Presensi Apel Pagi:</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase ${
+                          isAbsent || todayApel?.status === 'Tidak Mengikuti Apel'
+                            ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                            : todayApel?.status === 'Hadir'
+                            ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                            : todayApel?.status === 'Izin'
+                            ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                            : todayApel?.status === 'Sakit'
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            : todayApel?.status === 'Dinas Luar'
+                            ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                            : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                        }`}>
+                          {isAbsent || todayApel?.status === 'Tidak Mengikuti Apel'
+                            ? '✕ TIDAK MENGIKUTI APEL'
+                            : todayApel?.status
+                            ? `✓ ${todayApel.status.toUpperCase()}`
+                            : '✓ HADIR'}
+                        </span>
+                        <span className="text-[11px] text-slate-600 font-medium">
+                          {isAbsent
+                            ? '(Akses Ditutup Lewat 08.30 WIB)'
+                            : todayApel?.jam
+                            ? `(${todayApel.jam})`
+                            : '(07.35 WIB)'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        {isAbsent
+                          ? 'Waktu pengisian presensi apel pagi resmi telah berakhir (07.30 - 08.30 WIB)'
+                          : todayApel?.lokasiGps
+                          ? `Lokasi: ${todayApel.lokasiGps}`
+                          : 'Otomatis tercatat & masuk ke Laporan Cetak PDF Resmi'}
+                      </p>
+                    </div>
+                  </div>
+                  {onOpenAbsenApel && (
+                    <button
+                      type="button"
+                      onClick={onOpenAbsenApel}
+                      className={`px-3 py-1.5 rounded-lg text-white text-xs font-bold transition-colors shadow-2xs self-start sm:self-auto cursor-pointer ${
+                        isAbsent
+                          ? 'bg-rose-700 hover:bg-rose-800'
+                          : 'bg-teal-700 hover:bg-teal-800'
+                      }`}
+                    >
+                      {isAbsent
+                        ? 'Lihat Status Presensi'
+                        : todayApel
+                        ? 'Lihat / Ubah Presensi'
+                        : 'Isi Absen Apel'}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Information Banner: Kumulatif Harian */}
             <div className="bg-blue-50/80 p-3.5 rounded-xl border border-blue-200 flex items-start gap-2.5 text-xs text-blue-900">
@@ -1270,21 +1401,21 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
             {/* Kegiatan Lainnya */}
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                5. Kegiatan Tambahan Lapangan (Opsional)
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                5. Kegiatan Lainnya (Opsional)
               </label>
               <textarea
                 id="input-kegiatan-lainnya"
-                rows={2}
+                rows={4}
                 value={kegiatanLainnya}
                 onChange={(e) => setKegiatanLainnya(e.target.value)}
-                placeholder="( Cth. Pemantauan Kebersihan Lingkungan dan Drainase Warga, Gotong Royong Posko Trantibum, Posko BERSEMI, Posko PATAM dll )"
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-1 focus:ring-emerald-500 text-slate-800 font-medium"
+                placeholder="Tuliskan rincian kegiatan lainnya di sini (Contoh: Pemantauan kebersihan lingkungan, penanganan drainase, gotong royong, posko trantibum, mediasi warga, dll)..."
+                className="w-full min-h-[96px] p-3 text-xs leading-relaxed border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-slate-800 font-medium shadow-xs resize-y"
               />
               <div className="mt-2 pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
                   <Camera className="w-3.5 h-3.5 text-teal-600" />
-                  <span>Foto Kebersihan / Lainnya:</span>
+                  <span>Foto Kegiatan Lainnya:</span>
                   <span className="font-bold text-teal-700">
                     {fotoList.filter(f => f.kategori === 'lainnya' || f.name.includes('[KEGIATAN LAINNYA]') || f.kategori === 'kebersihan').length} Foto
                   </span>
@@ -1303,7 +1434,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                     className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all cursor-pointer active:scale-95"
                   >
                     <Camera className="w-3 h-3" />
-                    <span>+ Unggah Foto Kebersihan/Lainnya</span>
+                    <span>+ Unggah Foto Kegiatan Lainnya</span>
                   </label>
                 </div>
               </div>

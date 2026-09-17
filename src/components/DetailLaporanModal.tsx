@@ -23,8 +23,10 @@ import {
   Maximize2,
   RefreshCw,
 } from 'lucide-react';
-import { LaporanHarianItem, SheetMetadata } from '../types';
+import { LaporanHarianItem, SheetMetadata, AbsenApelItem } from '../types';
 import { formatTanggalIndonesia, generateReportPdfFileName } from '../lib/formatter';
+import { loadAllAttendance } from '../lib/attendanceApi';
+import { KEPLING_ACCOUNTS } from '../data/keplingList';
 
 interface DetailLaporanModalProps {
   item: LaporanHarianItem | null;
@@ -33,6 +35,7 @@ interface DetailLaporanModalProps {
   sheetMeta: SheetMetadata | null;
   hasGoogleAuth: boolean;
   isAdmin?: boolean;
+  attendanceList?: AbsenApelItem[];
   onUpdateReport?: (updatedItem: LaporanHarianItem) => Promise<void>;
   onDeleteReport?: (id: string) => Promise<void>;
 }
@@ -44,6 +47,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   sheetMeta,
   hasGoogleAuth,
   isAdmin = true,
+  attendanceList = [],
   onUpdateReport,
   onDeleteReport,
 }) => {
@@ -61,9 +65,117 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [pdfStatusMsg, setPdfStatusMsg] = useState('');
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [absenApelData, setAbsenApelData] = useState<AbsenApelItem | null>(null);
+
+  // Sync / load Absensi Apel Pagi data for the report
+  useEffect(() => {
+    if (!item) {
+      setAbsenApelData(null);
+      return;
+    }
+
+    if (item.absenApel && (item.absenApel.status || item.absenApel.jam)) {
+      setAbsenApelData({
+        id: 'absen_inline',
+        accountId: item.keplingId || '',
+        namaKepling: item.namaKepling || '',
+        lingkungan: item.jabatan || '',
+        tanggal: item.tanggal || '',
+        jam: item.absenApel.jam || '07:35 WIB',
+        waktuLengkap: item.absenApel.waktuLengkap || item.createdAt || '',
+        status: (item.absenApel.status as any) || 'Hadir',
+        fotoSelfieUrl: item.absenApel.fotoSelfieUrl,
+        lokasiGps: item.absenApel.lokasiGps || 'Halaman Kantor Kelurahan Mangga',
+        catatan: item.absenApel.catatan,
+        createdAt: item.createdAt || '',
+      });
+      return;
+    }
+
+    let dateKey = '';
+    if (item.tanggal && /^\d{4}-\d{2}-\d{2}$/.test(item.tanggal)) {
+      dateKey = item.tanggal;
+    } else if (item.createdAt && item.createdAt.length >= 10) {
+      dateKey = item.createdAt.substring(0, 10);
+    } else if (item.tanggal) {
+      const monthMap: Record<string, string> = {
+        JANUARI: '01', PEBRUARI: '02', FEBRUARI: '02', MARET: '03', APRIL: '04', MEI: '05', JUNI: '06',
+        JULI: '07', AGUSTUS: '08', SEPTEMBER: '09', OKTOBER: '10', NOVEMBER: '11', DESEMBER: '12',
+        JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', JUN: '06', JUL: '07', AUG: '08', SEP: '09', OCT: '10', NOV: '11', DEC: '12'
+      };
+      const parts = item.tanggal.trim().split(/[\s-]+/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          dateKey = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+        } else {
+          const day = parts[0].padStart(2, '0');
+          const mStr = parts[1].toUpperCase();
+          const month = monthMap[mStr] || '01';
+          const year = parts[2];
+          dateKey = `${year}-${month}-${day}`;
+        }
+      }
+    }
+
+    const kepling = KEPLING_ACCOUNTS.find(
+      (k) =>
+        (item.keplingId && k.id === item.keplingId) ||
+        k.nama.toLowerCase() === (item.namaKepling || '').toLowerCase() ||
+        k.jabatan.toLowerCase() === (item.jabatan || '').toLowerCase() ||
+        k.lingkungan.toLowerCase() === (item.jabatan || '').toLowerCase()
+    );
+    const targetKeplingId = item.keplingId || kepling?.id;
+
+    const findMatch = (list: AbsenApelItem[]) => {
+      return list.find((a) => {
+        const matchKepling =
+          (targetKeplingId && a.accountId === targetKeplingId) ||
+          (kepling && a.accountId === kepling.id) ||
+          a.namaKepling.toLowerCase() === (item.namaKepling || '').toLowerCase() ||
+          a.lingkungan.toLowerCase() === (item.jabatan || '').toLowerCase();
+
+        const matchDate =
+          (dateKey && a.tanggal === dateKey) ||
+          (item.createdAt && a.tanggal === item.createdAt.substring(0, 10));
+
+        return matchKepling && matchDate;
+      });
+    };
+
+    if (attendanceList && attendanceList.length > 0) {
+      const m = findMatch(attendanceList);
+      if (m) {
+        setAbsenApelData(m);
+        return;
+      }
+    }
+
+    loadAllAttendance().then((list) => {
+      const m = findMatch(list);
+      setAbsenApelData(m || null);
+    });
+  }, [item, attendanceList]);
+
+  // Combined photos array for lightbox and printing
+  const effectivePhotos = React.useMemo(() => {
+    const list = [...(item?.dokumentasiFoto || [])];
+    if (absenApelData?.fotoSelfieUrl) {
+      const alreadyHasApel = list.some((p) => p.url === absenApelData.fotoSelfieUrl || (p.name && p.name.toLowerCase().includes('apel')));
+      if (!alreadyHasApel) {
+        list.unshift({
+          id: 'foto_apel_selfie',
+          url: absenApelData.fotoSelfieUrl,
+          name: 'Foto Selfie Presensi Apel Pagi',
+          timestamp: absenApelData.waktuLengkap || new Date().toISOString(),
+          kategori: 'apel',
+        });
+      }
+    }
+    return list;
+  }, [item?.dokumentasiFoto, absenApelData]);
 
   // All photos array for easy lightbox flipping
-  const allDokumentasi = item?.dokumentasiFoto || [];
+  const allDokumentasi = effectivePhotos;
 
   const handleOpenPhotoPreview = (fotoUrl: string, fallbackName: string) => {
     const foundIdx = allDokumentasi.findIndex((p) => p.url === fotoUrl);
@@ -246,6 +358,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
   const groupPhotosByActivity = (photos: Array<{ id?: string; url: string; name?: string; kategori?: string }> = []) => {
     const groups: Record<string, Array<{ id?: string; url: string; name?: string; kategori?: string }>> = {
+      apel: [],
       pbb: [],
       perlinsos: [],
       ikd: [],
@@ -258,7 +371,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       const cat = (foto.kategori || '').toLowerCase();
       const name = (foto.name || '').toLowerCase();
 
-      if (cat === 'pbb' || name.includes('[pbb]') || name.includes('pbb') || name.includes('pajak')) {
+      if (cat === 'apel' || name.includes('[apel]') || name.includes('apel') || name.includes('presensi') || name.includes('selfie')) {
+        groups.apel.push(foto);
+      } else if (cat === 'pbb' || name.includes('[pbb]') || name.includes('pbb') || name.includes('pajak')) {
         groups.pbb.push(foto);
       } else if (cat === 'perlinsos' || name.includes('[perlinsos]') || name.includes('perlinsos') || name.includes('bansos')) {
         groups.perlinsos.push(foto);
@@ -274,6 +389,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     });
 
     const metaList = [
+      { key: 'apel', title: 'Dokumentasi Presensi Apel Pagi', badgeBg: 'bg-teal-100', textClr: 'text-teal-950', borderClr: 'border-teal-300' },
       { key: 'pbb', title: '1. Dokumentasi Opsir PBB (Pajak Bumi & Bangunan)', badgeBg: 'bg-blue-100', textClr: 'text-blue-900', borderClr: 'border-blue-300' },
       { key: 'perlinsos', title: '2. Dokumentasi PERLINSOS (Perlindungan Sosial)', badgeBg: 'bg-emerald-100', textClr: 'text-emerald-900', borderClr: 'border-emerald-300' },
       { key: 'ikd', title: '3. Dokumentasi Aktivasi IKD Dukcapil', badgeBg: 'bg-purple-100', textClr: 'text-purple-900', borderClr: 'border-purple-300' },
@@ -492,6 +608,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       `Tanggal  : ${activeItem?.tanggal || ''}`,
       `Nama     : ${activeItem?.namaKepling || ''}`,
       `Jabatan  : ${activeItem?.jabatan || ''}`,
+      `Presensi Apel : ${absenApelData ? `${absenApelData.status.toUpperCase()} (${absenApelData.jam || ''})` : 'HADIR (07.35 WIB)'}`,
       `----------------------------------------`,
       `KINERJA HARIAN:`,
       `1. OPSIR PBB : ${kin.opsirPbbWp || '0'} WP ${kin.opsirPbbKeterangan ? `(${kin.opsirPbbKeterangan})` : ''}`,
@@ -773,6 +890,46 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                           <td className="font-bold">:</td>
                           <td className="text-slate-900">{item.kecamatan || 'Kecamatan Medan Tuntungan'}</td>
                         </tr>
+                        <tr>
+                          <td className="font-bold py-0.5 text-slate-800">Presensi Apel Pagi</td>
+                          <td className="font-bold">:</td>
+                          <td className="font-bold text-slate-900" colSpan={4}>
+                            <div className="flex flex-wrap items-center gap-1.5 font-sans">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[7.5pt] font-black uppercase tracking-wider ${
+                                  absenApelData?.status === 'Hadir'
+                                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                    : absenApelData?.status === 'Izin'
+                                    ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                    : absenApelData?.status === 'Sakit'
+                                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                    : absenApelData?.status === 'Dinas Luar'
+                                    ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                                    : absenApelData?.status === 'Tidak Mengikuti Apel'
+                                    ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                }`}
+                              >
+                                {absenApelData?.status === 'Tidak Mengikuti Apel'
+                                  ? '✕ TIDAK MENGIKUTI APEL'
+                                  : absenApelData?.status
+                                  ? `✓ ${absenApelData.status.toUpperCase()}`
+                                  : '✓ HADIR'}
+                              </span>
+                              <span className="text-slate-800 font-medium text-[8pt]">
+                                {absenApelData?.status === 'Tidak Mengikuti Apel' ? (
+                                  absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ' • Tanpa Kehadiran Apel Pagi'
+                                ) : (
+                                  <>
+                                    {absenApelData?.jam ? `(Pukul ${absenApelData.jam})` : '(07.35 WIB)'}
+                                    {absenApelData?.lokasiGps ? ` • ${absenApelData.lokasiGps}` : ' • Halaman Kantor Kelurahan Mangga'}
+                                    {absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ''}
+                                  </>
+                                )}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -842,21 +999,21 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                           <td className="text-center font-bold border border-black py-1">6</td>
                           <td className="font-bold border border-black px-1.5 py-1">Kegiatan Kebersihan & Lainnya</td>
                           <td className="text-center font-bold border border-black py-1">Terlaksana</td>
-                          <td className="border border-black px-1.5 py-1">{item.kinerja?.kegiatanLainnya || 'Pemantauan kebersihan lingkungan dan drainase warga'}</td>
+                          <td className="border border-black px-1.5 py-1">{item.kinerja?.kegiatanLainnya || '-'}</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
 
                   {/* Foto Dokumentasi - Terkelompok Per Kegiatan & Adaptif Kedinasan */}
-                  {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
+                  {effectivePhotos && effectivePhotos.length > 0 && (
                     <div className="mb-2">
                       <div className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1.5 text-slate-900 flex items-center justify-between">
-                        <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
+                        <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({effectivePhotos.length} FOTO):</span>
                         <span className="text-[7pt] text-slate-500 font-normal normal-case">Format Album Resmi Kedinasan</span>
                       </div>
                       <div className="space-y-2">
-                        {groupPhotosByActivity(item.dokumentasiFoto.slice(0, 6)).map((group) => (
+                        {groupPhotosByActivity(effectivePhotos.slice(0, 6)).map((group) => (
                           <div key={group.key}>
                             <div className="text-[7.5pt] font-bold font-sans text-slate-800 uppercase mb-1 flex items-center justify-between border-b border-slate-200 pb-0.5">
                               <span>• {group.title} ({group.photos.length} Foto)</span>
@@ -1785,6 +1942,44 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     <td className="font-bold" style={{ fontWeight: 'bold' }}>:</td>
                     <td className="text-slate-900" style={{ color: '#0f172a' }}>{item?.kecamatan || 'Kecamatan Medan Tuntungan'}</td>
                   </tr>
+                  <tr>
+                    <td className="font-bold py-0.5 text-slate-800" style={{ fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Presensi Apel Pagi</td>
+                    <td className="font-bold" style={{ fontWeight: 'bold' }}>:</td>
+                    <td className="font-bold text-slate-900" colSpan={4} style={{ fontWeight: 'bold', color: '#0f172a' }}>
+                      <span
+                        style={{
+                          fontWeight: 'bold',
+                          color:
+                            absenApelData?.status === 'Tidak Mengikuti Apel'
+                              ? '#be123c'
+                              : absenApelData?.status === 'Izin'
+                              ? '#1d4ed8'
+                              : absenApelData?.status === 'Sakit'
+                              ? '#b45309'
+                              : absenApelData?.status === 'Dinas Luar'
+                              ? '#6b21a8'
+                              : '#065f46',
+                        }}
+                      >
+                        {absenApelData?.status === 'Tidak Mengikuti Apel'
+                          ? '[✕ TIDAK MENGIKUTI APEL]'
+                          : absenApelData?.status
+                          ? `[✓ ${absenApelData.status.toUpperCase()}]`
+                          : '[✓ HADIR]'}
+                      </span>{' '}
+                      <span style={{ color: '#334155' }}>
+                        {absenApelData?.status === 'Tidak Mengikuti Apel' ? (
+                          absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ' • Tanpa Kehadiran Apel Pagi'
+                        ) : (
+                          <>
+                            {absenApelData?.jam ? `(Pukul ${absenApelData.jam})` : '(07.35 WIB)'}
+                            {absenApelData?.lokasiGps ? ` • ${absenApelData.lokasiGps}` : ' • Halaman Kantor Kelurahan Mangga'}
+                            {absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ''}
+                          </>
+                        )}
+                      </span>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -1870,20 +2065,20 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>6</td>
                     <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Kegiatan Kebersihan & Lainnya</td>
                     <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>Terlaksana</td>
-                    <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.kegiatanLainnya || 'Pemantauan kebersihan lingkungan dan drainase warga'}</td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.kegiatanLainnya || '-'}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
             {/* DOKUMENTASI FOTO KEGIATAN - SELALU DITAMPILKAN DI HALAMAN 1 */}
-            {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
+            {effectivePhotos && effectivePhotos.length > 0 && (
               <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '8px' }}>
                 <div
                   className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900"
                   style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '5px', color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
-                  <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({item.dokumentasiFoto.length} FOTO):</span>
+                  <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({effectivePhotos.length} FOTO):</span>
                   <span style={{ fontSize: '7pt', color: '#64748b', fontWeight: 'normal', textTransform: 'none' }}>Format Album Resmi Kedinasan</span>
                 </div>
                 <div
@@ -1894,7 +2089,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     width: '100%',
                   }}
                 >
-                  {groupPhotosByActivity(item.dokumentasiFoto.slice(0, 6)).map((group) => (
+                  {groupPhotosByActivity(effectivePhotos.slice(0, 6)).map((group) => (
                     <div
                       key={group.key}
                       style={{

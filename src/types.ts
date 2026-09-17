@@ -27,7 +27,16 @@ export interface FotoDokumentasi {
   url: string;
   name: string;
   timestamp: string;
-  kategori?: 'poskamling' | 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'umum' | string;
+  kategori?: 'poskamling' | 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'apel' | 'umum' | string;
+}
+
+export interface InfoAbsenApelLaporan {
+  status: StatusAbsenApel | string;
+  jam?: string; // e.g. "07:35 WIB"
+  waktuLengkap?: string;
+  fotoSelfieUrl?: string;
+  lokasiGps?: string;
+  catatan?: string;
 }
 
 export interface LaporanHarianItem {
@@ -40,6 +49,7 @@ export interface LaporanHarianItem {
   kelurahan: string; // e.g. "Kelurahan Mangga"
   kecamatan: string; // e.g. "Kecamatan Medan Tuntungan"
   kinerja: KinerjaHarian;
+  absenApel?: InfoAbsenApelLaporan;
   jumlahDokumentasi: number;
   dokumentasiFoto?: FotoDokumentasi[];
   nomorWaAtasan?: string;
@@ -142,7 +152,7 @@ export interface KeplingTargetCapaian {
 
 export type TargetsCapaianMap = Record<string, KeplingTargetCapaian>;
 
-export type StatusAbsenApel = 'Hadir' | 'Izin' | 'Sakit' | 'Dinas Luar';
+export type StatusAbsenApel = 'Hadir' | 'Izin' | 'Sakit' | 'Dinas Luar' | 'Tidak Mengikuti Apel';
 
 export interface AbsenApelItem {
   id: string; // e.g. "absen_kepling_1_2026-09-13" or timestamp
