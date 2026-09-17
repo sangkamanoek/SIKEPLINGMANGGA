@@ -10,8 +10,10 @@ import {
   Award,
   Trophy,
   UserCheck,
+  Users,
 } from 'lucide-react';
 import ViewImagesPage from './components/ViewImagesPage';
+import { KunjunganHarianView } from './components/KunjunganHarianView';
 import { GoogleUser, SheetMetadata, LaporanHarianItem, UserAccount } from './types';
 import { safeSetLocalStorage, safeSetSessionStorage } from './lib/safeStorage';
 import {
@@ -122,9 +124,9 @@ export default function App() {
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
 
-  // Active view tab: form | capaian | monitoring | capaian_admin | riwayat
+  // Active view tab: form | capaian | monitoring | capaian_admin | riwayat | kunjungan
   const [activeTab, setActiveTab] = useState<
-    'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat'
+    'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan'
   >(() => {
     return activeAccount.role === 'super_admin' ? 'monitoring' : 'form';
   });
@@ -689,6 +691,24 @@ export default function App() {
                   <span>Formulir Laporan</span>
                 </button>
 
+                {/* Kepling Tab 1b: Kunjungan Harian Warga */}
+                <button
+                  id="tab-kunjungan-warga-kepling"
+                  type="button"
+                  onClick={() => setActiveTab('kunjungan')}
+                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === 'kunjungan'
+                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
+                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <Users className="w-4 h-4 text-emerald-700" />
+                  <span>Kunjungan Harian</span>
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                    WARGA
+                  </span>
+                </button>
+
                 {/* Kepling Tab 2: Dashboard Capaian Saya */}
                 <button
                   id="tab-capaian-kepling"
@@ -800,7 +820,25 @@ export default function App() {
                   )}
                 </button>
 
-                {/* Super Admin Tab 4: Input Formulir (Bantuan/Asistensi) */}
+                {/* Super Admin Tab 4: Kunjungan Harian 24 Kepling */}
+                <button
+                  id="tab-kunjungan-warga-admin"
+                  type="button"
+                  onClick={() => setActiveTab('kunjungan')}
+                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === 'kunjungan'
+                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
+                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <Users className="w-4 h-4 text-emerald-700" />
+                  <span>Kunjungan Harian</span>
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                    24 LINGKUNGAN
+                  </span>
+                </button>
+
+                {/* Super Admin Tab 5: Input Formulir (Bantuan/Asistensi) */}
                 <button
                   id="tab-input-laporan"
                   type="button"
@@ -926,6 +964,16 @@ export default function App() {
               initialPetugasFilter={riwayatFilterPetugas}
               isAdmin={activeAccount.role === 'super_admin'}
               onDeleteReport={handleDeleteReport}
+            />
+          </ErrorBoundary>
+        )}
+
+        {/* Tab Kunjungan Harian Warga (Door-to-Door) */}
+        {activeTab === 'kunjungan' && (
+          <ErrorBoundary fallbackTitle="Gagal Memuat Kunjungan Harian">
+            <KunjunganHarianView
+              currentUser={activeAccount}
+              onNavigateToForm={() => setActiveTab('form')}
             />
           </ErrorBoundary>
         )}

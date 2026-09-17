@@ -10,7 +10,9 @@ import {
   Shield,
   Lock,
   RotateCcw,
+  Users,
 } from 'lucide-react';
+import { FormKunjunganWarga, KunjunganWargaData } from './FormKunjunganWarga';
 import { LaporanHarianItem, FotoDokumentasi, KinerjaHarian, UserAccount } from '../types';
 import {
   getNamaHariIndonesia,
@@ -105,6 +107,50 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   const [fotoList, setFotoList] = useState<FotoDokumentasi[]>([]);
   const [copiedPreview, setCopiedPreview] = useState(false);
   const [showPhotoValidationModal, setShowPhotoValidationModal] = useState<boolean>(false);
+  const [showKunjunganInline, setShowKunjunganInline] = useState<boolean>(false);
+
+  const handleKunjunganSuccess = (data: KunjunganWargaData) => {
+    // Sinkronisasi data kunjungan warga ke formulir kinerja harian
+    if (data.keterangan === 'Sudah') {
+      setPerlinsosKk((prev) => {
+        const cur = parseInt(prev, 10) || 0;
+        return String(cur + 1);
+      });
+      setPerlinsosKeterangan((prev) =>
+        prev && prev !== 'Pendataan Perlinsos'
+          ? `${prev}, Kunjungan ${data.namaWarga}`
+          : `Kunjungan warga: ${data.namaWarga}`
+      );
+    } else if (data.keterangan === 'Menolak') {
+      setPerlinsosMenolakKk((prev) => {
+        const cur = parseInt(prev, 10) || 0;
+        return String(cur + 1);
+      });
+      setPerlinsosMenolakRincian((prev) =>
+        prev ? `${prev}, ${data.namaWarga} (${data.alamat})` : `${data.namaWarga} (${data.alamat})`
+      );
+    } else if (data.keterangan === 'Tidak Ditempat') {
+      setPerlinsosTidakDiTempatKk((prev) => {
+        const cur = parseInt(prev, 10) || 0;
+        return String(cur + 1);
+      });
+      setPerlinsosTidakDiTempatRincian((prev) =>
+        prev ? `${prev}, ${data.namaWarga} (${data.alamat})` : `${data.namaWarga} (${data.alamat})`
+      );
+    }
+
+    // Jika ada foto hasil kamera dari form kunjungan, otomatis masukkan ke list foto perlinsos
+    if (data.fotoDokumentasi) {
+      const newFoto: FotoDokumentasi = {
+        id: `foto_kunjungan_${Date.now()}`,
+        name: `[PERLINSOS] Kunjungan ${data.namaWarga}`,
+        url: data.fotoDokumentasi,
+        kategori: 'perlinsos',
+        timestamp: new Date().toLocaleTimeString('id-ID'),
+      };
+      setFotoList((prev) => [newFoto, ...prev]);
+    }
+  };
 
   // Load saved profile info from localStorage
   useEffect(() => {
@@ -798,15 +844,41 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
             {/* Pilar 2: PERLINSOS */}
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[10px] font-black">
                     2
                   </span>
                   PERLINSOS (Perlindungan Sosial / Bansos)
                 </span>
-                <span className="text-[11px] font-semibold text-slate-500">Satuan: KK</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowKunjunganInline(!showKunjunganInline)}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] shadow-2xs transition-all cursor-pointer"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>{showKunjunganInline ? '✕ Tutup Form Kunjungan' : '👥 + Catat Kunjungan Warga (Door-to-Door)'}</span>
+                  </button>
+                  <span className="text-[11px] font-semibold text-slate-500">Satuan: KK</span>
+                </div>
               </div>
+
+              {/* Form Kunjungan Warga Terintegrasi */}
+              {showKunjunganInline && (
+                <div className="my-2">
+                  <FormKunjunganWarga
+                    currentUser={activeAccount || KEPLING_ACCOUNTS[0]}
+                    tanggalLaporan={rawDate}
+                    onSuccess={(data) => {
+                      handleKunjunganSuccess(data);
+                      setShowKunjunganInline(false);
+                    }}
+                    onCancel={() => setShowKunjunganInline(false)}
+                    compact={true}
+                  />
+                </div>
+              )}
 
               {/* Status / Kategori Aktivitas Perlinsos */}
               <div className="flex items-center gap-1.5 flex-wrap">

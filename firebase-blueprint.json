@@ -129,6 +129,24 @@
         "catatan": "string",
         "createdAt": "string"
       }
+    },
+    {
+      "name": "kunjungan_warga",
+      "description": "Pencatatan kegiatan kunjungan warga lapangan door-to-door oleh 24 Kepling",
+      "fields": {
+        "id": "string",
+        "tanggal": "string",
+        "namaWarga": "string",
+        "alamat": "string",
+        "lingkungan": "string",
+        "lingkunganNomor": "number",
+        "namaKepling": "string",
+        "keplingId": "string",
+        "statusPerlinsos": "boolean",
+        "keterangan": "string",
+        "fotoDokumentasi": "string",
+        "createdAt": "string"
+      }
     }
   ]
 }

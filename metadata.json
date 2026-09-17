@@ -2,8 +2,7 @@
   "name": "SI-KEPLING MANGGA",
   "description": "SI-KEPLING MANGGA - Sistem Informasi & Pelaporan Kegiatan Harian Kepala Lingkungan Kelurahan Mangga Kecamatan Medan Tuntungan dengan pemantauan 24 Kepling, capaian target indikator, rekapitulasi kinerja, dan dokumentasi foto lapangan.",
   "requestFramePermissions": [
-    "camera",
-    "geolocation"
+    "camera"
   ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
