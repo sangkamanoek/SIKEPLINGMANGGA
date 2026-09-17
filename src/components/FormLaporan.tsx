@@ -22,7 +22,7 @@ import {
 } from '../lib/formatter';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { safeSetLocalStorage } from '../lib/safeStorage';
-import { loadAllAttendance, checkApelTimeStatus } from '../lib/attendanceApi';
+import { loadAllAttendance, checkApelTimeStatus, calculateAbsentDays } from '../lib/attendanceApi';
 
 interface FormLaporanProps {
   onSaveReport: (item: LaporanHarianItem) => Promise<void>;
@@ -658,6 +658,24 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                           ? `Lokasi: ${todayApel.lokasiGps}`
                           : 'Otomatis tercatat & masuk ke Laporan Cetak PDF Resmi'}
                       </p>
+                      {(isAbsent || todayApel?.status === 'Tidak Mengikuti Apel') && (
+                        <div className="mt-1">
+                          {(() => {
+                            const absentStat = calculateAbsentDays(
+                              attendanceList,
+                              selectedAccountId,
+                              rawDate
+                            );
+                            return (
+                              <span className="inline-block px-2.5 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10px] tracking-wide shadow-2xs">
+                                {absentStat.consecutiveDays > 0
+                                  ? `TIDAK MENGIKUTI APEL PAGI SELAMA ${absentStat.consecutiveDays} HARI`
+                                  : 'TIDAK MENGIKUTI APEL PAGI'}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                   {onOpenAbsenApel && (

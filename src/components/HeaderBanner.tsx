@@ -80,15 +80,35 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                 className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md shadow-xs self-start sm:self-auto ${
                   activeAccount.role === 'super_admin'
                     ? 'bg-amber-400 text-slate-950'
+                    : activeAccount.role === 'kasi_pemerintahan'
+                    ? 'bg-teal-400 text-teal-950 font-black'
+                    : activeAccount.role === 'kasi_pembangunan'
+                    ? 'bg-blue-400 text-blue-950 font-black'
+                    : activeAccount.role === 'kasi_trantibum'
+                    ? 'bg-orange-400 text-orange-950 font-black'
                     : 'bg-emerald-950 text-emerald-200 border border-emerald-600'
                 }`}
               >
-                {activeAccount.role === 'super_admin' ? 'PORTAL SUPER ADMIN' : 'APLIKASI KEPALA LINGKUNGAN'}
+                {activeAccount.role === 'super_admin'
+                  ? 'PORTAL SUPER ADMIN'
+                  : activeAccount.role === 'kasi_pemerintahan'
+                  ? 'KASI TATA PEMERINTAHAN (PBB)'
+                  : activeAccount.role === 'kasi_pembangunan'
+                  ? 'KASI PEMBANGUNAN (PERLINSOS)'
+                  : activeAccount.role === 'kasi_trantibum'
+                  ? 'KASI TRANTIBUM (KETERTIBAN)'
+                  : 'APLIKASI KEPALA LINGKUNGAN'}
               </span>
             </div>
             <p className="text-emerald-100 text-[11px] sm:text-xs uppercase tracking-widest font-semibold mt-0.5">
               {activeAccount.role === 'super_admin'
                 ? 'MONITORING LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN'
+                : activeAccount.role === 'kasi_pemerintahan'
+                ? 'DASHBOARD LAPORAN & MONITORING REALISASI OPSIR PBB 24 LINGKUNGAN'
+                : activeAccount.role === 'kasi_pembangunan'
+                ? 'DASHBOARD LAPORAN & CAPAIAN TARGET PERLINDUNGAN SOSIAL (PERLINSOS)'
+                : activeAccount.role === 'kasi_trantibum'
+                ? 'DASHBOARD KETENTRAMAN, KETERTIBAN UMUM, POSKAMLING & KEDISIPLINAN'
                 : `PELAPORAN HARIAN ${activeAccount.lingkungan.toUpperCase() || 'KEPALA LINGKUNGAN'}`} • KELURAHAN MANGGA
             </p>
           </div>

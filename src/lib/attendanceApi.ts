@@ -310,3 +310,321 @@ export function computeAttendanceSummary24(
     percentageHadir,
   };
 }
+
+/**
+ * Calculate how many consecutive days and total days a Kepling has missed Apel Pagi.
+ * Only counts working days (Senin s/d Jumat).
+ */
+export interface AbsentDaysResult {
+  consecutiveDays: number;
+  totalAbsentThisMonth: number;
+  label: string;
+  detailDates: string[];
+}
+
+export function calculateAbsentDays(
+  attendanceList: AbsenApelItem[],
+  accountId: string,
+  referenceDateStr?: string
+): AbsentDaysResult {
+  const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
+  const timeStat = checkApelTimeStatus();
+
+  // Determine if today itself is considered absent
+  const todayStr = getTodayDateString();
+  const isTodayRef = !referenceDateStr || referenceDateStr === todayStr;
+
+  let consecutiveDays = 0;
+  let totalAbsentThisMonth = 0;
+  const detailDates: string[] = [];
+
+  // Check past 30 days backwards
+  const checkDate = new Date(refDate);
+  const currentMonth = refDate.getMonth();
+  const currentYear = refDate.getFullYear();
+
+  let streakActive = true;
+
+  for (let i = 0; i < 30; i++) {
+    const dayOfWeek = checkDate.getDay(); // 0 = Sun, 6 = Sat
+    const isWorkDay = dayOfWeek >= 1 && dayOfWeek <= 5;
+    const dateStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+
+    if (isWorkDay) {
+      const rec = attendanceList.find((a) => a.accountId === accountId && a.tanggal === dateStr);
+      const isToday = dateStr === todayStr;
+
+      let isAbsent = false;
+
+      if (rec) {
+        if (rec.status === 'Tidak Mengikuti Apel') {
+          isAbsent = true;
+        } else {
+          // Attended (Hadir, Izin, Sakit, Dinas Luar)
+          isAbsent = false;
+        }
+      } else {
+        // No record
+        if (isToday) {
+          // If today is past 08.30 WIB, count as absent
+          if (timeStat.isLate) {
+            isAbsent = true;
+          } else {
+            // Still within or before window, streak not broken yet
+            isAbsent = false;
+          }
+        } else {
+          // Past workday without attendance record is absent
+          isAbsent = true;
+        }
+      }
+
+      // If check date is in the same month, count monthly absent
+      if (checkDate.getMonth() === currentMonth && checkDate.getFullYear() === currentYear && isAbsent) {
+        totalAbsentThisMonth++;
+      }
+
+      if (streakActive) {
+        if (isAbsent) {
+          consecutiveDays++;
+          detailDates.push(dateStr);
+        } else {
+          // If we encounter an attended day, streak stops
+          if (!isToday || (rec && rec.status !== 'Tidak Mengikuti Apel')) {
+            streakActive = false;
+          }
+        }
+      }
+    }
+
+    // Move back 1 day
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+
+  const label =
+    consecutiveDays <= 0
+      ? '0 Hari'
+      : consecutiveDays === 1
+      ? '1 Hari'
+      : `${consecutiveDays} Hari`;
+
+  return {
+    consecutiveDays,
+    totalAbsentThisMonth,
+    label,
+    detailDates,
+  };
+}
+
+export interface KeplingWeeklyRow {
+  accountId: string;
+  nama: string;
+  lingkungan: string;
+  nomorLingkungan: number;
+  days: {
+    dateStr: string;
+    dayName: string;
+    status: StatusAbsenApel | 'Belum Absen' | '-';
+    jam?: string;
+  }[];
+  totalHadir: number;
+  totalTidakApel: number;
+  totalIzinSakit: number;
+  persentase: number;
+}
+
+export interface KeplingMonthlyRow {
+  accountId: string;
+  nama: string;
+  lingkungan: string;
+  nomorLingkungan: number;
+  totalHariKerja: number;
+  totalHadir: number;
+  totalIzin: number;
+  totalSakit: number;
+  totalDinasLuar: number;
+  totalTidakApel: number;
+  consecutiveAbsentDays: number;
+  persentaseHadir: number;
+}
+
+/**
+ * Compute weekly recap for 24 Kepling (Monday to Friday)
+ */
+export function computeWeeklyAttendance24(
+  attendanceList: AbsenApelItem[],
+  referenceDateStr?: string
+): {
+  weekLabel: string;
+  workDates: { dateStr: string; dayName: string; formatted: string }[];
+  rows: KeplingWeeklyRow[];
+} {
+  const ref = referenceDateStr ? new Date(referenceDateStr) : new Date();
+  const day = ref.getDay(); // 0 = Sun
+  const diffToMonday = day === 0 ? -6 : 1 - day; // calculate Monday of the week
+
+  const monday = new Date(ref);
+  monday.setDate(ref.getDate() + diffToMonday);
+
+  const dayNames = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+  const workDates: { dateStr: string; dayName: string; formatted: string }[] = [];
+
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const formatted = `${d.getDate()}/${d.getMonth() + 1}`;
+    workDates.push({ dateStr, dayName: dayNames[i], formatted });
+  }
+
+  const weekLabel = `${workDates[0].formatted} s/d ${workDates[4].formatted} ${monday.getFullYear()}`;
+
+  const todayStr = getTodayDateString();
+  const timeStat = checkApelTimeStatus();
+
+  const rows: KeplingWeeklyRow[] = KEPLING_ACCOUNTS.map((k) => {
+    let totalHadir = 0;
+    let totalTidakApel = 0;
+    let totalIzinSakit = 0;
+
+    const days = workDates.map((wd) => {
+      const rec = attendanceList.find((a) => a.accountId === k.id && a.tanggal === wd.dateStr);
+      let status: StatusAbsenApel | 'Belum Absen' | '-' = '-';
+      let jam = rec?.jam;
+
+      if (rec) {
+        status = rec.status;
+        if (status === 'Hadir') totalHadir++;
+        else if (status === 'Tidak Mengikuti Apel') totalTidakApel++;
+        else if (status === 'Izin' || status === 'Sakit' || status === 'Dinas Luar') totalIzinSakit++;
+      } else {
+        if (wd.dateStr === todayStr) {
+          if (timeStat.isLate) {
+            status = 'Tidak Mengikuti Apel';
+            totalTidakApel++;
+          } else {
+            status = 'Belum Absen';
+          }
+        } else if (wd.dateStr < todayStr) {
+          status = 'Tidak Mengikuti Apel';
+          totalTidakApel++;
+        } else {
+          status = '-';
+        }
+      }
+
+      return {
+        dateStr: wd.dateStr,
+        dayName: wd.dayName,
+        status,
+        jam,
+      };
+    });
+
+    const evaluatedDays = days.filter((d) => d.status !== '-').length || 1;
+    const persentase = Math.round((totalHadir / evaluatedDays) * 100);
+
+    return {
+      accountId: k.id,
+      nama: k.nama,
+      lingkungan: k.lingkungan,
+      nomorLingkungan: k.nomorLingkungan || 0,
+      days,
+      totalHadir,
+      totalTidakApel,
+      totalIzinSakit,
+      persentase,
+    };
+  });
+
+  return { weekLabel, workDates, rows };
+}
+
+/**
+ * Compute monthly attendance recap for 24 Kepling
+ */
+export function computeMonthlyAttendance24(
+  attendanceList: AbsenApelItem[],
+  year: number,
+  month: number // 1-12
+): {
+  monthName: string;
+  totalWorkDays: number;
+  rows: KeplingMonthlyRow[];
+} {
+  const monthNames = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+  const monthName = `${monthNames[month - 1]} ${year}`;
+
+  // Find all work days in this month
+  const totalDaysInMonth = new Date(year, month, 0).getDate();
+  const workDates: string[] = [];
+
+  for (let d = 1; d <= totalDaysInMonth; d++) {
+    const dt = new Date(year, month - 1, d);
+    const dayOfWeek = dt.getDay();
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      workDates.push(
+        `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      );
+    }
+  }
+
+  const todayStr = getTodayDateString();
+  const timeStat = checkApelTimeStatus();
+
+  // Evaluate work days up to today (if current month) or all work days
+  const activeWorkDates = workDates.filter((wd) => wd <= todayStr);
+  const totalWorkDays = activeWorkDates.length || 1;
+
+  const rows: KeplingMonthlyRow[] = KEPLING_ACCOUNTS.map((k) => {
+    let totalHadir = 0;
+    let totalIzin = 0;
+    let totalSakit = 0;
+    let totalDinasLuar = 0;
+    let totalTidakApel = 0;
+
+    activeWorkDates.forEach((wd) => {
+      const rec = attendanceList.find((a) => a.accountId === k.id && a.tanggal === wd);
+      if (rec) {
+        if (rec.status === 'Hadir') totalHadir++;
+        else if (rec.status === 'Izin') totalIzin++;
+        else if (rec.status === 'Sakit') totalSakit++;
+        else if (rec.status === 'Dinas Luar') totalDinasLuar++;
+        else if (rec.status === 'Tidak Mengikuti Apel') totalTidakApel++;
+      } else {
+        if (wd === todayStr) {
+          if (timeStat.isLate) totalTidakApel++;
+        } else {
+          totalTidakApel++;
+        }
+      }
+    });
+
+    const absentStat = calculateAbsentDays(attendanceList, k.id, todayStr);
+    const persentaseHadir = Math.round((totalHadir / totalWorkDays) * 100);
+
+    return {
+      accountId: k.id,
+      nama: k.nama,
+      lingkungan: k.lingkungan,
+      nomorLingkungan: k.nomorLingkungan || 0,
+      totalHariKerja: totalWorkDays,
+      totalHadir,
+      totalIzin,
+      totalSakit,
+      totalDinasLuar,
+      totalTidakApel,
+      consecutiveAbsentDays: absentStat.consecutiveDays,
+      persentaseHadir,
+    };
+  });
+
+  return {
+    monthName,
+    totalWorkDays,
+    rows,
+  };
+}

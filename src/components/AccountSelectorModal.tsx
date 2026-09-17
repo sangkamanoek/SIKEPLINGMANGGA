@@ -21,6 +21,10 @@ import {
 import { SheetMetadata, UserAccount } from '../types';
 import {
   SUPER_ADMIN_ACCOUNT,
+  KASI_ACCOUNTS,
+  KASI_PEMERINTAHAN_ACCOUNT,
+  KASI_PEMBANGUNAN_ACCOUNT,
+  KASI_TRANTIBUM_ACCOUNT,
   KEPLING_ACCOUNTS,
   ALL_ACCOUNTS,
   verifyAccountPassword,
@@ -438,6 +442,70 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
                     </button>
                   </div>
 
+                  {/* Kepala Seksi (Kasi) Options */}
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2 flex items-center justify-between">
+                      <span>Akun Kepala Seksi (Kasi) Kelurahan Mangga</span>
+                      <span className="text-[10px] text-teal-700 font-bold bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
+                        Dashboard Khusus Sektoral
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {KASI_ACCOUNTS.map((kasi) => {
+                        const isSelected = activeAccount.id === kasi.id;
+                        const isPem = kasi.role === 'kasi_pemerintahan';
+                        const isBang = kasi.role === 'kasi_pembangunan';
+                        const isTrantib = kasi.role === 'kasi_trantibum';
+
+                        return (
+                          <button
+                            key={kasi.id}
+                            type="button"
+                            onClick={() => handleStartLogin(kasi)}
+                            className={`text-left p-3 rounded-xl border transition-all flex flex-col justify-between cursor-pointer ${
+                              isSelected
+                                ? 'bg-teal-50 border-teal-500 ring-2 ring-teal-300'
+                                : 'bg-white border-slate-200 hover:border-teal-300 hover:bg-teal-50/30'
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span
+                                  className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                                    isPem
+                                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                      : isBang
+                                      ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                      : 'bg-orange-100 text-orange-900 border border-orange-300'
+                                  }`}
+                                >
+                                  {isPem ? 'PBB' : isBang ? 'PERLINSOS' : 'TRANTIB'}
+                                </span>
+                                {isSelected && (
+                                  <span className="text-[10px] font-bold text-teal-800 bg-teal-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                    <Check className="w-3 h-3" /> Aktif
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs font-bold text-slate-900 line-clamp-1">
+                                {kasi.nama}
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-0.5">
+                                {kasi.jabatan}
+                              </div>
+                            </div>
+
+                            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10.5px]">
+                              <span className="font-mono text-slate-400">{kasi.id}</span>
+                              <span className="font-bold text-teal-700">Masuk &rarr;</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* 24 Kepling Option */}
                   <div>
                     <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2 flex items-center justify-between">
@@ -618,6 +686,58 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
                       </button>
                     </td>
                   </tr>
+
+                  {/* Kasi accounts rows */}
+                  {KASI_ACCOUNTS.map((kasi) => {
+                    const effPass = getEffectivePassword(kasi);
+                    const isCustom = hasCustomPassword(kasi.id);
+                    return (
+                      <tr key={kasi.id} className="bg-teal-50/30 hover:bg-teal-50/60 transition-colors">
+                        <td className="p-2.5 font-bold text-teal-950">
+                          {kasi.jabatan}
+                        </td>
+                        <td className="p-2.5">
+                          <code className="text-[11px] font-mono font-bold text-teal-900 bg-teal-100/60 border border-teal-300 px-2 py-0.5 rounded">
+                            {kasi.id}
+                          </code>
+                        </td>
+                        <td className="p-2.5 font-semibold text-slate-800">
+                          {kasi.nama}
+                        </td>
+                        <td className="p-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <code className="bg-white border border-teal-300 text-teal-900 px-2 py-0.5 rounded font-mono font-bold">
+                              {effPass}
+                            </code>
+                            {isCustom && (
+                              <span className="text-[9px] bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded font-bold">
+                                Kustom
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyPassword(effPass, kasi.id)}
+                            className="px-2 py-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            {copiedId === kasi.id ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-600" />
+                                <span className="text-emerald-700">Tersalin</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Salin</span>
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
 
                   {/* 24 Kepling rows */}
                   {KEPLING_ACCOUNTS.map((k) => {

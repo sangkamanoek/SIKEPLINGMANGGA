@@ -13,6 +13,7 @@ import {
   RefreshCw,
   FileText,
   ShieldCheck,
+  ShieldAlert,
   Users,
   Image as ImageIcon,
   Check,
@@ -20,6 +21,7 @@ import {
   Navigation,
   Video,
   Lock,
+  Download,
 } from 'lucide-react';
 import { AbsenApelItem, StatusAbsenApel, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
@@ -30,8 +32,11 @@ import {
   computeAttendanceSummary24,
   getTodayAbsenForKepling,
   checkApelTimeStatus,
+  calculateAbsentDays,
 } from '../lib/attendanceApi';
 import { getStreetLocationWithMaxAccuracy } from '../lib/geoService';
+import { RekapAbsensiSuperAdmin } from './RekapAbsensiSuperAdmin';
+import { downloadImage } from '../lib/imageDownloader';
 
 interface AbsenApelModalProps {
   isOpen: boolean;
@@ -54,6 +59,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const isSuperAdmin = activeAccount.role === 'super_admin';
 
   // Form State
   const [selectedKeplingAccount, setSelectedKeplingAccount] = useState<UserAccount>(activeAccount);
@@ -465,27 +471,46 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                       </p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 max-w-md mx-auto space-y-1">
-                      <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider block">
-                        Status Kehadiran Hari Ini
-                      </span>
-                      <span className="text-sm sm:text-base font-black text-rose-900 block">
-                        ✕ TIDAK MENGIKUTI APEL PAGI
-                      </span>
-                      <span className="text-[10.5px] text-rose-700/80 block">
-                        Otomatis tercatat pada sistem rekapitulasi & laporan harian kelurahan
-                      </span>
-                    </div>
+                    {(() => {
+                      const absentStat = calculateAbsentDays(
+                        attendanceList,
+                        selectedKeplingAccount.id,
+                        selectedDate
+                      );
+                      return (
+                        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 max-w-md mx-auto space-y-2">
+                          <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider block">
+                            Status Kehadiran Hari Ini
+                          </span>
+                          <span className="text-sm sm:text-base font-black text-rose-900 block">
+                            ✕ TIDAK MENGIKUTI APEL PAGI
+                          </span>
+                          <div className="inline-block px-3 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-black tracking-wide shadow-xs">
+                            {absentStat.consecutiveDays > 0
+                              ? `TIDAK MENGIKUTI APEL PAGI SELAMA ${absentStat.consecutiveDays} HARI`
+                              : 'TIDAK MENGIKUTI APEL PAGI'}
+                          </div>
+                          <span className="text-[11px] text-rose-800 font-semibold block">
+                            Akumulasi: {absentStat.consecutiveDays} hari kerja berturut-turut ({absentStat.totalAbsentThisMonth} hari bulan ini)
+                          </span>
+                          <span className="text-[10px] text-rose-700/80 block">
+                            Otomatis tercatat pada sistem rekapitulasi & laporan resmi kelurahan
+                          </span>
+                        </div>
+                      );
+                    })()}
 
                     <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('monitoring')}
-                        className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Users className="w-4 h-4" />
-                        <span>Lihat Monitoring 24 Kepling</span>
-                      </button>
+                      {isSuperAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('monitoring')}
+                          className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Users className="w-4 h-4" />
+                          <span>Lihat Rekapitulasi 24 Kepling</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -598,9 +623,26 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                       Sudah Absen ({myTodayRecord.status})
                     </span>
                   ) : (
-                    <span className="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-black shadow-xs">
-                      TIDAK MENGIKUTI APEL (Belum Isi Presensi)
-                    </span>
+                    <div className="text-right">
+                      <span className="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-black shadow-xs inline-block">
+                        TIDAK MENGIKUTI APEL (Belum Isi Presensi)
+                      </span>
+                      {(() => {
+                        const absentStat = calculateAbsentDays(
+                          attendanceList,
+                          selectedKeplingAccount.id,
+                          selectedDate
+                        );
+                        if (absentStat.consecutiveDays > 0) {
+                          return (
+                            <span className="block text-[10.5px] font-black text-rose-700 mt-1">
+                              TIDAK MENGIKUTI APEL PAGI SELAMA {absentStat.consecutiveDays} HARI
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
                   )}
                 </div>
               )}
@@ -863,223 +905,36 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
           );
         })()}
 
-          {/* TAB 2: MONITORING 24 KEPLING */}
+          {/* TAB 2: REKAPITULASI 24 KEPLING (SUPER ADMIN ONLY) */}
           {activeTab === 'monitoring' && (
-            <div className="space-y-5">
-              {/* Summary Scorecards */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center">
-                  <span className="text-[11px] text-emerald-700 font-bold block uppercase">
-                    HADIR
-                  </span>
-                  <span className="text-2xl font-black text-emerald-950">
-                    {summary.totalHadir}
-                  </span>
-                  <span className="text-[10px] text-emerald-800 font-semibold block">
-                    {summary.percentageHadir}% Presensi
-                  </span>
+            isSuperAdmin ? (
+              <RekapAbsensiSuperAdmin
+                attendanceList={attendanceList}
+                currentUser={activeAccount}
+                selectedDate={selectedDate}
+                onDateChange={(d) => setSelectedDate(d)}
+                onOpenSelfiePreview={(p) => setPreviewImage(p)}
+              />
+            ) : (
+              <div className="bg-rose-50 border border-rose-200 rounded-3xl p-8 text-center max-w-md mx-auto space-y-3 my-6">
+                <div className="w-12 h-12 rounded-2xl bg-rose-100 border border-rose-200 text-rose-700 flex items-center justify-center mx-auto">
+                  <ShieldAlert className="w-6 h-6" />
                 </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 text-center">
-                  <span className="text-[11px] text-blue-700 font-bold block uppercase">
-                    IZIN
-                  </span>
-                  <span className="text-2xl font-black text-blue-950">
-                    {summary.totalIzin}
-                  </span>
-                  <span className="text-[10px] text-blue-800 font-semibold block">Kepling</span>
-                </div>
-
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center">
-                  <span className="text-[11px] text-amber-700 font-bold block uppercase">
-                    SAKIT
-                  </span>
-                  <span className="text-2xl font-black text-amber-950">
-                    {summary.totalSakit}
-                  </span>
-                  <span className="text-[10px] text-amber-800 font-semibold block">Kepling</span>
-                </div>
-
-                <div className="bg-purple-50 border border-purple-200 rounded-2xl p-3 text-center">
-                  <span className="text-[11px] text-purple-700 font-bold block uppercase">
-                    DINAS LUAR
-                  </span>
-                  <span className="text-2xl font-black text-purple-950">
-                    {summary.totalDinasLuar}
-                  </span>
-                  <span className="text-[10px] text-purple-800 font-semibold block">Kepling</span>
-                </div>
-
-                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-center col-span-2 sm:col-span-1">
-                  <span className="text-[11px] text-rose-700 font-bold block uppercase">
-                    TIDAK MENGIKUTI APEL
-                  </span>
-                  <span className="text-2xl font-black text-rose-950">
-                    {summary.totalBelumAbsen}
-                  </span>
-                  <span className="text-[10px] text-rose-800 font-semibold block">Kepling</span>
-                </div>
+                <h4 className="font-black text-sm sm:text-base text-rose-950">
+                  Akses Terbatas: Hanya Super Admin
+                </h4>
+                <p className="text-xs text-rose-800 leading-relaxed">
+                  Sesuai kebijakan privasi dan kepegawaian, Kepala Lingkungan tidak memiliki akses untuk melihat rekapitulasi absensi Kepala Lingkungan lainnya.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('form')}
+                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  Kembali ke Presensi Saya
+                </button>
               </div>
-
-              {/* Filters & Search */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="relative w-full sm:w-64">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Cari nama / lingkungan..."
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto overflow-x-auto">
-                  {[
-                    { key: 'all', label: 'Semua' },
-                    { key: 'hadir', label: 'Hadir' },
-                    { key: 'izin', label: 'Izin' },
-                    { key: 'sakit', label: 'Sakit' },
-                    { key: 'dinas_luar', label: 'Dinas Luar' },
-                    { key: 'belum', label: 'Tidak Mengikuti Apel' },
-                  ].map((fl) => (
-                    <button
-                      key={fl.key}
-                      type="button"
-                      onClick={() => setStatusFilter(fl.key)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        statusFilter === fl.key
-                          ? 'bg-slate-900 text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      {fl.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Grid 24 Kepling Status Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {keplingStatusList.map(({ account, record }) => {
-                  return (
-                    <div
-                      key={account.id}
-                      className={`p-3.5 rounded-2xl border transition-all flex items-start gap-3 relative ${
-                        record
-                          ? record.status === 'Hadir'
-                            ? 'bg-emerald-50/50 border-emerald-200'
-                            : record.status === 'Izin'
-                            ? 'bg-blue-50/50 border-blue-200'
-                            : record.status === 'Sakit'
-                            ? 'bg-amber-50/50 border-amber-200'
-                            : record.status === 'Dinas Luar'
-                            ? 'bg-purple-50/50 border-purple-200'
-                            : 'bg-rose-50/50 border-rose-200'
-                          : 'bg-rose-50/40 border-rose-200'
-                      }`}
-                    >
-                      {/* Avatar Photo */}
-                      {record?.fotoSelfieUrl ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPreviewImage({
-                              url: record.fotoSelfieUrl!,
-                              title: `Presensi ${account.lingkungan} - ${account.nama}`,
-                            })
-                          }
-                          className="w-14 h-14 rounded-xl overflow-hidden border border-slate-300 shrink-0 shadow-xs cursor-pointer group relative"
-                        >
-                          <img
-                            src={record.fotoSelfieUrl}
-                            alt={account.nama}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          />
-                        </button>
-                      ) : (
-                        <div className="w-14 h-14 rounded-xl bg-slate-200 border border-slate-300 flex items-center justify-center text-slate-500 font-black text-sm shrink-0">
-                          {account.nomorLingkungan}
-                        </div>
-                      )}
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-[11px] font-black text-emerald-800 uppercase tracking-tight">
-                            {account.lingkungan}
-                          </span>
-                          {record ? (
-                            <span
-                              className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
-                                record.status === 'Hadir'
-                                  ? 'bg-emerald-700 text-white'
-                                  : record.status === 'Izin'
-                                  ? 'bg-blue-700 text-white'
-                                  : record.status === 'Sakit'
-                                  ? 'bg-amber-600 text-white'
-                                  : record.status === 'Dinas Luar'
-                                  ? 'bg-purple-700 text-white'
-                                  : 'bg-rose-700 text-white'
-                              }`}
-                            >
-                              {record.status}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-md">
-                              TIDAK MENGIKUTI APEL
-                            </span>
-                          )}
-                        </div>
-
-                        <h4 className="text-xs font-bold text-slate-900 truncate mt-0.5">
-                          {account.nama}
-                        </h4>
-
-                        {record ? (
-                          <div className="mt-1 space-y-0.5 text-[11px] text-slate-600 font-medium">
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-emerald-700 shrink-0" />
-                              <span>{record.jam}</span>
-                            </div>
-                            {record.lokasiGps && (
-                              <div className="flex items-center gap-1 truncate text-slate-500">
-                                <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                                <span className="truncate">{record.lokasiGps}</span>
-                              </div>
-                            )}
-                            {record.catatan && (
-                              <p className="text-[10px] text-slate-600 italic bg-white/80 p-1 rounded border border-slate-200 mt-1">
-                                "{record.catatan}"
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-rose-600 mt-1 font-semibold">
-                            Tidak mengikuti apel pagi
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Super Admin Action */}
-                      {activeAccount.role === 'super_admin' && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedKeplingAccount(account);
-                            setActiveTab('form');
-                          }}
-                          className="text-[10px] font-bold text-slate-500 hover:text-emerald-800 underline self-start cursor-pointer shrink-0"
-                          title="Bantu Absenkan Kepling"
-                        >
-                          Isikan
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            )
           )}
         </div>
 
@@ -1118,8 +973,30 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
             <img
               src={previewImage.url}
               alt="Preview Selfie"
-              className="w-full max-h-[70vh] object-contain rounded-2xl bg-slate-900"
+              className="w-full max-h-[65vh] object-contain rounded-2xl bg-slate-900"
             />
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  downloadImage(
+                    previewImage.url,
+                    `${previewImage.title.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`
+                  );
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Unduh Foto Selfie (.JPG)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

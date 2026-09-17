@@ -19,6 +19,50 @@ export const SUPER_ADMIN_ACCOUNT: UserAccount = {
   password: 'mangga2026',
 };
 
+export const KASI_PEMERINTAHAN_ACCOUNT: UserAccount = {
+  id: 'kasi_pemerintahan',
+  role: 'kasi_pemerintahan',
+  lingkungan: 'Kantor Kelurahan',
+  nama: 'KASI TATA PEMERINTAHAN',
+  jabatan: 'Kepala Seksi Tata Pemerintahan (PBB)',
+  kelurahan: 'Kelurahan Mangga',
+  kecamatan: 'Kecamatan Medan Tuntungan',
+  password: 'pem_mangga2026',
+};
+
+export const KASI_PEMBANGUNAN_ACCOUNT: UserAccount = {
+  id: 'kasi_pembangunan',
+  role: 'kasi_pembangunan',
+  lingkungan: 'Kantor Kelurahan',
+  nama: 'KASI PEMBANGUNAN & PMK',
+  jabatan: 'Kepala Seksi Pembangunan & PMK (Perlinsos)',
+  kelurahan: 'Kelurahan Mangga',
+  kecamatan: 'Kecamatan Medan Tuntungan',
+  password: 'bang_mangga2026',
+};
+
+export const KASI_TRANTIBUM_ACCOUNT: UserAccount = {
+  id: 'kasi_trantibum',
+  role: 'kasi_trantibum',
+  lingkungan: 'Kantor Kelurahan',
+  nama: 'KASI KETENTRAMAN & KETERTIBAN UMUM',
+  jabatan: 'Kepala Seksi Ketentraman & Ketertiban Umum (Trantibum)',
+  kelurahan: 'Kelurahan Mangga',
+  kecamatan: 'Kecamatan Medan Tuntungan',
+  password: 'trantib_mangga2026',
+};
+
+export const KASI_ACCOUNTS: UserAccount[] = [
+  KASI_PEMERINTAHAN_ACCOUNT,
+  KASI_PEMBANGUNAN_ACCOUNT,
+  KASI_TRANTIBUM_ACCOUNT,
+];
+
+export const ADMIN_ACCOUNTS: UserAccount[] = [
+  SUPER_ADMIN_ACCOUNT,
+  ...KASI_ACCOUNTS,
+];
+
 export const KEPLING_ACCOUNTS: UserAccount[] = [
   {
     id: 'kepling_1',
@@ -288,6 +332,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
 
 export const ALL_ACCOUNTS: UserAccount[] = [
   SUPER_ADMIN_ACCOUNT,
+  ...KASI_ACCOUNTS,
   ...KEPLING_ACCOUNTS,
 ];
 
@@ -505,7 +550,7 @@ export interface FixedAccountOption {
   username: string;
   nama: string;
   lingkungan: string;
-  role: 'super_admin' | 'kepling';
+  role: UserRole;
   nomorLingkungan?: number;
   defaultPasswordHint: string;
 }
@@ -518,6 +563,27 @@ export const getFixedAccountsList = (): FixedAccountOption[] => {
       lingkungan: 'Kantor Kelurahan Mangga',
       role: 'super_admin',
       defaultPasswordHint: 'mangga2026',
+    },
+    {
+      username: 'kasi_pemerintahan',
+      nama: 'KASI TATA PEMERINTAHAN (PBB)',
+      lingkungan: 'Kantor Kelurahan Mangga',
+      role: 'kasi_pemerintahan',
+      defaultPasswordHint: 'pem_mangga2026',
+    },
+    {
+      username: 'kasi_pembangunan',
+      nama: 'KASI PEMBANGUNAN (PERLINSOS)',
+      lingkungan: 'Kantor Kelurahan Mangga',
+      role: 'kasi_pembangunan',
+      defaultPasswordHint: 'bang_mangga2026',
+    },
+    {
+      username: 'kasi_trantibum',
+      nama: 'KASI TRANTIBUM (KETERTIBAN)',
+      lingkungan: 'Kantor Kelurahan Mangga',
+      role: 'kasi_trantibum',
+      defaultPasswordHint: 'trantib_mangga2026',
     },
     ...KEPLING_ACCOUNTS.map((k) => {
       const eff = getEffectiveAccount(k);
@@ -540,6 +606,27 @@ export const FIXED_ACCOUNTS_LIST: FixedAccountOption[] = [
     lingkungan: 'Kantor Kelurahan Mangga',
     role: 'super_admin',
     defaultPasswordHint: 'mangga2026',
+  },
+  {
+    username: 'kasi_pemerintahan',
+    nama: 'KASI TATA PEMERINTAHAN (PBB)',
+    lingkungan: 'Kantor Kelurahan Mangga',
+    role: 'kasi_pemerintahan',
+    defaultPasswordHint: 'pem_mangga2026',
+  },
+  {
+    username: 'kasi_pembangunan',
+    nama: 'KASI PEMBANGUNAN (PERLINSOS)',
+    lingkungan: 'Kantor Kelurahan Mangga',
+    role: 'kasi_pembangunan',
+    defaultPasswordHint: 'bang_mangga2026',
+  },
+  {
+    username: 'kasi_trantibum',
+    nama: 'KASI TRANTIBUM (KETERTIBAN)',
+    lingkungan: 'Kantor Kelurahan Mangga',
+    role: 'kasi_trantibum',
+    defaultPasswordHint: 'trantib_mangga2026',
   },
   ...KEPLING_ACCOUNTS.map((k) => ({
     username: k.id,
@@ -616,6 +703,53 @@ export const findAccountByUsername = (input: string): UserAccount | undefined =>
     rawClean === 'fery.arapenta@gmail.com'
   ) {
     return SUPER_ADMIN_ACCOUNT;
+  }
+
+  // 1b. Check Kasi Pemerintahan (PBB)
+  if (
+    norm === 'kasi_pemerintahan' ||
+    norm === 'kasipemerintahan' ||
+    norm === 'pemerintahan' ||
+    norm === 'kasi_pem' ||
+    norm === 'kasipem' ||
+    norm === 'pbb' ||
+    norm === 'admin_pbb' ||
+    norm === 'kasi_pbb' ||
+    norm === 'kasipbb'
+  ) {
+    return KASI_PEMERINTAHAN_ACCOUNT;
+  }
+
+  // 1c. Check Kasi Pembangunan (Perlinsos)
+  if (
+    norm === 'kasi_pembangunan' ||
+    norm === 'kasipembangunan' ||
+    norm === 'pembangunan' ||
+    norm === 'kasi_bang' ||
+    norm === 'kasibang' ||
+    norm === 'perlinsos' ||
+    norm === 'admin_perlinsos' ||
+    norm === 'kasi_perlinsos' ||
+    norm === 'kasiperlinsos' ||
+    norm === 'pmk' ||
+    norm === 'kasi_pmk'
+  ) {
+    return KASI_PEMBANGUNAN_ACCOUNT;
+  }
+
+  // 1d. Check Kasi Trantibum (Ketertiban Umum / Poskamling)
+  if (
+    norm === 'kasi_trantibum' ||
+    norm === 'kasitrantibum' ||
+    norm === 'trantibum' ||
+    norm === 'trantib' ||
+    norm === 'kasi_trantib' ||
+    norm === 'kasitrantib' ||
+    norm === 'ketertiban' ||
+    norm === 'kamtibmas' ||
+    norm === 'poskamling'
+  ) {
+    return KASI_TRANTIBUM_ACCOUNT;
   }
 
   // 2. Exact ID match (e.g. kepling_1, kepling_2, ...)
@@ -742,6 +876,56 @@ export const verifyAccountPassword = (
       '123456',
     ];
     if (adminVariants.includes(trimmed.toLowerCase())) {
+      return true;
+    }
+  }
+
+  // Flexible Kasi Pemerintahan default passwords
+  if (account.role === 'kasi_pemerintahan') {
+    const pemVariants = [
+      'pem_mangga2026',
+      'pemerintahan2026',
+      'pemerintahan',
+      'pbb2026',
+      'mangga2026',
+      'mangga',
+      '123456',
+    ];
+    if (pemVariants.includes(trimmed.toLowerCase())) {
+      return true;
+    }
+  }
+
+  // Flexible Kasi Pembangunan default passwords
+  if (account.role === 'kasi_pembangunan') {
+    const bangVariants = [
+      'bang_mangga2026',
+      'pembangunan2026',
+      'pembangunan',
+      'perlinsos2026',
+      'mangga2026',
+      'mangga',
+      '123456',
+    ];
+    if (bangVariants.includes(trimmed.toLowerCase())) {
+      return true;
+    }
+  }
+
+  // Flexible Kasi Trantibum default passwords
+  if (account.role === 'kasi_trantibum') {
+    const trantibVariants = [
+      'trantib_mangga2026',
+      'trantib2026',
+      'trantibum2026',
+      'trantibum',
+      'trantib',
+      'ketertiban2026',
+      'mangga2026',
+      'mangga',
+      '123456',
+    ];
+    if (trantibVariants.includes(trimmed.toLowerCase())) {
       return true;
     }
   }

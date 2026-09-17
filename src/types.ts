@@ -108,7 +108,21 @@ export interface CalendarScheduleItem {
   reportId?: string;
 }
 
-export type UserRole = 'super_admin' | 'kepling';
+export type UserRole =
+  | 'super_admin'
+  | 'kepling'
+  | 'kasi_pemerintahan'
+  | 'kasi_pembangunan'
+  | 'kasi_trantibum';
+
+export const isKelurahanAdmin = (role: UserRole | string): boolean => {
+  return (
+    role === 'super_admin' ||
+    role === 'kasi_pemerintahan' ||
+    role === 'kasi_pembangunan' ||
+    role === 'kasi_trantibum'
+  );
+};
 
 export interface UserAccount {
   id: string;

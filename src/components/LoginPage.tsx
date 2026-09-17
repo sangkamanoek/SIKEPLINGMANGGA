@@ -99,7 +99,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
       if (!targetAccount) {
         setErrorMessage(
-          `Username "${trimmedUser}" tidak terdaftar. Gunakan format username: kepling_1 s/d kepling_24 atau super_admin.`
+          `Username "${trimmedUser}" tidak terdaftar. Gunakan format username: kepling_1 s/d kepling_24, super_admin, atau kasi_pemerintahan, kasi_pembangunan, kasi_trantibum.`
         );
         setIsLoading(false);
         return;
@@ -280,7 +280,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 className="w-full px-3 py-2.5 text-xs sm:text-sm border border-emerald-300 rounded-xl bg-emerald-50/50 font-semibold text-emerald-950 focus:bg-white focus:outline-emerald-600 cursor-pointer transition-colors"
               >
                 <option value="">-- Pilih Username Akun Resmi --</option>
-                <option value="super_admin">🔑 super_admin • SUPER ADMIN (Lurah / Seklur)</option>
+                <optgroup label="Pimpinan & Administrator Kelurahan">
+                  <option value="super_admin">🔑 super_admin • SUPER ADMIN (Lurah / Seklur)</option>
+                </optgroup>
+                <optgroup label="Kepala Seksi (Kasi) Kelurahan Mangga">
+                  <option value="kasi_pemerintahan">🏛️ kasi_pemerintahan • Kasi Pemerintahan (Dashboard PBB)</option>
+                  <option value="kasi_pembangunan">🏗️ kasi_pembangunan • Kasi Pembangunan (Dashboard Perlinsos)</option>
+                  <option value="kasi_trantibum">🛡️ kasi_trantibum • Kasi Trantibum (Poskamling & Kedisiplinan)</option>
+                </optgroup>
                 <optgroup label="24 Kepala Lingkungan (kepling_1 s/d kepling_24)">
                   {FIXED_ACCOUNTS_LIST.filter((a) => a.role === 'kepling').map((acc) => (
                     <option key={acc.username} value={acc.username}>
@@ -302,7 +309,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     if (errorMessage) setErrorMessage('');
                     if (successMessage) setSuccessMessage('');
                   }}
-                  placeholder="Atau ketik username (contoh: kepling_1 atau super_admin)"
+                  placeholder="Atau ketik username (contoh: kepling_1, kasi_pemerintahan, super_admin)"
                   className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl bg-slate-50 font-mono text-slate-900 focus:bg-white focus:outline-emerald-600 focus:ring-2 focus:ring-emerald-600/30 transition-colors"
                   required
                 />
@@ -321,7 +328,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               ) : (
                 <p className="text-[10.5px] text-slate-500 leading-tight">
-                  Format resmi: <strong className="text-slate-700">kepling_1</strong> s/d <strong className="text-slate-700">kepling_24</strong>, atau <strong className="text-slate-700">super_admin</strong>.
+                  Format resmi: <strong className="text-slate-700">kepling_1</strong> s/d <strong className="text-slate-700">kepling_24</strong>, <strong className="text-slate-700">kasi_pemerintahan</strong>, <strong className="text-slate-700">kasi_pembangunan</strong>, <strong className="text-slate-700">kasi_trantibum</strong>, atau <strong className="text-slate-700">super_admin</strong>.
                 </p>
               )}
             </div>
@@ -461,11 +468,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 font-semibold text-slate-900 focus:bg-white focus:outline-emerald-600 cursor-pointer"
                 >
                   <option value="super_admin">🔑 super_admin • SUPER ADMIN</option>
-                  {FIXED_ACCOUNTS_LIST.filter((a) => a.role === 'kepling').map((acc) => (
-                    <option key={acc.username} value={acc.username}>
-                      📍 {acc.username} • {acc.lingkungan} ({acc.nama})
-                    </option>
-                  ))}
+                  <optgroup label="Kepala Seksi (Kasi)">
+                    <option value="kasi_pemerintahan">🏛️ kasi_pemerintahan • Kasi Pemerintahan (PBB)</option>
+                    <option value="kasi_pembangunan">🏗️ kasi_pembangunan • Kasi Pembangunan (Perlinsos)</option>
+                    <option value="kasi_trantibum">🛡️ kasi_trantibum • Kasi Trantibum</option>
+                  </optgroup>
+                  <optgroup label="24 Kepala Lingkungan">
+                    {FIXED_ACCOUNTS_LIST.filter((a) => a.role === 'kepling').map((acc) => (
+                      <option key={acc.username} value={acc.username}>
+                        📍 {acc.username} • {acc.lingkungan} ({acc.nama})
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 
