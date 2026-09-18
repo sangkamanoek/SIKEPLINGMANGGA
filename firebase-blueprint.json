@@ -147,6 +147,38 @@
         "fotoDokumentasi": "string",
         "createdAt": "string"
       }
+    },
+    {
+      "name": "custom_events",
+      "description": "Daftar kegiatan khusus / acara yang dibuat oleh admin untuk diabsensi oleh Kepling",
+      "fields": {
+        "id": "string",
+        "title": "string",
+        "date": "string",
+        "time": "string",
+        "location": "string",
+        "description": "string",
+        "required": "boolean",
+        "createdBy": "string",
+        "createdAt": "string"
+      }
+    },
+    {
+      "name": "event_attendance",
+      "description": "Data rekap absensi / kehadiran Kepala Lingkungan pada kegiatan khusus yang dibuat Admin",
+      "fields": {
+        "id": "string",
+        "eventId": "string",
+        "accountId": "string",
+        "namaKepling": "string",
+        "lingkungan": "string",
+        "nomorLingkungan": "number",
+        "status": "string",
+        "timestamp": "string",
+        "fotoSelfieUrl": "string",
+        "lokasiGps": "string",
+        "catatan": "string"
+      }
     }
   ]
 }

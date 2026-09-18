@@ -711,16 +711,6 @@ export const RekapAbsensiSuperAdmin: React.FC<RekapAbsensiSuperAdminProps> = ({
         </div>
       )}
 
-      {/* Slogan Banner */}
-      <div className="flex items-center justify-center gap-3 pt-2">
-        <span className="px-3 py-1 rounded-lg bg-[#991B1B] text-white text-[11px] font-black tracking-wider uppercase shadow-2xs">
-          #MEDANUNTUKSEMUA
-        </span>
-        <span className="px-3 py-1 rounded-lg bg-[#1E3A8A] text-white text-[11px] font-black tracking-wider uppercase shadow-2xs">
-          #SEMUAUNTUKMEDAN
-        </span>
-      </div>
-
       {/* Zoom / Lightbox Photo Modal */}
       {previewPhoto && (
         <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">

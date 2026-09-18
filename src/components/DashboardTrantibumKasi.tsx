@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  UserCheck,
   Users,
   MapPin,
   Eye,
@@ -20,34 +19,23 @@ import {
   FileText,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { LaporanHarianItem, AbsenApelItem, UserAccount } from '../types';
+import { LaporanHarianItem, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
-import { RekapAbsensiSuperAdmin } from './RekapAbsensiSuperAdmin';
 
 interface DashboardTrantibumKasiProps {
   reports: LaporanHarianItem[];
-  attendanceList: AbsenApelItem[];
   currentUser: UserAccount;
-  selectedDate: string;
-  onDateChange: (date: string) => void;
-  onOpenSelfiePreview?: (photo: { url: string; title: string }) => void;
   onSelectKeplingRiwayat?: (namaKepling: string) => void;
 }
 
 type PeriodFilter = 'all' | 'today' | '7days' | 'month';
-type ActiveSubView = 'poskamling' | 'presensi_apel' | 'kamtibmas_log';
 
 export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
   reports,
-  attendanceList,
   currentUser,
-  selectedDate,
-  onDateChange,
-  onOpenSelfiePreview,
   onSelectKeplingRiwayat,
 }) => {
   const [period, setPeriod] = useState<PeriodFilter>('all');
-  const [subView, setSubView] = useState<ActiveSubView>('poskamling');
   const [searchQuery, setSearchQuery] = useState('');
 
   // 1. Filter reports based on period
@@ -147,26 +135,11 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
   const kpiMetrics = useMemo(() => {
     const activePoskamlingCount = keplingTrantibStats.filter((k) => k.isPoskamlingActive).length;
 
-    // Today's attendance calculation
-    const todayDateStr = selectedDate || new Date().toISOString().split('T')[0];
-    const todayAttendance = attendanceList.filter((a) => a.tanggal === todayDateStr);
-    const hadirCount = todayAttendance.filter((a) => a.status === 'hadir').length;
-    const izinCount = todayAttendance.filter((a) => a.status === 'izin').length;
-    const sakitCount = todayAttendance.filter((a) => a.status === 'sakit').length;
-    const dinasCount = todayAttendance.filter((a) => a.status === 'dinas_luar').length;
-    const tidakApelCount = Math.max(0, 24 - todayAttendance.length);
-
     return {
       activePoskamlingCount,
       totalLingkungan: 24,
-      hadirCount,
-      izinCount,
-      sakitCount,
-      dinasCount,
-      tidakApelCount,
-      attendancePercentage: Math.round((hadirCount / 24) * 100),
     };
-  }, [keplingTrantibStats, attendanceList, selectedDate]);
+  }, [keplingTrantibStats]);
 
   // 4. Filtered List by Search Query
   const displayedKeplings = useMemo(() => {
@@ -265,65 +238,41 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
 
         {/* Sub-view Navigation Tabs */}
         <div className="mt-6 pt-5 border-t border-amber-600/50 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 bg-amber-950/60 p-1 rounded-xl border border-amber-600/60">
-            <button
-              type="button"
-              onClick={() => setSubView('poskamling')}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                subView === 'poskamling'
-                  ? 'bg-amber-400 text-slate-950 shadow-xs'
-                  : 'text-amber-200 hover:text-white'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Giat Poskamling & Keamanan</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSubView('presensi_apel')}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                subView === 'presensi_apel'
-                  ? 'bg-amber-400 text-slate-950 shadow-xs'
-                  : 'text-amber-200 hover:text-white'
-              }`}
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>Presensi Apel Pagi 24 Kepling</span>
-            </button>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-black text-amber-200 uppercase tracking-wider">
+              Filter Periode Laporan:
+            </span>
           </div>
 
-          {subView === 'poskamling' && (
-            <div className="flex items-center gap-1.5 bg-amber-950/40 p-1 rounded-xl border border-amber-700/50 text-xs">
-              <button
-                type="button"
-                onClick={() => setPeriod('all')}
-                className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                  period === 'all' ? 'bg-amber-500 text-white' : 'text-amber-200 hover:text-white'
-                }`}
-              >
-                Semua
-              </button>
-              <button
-                type="button"
-                onClick={() => setPeriod('today')}
-                className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                  period === 'today' ? 'bg-amber-500 text-white' : 'text-amber-200 hover:text-white'
-                }`}
-              >
-                Hari Ini
-              </button>
-              <button
-                type="button"
-                onClick={() => setPeriod('7days')}
-                className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                  period === '7days' ? 'bg-amber-500 text-white' : 'text-amber-200 hover:text-white'
-                }`}
-              >
-                7 Hari
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5 bg-amber-950/40 p-1 rounded-xl border border-amber-700/50 text-xs">
+            <button
+              type="button"
+              onClick={() => setPeriod('all')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                period === 'all' ? 'bg-amber-500 text-white font-black' : 'text-amber-200 hover:text-white'
+              }`}
+            >
+              Semua Periode
+            </button>
+            <button
+              type="button"
+              onClick={() => setPeriod('today')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                period === 'today' ? 'bg-amber-500 text-white font-black' : 'text-amber-200 hover:text-white'
+              }`}
+            >
+              Hari Ini
+            </button>
+            <button
+              type="button"
+              onClick={() => setPeriod('7days')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                period === '7days' ? 'bg-amber-500 text-white font-black' : 'text-amber-200 hover:text-white'
+              }`}
+            >
+              7 Hari Terakhir
+            </button>
+          </div>
         </div>
       </div>
 
@@ -373,178 +322,148 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
           </div>
         </div>
 
-        {/* Card 3: Kehadiran Apel Pagi Kepling */}
+        {/* Card 3: Total Wilayah Kerja */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Disiplin Apel Pagi ({selectedDate})
+              Total Wilayah Kerja
             </span>
             <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-              <UserCheck className="w-5 h-5" />
+              <Building2 className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black text-slate-900 tracking-tight">
-              {kpiMetrics.hadirCount}
+              24
             </span>
-            <span className="text-xs font-semibold text-slate-500">/ 24 Hadir Apel</span>
+            <span className="text-xs font-semibold text-slate-500">Lingkungan</span>
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Tidak apel / belum absen:</span>
-            <span
-              className={`font-bold ${
-                kpiMetrics.tidakApelCount > 0 ? 'text-rose-700' : 'text-emerald-700'
-              }`}
-            >
-              {kpiMetrics.tidakApelCount} Kepling
-            </span>
+          <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500 font-medium">
+            Kecamatan Medan Tuntungan
           </div>
         </div>
 
-        {/* Card 4: Izin & Dinas Luar */}
+        {/* Card 4: Kepatuhan Patroli Ronda */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Izin / Sakit / Dinas
+              Kepatuhan Patroli Ronda
             </span>
             <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
-              <Clock className="w-5 h-5" />
+              <Activity className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black text-slate-900 tracking-tight">
-              {kpiMetrics.izinCount + kpiMetrics.sakitCount + kpiMetrics.dinasCount}
+              {Math.round((kpiMetrics.activePoskamlingCount / 24) * 100)}%
             </span>
-            <span className="text-xs font-semibold text-slate-500">Orang</span>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500 font-medium">
-            {kpiMetrics.izinCount} Izin • {kpiMetrics.sakitCount} Sakit • {kpiMetrics.dinasCount} Dinas
+            Seksi Trantibum Kelurahan Mangga
           </div>
         </div>
       </div>
 
-      {/* Konten Utama Berdasarkan Sub-View */}
-      {subView === 'poskamling' ? (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-5 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-amber-700" />
-                <span>Monitoring Poskamling / Siskamling 24 Lingkungan</span>
-              </h3>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Status kesiapsiagaan pos ronda, personel jaga, dan keterangan situasi kamtibmas
-              </p>
-            </div>
-
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Cari lingkungan / lokasi pos ronda..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
-              />
-            </div>
+      {/* Konten Utama */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-5 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-amber-700" />
+              <span>Monitoring Poskamling / Siskamling 24 Lingkungan</span>
+            </h3>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Status kesiapsiagaan pos ronda, personel jaga, dan keterangan situasi kamtibmas
+            </p>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 text-[11px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                  <th className="py-3 px-4 text-center w-12">No</th>
-                  <th className="py-3 px-4">Wilayah & Kepala Lingkungan</th>
-                  <th className="py-3 px-4 text-center">Status Giat</th>
-                  <th className="py-3 px-4">Lokasi Pos Ronda</th>
-                  <th className="py-3 px-4">Petugas / Warga Jaga</th>
-                  <th className="py-3 px-4">Situasi Kamtibmas</th>
-                  <th className="py-3 px-4 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {displayedKeplings.map((item, index) => (
-                  <tr key={item.kepling.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4 text-center font-bold text-slate-500">
-                      {item.kepling.nomorLingkungan || index + 1}
-                    </td>
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari lingkungan / lokasi pos ronda..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+            />
+          </div>
+        </div>
 
-                    <td className="py-3 px-4">
-                      <div className="font-bold text-slate-900">{item.kepling.nama}</div>
-                      <div className="text-[11px] text-slate-500 font-medium">{item.kepling.lingkungan}</div>
-                    </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/80 text-[11px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                <th className="py-3 px-4 text-center w-12">No</th>
+                <th className="py-3 px-4">Wilayah & Kepala Lingkungan</th>
+                <th className="py-3 px-4 text-center">Status Giat</th>
+                <th className="py-3 px-4">Lokasi Pos Ronda</th>
+                <th className="py-3 px-4">Petugas / Warga Jaga</th>
+                <th className="py-3 px-4">Situasi Kamtibmas</th>
+                <th className="py-3 px-4 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-xs">
+              {displayedKeplings.map((item, index) => (
+                <tr key={item.kepling.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="py-3 px-4 text-center font-bold text-slate-500">
+                    {item.kepling.nomorLingkungan || index + 1}
+                  </td>
 
-                    <td className="py-3 px-4 text-center">
-                      <span
-                        className={`inline-block text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                          item.isPoskamlingActive
-                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}
+                  <td className="py-3 px-4">
+                    <div className="font-bold text-slate-900">{item.kepling.nama}</div>
+                    <div className="text-[11px] text-slate-500 font-medium">{item.kepling.lingkungan}</div>
+                  </td>
+
+                  <td className="py-3 px-4 text-center">
+                    <span
+                      className={`inline-block text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                        item.isPoskamlingActive
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {item.status}
+                    </span>
+                  </td>
+
+                  <td className="py-3 px-4 font-medium text-slate-800">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate max-w-xs">{item.lokasi}</span>
+                    </div>
+                  </td>
+
+                  <td className="py-3 px-4 text-slate-700 font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate max-w-xs">{item.petugas}</span>
+                    </div>
+                  </td>
+
+                  <td className="py-3 px-4 max-w-xs">
+                    <p className="text-[11px] text-slate-600 truncate font-medium" title={item.keterangan}>
+                      {item.keterangan}
+                    </p>
+                  </td>
+
+                  <td className="py-3 px-4 text-right">
+                    {onSelectKeplingRiwayat && (
+                      <button
+                        type="button"
+                        onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-200"
+                        title="Lihat riwayat laporan poskamling kepling ini"
                       >
-                        {item.status}
-                      </span>
-                    </td>
-
-                    <td className="py-3 px-4 font-medium text-slate-800">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate max-w-xs">{item.lokasi}</span>
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-4 text-slate-700 font-medium">
-                      <div className="flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate max-w-xs">{item.petugas}</span>
-                      </div>
-                    </td>
-
-                    <td className="py-3 px-4 max-w-xs">
-                      <p className="text-[11px] text-slate-600 truncate font-medium" title={item.keterangan}>
-                        {item.keterangan}
-                      </p>
-                    </td>
-
-                    <td className="py-3 px-4 text-right">
-                      {onSelectKeplingRiwayat && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
-                          className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-200"
-                          title="Lihat riwayat laporan poskamling kepling ini"
-                        >
-                          Riwayat
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        Riwayat
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      ) : (
-        /* Presensi & Kedisiplinan Apel Pagi 24 Kepling (Terintegrasi RekapAbsensiSuperAdmin) */
-        <div className="space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-amber-700 shrink-0" />
-              <span>
-                <strong>Modul Pengawasan Kedisiplinan Kasi Trantibum:</strong> Memonitor presensi apel pagi harian, mingguan, bulanan, serta rekapan kepling yang tidak mengikuti apel.
-              </span>
-            </div>
-          </div>
-
-          <RekapAbsensiSuperAdmin
-            attendanceList={attendanceList}
-            currentUser={currentUser}
-            selectedDate={selectedDate}
-            onDateChange={onDateChange}
-            onOpenSelfiePreview={onOpenSelfiePreview}
-          />
-        </div>
-      )}
+      </div>
     </div>
   );
 };

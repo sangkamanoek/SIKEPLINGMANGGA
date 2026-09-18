@@ -168,6 +168,32 @@ export type TargetsCapaianMap = Record<string, KeplingTargetCapaian>;
 
 export type StatusAbsenApel = 'Hadir' | 'Izin' | 'Sakit' | 'Dinas Luar' | 'Tidak Mengikuti Apel';
 
+export interface CustomEvent {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  time: string;
+  location: string;
+  description?: string;
+  required: boolean;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface EventAttendance {
+  id: string; // e.g. "att_eventid_accountId"
+  eventId: string;
+  accountId: string;
+  namaKepling: string;
+  lingkungan: string;
+  nomorLingkungan?: number;
+  status: 'Hadir' | 'Izin' | 'Sakit' | 'Dinas Luar' | 'Tidak Hadir';
+  timestamp: string;
+  fotoSelfieUrl?: string;
+  lokasiGps?: string;
+  catatan?: string;
+}
+
 export interface AbsenApelItem {
   id: string; // e.g. "absen_kepling_1_2026-09-13" or timestamp
   accountId: string; // e.g. "kepling_1" or "super_admin"

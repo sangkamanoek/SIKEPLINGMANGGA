@@ -37,6 +37,20 @@ interface FormLaporanProps {
 
 const STORAGE_KEY_PROFILE = 'kepling_profile_data';
 
+const LAINNYA_OPTIONS_PRESET = [
+  'Posko Trantibum Kelurahan',
+  'Posko Bersemi',
+  'Posko Patam',
+  'Mediasi Warga',
+  'Pemantauan Kebersihan Lingkungan',
+  'Pemantauan Faktor 74',
+  'Rapat Koordinasi Kecamatan',
+  'Rapat Koordinasi Kelurahan',
+  'Fasilitasi Posyandu',
+  'Menghadiri Reses/Sosperda',
+  'Kegiatan Lainnya',
+];
+
 export const FormLaporan: React.FC<FormLaporanProps> = ({
   onSaveReport,
   isSaving,
@@ -96,6 +110,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     setPerlinsosTidakDiTempatRincian('');
     setIkdOrang('0');
     setBpjsKetenagakerjaanOrang('0');
+    setSelectedLainnyaOptions([]);
+    setKegiatanLainnyaCustomText('');
   };
 
   // Tugas Tambahan POSKAMLING / SISKAMLING
@@ -110,6 +126,27 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   );
 
   const [kegiatanLainnya, setKegiatanLainnya] = useState<string>('');
+  const [selectedLainnyaOptions, setSelectedLainnyaOptions] = useState<string[]>([]);
+  const [kegiatanLainnyaCustomText, setKegiatanLainnyaCustomText] = useState<string>('');
+
+  // Sinkronisasi pilihan cepat Kegiatan Lainnya ke string kegiatanLainnya untuk preview & database
+  useEffect(() => {
+    if (selectedLainnyaOptions.length === 0) {
+      setKegiatanLainnya('');
+      return;
+    }
+    const formatted = selectedLainnyaOptions
+      .map((opt) => {
+        if (opt === 'Kegiatan Lainnya') {
+          return kegiatanLainnyaCustomText.trim()
+            ? `Kegiatan Lainnya: ${kegiatanLainnyaCustomText.trim()}`
+            : 'Kegiatan Lainnya';
+        }
+        return opt;
+      })
+      .join(', ');
+    setKegiatanLainnya(formatted);
+  }, [selectedLainnyaOptions, kegiatanLainnyaCustomText]);
 
   // Dokumentasi Foto state
   const [fotoList, setFotoList] = useState<FotoDokumentasi[]>([]);
@@ -396,9 +433,18 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       (!f.kategori && !f.name.includes('[PBB]') && !f.name.includes('[PERLINSOS]'))
   );
 
+  const lainnyaPhotos = fotoList.filter(
+    (f) =>
+      f.kategori === 'lainnya' ||
+      f.name.toUpperCase().includes('[KEGIATAN LAINNYA]') ||
+      f.kategori === 'kebersihan'
+  );
+  const lainnyaPhotosCount = lainnyaPhotos.length;
+
   const pbbDeficit = pbbWpNumber > pbbPhotosCount ? pbbWpNumber - pbbPhotosCount : 0;
   const perlinsosDeficit = perlinsosKkNumber > perlinsosPhotosCount ? perlinsosKkNumber - perlinsosPhotosCount : 0;
-  const hasPhotoDeficit = pbbDeficit > 0 || perlinsosDeficit > 0;
+  const lainnyaDeficit = selectedLainnyaOptions.length > lainnyaPhotosCount ? selectedLainnyaOptions.length - lainnyaPhotosCount : 0;
+  const hasPhotoDeficit = pbbDeficit > 0 || perlinsosDeficit > 0 || lainnyaDeficit > 0;
 
   const constructReportItem = (): LaporanHarianItem => {
     const kinerja: KinerjaHarian = {
@@ -481,6 +527,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       setBpjsKetenagakerjaanKeterangan('');
       setPoskamlingKeterangan('');
       setKegiatanLainnya('');
+      setSelectedLainnyaOptions([]);
+      setKegiatanLainnyaCustomText('');
       setFotoList([]);
       setShowPhotoValidationModal(false);
     } catch (err) {
@@ -490,6 +538,10 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedLainnyaOptions.includes('Kegiatan Lainnya') && !kegiatanLainnyaCustomText.trim()) {
+      alert('⚠️ Jika memilih "Kegiatan Lainnya", Anda wajib mengisi keterangan rincian tentang Kegiatan Lainnya tersebut!');
+      return;
+    }
     if (hasPhotoDeficit) {
       setShowPhotoValidationModal(true);
       return;
@@ -992,90 +1044,18 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
             </div>
 
             {/* Pilar 2: PERLINSOS */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+              <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[10px] font-black">
                     2
                   </span>
                   PERLINSOS (Perlindungan Sosial / Bansos)
                 </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowKunjunganInline(!showKunjunganInline)}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] shadow-2xs transition-all cursor-pointer"
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    <span>{showKunjunganInline ? '✕ Tutup Form Kunjungan' : '👥 + Catat Kunjungan Warga (Door-to-Door)'}</span>
-                  </button>
-                  <span className="text-[11px] font-semibold text-slate-500">Satuan: KK</span>
-                </div>
+                <span className="text-[11px] font-semibold text-slate-500">Satuan: KK</span>
               </div>
-
-              {/* Form Kunjungan Warga Terintegrasi */}
-              {showKunjunganInline && (
-                <div className="my-2">
-                  <FormKunjunganWarga
-                    currentUser={activeAccount || KEPLING_ACCOUNTS[0]}
-                    tanggalLaporan={rawDate}
-                    onSuccess={(data) => {
-                      handleKunjunganSuccess(data);
-                      setShowKunjunganInline(false);
-                    }}
-                    onCancel={() => setShowKunjunganInline(false)}
-                    compact={true}
-                  />
-                </div>
-              )}
-
-              {/* Status / Kategori Aktivitas Perlinsos */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] text-slate-400 font-bold uppercase">Aktivitas:</span>
-                {[
-                  'Pendataan Perlinsos',
-                  'Pengecekan Data',
-                  'Verifikasi Bansos',
-                  'Menolak Pendataan Perlinsos',
-                  'Tidak Di Tempat',
-                ].map((opt) => {
-                  const isMenolak = opt === 'Menolak Pendataan Perlinsos';
-                  const isTidakDiTempat = opt === 'Tidak Di Tempat';
-                  const isActive = perlinsosKeterangan === opt || perlinsosKategoriKegiatan === opt;
-
-                  return (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => {
-                        setPerlinsosKeterangan(opt);
-                        setPerlinsosKategoriKegiatan(opt);
-                        if (isMenolak || isTidakDiTempat) {
-                          setShowPerlinsosRincianKhusus(true);
-                        }
-                      }}
-                      className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer font-bold ${
-                        isActive
-                          ? isMenolak
-                            ? 'bg-rose-100 border-rose-400 text-rose-800 shadow-2xs'
-                            : isTidakDiTempat
-                            ? 'bg-amber-100 border-amber-400 text-amber-900 shadow-2xs'
-                            : 'bg-emerald-100 border-emerald-400 text-emerald-800 shadow-2xs'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      {isMenolak ? '⚠️ ' : isTidakDiTempat ? '🏠 ' : ''}{opt}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Baris Input Realisasi & Keterangan Utama */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
-                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">
-                    Realisasi (KK)
-                  </label>
                   <input
                     id="input-perlinsos-kk"
                     type="number"
@@ -1087,116 +1067,18 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">
-                    Keterangan Kegiatan Perlinsos
-                  </label>
                   <input
                     id="input-perlinsos-ket"
                     type="text"
                     value={perlinsosKeterangan}
                     onChange={(e) => setPerlinsosKeterangan(e.target.value)}
-                    placeholder="Contoh: Pendataan Perlinsos"
+                    placeholder="Keterangan kegiatan Perlinsos"
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 font-medium"
                   />
                 </div>
               </div>
 
-              {/* Toggle Khusus Menolak / Tidak Di Tempat */}
-              <div className="pt-2 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowPerlinsosRincianKhusus(!showPerlinsosRincianKhusus)}
-                  className="w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span>⚠️</span>
-                    <span>Pencatatan Warga Menolak & Tidak Di Tempat</span>
-                    {(Number(perlinsosMenolakKk) > 0 || Number(perlinsosTidakDiTempatKk) > 0) && (
-                      <span className="ml-1.5 px-1.5 py-0.5 bg-rose-500 text-white rounded-full text-[9px]">
-                        Terisi
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    {showPerlinsosRincianKhusus ? 'Tutup ▲' : 'Buka Form ▼'}
-                  </span>
-                </button>
-
-                {/* Sub-form Warga Menolak & Tidak di Tempat */}
-                {(showPerlinsosRincianKhusus || Number(perlinsosMenolakKk) > 0 || Number(perlinsosTidakDiTempatKk) > 0) && (
-                  <div className="mt-2.5 space-y-3 p-3 bg-white border border-slate-200 rounded-xl">
-                    {/* 1. Warga Menolak Pendataan Perlinsos */}
-                    <div className="p-2.5 rounded-lg border border-rose-200 bg-rose-50/60 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
-                          <span>⚠️</span>
-                          <span>1. Warga Menolak Pendataan Perlinsos</span>
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-rose-700">Jumlah:</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={perlinsosMenolakKk}
-                            onChange={(e) => setPerlinsosMenolakKk(e.target.value.replace(/^0+(?=\d)/, ''))}
-                            placeholder="0"
-                            className="w-16 px-2 py-1 text-xs border border-rose-300 rounded-md bg-white font-bold text-rose-900 text-center"
-                          />
-                          <span className="text-[10px] font-bold text-rose-700">KK</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-rose-800 uppercase block mb-1">
-                          Nama & Alamat Warga Yang Menolak:
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={perlinsosMenolakRincian}
-                          onChange={(e) => setPerlinsosMenolakRincian(e.target.value)}
-                          placeholder="Tuliskan nama & alamat lengkap warga yang menolak pendataan, contoh:&#10;1. Bpk. Sitorus - Jl. Tembakau No. 14 (Menolak didata bansos)&#10;2. Ibu Farida - Jl. Bunga Raya No. 5"
-                          className="w-full px-2.5 py-1.5 text-xs border border-rose-200 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-rose-500 font-medium"
-                        />
-                      </div>
-                    </div>
-
-                    {/* 2. Warga Tidak Di Tempat */}
-                    <div className="p-2.5 rounded-lg border border-amber-200 bg-amber-50/60 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                          <span>🏠</span>
-                          <span>2. Warga Tidak Di Tempat</span>
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-amber-800">Jumlah:</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={perlinsosTidakDiTempatKk}
-                            onChange={(e) => setPerlinsosTidakDiTempatKk(e.target.value.replace(/^0+(?=\d)/, ''))}
-                            placeholder="0"
-                            className="w-16 px-2 py-1 text-xs border border-amber-300 rounded-md bg-white font-bold text-amber-900 text-center"
-                          />
-                          <span className="text-[10px] font-bold text-amber-800">KK</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-amber-800 uppercase block mb-1">
-                          Nama & Alamat Warga Yang Tidak Di Tempat:
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={perlinsosTidakDiTempatRincian}
-                          onChange={(e) => setPerlinsosTidakDiTempatRincian(e.target.value)}
-                          placeholder="Tuliskan nama & alamat lengkap warga yang sedang tidak di tempat, contoh:&#10;1. Ibu Nurmala - Jl. Tembakau No. 22 (Rumah terkunci / sedang kerja)&#10;2. Bpk. Hendra - Jl. Melati No. 9 (Luar kota)"
-                          className="w-full px-2.5 py-1.5 text-xs border border-amber-200 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-amber-500 font-medium"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
+              <div className="mt-2 pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
                   <Camera className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Foto Perlinsos:</span>
@@ -1226,10 +1108,10 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
               {/* Peringatan & Notifikasi Kesesuaian Foto Perlinsos */}
               {perlinsosKkNumber > 0 && (
                 <div
-                  className={`mt-2.5 p-2.5 rounded-lg border text-xs transition-all ${
+                  className={`mt-2 p-2.5 rounded-lg border text-xs transition-all ${
                     perlinsosDeficit > 0
-                      ? 'bg-amber-50/95 border-amber-300 text-amber-950 shadow-2xs'
-                      : 'bg-emerald-50/95 border-emerald-300 text-emerald-950 shadow-2xs'
+                      ? 'bg-amber-50/95 border-amber-300 text-amber-950'
+                      : 'bg-emerald-50/95 border-emerald-300 text-emerald-950'
                   }`}
                 >
                   <div className="flex items-start gap-2">
@@ -1418,24 +1300,82 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
             </div>
 
             {/* Kegiatan Lainnya */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                5. Kegiatan Lainnya (Opsional)
-              </label>
-              <textarea
-                id="input-kegiatan-lainnya"
-                rows={4}
-                value={kegiatanLainnya}
-                onChange={(e) => setKegiatanLainnya(e.target.value)}
-                placeholder="Tuliskan rincian kegiatan lainnya di sini (Contoh: Pemantauan kebersihan lingkungan, penanganan drainase, gotong royong, posko trantibum, mediasi warga, dll)..."
-                className="w-full min-h-[96px] p-3 text-xs leading-relaxed border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-slate-800 font-medium shadow-xs resize-y"
-              />
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700">
+                  5. Kegiatan Lainnya (Pilihan Cepat & Keterangan)
+                </label>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Pilih satu atau beberapa kegiatan di bawah ini. Unggah minimal 1 foto untuk setiap kegiatan yang dipilih.
+                </p>
+              </div>
+
+              {/* Grid of Option Pills */}
+              <div className="flex flex-wrap gap-2">
+                {LAINNYA_OPTIONS_PRESET.map((opt) => {
+                  const isSelected = selectedLainnyaOptions.includes(opt);
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => {
+                        setSelectedLainnyaOptions((prev) =>
+                          prev.includes(opt)
+                            ? prev.filter((o) => o !== opt)
+                            : [...prev, opt]
+                        );
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none active:scale-95 ${
+                        isSelected
+                          ? 'bg-teal-600 border-teal-600 text-white shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      {isSelected ? (
+                        <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />
+                      ) : (
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                      )}
+                      <span>{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Conditional Custom Text Area */}
+              {selectedLainnyaOptions.includes('Kegiatan Lainnya') && (
+                <div className="space-y-1.5 animate-in fade-in duration-200">
+                  <label className="block text-[11px] font-bold text-teal-900 uppercase">
+                    Rincian Keterangan Kegiatan Lainnya <span className="text-red-600">*Wajib Diisi</span>
+                  </label>
+                  <textarea
+                    id="input-kegiatan-lainnya-custom"
+                    rows={3}
+                    value={kegiatanLainnyaCustomText}
+                    onChange={(e) => setKegiatanLainnyaCustomText(e.target.value)}
+                    placeholder="Tuliskan keterangan detail tentang kegiatan lainnya yang dimaksud di sini..."
+                    className={`w-full p-2.5 text-xs border rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-teal-600 font-medium ${
+                      !kegiatanLainnyaCustomText.trim()
+                        ? 'border-rose-300 bg-rose-50/20'
+                        : 'border-slate-300'
+                    }`}
+                  />
+                  {!kegiatanLainnyaCustomText.trim() && (
+                    <p className="text-[10px] text-rose-600 font-semibold flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      Wajib menuliskan keterangan jika Anda mencentang pilihan "Kegiatan Lainnya"!
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Upload Foto Kegiatan Lainnya */}
               <div className="mt-2 pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
                   <Camera className="w-3.5 h-3.5 text-teal-600" />
                   <span>Foto Kegiatan Lainnya:</span>
                   <span className="font-bold text-teal-700">
-                    {fotoList.filter(f => f.kategori === 'lainnya' || f.name.includes('[KEGIATAN LAINNYA]') || f.kategori === 'kebersihan').length} Foto
+                    {lainnyaPhotosCount} Foto
                   </span>
                 </div>
                 <div>
@@ -1451,11 +1391,59 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                     htmlFor="file-input-lainnya"
                     className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-[11px] font-bold shadow-2xs transition-all cursor-pointer active:scale-95"
                   >
-                    <Camera className="w-3 h-3" />
+                    <Camera className="w-3.5 h-3.5" />
                     <span>+ Unggah Foto Kegiatan Lainnya</span>
                   </label>
                 </div>
               </div>
+
+              {/* Real-time comparison indicator */}
+              {selectedLainnyaOptions.length > 0 && (
+                <div
+                  className={`mt-2 p-2.5 rounded-lg border text-xs transition-all ${
+                    lainnyaDeficit > 0
+                      ? 'bg-amber-50/95 border-amber-300 text-amber-950'
+                      : 'bg-teal-50/95 border-teal-300 text-teal-950'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {lainnyaDeficit > 0 ? (
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <span className="font-bold">
+                          {lainnyaDeficit > 0
+                            ? '⚠️ Peringatan: Jumlah Foto Belum Sesuai Kegiatan'
+                            : '✅ Jumlah Foto Kegiatan Lainnya Sudah Sesuai'}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                            lainnyaDeficit > 0
+                              ? 'bg-amber-200 text-amber-900'
+                              : 'bg-teal-200 text-teal-900'
+                          }`}
+                        >
+                          {lainnyaPhotosCount} / {selectedLainnyaOptions.length} Foto ({lainnyaDeficit > 0 ? `Kurang ${lainnyaDeficit} Foto` : 'Lengkap'})
+                        </span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed">
+                        {lainnyaDeficit > 0 ? (
+                          <>
+                            Anda memilih <strong>{selectedLainnyaOptions.length} kegiatan</strong>. Jumlah foto yang dilampirkan <strong>harus disesuaikan (minimal {selectedLainnyaOptions.length} Foto)</strong>. Saat ini baru terunggah <strong>{lainnyaPhotosCount} foto</strong> (masih kurang <strong>{lainnyaDeficit} foto</strong>).
+                          </>
+                        ) : (
+                          <>
+                            Dokumentasi foto kegiatan lainnya telah sesuai dengan jumlah <strong>{selectedLainnyaOptions.length} kegiatan</strong> yang dipilih (<strong>{lainnyaPhotosCount} foto</strong> terlampir).
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1840,7 +1828,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                         Peringatan: Jumlah Foto Belum Sesuai Angka Inputan!
                       </span>
                       <span className="text-[11px] text-amber-800">
-                        Foto bukti harus sama dengan jumlah WP / KK yang diinput:
+                        Foto bukti harus sesuai dengan jumlah WP / KK / Kegiatan yang dipilih:
                       </span>
                     </div>
                   </div>
@@ -1867,13 +1855,24 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                         </span>
                       </div>
                     )}
+                    {lainnyaDeficit > 0 && (
+                      <div className="flex items-center justify-between bg-white/90 px-2.5 py-1.5 rounded-lg border border-amber-200 text-[11px]">
+                        <div>
+                          <span className="font-bold text-slate-800">Kegiatan Lainnya: </span>
+                          <span className="text-slate-600">{selectedLainnyaOptions.length} Kegiatan</span>
+                        </div>
+                        <span className="font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          Baru {lainnyaPhotosCount} Foto (Kurang {lainnyaDeficit})
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ) : (pbbWpNumber > 0 || perlinsosKkNumber > 0) ? (
+              ) : (pbbWpNumber > 0 || perlinsosKkNumber > 0 || selectedLainnyaOptions.length > 0) ? (
                 <div className="p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-950 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span className="text-[11px] font-medium text-emerald-900">
-                    Jumlah foto bukti dokumentasi telah <strong>sesuai</strong> dengan angka WP ({pbbPhotosCount}/{pbbWpNumber}) dan KK ({perlinsosPhotosCount}/{perlinsosKkNumber}).
+                    Jumlah foto bukti dokumentasi telah <strong>sesuai</strong> dengan angka WP ({pbbPhotosCount}/{pbbWpNumber}), KK ({perlinsosPhotosCount}/{perlinsosKkNumber}), dan Kegiatan Lainnya ({lainnyaPhotosCount}/{selectedLainnyaOptions.length}).
                   </span>
                 </div>
               ) : null}
@@ -2002,8 +2001,34 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                   </div>
                 </div>
               )}
-            </div>
 
+              {lainnyaDeficit > 0 && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-bold text-amber-950">5. KEGIATAN LAINNYA</div>
+                      <div className="text-[11px] text-amber-800 mt-0.5">
+                        Terpilih: <strong>{selectedLainnyaOptions.length} Kegiatan</strong> ➔ Foto terlampir: <strong>{lainnyaPhotosCount} Foto</strong>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 bg-rose-600 text-white font-extrabold text-[10px] rounded-lg shadow-2xs">
+                      Kurang {lainnyaDeficit} Foto
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 flex-wrap">
+                    <label
+                      htmlFor="file-input-lainnya"
+                      onClick={() => setShowPhotoValidationModal(false)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>+ Upload {lainnyaDeficit} Foto Lainnya</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+ 
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-end gap-2.5">
               <button
                 type="button"
@@ -2013,6 +2038,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                     document.getElementById('input-opsir-pbb-wp')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                   } else if (perlinsosDeficit > 0) {
                     document.getElementById('input-perlinsos-kk')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  } else if (lainnyaDeficit > 0) {
+                    document.getElementById('input-kegiatan-lainnya-custom')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                   }
                 }}
                 className="w-full sm:w-auto px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-all text-center"

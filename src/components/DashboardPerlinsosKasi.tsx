@@ -21,6 +21,12 @@ import {
 import * as XLSX from 'xlsx';
 import { LaporanHarianItem, TargetsCapaianMap, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import {
+  calculateEffectiveKinerja,
+  DEFAULT_PERLINSOS_TARGETS,
+  DEFAULT_PERLINSOS_BASELINES,
+} from '../data/targetsData';
+import { KunjunganHarianView } from './KunjunganHarianView';
 
 interface DashboardPerlinsosKasiProps {
   reports: LaporanHarianItem[];
@@ -39,6 +45,7 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
   onSelectKeplingRiwayat,
   onOpenKunjunganWarga,
 }) => {
+  const [subView, setSubView] = useState<'perlinsos' | 'kunjungan_warga'>('perlinsos');
   const [period, setPeriod] = useState<PeriodFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -74,7 +81,7 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
 
   // 2. Aggregate Perlinsos stats per Kepling
   const keplingPerlinsosStats = useMemo(() => {
-    return KEPLING_ACCOUNTS.map((kepling) => {
+    return KEPLING_ACCOUNTS.map((kepling, index) => {
       const keplingReports = filteredReports.filter(
         (r) =>
           r.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase() ||
@@ -83,13 +90,13 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
 
       // Reported Perlinsos KK
       const reportedKk = keplingReports.reduce((sum, r) => {
-        const val = Number(r.perlinsosKk || 0);
+        const val = Number(r.kinerja?.perlinsosKk || 0);
         return sum + (isNaN(val) ? 0 : val);
       }, 0);
 
       // Reported BPJS TK
       const reportedBpjs = keplingReports.reduce((sum, r) => {
-        const val = Number(r.bpjsKetenagakerjaan || 0);
+        const val = Number(r.kinerja?.bpjsKetenagakerjaanOrang || 0);
         return sum + (isNaN(val) ? 0 : val);
       }, 0);
 
@@ -101,35 +108,59 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
       let tidakDiTempatKk = 0;
 
       keplingReports.forEach((r) => {
-        if (r.kategoriPerlinsos === 'pendataan') pendataanCount += Number(r.perlinsosKk || 0);
-        if (r.kategoriPerlinsos === 'pengecekan') pengecekanCount += Number(r.perlinsosKk || 0);
-        if (r.kategoriPerlinsos === 'verifikasi') verifikasiCount += Number(r.perlinsosKk || 0);
-        if (r.wargaMenolak) menolakKk += Number(r.wargaMenolakCount || 1);
-        if (r.wargaTidakDiTempat) tidakDiTempatKk += Number(r.wargaTidakDiTempatCount || 1);
+        const kat = (r.kinerja?.perlinsosKategoriKegiatan || '').toLowerCase();
+        const kkVal = Number(r.kinerja?.perlinsosKk || 0);
+
+        if (kat.includes('pendataan')) {
+          pendataanCount += kkVal;
+        } else if (kat.includes('pengecekan')) {
+          pengecekanCount += kkVal;
+        } else if (kat.includes('verifikasi')) {
+          verifikasiCount += kkVal;
+        }
+
+        const mKk = Number(r.kinerja?.perlinsosMenolakKk || 0);
+        const tKk = Number(r.kinerja?.perlinsosTidakDiTempatKk || 0);
+        menolakKk += mKk;
+        tidakDiTempatKk += tKk;
+
+        if (kat.includes('menolak') && mKk === 0) {
+          menolakKk += kkVal || 1;
+        }
+        if ((kat.includes('tempat') || kat.includes('tidak')) && tKk === 0) {
+          tidakDiTempatKk += kkVal || 1;
+        }
       });
 
       // Target configuration from targetsMap
       const targetConfig = targetsMap[kepling.id];
-      const targetPerlinsos = targetConfig?.targetPerlinsos || 300; // default 300 KK
+      const targetPerlinsos =
+        targetConfig?.targetPerlinsos ??
+        DEFAULT_PERLINSOS_TARGETS[index] ??
+        300;
 
-      // Total Perlinsos (with admin baseline override if in all-time view)
-      let totalPerlinsos = reportedKk;
-      let isOverridden = false;
-      if (period === 'all' && targetConfig?.capaianPerlinsosManual !== undefined) {
-        totalPerlinsos = targetConfig.capaianPerlinsosManual;
-        isOverridden = true;
-      }
+      // Use calculateEffectiveKinerja to get the exact matching cumulative stats
+      const reported = {
+        pbb: 0,
+        perlinsos: reportedKk,
+        ikd: 0,
+        bpjs: reportedBpjs,
+      };
+
+      const effective = calculateEffectiveKinerja(reported, targetConfig, index);
+      const totalPerlinsos = effective.perlinsos;
+      const isOverridden = effective.isPerlinsosOverridden || effective.isOverridden;
 
       const perlinsosPercentage =
         targetPerlinsos > 0 ? Math.round((totalPerlinsos / targetPerlinsos) * 100) : 0;
 
       // Find latest Perlinsos report note
       const latestPerlinsosReport = [...keplingReports]
-        .filter((r) => r.perlinsosKk && Number(r.perlinsosKk) > 0)
+        .filter((r) => r.kinerja?.perlinsosKk && Number(r.kinerja?.perlinsosKk) > 0)
         .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime())[0];
 
       const latestNote =
-        latestPerlinsosReport?.uraianPerlinsos ||
+        latestPerlinsosReport?.kinerja?.perlinsosKeterangan ||
         latestPerlinsosReport?.uraianTugas ||
         latestPerlinsosReport?.catatanUmum ||
         '-';
@@ -147,7 +178,7 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
         menolakKk,
         tidakDiTempatKk,
         reportCount: keplingReports.length,
-        perlinsosReportCount: keplingReports.filter((r) => Number(r.perlinsosKk || 0) > 0).length,
+        perlinsosReportCount: keplingReports.filter((r) => Number(r.kinerja?.perlinsosKk || 0) > 0).length,
         latestNote,
         isOverridden,
       };
@@ -294,63 +325,89 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
           </div>
         </div>
 
-        {/* Filter Periode */}
+        {/* Sub-view Navigation Tabs */}
         <div className="mt-6 pt-5 border-t border-blue-800/60 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 bg-blue-950/50 p-1 rounded-xl border border-blue-700/60">
+          <div className="flex items-center gap-1.5 bg-blue-950/60 p-1 rounded-xl border border-blue-700/60">
             <button
               type="button"
-              onClick={() => setPeriod('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                period === 'all'
-                  ? 'bg-blue-500 text-white shadow-xs'
+              onClick={() => setSubView('perlinsos')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                subView === 'perlinsos'
+                  ? 'bg-blue-400 text-slate-950 shadow-xs'
                   : 'text-blue-200 hover:text-white'
               }`}
             >
-              Semua Waktu
+              <HeartHandshake className="w-4 h-4" />
+              <span>Giat Perlinsos & BPJS</span>
             </button>
+
             <button
               type="button"
-              onClick={() => setPeriod('today')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                period === 'today'
-                  ? 'bg-blue-500 text-white shadow-xs'
+              onClick={() => setSubView('kunjungan_warga')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                subView === 'kunjungan_warga'
+                  ? 'bg-blue-400 text-slate-950 shadow-xs'
                   : 'text-blue-200 hover:text-white'
               }`}
             >
-              Hari Ini
-            </button>
-            <button
-              type="button"
-              onClick={() => setPeriod('7days')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                period === '7days'
-                  ? 'bg-blue-500 text-white shadow-xs'
-                  : 'text-blue-200 hover:text-white'
-              }`}
-            >
-              7 Hari Terakhir
-            </button>
-            <button
-              type="button"
-              onClick={() => setPeriod('month')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                period === 'month'
-                  ? 'bg-blue-500 text-white shadow-xs'
-                  : 'text-blue-200 hover:text-white'
-              }`}
-            >
-              Bulan Ini
+              <Users className="w-4 h-4" />
+              <span>Kunjungan Harian Warga</span>
             </button>
           </div>
 
-          <div className="text-xs text-blue-200 font-medium">
-            Terekam dari <span className="font-bold text-white">{filteredReports.length}</span> laporan harian
-          </div>
+          {subView === 'perlinsos' && (
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 bg-blue-950/40 p-1 rounded-xl border border-blue-700/50 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setPeriod('all')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                    period === 'all' ? 'bg-blue-500 text-white font-black' : 'text-blue-200 hover:text-white'
+                  }`}
+                >
+                  Semua Waktu
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriod('today')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                    period === 'today' ? 'bg-blue-500 text-white font-black' : 'text-blue-200 hover:text-white'
+                  }`}
+                >
+                  Hari Ini
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriod('7days')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                    period === '7days' ? 'bg-blue-500 text-white font-black' : 'text-blue-200 hover:text-white'
+                  }`}
+                >
+                  7 Hari
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriod('month')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                    period === 'month' ? 'bg-blue-500 text-white font-black' : 'text-blue-200 hover:text-white'
+                  }`}
+                >
+                  Bulan Ini
+                </button>
+              </div>
+              <div className="text-xs text-blue-200 font-medium">
+                Terekam dari <span className="font-bold text-white">{filteredReports.length}</span> laporan harian
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* KPI Cards Ringkasan Perlinsos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {subView === 'perlinsos' && (
+        <>
+
+        {/* KPI Cards Ringkasan Perlinsos */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Realisasi KK */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
@@ -649,6 +706,18 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
           </table>
         </div>
       </div>
+        </>
+      )}
+
+      {subView === 'kunjungan_warga' && (
+        <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4 sm:p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <Users className="w-4 h-4 text-blue-700" />
+            <span>Sistem Pengawasan Kunjungan Warga Rentan Harian</span>
+          </div>
+          <KunjunganHarianView currentUser={currentUser} />
+        </div>
+      )}
     </div>
   );
 };

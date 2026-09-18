@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Users,
   Calendar,
@@ -6,18 +6,12 @@ import {
   Printer,
   Trash2,
   CheckCircle2,
-  Camera,
   Share2,
   Plus,
   Download,
   FileSpreadsheet,
-  ExternalLink,
-  Eye,
   X,
-  Layers,
   MapPin,
-  Clock,
-  Check,
   Send,
 } from 'lucide-react';
 import { UserAccount, isKelurahanAdmin } from '../types';
@@ -34,6 +28,9 @@ import {
 } from 'firebase/firestore';
 import { downloadImage, downloadMultipleImages } from '../lib/imageDownloader';
 import { exportKunjunganWargaToExcel } from '../lib/excelExport';
+import { safeGetLocalStorage, safeSetLocalStorage } from '../lib/safeStorage';
+
+const STORAGE_CACHE_KEY = 'sikepling_kunjungan_harian_list_v1';
 
 interface KunjunganHarianViewProps {
   currentUser: UserAccount;
@@ -44,10 +41,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   currentUser,
 }) => {
   const isAdmin = isKelurahanAdmin(currentUser.role);
-  const isSuperAdmin = currentUser.role === 'super_admin';
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
-  const [records, setRecords] = useState<KunjunganWargaData[]>([]);
+  const [records, setRecords] = useState<KunjunganWargaData[]>(() =>
+    safeGetLocalStorage<KunjunganWargaData[]>(STORAGE_CACHE_KEY, [])
+  );
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [selectedLingkungan, setSelectedLingkungan] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -65,32 +63,16 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const [isBatchDownloading, setIsBatchDownloading] = useState<boolean>(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+    const timer = setTimeout(() => setToastMessage(null), 3500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Real-time listener dari Firestore collection 'kunjungan_warga'
   useEffect(() => {
-    // 1. Load initial dari cache lokal
-    try {
-      const localRaw = localStorage.getItem('sikepling_kunjungan_harian_list_v1');
-      if (localRaw) {
-        const parsed = JSON.parse(localRaw);
-        if (Array.isArray(parsed)) {
-          const map = new Map<string, KunjunganWargaData>();
-          parsed.forEach((item: KunjunganWargaData) => {
-            if (item && item.id && !map.has(item.id)) {
-              map.set(item.id, item);
-            }
-          });
-          setRecords(Array.from(map.values()));
-        }
-      }
-    } catch {}
-
-    // 2. Realtime listener Firestore
     if (!db) return;
+
     try {
       const q = query(collection(db, 'kunjungan_warga'), orderBy('createdAt', 'desc'));
       const unsubscribe = onSnapshot(
@@ -105,10 +87,10 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
           });
           const list = Array.from(map.values());
           setRecords(list);
-          localStorage.setItem('sikepling_kunjungan_harian_list_v1', JSON.stringify(list));
+          safeSetLocalStorage(STORAGE_CACHE_KEY, JSON.stringify(list));
         },
         (err) => {
-          console.warn('Firestore snapshot error:', err);
+          console.warn('Firestore snapshot error on kunjungan_warga:', err);
         }
       );
       return () => unsubscribe();
@@ -125,7 +107,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       }
       setRecords((prev) => {
         const updated = prev.filter((r) => r.id !== id);
-        localStorage.setItem('sikepling_kunjungan_harian_list_v1', JSON.stringify(updated));
+        safeSetLocalStorage(STORAGE_CACHE_KEY, JSON.stringify(updated));
         return updated;
       });
       showToast(`Catatan kunjungan ke ${namaWarga} berhasil dihapus.`);
@@ -135,23 +117,29 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   };
 
   // Filter records
-  const filtered = records.filter((r) => {
-    const isDate = !selectedDate || r.tanggal === selectedDate;
-    const isLingkungan =
-      selectedLingkungan === 'ALL' ||
-      r.lingkunganNomor === Number(selectedLingkungan) ||
-      r.keplingId === selectedLingkungan;
-    const isRole = isAdmin || r.keplingId === currentUser.id;
-    const isSearch =
-      !searchQuery.trim() ||
-      r.namaWarga.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.alamat.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.lingkungan.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.namaKepling.toLowerCase().includes(searchQuery.toLowerCase());
-    return isDate && isLingkungan && isRole && isSearch;
-  });
+  const filtered = useMemo(() => {
+    const qLower = searchQuery.toLowerCase().trim();
+    return records.filter((r) => {
+      const isDate = !selectedDate || r.tanggal === selectedDate;
+      const isLingkungan =
+        selectedLingkungan === 'ALL' ||
+        r.lingkunganNomor === Number(selectedLingkungan) ||
+        r.keplingId === selectedLingkungan;
+      const isRole = isAdmin || r.keplingId === currentUser.id;
+      const isSearch =
+        !qLower ||
+        r.namaWarga.toLowerCase().includes(qLower) ||
+        r.alamat.toLowerCase().includes(qLower) ||
+        r.lingkungan.toLowerCase().includes(qLower) ||
+        r.namaKepling.toLowerCase().includes(qLower);
+      return isDate && isLingkungan && isRole && isSearch;
+    });
+  }, [records, selectedDate, selectedLingkungan, searchQuery, isAdmin, currentUser.id]);
 
-  const photosCount = filtered.filter((r) => Boolean(r.fotoDokumentasi)).length;
+  const photosCount = useMemo(
+    () => filtered.filter((r) => Boolean(r.fotoDokumentasi)).length,
+    [filtered]
+  );
 
   const handleCopyWA = () => {
     let text = `*REKAP KUNJUNGAN HARIAN DOOR-TO-DOOR*\n`;
@@ -275,7 +263,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         </div>
       )}
 
-      {/* Header Banner Halaman - Mobile Proportional */}
+      {/* Header Banner Halaman */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 sm:p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-700 shrink-0">
@@ -319,7 +307,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         />
       )}
 
-      {/* Filter & Action Controls - Responsive & Proportional for HP */}
+      {/* Filter & Action Controls */}
       <div className="bg-white rounded-2xl border border-slate-200 p-3.5 sm:p-4 shadow-xs space-y-3">
         {/* Row 1: Filters */}
         <div className="flex flex-wrap items-center justify-between gap-2.5">
@@ -364,7 +352,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
             </div>
           </div>
 
-          {/* View Mode Toggle (Mobile / Tablet) */}
+          {/* View Mode Toggle */}
           <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
             <button
               type="button"
@@ -391,7 +379,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
           </div>
         </div>
 
-        {/* Row 2: Action Buttons (Excel, Share, Download Photos, WA, Print) */}
+        {/* Row 2: Action Buttons */}
         <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
           {/* Photos summary & batch download for Admin */}
           <div className="flex items-center gap-2 text-xs">
@@ -468,7 +456,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         </div>
       </div>
 
-      {/* VIEW MODE 1: MOBILE CARDS VIEW (PROPORTIONAL FOR HP KEPLING) */}
+      {/* VIEW MODE 1: MOBILE CARDS VIEW */}
       {viewMode === 'cards' ? (
         <div className="space-y-3">
           {filtered.length === 0 ? (
@@ -491,8 +479,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                         <h4 className="font-extrabold text-slate-900 text-sm leading-tight">
                           {item.namaWarga}
                         </h4>
-                        <span className="text-[11px] text-slate-500 font-semibold">
+                        <span className="text-[11px] text-slate-500 font-semibold block">
                           {item.lingkungan} • {item.namaKepling}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-black block mt-1 bg-slate-100 px-1.5 py-0.5 rounded w-max">
+                          📅 {item.tanggal || '-'}
                         </span>
                       </div>
                     </div>
@@ -571,6 +562,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               <thead>
                 <tr className="bg-slate-100 border-b border-slate-200 font-extrabold text-slate-700">
                   <th className="py-3 px-3 w-10 text-center">NO</th>
+                  <th className="py-3 px-3">TANGGAL KUNJUNGAN</th>
                   <th className="py-3 px-3">NAMA WARGA</th>
                   <th className="py-3 px-3">ALAMAT LENGKAP</th>
                   <th className="py-3 px-3 text-center">LINGKUNGAN</th>
@@ -582,7 +574,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               <tbody className="divide-y divide-slate-200">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-10 text-center text-slate-400 font-medium">
+                    <td colSpan={8} className="py-10 text-center text-slate-400 font-medium">
                       Belum ada catatan kunjungan pada tanggal {selectedDate}. Gunakan formulir di atas untuk menambahkan.
                     </td>
                   </tr>
@@ -590,6 +582,9 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                   filtered.map((item, index) => (
                     <tr key={`${item.id}_${index}`} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-3 text-center font-bold text-slate-500">{index + 1}</td>
+                      <td className="py-3 px-3 font-bold text-slate-700 whitespace-nowrap">
+                        {item.tanggal || '-'}
+                      </td>
                       <td className="py-3 px-3 font-extrabold text-slate-900 whitespace-nowrap">
                         {item.namaWarga}
                       </td>
@@ -674,17 +669,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         </div>
       )}
 
-      {/* Slogan Banner */}
-      <div className="flex items-center justify-center gap-3 pt-2">
-        <span className="px-3 py-1 rounded-lg bg-[#991B1B] text-white text-[11px] font-black tracking-wider uppercase shadow-2xs">
-          #MEDANUNTUKSEMUA
-        </span>
-        <span className="px-3 py-1 rounded-lg bg-[#1E3A8A] text-white text-[11px] font-black tracking-wider uppercase shadow-2xs">
-          #SEMUAUNTUKMEDAN
-        </span>
-      </div>
-
-      {/* LIGHTBOX PHOTO MODAL (WITH DIRECT DOWNLOAD) */}
+      {/* LIGHTBOX PHOTO MODAL */}
       {previewPhotoItem && previewPhotoItem.fotoDokumentasi && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 space-y-0 animate-in fade-in zoom-in-95 duration-200">

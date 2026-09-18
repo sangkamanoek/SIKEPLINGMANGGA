@@ -1,25 +1,41 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // SI KEPLING MANGGA - Firestore Security Rules
-    // Mengizinkan akses baca dan tulis untuk koleksi sistem pelaporan Kepling Mangga
+    // SI KEPLING MANGGA - Firestore Security & Validation Rules
+    // Enforces schema integrity, payload limits, and data validation
 
+    // Helper functions
+    function isValidString(str, minLen, maxLen) {
+      return str is string && str.size() >= minLen && str.size() <= maxLen;
+    }
+
+    // Koleksi Laporan Kinerja Utama
     match /SIKEPLINGMANGGA/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasAll(['id', 'tanggalLaporan'])
+                   && isValidString(request.resource.data.id, 1, 100);
     }
 
     match /reports/{reportId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasAll(['id'])
+                   && isValidString(request.resource.data.id, 1, 100);
     }
 
+    // Target Capaian Kinerja (PBB, Perlinsos, IKD, dll.)
     match /targets_capaian/{keplingId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if true;
     }
 
+    // Passwords & Profile Sync
     match /account_passwords/{accountId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasAll(['id'])
+                   && isValidString(request.resource.data.id, 1, 50);
     }
 
+    // Reminders & Notification Logs
     match /reminders/{reminderId} {
       allow read, write: if true;
     }
@@ -28,16 +44,35 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Absensi Harian & Apel
     match /attendance/{attendanceId} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasAll(['id', 'tanggal'])
+                   && isValidString(request.resource.data.id, 1, 100);
+    }
+
+    // Agenda & Kegiatan Khusus
+    match /custom_events/{eventId} {
       allow read, write: if true;
     }
 
+    match /event_attendance/{attendanceId} {
+      allow read, write: if true;
+    }
+
+    // Kunjungan Warga (Door-to-Door)
     match /kunjungan_warga/{kunjunganId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'tanggal', 'namaWarga', 'alamat'])
+                            && isValidString(request.resource.data.namaWarga, 1, 150)
+                            && isValidString(request.resource.data.alamat, 1, 300);
+      allow delete: if true;
     }
 
+    // Default Fallback Match
     match /{document=**} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }

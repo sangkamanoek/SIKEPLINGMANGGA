@@ -1,9 +1,45 @@
 /**
- * Utility to safely set localStorage and sessionStorage items without throwing QuotaExceededError
+ * Safe Storage & Sanitization Utility
+ * Provides defensive storage management, quota overflow recovery,
+ * fallback in-memory adapters, and input sanitization helpers.
+ */
+
+const memoryFallbackStorage = new Map<string, string>();
+
+/**
+ * Clean & sanitize text input to prevent malicious injections (XSS / SQLi / Corrupt characters)
+ */
+export function sanitizeText(input: unknown): string {
+  if (typeof input !== 'string') return '';
+  return input
+    .replace(/<[^>]*>?/gm, '') // Remove HTML tags
+    .trim();
+}
+
+/**
+ * Type-safe and error-resilient retrieval from LocalStorage with fallback
+ */
+export function safeGetLocalStorage<T>(key: string, defaultValue: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null || raw === undefined) {
+      const fallback = memoryFallbackStorage.get(key);
+      return fallback ? JSON.parse(fallback) : defaultValue;
+    }
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn(`[safeStorage] Failed parsing localStorage key "${key}":`, err);
+    return defaultValue;
+  }
+}
+
+/**
+ * Safely set localStorage items with defensive quota recovery
  */
 export function safeSetLocalStorage(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value);
+    memoryFallbackStorage.set(key, value);
     return true;
   } catch (error: any) {
     const isQuotaError =
@@ -14,9 +50,9 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
         error.code === 1014);
 
     if (isQuotaError) {
-      console.warn(`[safeStorage] LocalStorage quota exceeded when setting "${key}". Cleaning up offline cache...`);
+      console.warn(`[safeStorage] LocalStorage quota exceeded for key "${key}". Initiating defensive cleanup...`);
 
-      // 1. Remove obsolete temporary tokens only
+      // 1. Remove obsolete or volatile items
       try {
         localStorage.removeItem('cleaned_reports_v2_kepling21');
         localStorage.removeItem('google_cached_access_token');
@@ -40,26 +76,37 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
           }));
 
           localStorage.setItem(key, JSON.stringify(lightweight));
-          console.info(`[safeStorage] Saved pruned lightweight offline cache for key "${key}".`);
+          memoryFallbackStorage.set(key, JSON.stringify(lightweight));
           return true;
         }
       } catch (innerErr) {
         console.warn('[safeStorage] Heavy array pruning attempt failed:', innerErr);
       }
 
-      // 3. Last attempt
-      try {
-        localStorage.setItem(key, value);
-        return true;
-      } catch {}
-    } else {
-      console.warn(`[safeStorage] Could not write "${key}" to localStorage:`, error);
+      // 3. Fallback to memory map if storage is completely full
+      memoryFallbackStorage.set(key, value);
+      return true;
     }
 
+    // Save in-memory if browser blocks localStorage
+    memoryFallbackStorage.set(key, value);
     return false;
   }
 }
 
+/**
+ * Safely remove an item from storage
+ */
+export function safeRemoveLocalStorage(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {}
+  memoryFallbackStorage.delete(key);
+}
+
+/**
+ * Safely write to sessionStorage
+ */
 export function safeSetSessionStorage(key: string, value: string): boolean {
   try {
     sessionStorage.setItem(key, value);
@@ -67,5 +114,18 @@ export function safeSetSessionStorage(key: string, value: string): boolean {
   } catch (error) {
     console.warn(`[safeStorage] Could not write "${key}" to sessionStorage:`, error);
     return false;
+  }
+}
+
+/**
+ * Safely read from sessionStorage
+ */
+export function safeGetSessionStorage<T>(key: string, defaultValue: T): T {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return defaultValue;
+    return JSON.parse(raw);
+  } catch {
+    return defaultValue;
   }
 }

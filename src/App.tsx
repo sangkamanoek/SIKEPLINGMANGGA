@@ -11,6 +11,7 @@ import {
   Trophy,
   UserCheck,
   Users,
+  Compass,
 } from 'lucide-react';
 import ViewImagesPage from './components/ViewImagesPage';
 import { KunjunganHarianView } from './components/KunjunganHarianView';
@@ -43,6 +44,8 @@ import { getDefaultTargetsCapaianMap } from './data/targetsData';
 import { fetchTargetsCapaian } from './lib/targetsApi';
 import { PWAInstallModal } from './components/PWAInstallModal';
 import { PanduanPPTModal } from './components/PanduanPPTModal';
+import { AbsenKegiatanKhusus } from './components/AbsenKegiatanKhusus';
+import { SmartHubDashboard } from './components/SmartHubDashboard';
 import { LoginPage } from './components/LoginPage';
 import { UbahPasswordModal } from './components/UbahPasswordModal';
 import { EditProfileModal } from './components/EditProfileModal';
@@ -129,25 +132,15 @@ export default function App() {
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
 
-  // Active view tab: form | capaian | monitoring | capaian_admin | riwayat | kunjungan | dashboard_kasi
+  // Active view tab: hub | form | capaian | monitoring | capaian_admin | riwayat | kunjungan | dashboard_kasi | kegiatan_khusus
   const [activeTab, setActiveTab] = useState<
-    'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi'
-  >(() => {
-    if (activeAccount.role === 'super_admin') return 'monitoring';
-    if (
-      activeAccount.role === 'kasi_pemerintahan' ||
-      activeAccount.role === 'kasi_pembangunan' ||
-      activeAccount.role === 'kasi_trantibum'
-    ) {
-      return 'dashboard_kasi';
-    }
-    return 'form';
-  });
+    'hub' | 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus'
+  >('hub');
 
-  // Kasi Dashboard Target Mapping and Trantibum date states
+  // Kasi Dashboard Target Mapping and Pemerintahan date states
   const [targetsMap, setTargetsMap] = useState<TargetsCapaianMap>(getDefaultTargetsCapaianMap);
   const todayStr = new Date().toISOString().split('T')[0];
-  const [trantibumDate, setTrantibumDate] = useState<string>(todayStr);
+  const [pemerintahanDate, setPemerintahanDate] = useState<string>(todayStr);
 
   // Reports data
   const [reports, setReports] = useState<LaporanHarianItem[]>([]);
@@ -690,6 +683,21 @@ export default function App() {
           <div className="flex gap-1">
             {activeAccount.role === 'kepling' ? (
               <>
+                {/* Kepling Tab - Hub */}
+                <button
+                  id="tab-hub-kepling"
+                  type="button"
+                  onClick={() => setActiveTab('hub')}
+                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === 'hub'
+                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
+                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <Compass className="w-4 h-4 text-emerald-700" />
+                  <span>Pusat Menu</span>
+                </button>
+
                 {/* Kepling Tab 0: Presensi Apel Pagi */}
                 <button
                   id="tab-absen-apel-kepling"
@@ -772,9 +780,38 @@ export default function App() {
                   <History className="w-4 h-4 text-emerald-700" />
                   <span>Riwayat Laporan Saya</span>
                 </button>
+
+                <button
+                  id="tab-kegiatan-khusus"
+                  type="button"
+                  onClick={() => setActiveTab('kegiatan_khusus')}
+                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === 'kegiatan_khusus'
+                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
+                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <UserCheck className="w-4 h-4 text-emerald-700" />
+                  <span>Absen Kegiatan Khusus</span>
+                </button>
               </>
             ) : (
               <>
+                {/* Admin/Kasi Shared Tab - Hub */}
+                <button
+                  id="tab-hub-admin"
+                  type="button"
+                  onClick={() => setActiveTab('hub')}
+                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === 'hub'
+                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
+                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <Compass className="w-4 h-4 text-emerald-700" />
+                  <span>Pusat Menu</span>
+                </button>
+
                 {/* Kasi Sektoral Dashboard Tab */}
                 {(activeAccount.role === 'kasi_pemerintahan' ||
                   activeAccount.role === 'kasi_pembangunan' ||
@@ -801,111 +838,130 @@ export default function App() {
                   </button>
                 )}
 
-                {/* Super Admin Tab 0: Absen Apel Pagi 24 Kepling */}
-                <button
-                  id="tab-absen-apel-admin"
-                  type="button"
-                  onClick={() => setIsAbsenApelModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-black border-b-2 border-transparent text-amber-900 hover:bg-amber-100/70 cursor-pointer whitespace-nowrap"
-                >
-                  <UserCheck className="w-4 h-4 text-amber-600" />
-                  <span>Absen Apel Pagi</span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-400 text-slate-950 shadow-2xs">
-                    REKAP 24
-                  </span>
-                </button>
+                {activeAccount.role === 'super_admin' && (
+                  <>
+                    {/* Super Admin Tab 0: Absen Apel Pagi 24 Kepling */}
+                    <button
+                      id="tab-absen-apel-admin"
+                      type="button"
+                      onClick={() => setIsAbsenApelModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-black border-b-2 border-transparent text-amber-900 hover:bg-amber-100/70 cursor-pointer whitespace-nowrap"
+                    >
+                      <UserCheck className="w-4 h-4 text-amber-600" />
+                      <span>Absen Apel Pagi</span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-400 text-slate-950 shadow-2xs">
+                        REKAP 24
+                      </span>
+                    </button>
 
-                {/* Super Admin Tab 1: Monitoring 24 Kepling */}
-                <button
-                  id="tab-monitoring-super-admin"
-                  type="button"
-                  onClick={() => setActiveTab('monitoring')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                    activeTab === 'monitoring'
-                      ? 'border-amber-500 text-amber-900 bg-amber-50/80 font-black'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <ShieldCheck className="w-4 h-4 text-amber-600" />
-                  <span>Monitoring 24 Kepling</span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-200 text-amber-950">
-                    STATUS
-                  </span>
-                </button>
+                    {/* Super Admin Tab 1: Monitoring 24 Kepling */}
+                    <button
+                      id="tab-monitoring-super-admin"
+                      type="button"
+                      onClick={() => setActiveTab('monitoring')}
+                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                        activeTab === 'monitoring'
+                          ? 'border-amber-500 text-amber-900 bg-amber-50/80 font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      <ShieldCheck className="w-4 h-4 text-amber-600" />
+                      <span>Monitoring 24 Kepling</span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-200 text-amber-950">
+                        STATUS
+                      </span>
+                    </button>
 
-                {/* Super Admin Tab 2: Dashboard Capaian 24 Kepling */}
-                <button
-                  id="tab-capaian-super-admin"
-                  type="button"
-                  onClick={() => setActiveTab('capaian_admin')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                    activeTab === 'capaian_admin'
-                      ? 'border-amber-500 text-amber-900 bg-amber-50/80 font-black'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <Trophy className="w-4 h-4 text-amber-600" />
-                  <span>Dashboard Capaian</span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
-                    24 KEPLING
-                  </span>
-                </button>
+                    {/* Super Admin Tab 2: Dashboard Capaian 24 Kepling */}
+                    <button
+                      id="tab-capaian-super-admin"
+                      type="button"
+                      onClick={() => setActiveTab('capaian_admin')}
+                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                        activeTab === 'capaian_admin'
+                          ? 'border-amber-500 text-amber-900 bg-amber-50/80 font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Trophy className="w-4 h-4 text-amber-600" />
+                      <span>Dashboard Capaian</span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                        24 KEPLING
+                      </span>
+                    </button>
 
-                {/* Super Admin Tab 3: Semua Riwayat Laporan */}
-                <button
-                  id="tab-riwayat-laporan"
-                  type="button"
-                  onClick={() => {
-                    setRiwayatFilterPetugas(undefined);
-                    setActiveTab('riwayat');
-                  }}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                    activeTab === 'riwayat'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <History className="w-4 h-4 text-emerald-700" />
-                  <span>Semua Riwayat</span>
-                  {reports.length > 0 && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-200 text-slate-800 font-bold">
-                      {reports.length}
-                    </span>
-                  )}
-                </button>
+                    {/* Super Admin Tab 3: Semua Riwayat Laporan */}
+                    <button
+                      id="tab-riwayat-laporan"
+                      type="button"
+                      onClick={() => {
+                        setRiwayatFilterPetugas(undefined);
+                        setActiveTab('riwayat');
+                      }}
+                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                        activeTab === 'riwayat'
+                          ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
+                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      <History className="w-4 h-4 text-emerald-700" />
+                      <span>Semua Riwayat</span>
+                      {reports.length > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-200 text-slate-800 font-bold">
+                          {reports.length}
+                        </span>
+                      )}
+                    </button>
 
-                {/* Super Admin Tab 4: Kunjungan Harian 24 Kepling */}
-                <button
-                  id="tab-kunjungan-warga-admin"
-                  type="button"
-                  onClick={() => setActiveTab('kunjungan')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                    activeTab === 'kunjungan'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <Users className="w-4 h-4 text-emerald-700" />
-                  <span>Kunjungan Harian</span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
-                    24 LINGKUNGAN
-                  </span>
-                </button>
+                    {/* Super Admin Tab 4: Kunjungan Harian 24 Kepling */}
+                    <button
+                      id="tab-kunjungan-warga-admin"
+                      type="button"
+                      onClick={() => setActiveTab('kunjungan')}
+                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                        activeTab === 'kunjungan'
+                          ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Users className="w-4 h-4 text-emerald-700" />
+                      <span>Kunjungan Harian</span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                        24 LINGKUNGAN
+                      </span>
+                    </button>
 
-                {/* Super Admin Tab 5: Input Formulir (Bantuan/Asistensi) */}
-                <button
-                  id="tab-input-laporan"
-                  type="button"
-                  onClick={() => setActiveTab('form')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                    activeTab === 'form'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <FileText className="w-4 h-4 text-emerald-700" />
-                  <span>Input Laporan</span>
-                </button>
+                    {/* Super Admin Tab 5: Input Formulir (Bantuan/Asistensi) */}
+                    <button
+                      id="tab-input-laporan"
+                      type="button"
+                      onClick={() => setActiveTab('form')}
+                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                        activeTab === 'form'
+                          ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
+                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      <FileText className="w-4 h-4 text-emerald-700" />
+                      <span>Input Laporan</span>
+                    </button>
+
+                    {/* Super Admin Tab 6: Kegiatan Khusus */}
+                    <button
+                      id="tab-kegiatan-khusus"
+                      type="button"
+                      onClick={() => setActiveTab('kegiatan_khusus')}
+                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                        activeTab === 'kegiatan_khusus'
+                          ? 'border-amber-500 text-amber-900 bg-amber-50/80 font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      <UserCheck className="w-4 h-4 text-amber-600" />
+                      <span>Kegiatan Khusus</span>
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -928,6 +984,25 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className={`flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 ${isModalOpen ? 'print:hidden' : ''}`}>
+        {/* Smart Hub Dashboard Tab */}
+        {activeTab === 'hub' && (
+          <ErrorBoundary fallbackTitle="Gagal Memuat Pusat Menu">
+            <SmartHubDashboard
+              activeAccount={activeAccount}
+              reports={reports}
+              attendanceList={attendanceList}
+              onNavigate={(tab) => {
+                if (tab === 'riwayat') {
+                  setRiwayatFilterPetugas(activeAccount.role === 'kepling' ? activeAccount.nama : undefined);
+                }
+                setActiveTab(tab);
+              }}
+              onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
+              onOpenPPTModal={() => setIsPPTModalOpen(true)}
+            />
+          </ErrorBoundary>
+        )}
+
         {/* Dashboard Kasi Sektoral */}
         {activeTab === 'dashboard_kasi' && (
           <ErrorBoundary fallbackTitle="Gagal Memuat Dashboard Kasi">
@@ -936,6 +1011,9 @@ export default function App() {
                 reports={reports}
                 targetsMap={targetsMap}
                 currentUser={activeAccount}
+                attendanceList={attendanceList}
+                selectedDate={pemerintahanDate}
+                onDateChange={setPemerintahanDate}
                 onSelectKeplingRiwayat={(keplingName) => {
                   setRiwayatFilterPetugas(keplingName);
                   setActiveTab('riwayat');
@@ -957,10 +1035,7 @@ export default function App() {
             {activeAccount.role === 'kasi_trantibum' && (
               <DashboardTrantibumKasi
                 reports={reports}
-                attendanceList={attendanceList}
                 currentUser={activeAccount}
-                selectedDate={trantibumDate}
-                onDateChange={setTrantibumDate}
                 onSelectKeplingRiwayat={(keplingName) => {
                   setRiwayatFilterPetugas(keplingName);
                   setActiveTab('riwayat');
@@ -1072,6 +1147,16 @@ export default function App() {
             <KunjunganHarianView
               currentUser={activeAccount}
               onNavigateToForm={() => setActiveTab('form')}
+            />
+          </ErrorBoundary>
+        )}
+
+        {/* Tab Kegiatan Khusus (Absen) */}
+        {activeTab === 'kegiatan_khusus' && (
+          <ErrorBoundary fallbackTitle="Gagal Memuat Absensi Kegiatan Khusus">
+            <AbsenKegiatanKhusus
+              activeAccount={activeAccount}
+              showToast={showToast}
             />
           </ErrorBoundary>
         )}

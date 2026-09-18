@@ -11,7 +11,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { LaporanHarianItem, KeplingTargetCapaian, TargetsCapaianMap, TaskReminder, NotificationLog, AbsenApelItem } from '../types';
+import { LaporanHarianItem, KeplingTargetCapaian, TargetsCapaianMap, TaskReminder, NotificationLog, AbsenApelItem, CustomEvent, EventAttendance } from '../types';
 import { getDefaultTargetsCapaianMap } from '../data/targetsData';
 
 // Local in-memory cache of deleted report IDs to prevent re-emergence
@@ -644,5 +644,129 @@ export function subscribeAttendanceFromFirestore(
     }
   );
 }
+
+// ==========================================
+// 8. CUSTOM EVENTS & EVENT ATTENDANCE CRUD
+// ==========================================
+
+const CUSTOM_EVENTS_COLLECTION = 'custom_events';
+const EVENT_ATTENDANCE_COLLECTION = 'event_attendance';
+
+export async function fetchCustomEventsFromFirestore(): Promise<CustomEvent[]> {
+  try {
+    const colRef = collection(db, CUSTOM_EVENTS_COLLECTION);
+    const snapshot = await getDocs(colRef);
+    const events: CustomEvent[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as CustomEvent;
+      if (data && data.id) {
+        events.push(data);
+      }
+    });
+    // Sort descending by date
+    events.sort((a, b) => b.date.localeCompare(a.date));
+    return events;
+  } catch (err: any) {
+    console.warn('Firebase Firestore custom events fetch notice:', err?.message || err);
+    return [];
+  }
+}
+
+export async function saveCustomEventToFirestore(event: CustomEvent): Promise<boolean> {
+  try {
+    const docRef = doc(db, CUSTOM_EVENTS_COLLECTION, event.id);
+    await setDoc(docRef, event, { merge: true });
+    return true;
+  } catch (err: any) {
+    console.warn('Firebase Firestore save custom event notice:', err?.message || err);
+    return false;
+  }
+}
+
+export async function deleteCustomEventFromFirestore(id: string): Promise<boolean> {
+  try {
+    const docRef = doc(db, CUSTOM_EVENTS_COLLECTION, id);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err: any) {
+    console.warn('Firebase Firestore delete custom event notice:', err?.message || err);
+    return false;
+  }
+}
+
+export function subscribeCustomEventsFromFirestore(
+  onData: (events: CustomEvent[]) => void
+): Unsubscribe {
+  const colRef = collection(db, CUSTOM_EVENTS_COLLECTION);
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const events: CustomEvent[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as CustomEvent;
+        if (data && data.id) {
+          events.push(data);
+        }
+      });
+      events.sort((a, b) => b.date.localeCompare(a.date));
+      onData(events);
+    },
+    (err) => {
+      console.warn('Firestore onSnapshot custom events notice:', err?.message || err);
+    }
+  );
+}
+
+export async function fetchEventAttendanceFromFirestore(): Promise<EventAttendance[]> {
+  try {
+    const colRef = collection(db, EVENT_ATTENDANCE_COLLECTION);
+    const snapshot = await getDocs(colRef);
+    const attendance: EventAttendance[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as EventAttendance;
+      if (data && data.id) {
+        attendance.push(data);
+      }
+    });
+    return attendance;
+  } catch (err: any) {
+    console.warn('Firebase Firestore event attendance fetch notice:', err?.message || err);
+    return [];
+  }
+}
+
+export async function saveEventAttendanceToFirestore(item: EventAttendance): Promise<boolean> {
+  try {
+    const docRef = doc(db, EVENT_ATTENDANCE_COLLECTION, item.id);
+    await setDoc(docRef, item, { merge: true });
+    return true;
+  } catch (err: any) {
+    console.warn('Firebase Firestore save event attendance notice:', err?.message || err);
+    return false;
+  }
+}
+
+export function subscribeEventAttendanceFromFirestore(
+  onData: (items: EventAttendance[]) => void
+): Unsubscribe {
+  const colRef = collection(db, EVENT_ATTENDANCE_COLLECTION);
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const attendance: EventAttendance[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as EventAttendance;
+        if (data && data.id) {
+          attendance.push(data);
+        }
+      });
+      onData(attendance);
+    },
+    (err) => {
+      console.warn('Firestore onSnapshot event attendance notice:', err?.message || err);
+    }
+  );
+}
+
 
 

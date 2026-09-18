@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   Users,
   Camera,
@@ -9,9 +9,10 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import { sanitizeText, safeSetLocalStorage, safeGetLocalStorage } from '../lib/safeStorage';
 
 export type KeteranganKunjunganType = 'Sudah' | 'Belum' | 'Menolak' | 'Tidak Ditempat';
 
@@ -38,6 +39,10 @@ interface FormKunjunganWargaProps {
   compact?: boolean;
 }
 
+const STORAGE_CACHE_KEY = 'sikepling_kunjungan_harian_list_v1';
+const MAX_IMAGE_DIMENSION = 800;
+const IMAGE_JPEG_QUALITY = 0.7;
+
 export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   currentUser,
   tanggalLaporan,
@@ -48,7 +53,8 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const isSuperAdmin = currentUser.role === 'super_admin';
   const defaultDate = tanggalLaporan || new Date().toISOString().split('T')[0];
 
-  // Form State
+  // State Management
+  const [tanggal, setTanggal] = useState<string>(defaultDate);
   const [namaWarga, setNamaWarga] = useState<string>('');
   const [alamat, setAlamat] = useState<string>('');
   const [targetKeplingId, setTargetKeplingId] = useState<string>(
@@ -60,14 +66,16 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputCameraRef = useRef<HTMLInputElement>(null);
+  const fileInputGalleryRef = useRef<HTMLInputElement>(null);
 
-  // Ambil data Kepling
+  // Derive Kepling Metadata
   const selectedKepling = isSuperAdmin
     ? KEPLING_ACCOUNTS.find((k) => k.id === targetKeplingId) || currentUser
     : currentUser;
 
-  const handleCapturePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Optimized image compression
+  const handleCapturePhoto = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -76,32 +84,38 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800;
-        const scale = Math.min(1, MAX_WIDTH / img.width);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
+        const scale = Math.min(1, MAX_IMAGE_DIMENSION / img.width);
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          setFotoDokumentasi(canvas.toDataURL('image/jpeg', 0.7));
+          setFotoDokumentasi(canvas.toDataURL('image/jpeg', IMAGE_JPEG_QUALITY));
         }
       };
       img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
-  };
+
+    // Reset input so re-selecting same file fires onChange
+    e.target.value = '';
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (!namaWarga.trim()) {
-      setErrorMessage('Nama warga wajib diisi.');
+    const cleanNama = sanitizeText(namaWarga);
+    const cleanAlamat = sanitizeText(alamat);
+    const cleanTanggal = sanitizeText(tanggal);
+
+    if (!cleanNama) {
+      setErrorMessage('Nama warga wajib diisi dengan benar.');
       return;
     }
-    if (!alamat.trim()) {
-      setErrorMessage('Alamat warga wajib diisi.');
+    if (!cleanAlamat) {
+      setErrorMessage('Alamat warga wajib diisi dengan benar.');
       return;
     }
 
@@ -111,9 +125,9 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
 
     const data: KunjunganWargaData = {
       id,
-      tanggal: defaultDate,
-      namaWarga: namaWarga.trim(),
-      alamat: alamat.trim(),
+      tanggal: cleanTanggal || defaultDate,
+      namaWarga: cleanNama,
+      alamat: cleanAlamat,
       lingkungan: selectedKepling.lingkungan,
       lingkunganNomor: selectedKepling.nomorLingkungan || 1,
       namaKepling: selectedKepling.nama,
@@ -123,12 +137,11 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       createdAt: nowIso,
     };
 
-    // Bersihkan payload dari field yang bernilai undefined agar Firestore setDoc() tidak error
     const firestorePayload: Record<string, any> = {
       id,
-      tanggal: defaultDate,
-      namaWarga: namaWarga.trim(),
-      alamat: alamat.trim(),
+      tanggal: cleanTanggal || defaultDate,
+      namaWarga: cleanNama,
+      alamat: cleanAlamat,
       lingkungan: selectedKepling.lingkungan,
       lingkunganNomor: selectedKepling.nomorLingkungan || 1,
       namaKepling: selectedKepling.nama,
@@ -142,29 +155,21 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
     }
 
     try {
-      // 1. Simpan ke koleksi Firestore terpisah: 'kunjungan_warga'
+      // 1. Cloud Firestore Persistence
       if (db) {
         const docRef = doc(db, 'kunjungan_warga', id);
         await setDoc(docRef, firestorePayload);
       }
 
-      // 2. Simpan juga ke cache lokal agar langsung muncul di perangkat
-      try {
-        const localKey = 'sikepling_kunjungan_harian_list_v1';
-        const existingRaw = localStorage.getItem(localKey);
-        const existing = existingRaw ? JSON.parse(existingRaw) : [];
-        const filteredList = Array.isArray(existing)
-          ? existing.filter((item: any) => item && item.id !== id)
-          : [];
-        filteredList.unshift(data);
-        localStorage.setItem(localKey, JSON.stringify(filteredList));
-      } catch (locErr) {
-        console.warn('Local storage error:', locErr);
-      }
+      // 2. Local Cache Update
+      const existing = safeGetLocalStorage<KunjunganWargaData[]>(STORAGE_CACHE_KEY, []);
+      const filteredList = existing.filter((item) => item && item.id !== id);
+      filteredList.unshift(data);
+      safeSetLocalStorage(STORAGE_CACHE_KEY, JSON.stringify(filteredList.slice(0, 500)));
 
       setSuccessMessage('Data kunjungan warga berhasil disimpan ke Firestore!');
-      
-      // Reset form
+
+      // Reset form fields
       setNamaWarga('');
       setAlamat('');
       setKeterangan('Sudah');
@@ -175,7 +180,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       }
     } catch (err: any) {
       console.error('Error saving to Firestore:', err);
-      setErrorMessage(`Gagal menyimpan ke Firestore: ${err?.message || err}`);
+      setErrorMessage(`Gagal menyimpan ke Firestore: ${err?.message || 'Terjadi kesalahan'}`);
     } finally {
       setIsSaving(false);
     }
@@ -239,6 +244,20 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
           )}
         </div>
 
+        {/* Tanggal Kunjungan */}
+        <div>
+          <label className="font-extrabold text-slate-700 block mb-1">
+            Tanggal Kunjungan <span className="text-rose-500">*</span>:
+          </label>
+          <input
+            type="date"
+            required
+            value={tanggal}
+            onChange={(e) => setTanggal(e.target.value)}
+            className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 focus:outline-emerald-500"
+          />
+        </div>
+
         {/* Nama Warga */}
         <div>
           <label className="font-extrabold text-slate-700 block mb-1">
@@ -247,6 +266,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
           <input
             type="text"
             required
+            maxLength={120}
             placeholder="Contoh: Bpk. Gunawan Tarigan"
             value={namaWarga}
             onChange={(e) => setNamaWarga(e.target.value)}
@@ -262,6 +282,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
           <input
             type="text"
             required
+            maxLength={250}
             placeholder="Contoh: Jl. Bunga Rinte No. 12 Gang Bersama"
             value={alamat}
             onChange={(e) => setAlamat(e.target.value)}
@@ -269,7 +290,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
           />
         </div>
 
-        {/* Dropdown Keterangan (Sudah / Belum / Menolak / Tidak Ditempat) */}
+        {/* Dropdown Keterangan */}
         <div>
           <label className="font-extrabold text-slate-700 block mb-1">
             Keterangan Kunjungan:
@@ -286,7 +307,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
           </select>
         </div>
 
-        {/* Unggah Dokumentasi (Kamera / File) */}
+        {/* Unggah Dokumentasi */}
         <div>
           <label className="font-extrabold text-slate-700 block mb-1">
             Unggah Dokumentasi (Kamera / Foto):
@@ -295,7 +316,14 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
             type="file"
             accept="image/*"
             capture="environment"
-            ref={fileInputRef}
+            ref={fileInputCameraRef}
+            onChange={handleCapturePhoto}
+            className="hidden"
+          />
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputGalleryRef}
             onChange={handleCapturePhoto}
             className="hidden"
           />
@@ -306,6 +334,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
                 src={fotoDokumentasi}
                 alt="Dokumentasi Kunjungan"
                 className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
               />
               <button
                 type="button"
@@ -317,19 +346,35 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full py-4 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-xl flex flex-col items-center justify-center gap-1.5 text-slate-500 hover:text-emerald-700 transition-colors cursor-pointer bg-slate-50/50 hover:bg-emerald-50/20"
-            >
-              <Camera className="w-6 h-6 text-emerald-600" />
-              <span className="font-bold text-xs">
-                📸 Buka Kamera / Unggah Foto Dokumentasi
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium">
-                Dapat mengambil foto langsung dari kamera HP
-              </span>
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputCameraRef.current?.click()}
+                className="py-4 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-xl flex flex-col items-center justify-center gap-1.5 text-slate-500 hover:text-emerald-700 transition-colors cursor-pointer bg-slate-50/50 hover:bg-emerald-50/20"
+              >
+                <Camera className="w-6 h-6 text-emerald-600 animate-pulse" />
+                <span className="font-bold text-xs text-slate-800">
+                  📸 Ambil Foto Kamera
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Buka kamera HP secara langsung
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputGalleryRef.current?.click()}
+                className="py-4 border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-1.5 text-slate-500 hover:text-blue-700 transition-colors cursor-pointer bg-slate-50/50 hover:bg-blue-50/20"
+              >
+                <Upload className="w-6 h-6 text-blue-600" />
+                <span className="font-bold text-xs text-slate-800">
+                  📁 Pilih dari Galeri HP
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Pilih gambar yang sudah ada di galeri
+                </span>
+              </button>
+            </div>
           )}
         </div>
 
