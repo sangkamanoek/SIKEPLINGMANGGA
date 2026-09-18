@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { printOfficialDocument } from '../utils/printHelper';
 import {
   ShieldAlert,
   HeartHandshake,
@@ -37,6 +38,7 @@ interface DashboardPerlinsosKasiProps {
 }
 
 type PeriodFilter = 'all' | 'today' | '7days' | 'month';
+type SubView = 'perlinsos' | 'kunjungan_warga' | 'bpjs';
 
 export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
   reports,
@@ -45,7 +47,7 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
   onSelectKeplingRiwayat,
   onOpenKunjunganWarga,
 }) => {
-  const [subView, setSubView] = useState<'perlinsos' | 'kunjungan_warga'>('perlinsos');
+  const [subView, setSubView] = useState<SubView>('perlinsos');
   const [period, setPeriod] = useState<PeriodFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -268,11 +270,11 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
   };
 
   const handlePrint = () => {
-    window.print();
+    printOfficialDocument('lembar-cetak-rekap-perlinsos', `REKAP_PERLINSOS_MANGGA_${new Date().toISOString().split('T')[0]}`);
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div id="lembar-cetak-rekap-perlinsos" className="space-y-6 pb-12">
       {/* Header Banner Khusus Seksi Pembangunan */}
       <div className="bg-linear-to-r from-blue-900 via-indigo-900 to-blue-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
@@ -295,10 +297,10 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
               <button
                 type="button"
                 onClick={onOpenKunjunganWarga}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-md transition-all cursor-pointer border border-blue-400/40"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer border border-sky-200"
                 title="Buka Rekap Kunjungan Harian Warga"
               >
-                <Users className="w-4 h-4 text-blue-200" />
+                <Users className="w-4 h-4 text-slate-950" />
                 <span>Kunjungan Warga Rentan</span>
               </button>
             )}
@@ -306,7 +308,7 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-blue-950 font-black text-xs hover:bg-blue-50 shadow-md transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-blue-950 font-black text-xs hover:bg-blue-50 shadow-md transition-all cursor-pointer border border-blue-200/60"
               title="Unduh Rekap Excel Perlinsos 24 Kepling"
             >
               <FileSpreadsheet className="w-4 h-4 text-blue-700" />
@@ -316,7 +318,7 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-800/80 hover:bg-blue-700/80 text-white font-bold text-xs border border-blue-500/40 transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-900/90 hover:bg-blue-800 text-white font-extrabold text-xs border border-blue-400/50 shadow-md transition-all cursor-pointer"
               title="Cetak format cetak resmi Seksi Pembangunan"
             >
               <Printer className="w-4 h-4 text-blue-200" />
@@ -327,18 +329,18 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
 
         {/* Sub-view Navigation Tabs */}
         <div className="mt-6 pt-5 border-t border-blue-800/60 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 bg-blue-950/60 p-1 rounded-xl border border-blue-700/60">
+          <div className="flex items-center gap-1.5 bg-blue-950/80 p-1.5 rounded-xl border border-blue-700/60">
             <button
               type="button"
               onClick={() => setSubView('perlinsos')}
               className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
                 subView === 'perlinsos'
-                  ? 'bg-blue-400 text-slate-950 shadow-xs'
-                  : 'text-blue-200 hover:text-white'
+                  ? 'bg-white text-blue-950 shadow-md'
+                  : 'text-blue-100 hover:text-white hover:bg-white/10 font-bold'
               }`}
             >
               <HeartHandshake className="w-4 h-4" />
-              <span>Giat Perlinsos & BPJS</span>
+              <span>1. Giat Perlinsos & Bansos</span>
             </button>
 
             <button
@@ -346,23 +348,38 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
               onClick={() => setSubView('kunjungan_warga')}
               className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
                 subView === 'kunjungan_warga'
-                  ? 'bg-blue-400 text-slate-950 shadow-xs'
-                  : 'text-blue-200 hover:text-white'
+                  ? 'bg-white text-blue-950 shadow-md'
+                  : 'text-blue-100 hover:text-white hover:bg-white/10 font-bold'
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>Kunjungan Harian Warga</span>
+              <span>2. Kunjungan Warga Lapangan</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSubView('bpjs')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                subView === 'bpjs'
+                  ? 'bg-white text-blue-950 shadow-md'
+                  : 'text-blue-100 hover:text-white hover:bg-white/10 font-bold'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>3. BPJS Ketenagakerjaan</span>
             </button>
           </div>
 
-          {subView === 'perlinsos' && (
+          {(subView === 'perlinsos' || subView === 'bpjs') && (
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1.5 bg-blue-950/40 p-1 rounded-xl border border-blue-700/50 text-xs">
+              <div className="flex items-center gap-1 bg-blue-950/80 p-1 rounded-xl border border-blue-700/60 text-xs">
                 <button
                   type="button"
                   onClick={() => setPeriod('all')}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                    period === 'all' ? 'bg-blue-500 text-white font-black' : 'text-blue-200 hover:text-white'
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                    period === 'all'
+                      ? 'bg-white text-blue-950 shadow-xs'
+                      : 'text-blue-100 hover:text-white hover:bg-white/10 font-bold'
                   }`}
                 >
                   Semua Waktu
@@ -370,8 +387,10 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
                 <button
                   type="button"
                   onClick={() => setPeriod('today')}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                    period === 'today' ? 'bg-blue-500 text-white font-black' : 'text-blue-200 hover:text-white'
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                    period === 'today'
+                      ? 'bg-white text-blue-950 shadow-xs'
+                      : 'text-blue-100 hover:text-white hover:bg-white/10 font-bold'
                   }`}
                 >
                   Hari Ini
@@ -379,8 +398,10 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
                 <button
                   type="button"
                   onClick={() => setPeriod('7days')}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                    period === '7days' ? 'bg-blue-500 text-white font-black' : 'text-blue-200 hover:text-white'
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                    period === '7days'
+                      ? 'bg-white text-blue-950 shadow-xs'
+                      : 'text-blue-100 hover:text-white hover:bg-white/10 font-bold'
                   }`}
                 >
                   7 Hari
@@ -388,8 +409,10 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
                 <button
                   type="button"
                   onClick={() => setPeriod('month')}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                    period === 'month' ? 'bg-blue-500 text-white font-black' : 'text-blue-200 hover:text-white'
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                    period === 'month'
+                      ? 'bg-white text-blue-950 shadow-xs'
+                      : 'text-blue-100 hover:text-white hover:bg-white/10 font-bold'
                   }`}
                 >
                   Bulan Ini
@@ -716,6 +739,136 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
             <span>Sistem Pengawasan Kunjungan Warga Rentan Harian</span>
           </div>
           <KunjunganHarianView currentUser={currentUser} />
+        </div>
+      )}
+
+      {subView === 'bpjs' && (
+        <div className="space-y-6">
+          {/* Top Metric Banner BPJS */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total BPJS Ketenagakerjaan</div>
+                <div className="text-2xl font-black text-slate-900 mt-0.5">{overallTotals.totalBpjs} <span className="text-xs font-bold text-purple-700">Pekerja Rentan</span></div>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold shrink-0">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kepling Melaporkan BPJS</div>
+                <div className="text-2xl font-black text-slate-900 mt-0.5">{keplingPerlinsosStats.filter(k => k.reportedBpjs > 0).length} <span className="text-xs font-bold text-slate-500">/ 24 Lingkungan</span></div>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                <Award className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rata-Rata per Lingkungan</div>
+                <div className="text-2xl font-black text-slate-900 mt-0.5">{Math.round(overallTotals.totalBpjs / 24)} <span className="text-xs font-bold text-emerald-700">Orang / Lk</span></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabel Detail BPJS Ketenagakerjaan 24 Kepling */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-5 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-purple-700" />
+                  <span>Pendataan BPJS Ketenagakerjaan Pekerja Rentan 24 Lingkungan</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Rekapitulasi jumlah pekerja rentan yang terdaftar perlindungan jaminan sosial BPJS Ketenagakerjaan
+                </p>
+              </div>
+
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari lingkungan / kepling..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 text-[11px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                    <th className="py-3 px-4 text-center w-12">No</th>
+                    <th className="py-3 px-4">Kepala Lingkungan</th>
+                    <th className="py-3 px-4 text-center bg-purple-50/60 text-purple-950">Terdaftar BPJS TK</th>
+                    <th className="py-3 px-4 text-center">Laporan Masuk</th>
+                    <th className="py-3 px-4">Catatan Pendataan BPJS TK</th>
+                    <th className="py-3 px-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {[...keplingPerlinsosStats]
+                    .sort((a, b) => b.reportedBpjs - a.reportedBpjs)
+                    .filter((item) => {
+                      if (!searchQuery.trim()) return true;
+                      const q = searchQuery.toLowerCase();
+                      return (
+                        item.kepling.nama.toLowerCase().includes(q) ||
+                        item.kepling.lingkungan.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((item, index) => (
+                      <tr key={item.kepling.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 text-center font-bold text-slate-500">
+                          {index + 1}
+                        </td>
+
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900">{item.kepling.nama}</div>
+                          <div className="text-[11px] text-slate-500 font-medium">{item.kepling.lingkungan}</div>
+                        </td>
+
+                        <td className="py-3 px-4 text-center bg-purple-50/30">
+                          <span className="inline-block text-xs font-black px-3 py-1 rounded-full bg-purple-600 text-white shadow-2xs">
+                            {item.reportedBpjs} Pekerja Rentan
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-4 text-center font-semibold text-slate-700">
+                          {item.reportCount} Laporan
+                        </td>
+
+                        <td className="py-3 px-4 max-w-xs">
+                          <p className="text-[11px] text-slate-600 font-medium">
+                            {item.latestNote !== '-' ? item.latestNote : 'Pendataan BPJS Ketenagakerjaan aktif di lingkungan'}
+                          </p>
+                        </td>
+
+                        <td className="py-3 px-4 text-right">
+                          {onSelectKeplingRiwayat && (
+                            <button
+                              type="button"
+                              onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
+                              className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold text-xs transition-colors cursor-pointer border border-purple-200"
+                            >
+                              Riwayat
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>

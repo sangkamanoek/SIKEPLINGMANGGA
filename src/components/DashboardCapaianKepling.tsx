@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { printOfficialDocument } from '../utils/printHelper';
 import {
   Award,
   TrendingUp,
@@ -325,11 +326,12 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   }, [filteredReportsByPeriod, keplingSummaryList]);
 
   const handlePrint = () => {
-    window.print();
+    const todayStr = new Date().toISOString().split('T')[0];
+    printOfficialDocument('lembar-cetak-rekap-capaian', `REKAP_CAPAIAN_KINERJA_KEPLING_${todayStr}`);
   };
 
   return (
-    <div className="space-y-6">
+    <div id="lembar-cetak-rekap-capaian" className="space-y-6">
       {/* Top Title & Header Card */}
       <div className="bg-linear-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl pointer-events-none" />
@@ -354,14 +356,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           </div>
 
           {/* Period Filter Buttons */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-emerald-950/60 p-1.5 rounded-2xl border border-emerald-600/40 shrink-0 print:hidden">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 bg-emerald-950/80 p-1.5 rounded-2xl border border-emerald-600/50 shrink-0 print:hidden">
             <button
               type="button"
               onClick={() => setPeriod('TODAY')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 period === 'TODAY'
-                  ? 'bg-amber-400 text-slate-950 shadow-sm'
-                  : 'text-emerald-100 hover:text-white'
+                  ? 'bg-white text-emerald-950 shadow-md'
+                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
               }`}
             >
               Hari Ini
@@ -369,10 +371,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             <button
               type="button"
               onClick={() => setPeriod('7_DAYS')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 period === '7_DAYS'
-                  ? 'bg-amber-400 text-slate-950 shadow-sm'
-                  : 'text-emerald-100 hover:text-white'
+                  ? 'bg-white text-emerald-950 shadow-md'
+                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
               }`}
             >
               7 Hari
@@ -380,10 +382,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             <button
               type="button"
               onClick={() => setPeriod('THIS_MONTH')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 period === 'THIS_MONTH'
-                  ? 'bg-amber-400 text-slate-950 shadow-sm'
-                  : 'text-emerald-100 hover:text-white'
+                  ? 'bg-white text-emerald-950 shadow-md'
+                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
               }`}
             >
               Bulan Ini
@@ -391,10 +393,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             <button
               type="button"
               onClick={() => setPeriod('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 period === 'ALL'
-                  ? 'bg-amber-400 text-slate-950 shadow-sm'
-                  : 'text-emerald-100 hover:text-white'
+                  ? 'bg-white text-emerald-950 shadow-md'
+                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
               }`}
             >
               Semua
@@ -407,10 +409,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   setEditingKepling(null);
                   setIsModalEditOpen(true);
                 }}
-                className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-sm transition-all flex items-center gap-1.5 cursor-pointer ml-1"
+                className="px-3.5 py-1.5 rounded-xl bg-amber-300 hover:bg-amber-200 text-amber-950 font-black text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer ml-1 border border-amber-200"
                 title="Atur Target PERLINSOS dan Edit Capaian 24 Kepling"
               >
-                <Sliders className="w-3.5 h-3.5" />
+                <Sliders className="w-3.5 h-3.5 text-amber-950" />
                 <span>Target & Capaian</span>
               </button>
             )}

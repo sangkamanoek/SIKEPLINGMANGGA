@@ -20,6 +20,13 @@ export interface KinerjaHarian {
   poskamlingPetugas?: string; // e.g. 'Kepling & 3 Warga'
   poskamlingKeterangan?: string; // e.g. 'Patroli lingkungan berjalan aman dan kondusif'
   kegiatanLainnya?: string;
+  // Poin 6: Kegiatan Pemantauan Kondisi Infrastruktur Wilayah
+  infrastrukturAdaGiat?: boolean;
+  infrastrukturSubjek?: string; // e.g. 'Jalan Rusak / Berlubang', 'Drainase Tersumbat', 'Lampu Jalan Padam'
+  infrastrukturLokasi?: string; // Jalan... Lk.. Kelurahan Mangga Kecamatan Medan Tuntungan
+  infrastrukturTitikKoordinat?: string; // Berisi Link Google Maps
+  infrastrukturTanggalPelaporan?: string;
+  infrastrukturPelapor?: string; // Otomatis Nama Kepling
 }
 
 export interface FotoDokumentasi {
@@ -27,7 +34,7 @@ export interface FotoDokumentasi {
   url: string;
   name: string;
   timestamp: string;
-  kategori?: 'poskamling' | 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'apel' | 'umum' | string;
+  kategori?: 'poskamling' | 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'apel' | 'umum' | 'infrastruktur' | 'lainnya' | string;
 }
 
 export interface InfoAbsenApelLaporan {

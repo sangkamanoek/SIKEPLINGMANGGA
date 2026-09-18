@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { printOfficialDocument } from '../utils/printHelper';
 import {
   Calendar,
   Search,
@@ -229,15 +230,41 @@ export const RekapAbsensiSuperAdmin: React.FC<RekapAbsensiSuperAdminProps> = ({
 
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={() => printOfficialDocument('lembar-cetak-rekap-absensi', `REKAP_PRESENSI_APEL_PAGI_${selectedDate}`)}
             className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-xs cursor-pointer"
-            title="Cetak format cetak resmi"
+            title="Cetak format cetak resmi (Isolasi 100%)"
           >
             <Printer className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Cetak</span>
           </button>
         </div>
       </div>
+
+      {/* Kontainer Cetak Resmi Terisolasi */}
+      <div id="lembar-cetak-rekap-absensi" className="space-y-4">
+        {/* Kop Surat Resmi Pemko Medan (Tampak Saat Cetak) */}
+        <div className="hidden print:block border-b-2 border-black pb-3 mb-4 text-center">
+          <div className="flex items-center justify-between">
+            <img src="/logo_pemko_medan.svg" alt="Logo Pemko Medan" className="w-16 h-16 object-contain" />
+            <div className="text-center flex-1 px-4">
+              <h3 className="font-extrabold text-sm uppercase tracking-wide">PEMERINTAH KOTA MEDAN</h3>
+              <h2 className="font-black text-base uppercase tracking-wider">KECAMATAN MEDAN TUNTUNGAN</h2>
+              <h1 className="font-black text-lg uppercase tracking-wider">KELURAHAN MANGGA</h1>
+              <p className="text-[10px] font-medium text-slate-700">Jl. Keuangan No. 1, Medan Tuntungan, Kota Medan, Sumatera Utara</p>
+            </div>
+            <div className="w-16 h-16" />
+          </div>
+          <div className="mt-2 pt-1 border-t border-black text-center">
+            <h4 className="font-black text-sm uppercase tracking-wider text-slate-900">
+              REKAPITULASI PRESENSI APEL PAGI KEPALA LINGKUNGAN
+            </h4>
+            <p className="text-xs font-bold text-slate-700">
+              {activeSubTab === 'harian' && `Tanggal: ${selectedDate}`}
+              {activeSubTab === 'mingguan' && `Periode Minggu Acuan: ${weekRefDate}`}
+              {activeSubTab === 'bulanan' && `Bulan ${monthNames[selectedMonth - 1]} ${selectedYear}`}
+            </p>
+          </div>
+        </div>
 
       {/* ======================= TAB 1: REKAPAN HARIAN ======================= */}
       {activeSubTab === 'harian' && (
@@ -532,10 +559,10 @@ export const RekapAbsensiSuperAdmin: React.FC<RekapAbsensiSuperAdminProps> = ({
                   {weeklyData.rows.map((row, idx) => (
                     <tr key={row.accountId} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2.5 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
-                      <td className="py-2.5 px-3 font-bold text-emerald-900 whitespace-nowrap">
+                      <td className="py-2.5 px-3 font-bold text-emerald-900 sm:whitespace-nowrap print:whitespace-normal">
                         {row.lingkungan}
                       </td>
-                      <td className="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">
+                      <td className="py-2.5 px-3 font-bold text-slate-900 sm:whitespace-nowrap print:whitespace-normal">
                         {row.nama}
                       </td>
                       {row.days.map((day) => (
@@ -656,10 +683,10 @@ export const RekapAbsensiSuperAdmin: React.FC<RekapAbsensiSuperAdminProps> = ({
                   {monthlyData.rows.map((row, idx) => (
                     <tr key={row.accountId} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2.5 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
-                      <td className="py-2.5 px-3 font-bold text-emerald-900 whitespace-nowrap">
+                      <td className="py-2.5 px-3 font-bold text-emerald-900 sm:whitespace-nowrap print:whitespace-normal">
                         {row.lingkungan}
                       </td>
-                      <td className="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">
+                      <td className="py-2.5 px-3 font-bold text-slate-900 sm:whitespace-nowrap print:whitespace-normal">
                         {row.nama}
                       </td>
                       <td className="py-2.5 px-2 text-center font-medium text-slate-500">
@@ -710,6 +737,7 @@ export const RekapAbsensiSuperAdmin: React.FC<RekapAbsensiSuperAdminProps> = ({
           </div>
         </div>
       )}
+      </div>
 
       {/* Zoom / Lightbox Photo Modal */}
       {previewPhoto && (

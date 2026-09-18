@@ -197,18 +197,29 @@ export function generateLaporanWhatsAppText(item: LaporanHarianItem): string {
   const bpjsKet = kin.bpjsKetenagakerjaanKeterangan ? ` (${kin.bpjsKetenagakerjaanKeterangan})` : '';
   lines.push(`4. BPJS KETENAGAKERJAAN : ${bpjsVal}${bpjsKet}`);
 
-  // 5. Poskamling / Siskamling if active
+  // 5. Kegiatan Tambahan / Lainnya
+  const kegiatanLainnyaVal = kin.kegiatanLainnya && kin.kegiatanLainnya.trim() ? kin.kegiatanLainnya.trim() : '-';
+  lines.push(`5. KEGIATAN LAINNYA : ${kegiatanLainnyaVal}`);
+
+  // 6. Kegiatan Pemantauan Kondisi Infrastruktur Wilayah
+  if (kin.infrastrukturAdaGiat || kin.infrastrukturSubjek) {
+    lines.push(`6. KEGIATAN PEMANTAUAN KONDISI INFRASTRUKTUR WILAYAH :`);
+    lines.push(`   1. SUBJEK : ${kin.infrastrukturSubjek || '-'}`);
+    lines.push(`   2. LOKASI : ${kin.infrastrukturLokasi || '-'}`);
+    lines.push(`   3. Titik Koordinat : ${kin.infrastrukturTitikKoordinat || '-'}`);
+    lines.push(`   4. Tanggal Pelaporan : ${kin.infrastrukturTanggalPelaporan || item.tanggal || '-'}`);
+    lines.push(`   5. Pelapor : ${kin.infrastrukturPelapor || item.namaKepling || '-'}`);
+  } else {
+    lines.push(`6. KEGIATAN PEMANTAUAN KONDISI INFRASTRUKTUR WILAYAH : Nihil / Tidak Ada Temuan Kerusakan`);
+  }
+
+  // 7. Poskamling / Siskamling if active
   if (kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat') {
     const pStatus = kin.poskamlingStatus;
     const pLokasi = kin.poskamlingLokasi ? ` (${kin.poskamlingLokasi})` : '';
     const pPetugas = kin.poskamlingPetugas ? ` - Petugas: ${kin.poskamlingPetugas}` : '';
     const pKet = kin.poskamlingKeterangan ? ` [${kin.poskamlingKeterangan}]` : '';
-    lines.push(`5. POSKAMLING / SISKAMLING : ${pStatus}${pLokasi}${pPetugas}${pKet}`);
-  }
-
-  // 6. Kegiatan Tambahan / Lainnya if any
-  if (kin.kegiatanLainnya && kin.kegiatanLainnya.trim()) {
-    lines.push(`6. KEGIATAN LAINNYA : ${kin.kegiatanLainnya.trim()}`);
+    lines.push(`7. POSKAMLING / SISKAMLING : ${pStatus}${pLokasi}${pPetugas}${pKet}`);
   }
 
   lines.push('');
@@ -219,6 +230,62 @@ export function generateLaporanWhatsAppText(item: LaporanHarianItem): string {
   lines.push('');
   lines.push('#MedanUntukSemua');
   lines.push('#SemuaUntukMedan');
+
+  return lines.join('\n');
+}
+
+/**
+ * Format laporan harian menjadi teks terstandarisasi untuk dibagikan ke WhatsApp / Salin Teks.
+ * Menerima format LaporanHarianItem maupun object terflaten.
+ */
+export function formatReportToText(input: any): string {
+  if (!input) return '';
+
+  const kin = input.kinerja || input;
+  const hari = input.hari || '';
+  const tanggal = input.tanggal || '';
+  const namaKepling = input.namaKepling || '';
+  const jabatan = input.jabatan || 'KEPALA LINGKUNGAN';
+  const kelurahan = input.kelurahan || 'Kelurahan Mangga';
+  const kecamatan = input.kecamatan || 'Medan Tuntungan';
+  const apelText = input.absenApelJam
+    ? `${(input.absenApelStatus || 'HADIR').toUpperCase()} (${input.absenApelJam})`
+    : 'HADIR (07.35 WIB)';
+
+  const lines: string[] = [
+    `*🟩 LAPORAN KEGIATAN HARIAN*`,
+    `*${jabatan.toUpperCase()}*`,
+    `*${kelurahan.toUpperCase()}*`,
+    `*${kecamatan.toUpperCase()}*`,
+    `----------------------------------------`,
+    `Hari     : ${hari}`,
+    `Tanggal  : ${tanggal}`,
+    `Nama     : ${namaKepling}`,
+    `Jabatan  : ${jabatan}`,
+    `Presensi Apel : ${apelText}`,
+    `----------------------------------------`,
+    `KINERJA HARIAN:`,
+    `1. OPSIR PBB : ${kin.opsirPbbWp || '0'} WP ${kin.opsirPbbKeterangan ? `(${kin.opsirPbbKeterangan})` : ''}`,
+    `2. PERLINSOS : ${kin.perlinsosKk || '0'} KK ${kin.perlinsosKeterangan ? `(${kin.perlinsosKeterangan})` : ''}` +
+      (kin.perlinsosMenolakKk && String(kin.perlinsosMenolakKk) !== '0'
+        ? `\n   - ⚠️ Menolak: ${kin.perlinsosMenolakKk} KK${kin.perlinsosMenolakRincian ? ` (Nama & Alamat: ${kin.perlinsosMenolakRincian.replace(/\n/g, ', ')})` : ''}`
+        : '') +
+      (kin.perlinsosTidakDiTempatKk && String(kin.perlinsosTidakDiTempatKk) !== '0'
+        ? `\n   - 🏠 Tidak Di Tempat: ${kin.perlinsosTidakDiTempatKk} KK${kin.perlinsosTidakDiTempatRincian ? ` (Nama & Alamat: ${kin.perlinsosTidakDiTempatRincian.replace(/\n/g, ', ')})` : ''}`
+        : ''),
+    `3. IDENTITAS KEPENDUDUKAN DIGITAL : ${kin.ikdOrang || '0'} ORANG ${kin.ikdKeterangan ? `(${kin.ikdKeterangan})` : ''}`,
+    `4. BPJS KETENAGAKERJAAN : ${kin.bpjsKetenagakerjaanOrang || '0'} ORANG ${kin.bpjsKetenagakerjaanKeterangan ? `(${kin.bpjsKetenagakerjaanKeterangan})` : ''}`,
+    `5. KEGIATAN LAINNYA : ${kin.kegiatanLainnya || '-'}`,
+    kin.infrastrukturAdaGiat || kin.infrastrukturSubjek
+      ? `6. KEGIATAN PEMANTAUAN KONDISI INFRASTRUKTUR WILAYAH :\n   1. SUBJEK : ${kin.infrastrukturSubjek || '-'}\n   2. LOKASI : ${kin.infrastrukturLokasi || '-'}\n   3. Titik Koordinat : ${kin.infrastrukturTitikKoordinat || '-'}\n   4. Tanggal Pelaporan : ${kin.infrastrukturTanggalPelaporan || tanggal || '-'}\n   5. Pelapor : ${kin.infrastrukturPelapor || namaKepling || '-'}`
+      : `6. KEGIATAN PEMANTAUAN KONDISI INFRASTRUKTUR WILAYAH : Nihil / Tidak Ada Temuan Kerusakan`,
+    kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat'
+      ? `7. POSKAMLING / SISKAMLING : ${kin.poskamlingStatus}${kin.poskamlingLokasi ? ` (${kin.poskamlingLokasi})` : ''}${kin.poskamlingPetugas ? ` - Petugas: ${kin.poskamlingPetugas}` : ''}${kin.poskamlingKeterangan ? ` [${kin.poskamlingKeterangan}]` : ''}`
+      : '',
+    `----------------------------------------`,
+    `Dokumentasi : ${input.totalFoto ?? input.jumlahDokumentasi ?? (input.dokumentasiFoto ? input.dokumentasiFoto.length : 0)} Foto Terlampir`,
+    `#MedanUntukSemua #SemuaUntukMedan`,
+  ].filter(Boolean);
 
   return lines.join('\n');
 }

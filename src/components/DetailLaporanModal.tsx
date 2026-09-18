@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { printOfficialDocument } from '../utils/printHelper';
 import {
   X,
   FileSpreadsheet,
@@ -22,9 +23,10 @@ import {
   ChevronRight,
   Maximize2,
   RefreshCw,
+  MapPin,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, AbsenApelItem } from '../types';
-import { formatTanggalIndonesia, generateReportPdfFileName } from '../lib/formatter';
+import { formatTanggalIndonesia, generateReportPdfFileName, formatReportToText } from '../lib/formatter';
 import { loadAllAttendance } from '../lib/attendanceApi';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 
@@ -280,6 +282,12 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   const [editPoskamlingPetugas, setEditPoskamlingPetugas] = useState('');
   const [editPoskamlingKet, setEditPoskamlingKet] = useState('');
   const [editKegiatanLainnya, setEditKegiatanLainnya] = useState('');
+  const [editInfrastrukturAdaGiat, setEditInfrastrukturAdaGiat] = useState<boolean>(true);
+  const [editInfrastrukturSubjek, setEditInfrastrukturSubjek] = useState('');
+  const [editInfrastrukturLokasi, setEditInfrastrukturLokasi] = useState('');
+  const [editInfrastrukturTitikKoordinat, setEditInfrastrukturTitikKoordinat] = useState('');
+  const [editInfrastrukturTanggalPelaporan, setEditInfrastrukturTanggalPelaporan] = useState('');
+  const [editInfrastrukturPelapor, setEditInfrastrukturPelapor] = useState('');
 
   // Populate form fields whenever active item changes
   useEffect(() => {
@@ -305,6 +313,12 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       setEditPoskamlingPetugas(item.kinerja?.poskamlingPetugas || '');
       setEditPoskamlingKet(item.kinerja?.poskamlingKeterangan || '');
       setEditKegiatanLainnya(item.kinerja?.kegiatanLainnya || '');
+      setEditInfrastrukturAdaGiat(item.kinerja?.infrastrukturAdaGiat ?? Boolean(item.kinerja?.infrastrukturSubjek));
+      setEditInfrastrukturSubjek(item.kinerja?.infrastrukturSubjek || '');
+      setEditInfrastrukturLokasi(item.kinerja?.infrastrukturLokasi || '');
+      setEditInfrastrukturTitikKoordinat(item.kinerja?.infrastrukturTitikKoordinat || '');
+      setEditInfrastrukturTanggalPelaporan(item.kinerja?.infrastrukturTanggalPelaporan || item.tanggal || '');
+      setEditInfrastrukturPelapor(item.kinerja?.infrastrukturPelapor || item.namaKepling || '');
       setIsEditing(false);
       setShowDeleteConfirm(false);
       setShowPrintPreview(false);
@@ -327,32 +341,42 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     return item.tanggal;
   }, [item?.tanggal]);
 
-  const getProperFotoLabel = (foto: { name?: string }, idx: number) => {
-    if (!foto?.name) return `Dokumentasi Lapangan ${idx + 1}`;
-    const raw = foto.name.trim();
+  const getProperFotoLabel = (foto: { name?: string; kategori?: string }, idx: number) => {
+    if (!foto?.name && !foto?.kategori) return `Dokumentasi Lapangan ${idx + 1}`;
+    const raw = (foto.name || '').trim();
     const lower = raw.toLowerCase();
-    if (lower.includes('poskamling') || lower.includes('ronda') || lower.includes('siskamling')) {
+    const kat = (foto.kategori || '').toLowerCase();
+    if (lower.includes('poskamling') || lower.includes('ronda') || lower.includes('siskamling') || kat === 'poskamling') {
       return 'Dokumentasi Pos Ronda / Siskamling';
     }
-    if (lower.includes('pbb') || lower.includes('pajak')) {
+    if (lower.includes('pbb') || lower.includes('pajak') || kat === 'pbb') {
       return 'Dokumentasi Penagihan PBB';
     }
-    if (lower.includes('perlinsos') || lower.includes('bansos') || lower.includes('bantuan')) {
+    if (lower.includes('perlinsos') || lower.includes('bansos') || lower.includes('bantuan') || kat === 'perlinsos') {
       return 'Dokumentasi Verifikasi Perlinsos';
     }
-    if (lower.includes('ikd') || lower.includes('ktp') || lower.includes('kependudukan')) {
+    if (lower.includes('ikd') || lower.includes('ktp') || lower.includes('kependudukan') || kat === 'ikd') {
       return 'Dokumentasi Aktivasi IKD';
     }
-    if (lower.includes('bpjs') || lower.includes('rentan') || lower.includes('ketenagakerjaan')) {
+    if (lower.includes('bpjs') || lower.includes('rentan') || lower.includes('ketenagakerjaan') || kat === 'bpjs') {
       return 'Dokumentasi BPJS Ketenagakerjaan';
     }
-    if (lower.includes('bersih') || lower.includes('gotong') || lower.includes('drainase')) {
+    if (lower.includes('infrastruktur') || lower.includes('drainase') || lower.includes('jalan') || lower.includes('lampu') || lower.includes('lpju') || kat === 'infrastruktur') {
+      return 'Dokumentasi Pemantauan Infrastruktur';
+    }
+    if (lower.includes('bersih') || lower.includes('gotong') || lower.includes('sampah')) {
       return 'Dokumentasi Kebersihan Lingkungan';
+    }
+    if (lower.includes('apel') || lower.includes('presensi') || lower.includes('selfie') || kat === 'apel') {
+      return 'Dokumentasi Presensi Apel';
     }
     if (lower.includes('whatsapp') || lower.startsWith('img_') || lower.startsWith('image')) {
       return `Dokumentasi Lapangan ${idx + 1}`;
     }
     const clean = raw.replace(/\.[^/.]+$/, '').replace(/^[\[\(].*?[\]\)]\s*/, '').trim();
+    if (/^\d+$/.test(clean) || clean.length < 3 || /^[0-9_-]+$/.test(clean)) {
+      return `Dokumentasi Lapangan ${idx + 1}`;
+    }
     return clean.length > 28 ? `Dokumentasi Lapangan ${idx + 1}` : clean;
   };
 
@@ -363,8 +387,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       perlinsos: [],
       ikd: [],
       bpjs: [],
-      poskamling: [],
       lainnya: [],
+      infrastruktur: [],
+      poskamling: [],
     };
 
     photos.forEach((foto) => {
@@ -381,6 +406,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         groups.ikd.push(foto);
       } else if (cat === 'bpjs' || name.includes('[bpjs]') || name.includes('bpjs') || name.includes('rentan')) {
         groups.bpjs.push(foto);
+      } else if (cat === 'infrastruktur' || name.includes('[infrastruktur]') || name.includes('infrastruktur')) {
+        groups.infrastruktur.push(foto);
       } else if (cat === 'poskamling' || name.includes('[poskamling]') || name.includes('poskamling') || name.includes('ronda') || name.includes('siskamling')) {
         groups.poskamling.push(foto);
       } else {
@@ -394,8 +421,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       { key: 'perlinsos', title: '2. Dokumentasi PERLINSOS (Perlindungan Sosial)', badgeBg: 'bg-emerald-100', textClr: 'text-emerald-900', borderClr: 'border-emerald-300' },
       { key: 'ikd', title: '3. Dokumentasi Aktivasi IKD Dukcapil', badgeBg: 'bg-purple-100', textClr: 'text-purple-900', borderClr: 'border-purple-300' },
       { key: 'bpjs', title: '4. Dokumentasi BPJS Ketenagakerjaan', badgeBg: 'bg-indigo-100', textClr: 'text-indigo-900', borderClr: 'border-indigo-300' },
-      { key: 'poskamling', title: '5. Dokumentasi Pos Ronda / SISKAMLING', badgeBg: 'bg-amber-100', textClr: 'text-amber-950', borderClr: 'border-amber-300' },
-      { key: 'lainnya', title: '6. Dokumentasi Kebersihan & Kegiatan Lainnya', badgeBg: 'bg-slate-100', textClr: 'text-slate-900', borderClr: 'border-slate-300' },
+      { key: 'lainnya', title: '5. Dokumentasi Kegiatan Lainnya', badgeBg: 'bg-slate-100', textClr: 'text-slate-900', borderClr: 'border-slate-300' },
+      { key: 'infrastruktur', title: '6. Dokumentasi Pemantauan Kondisi Infrastruktur Wilayah', badgeBg: 'bg-emerald-100', textClr: 'text-emerald-950', borderClr: 'border-emerald-400' },
+      { key: 'poskamling', title: '7. Dokumentasi Pos Ronda / SISKAMLING', badgeBg: 'bg-amber-100', textClr: 'text-amber-950', borderClr: 'border-amber-300' },
     ];
 
     return metaList
@@ -547,21 +575,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
   const handlePrint = () => {
     if (!item) return;
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
-
-    if (isMobile) {
-      // Di Android & iOS: browser memblokir window.open popup.
-      // Panggil window.print() langsung pada halaman aktif untuk memicu Android Print Spooler bawaan
-      try {
-        window.print();
-      } catch (e) {
-        console.warn('Print direct error:', e);
-      }
-      return;
-    }
-
-    // Di Desktop: buka tab/window khusus yang rapi
-    openPrintableWindow();
+    const titleStr = generateReportPdfFileName(item, displayTanggal).replace(/\.pdf$/i, '');
+    printOfficialDocument('lembar-cetak-laporan-kepling', titleStr);
   };
 
   const handleCopyText = () => {
@@ -586,11 +601,17 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             ikdKeterangan: editIkdKet,
             bpjsKetenagakerjaanOrang: editBpjsOrang,
             bpjsKetenagakerjaanKeterangan: editBpjsKet,
+            kegiatanLainnya: editKegiatanLainnya,
+            infrastrukturAdaGiat: editInfrastrukturAdaGiat,
+            infrastrukturSubjek: editInfrastrukturSubjek,
+            infrastrukturLokasi: editInfrastrukturLokasi,
+            infrastrukturTitikKoordinat: editInfrastrukturTitikKoordinat,
+            infrastrukturTanggalPelaporan: editInfrastrukturTanggalPelaporan,
+            infrastrukturPelapor: editInfrastrukturPelapor,
             poskamlingStatus: editPoskamlingStatus,
             poskamlingLokasi: editPoskamlingLokasi,
             poskamlingPetugas: editPoskamlingPetugas,
             poskamlingKeterangan: editPoskamlingKet,
-            kegiatanLainnya: editKegiatanLainnya,
           },
           jumlahDokumentasi: item?.jumlahDokumentasi || 0,
         }
@@ -598,37 +619,41 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
     const kin = activeItem?.kinerja || {};
 
-    const text = [
-      `*🟩 LAPORAN KEGIATAN HARIAN*`,
-      `*${(activeItem?.jabatan || '').toUpperCase()}*`,
-      `*${(activeItem?.kelurahan || 'Kelurahan Mangga').toUpperCase()}*`,
-      `*${(activeItem?.kecamatan || 'Medan Tuntungan').toUpperCase()}*`,
-      `----------------------------------------`,
-      `Hari     : ${activeItem?.hari || ''}`,
-      `Tanggal  : ${activeItem?.tanggal || ''}`,
-      `Nama     : ${activeItem?.namaKepling || ''}`,
-      `Jabatan  : ${activeItem?.jabatan || ''}`,
-      `Presensi Apel : ${absenApelData ? `${absenApelData.status.toUpperCase()} (${absenApelData.jam || ''})` : 'HADIR (07.35 WIB)'}`,
-      `----------------------------------------`,
-      `KINERJA HARIAN:`,
-      `1. OPSIR PBB : ${kin.opsirPbbWp || '0'} WP ${kin.opsirPbbKeterangan ? `(${kin.opsirPbbKeterangan})` : ''}`,
-      `2. PERLINSOS : ${kin.perlinsosKk || '0'} KK ${kin.perlinsosKeterangan ? `(${kin.perlinsosKeterangan})` : ''}` +
-        (kin.perlinsosMenolakKk && String(kin.perlinsosMenolakKk) !== '0'
-          ? `\n   - ⚠️ Menolak: ${kin.perlinsosMenolakKk} KK${kin.perlinsosMenolakRincian ? ` (Nama & Alamat: ${kin.perlinsosMenolakRincian.replace(/\n/g, ', ')})` : ''}`
-          : '') +
-        (kin.perlinsosTidakDiTempatKk && String(kin.perlinsosTidakDiTempatKk) !== '0'
-          ? `\n   - 🏠 Tidak Di Tempat: ${kin.perlinsosTidakDiTempatKk} KK${kin.perlinsosTidakDiTempatRincian ? ` (Nama & Alamat: ${kin.perlinsosTidakDiTempatRincian.replace(/\n/g, ', ')})` : ''}`
-          : ''),
-      `3. IDENTITAS KEPENDUDUKAN DIGITAL : ${kin.ikdOrang || '0'} ORANG ${kin.ikdKeterangan ? `(${kin.ikdKeterangan})` : ''}`,
-      `4. BPJS KETENAGAKERJAAN : ${kin.bpjsKetenagakerjaanOrang || '0'} ORANG ${kin.bpjsKetenagakerjaanKeterangan ? `(${kin.bpjsKetenagakerjaanKeterangan})` : ''}`,
-      kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat'
-        ? `5. POSKAMLING / SISKAMLING : ${kin.poskamlingStatus}${kin.poskamlingLokasi ? ` (${kin.poskamlingLokasi})` : ''}${kin.poskamlingPetugas ? ` - Petugas: ${kin.poskamlingPetugas}` : ''}${kin.poskamlingKeterangan ? ` [${kin.poskamlingKeterangan}]` : ''}`
-        : '',
-      kin.kegiatanLainnya ? `6. KEGIATAN LAINNYA : ${kin.kegiatanLainnya}` : '',
-      `----------------------------------------`,
-      `Dokumentasi : ${activeItem?.jumlahDokumentasi || (activeItem?.dokumentasiFoto ? activeItem.dokumentasiFoto.length : 0)} Foto Terlampir`,
-      `#MedanUntukSemua #SemuaUntukMedan`,
-    ].filter(Boolean).join('\n');
+    const text = formatReportToText({
+      hari: activeItem?.hari || '',
+      tanggal: activeItem?.tanggal || '',
+      namaKepling: activeItem?.namaKepling || '',
+      jabatan: activeItem?.jabatan || '',
+      kelurahan: activeItem?.kelurahan || 'Kelurahan Mangga',
+      kecamatan: activeItem?.kecamatan || 'Medan Tuntungan',
+      absenApelJam: absenApelData?.jam || '07.35 WIB',
+      absenApelStatus: absenApelData?.status || 'HADIR',
+      opsirPbbWp: kin.opsirPbbWp || '0',
+      opsirPbbKeterangan: kin.opsirPbbKeterangan || '',
+      perlinsosKk: kin.perlinsosKk || '0',
+      perlinsosKeterangan: kin.perlinsosKeterangan || '',
+      perlinsosMenolakKk: kin.perlinsosMenolakKk || '0',
+      perlinsosMenolakRincian: kin.perlinsosMenolakRincian || '',
+      perlinsosTidakDiTempatKk: kin.perlinsosTidakDiTempatKk || '0',
+      perlinsosTidakDiTempatRincian: kin.perlinsosTidakDiTempatRincian || '',
+      ikdOrang: kin.ikdOrang || '0',
+      ikdKeterangan: kin.ikdKeterangan || '',
+      bpjsKetenagakerjaanOrang: kin.bpjsKetenagakerjaanOrang || '0',
+      bpjsKetenagakerjaanKeterangan: kin.bpjsKetenagakerjaanKeterangan || '',
+      kegiatanLainnya: kin.kegiatanLainnya || '',
+      infrastrukturAdaGiat: kin.infrastrukturAdaGiat,
+      infrastrukturSubjek: kin.infrastrukturSubjek || '',
+      infrastrukturLokasi: kin.infrastrukturLokasi || '',
+      infrastrukturTitikKoordinat: kin.infrastrukturTitikKoordinat || '',
+      infrastrukturTanggalPelaporan: kin.infrastrukturTanggalPelaporan || '',
+      infrastrukturPelapor: kin.infrastrukturPelapor || activeItem?.namaKepling || '',
+      poskamlingAdaGiat: Boolean(kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat'),
+      poskamlingStatus: kin.poskamlingStatus || '',
+      poskamlingLokasi: kin.poskamlingLokasi || '',
+      poskamlingPetugas: kin.poskamlingPetugas || '',
+      poskamlingKeterangan: kin.poskamlingKeterangan || '',
+      totalFoto: activeItem?.jumlahDokumentasi || (activeItem?.dokumentasiFoto ? activeItem.dokumentasiFoto.length : 0),
+    });
 
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -658,12 +683,18 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           ikdKeterangan: editIkdKet,
           bpjsKetenagakerjaanOrang: editBpjsOrang,
           bpjsKetenagakerjaanKeterangan: editBpjsKet,
+          kegiatanLainnya: editKegiatanLainnya,
+          infrastrukturAdaGiat: editInfrastrukturAdaGiat,
+          infrastrukturSubjek: editInfrastrukturSubjek,
+          infrastrukturLokasi: editInfrastrukturLokasi,
+          infrastrukturTitikKoordinat: editInfrastrukturTitikKoordinat,
+          infrastrukturTanggalPelaporan: editInfrastrukturTanggalPelaporan,
+          infrastrukturPelapor: editInfrastrukturPelapor,
           poskamlingAdaGiat: Boolean(editPoskamlingStatus && editPoskamlingStatus !== 'Tidak Ada Giat'),
           poskamlingStatus: editPoskamlingStatus,
           poskamlingLokasi: editPoskamlingLokasi,
           poskamlingPetugas: editPoskamlingPetugas,
           poskamlingKeterangan: editPoskamlingKet,
-          kegiatanLainnya: editKegiatanLainnya,
         },
       };
 
@@ -987,20 +1018,44 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         </tr>
                         <tr>
                           <td className="text-center font-bold border border-black py-1">5</td>
-                          <td className="font-bold border border-black px-1.5 py-1">Pos Ronda / SISKAMLING</td>
-                          <td className="text-center font-bold border border-black py-1">{item.kinerja?.poskamlingStatus || 'Aktif Ronda Malam'}</td>
-                          <td className="border border-black px-1.5 py-1">
-                            {item.kinerja?.poskamlingLokasi ? `Lokasi: ${item.kinerja.poskamlingLokasi}. ` : ''}
-                            {item.kinerja?.poskamlingPetugas ? `Petugas: ${item.kinerja.poskamlingPetugas}. ` : ''}
-                            {item.kinerja?.poskamlingKeterangan || 'Patroli siskamling lingkungan kondusif dan aman'}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="text-center font-bold border border-black py-1">6</td>
-                          <td className="font-bold border border-black px-1.5 py-1">Kegiatan Kebersihan & Lainnya</td>
+                          <td className="font-bold border border-black px-1.5 py-1">Kegiatan Lapangan Lainnya</td>
                           <td className="text-center font-bold border border-black py-1">Terlaksana</td>
                           <td className="border border-black px-1.5 py-1">{item.kinerja?.kegiatanLainnya || '-'}</td>
                         </tr>
+                        <tr>
+                          <td className="text-center font-bold border border-black py-1">6</td>
+                          <td className="font-bold border border-black px-1.5 py-1">Pemantauan Kondisi Infrastruktur Wilayah</td>
+                          <td className="text-center font-bold border border-black py-1">
+                            {item.kinerja?.infrastrukturSubjek ? 'Terpantau' : 'Nihil'}
+                          </td>
+                          <td className="border border-black px-1.5 py-1 text-[7.5pt]">
+                            {item.kinerja?.infrastrukturSubjek ? (
+                              <div>
+                                <div><strong>1. Subjek:</strong> {item.kinerja.infrastrukturSubjek}</div>
+                                <div><strong>2. Lokasi:</strong> {item.kinerja.infrastrukturLokasi || '-'}</div>
+                                {item.kinerja.infrastrukturTitikKoordinat && (
+                                  <div><strong>3. Titik Koordinat:</strong> {item.kinerja.infrastrukturTitikKoordinat}</div>
+                                )}
+                                <div><strong>4. Tanggal Pelaporan:</strong> {item.kinerja.infrastrukturTanggalPelaporan || item.tanggal || '-'}</div>
+                                <div><strong>5. Pelapor:</strong> {item.kinerja.infrastrukturPelapor || item.namaKepling || '-'}</div>
+                              </div>
+                            ) : (
+                              'Tidak ada temuan kondisi infrastruktur rusak / nihil.'
+                            )}
+                          </td>
+                        </tr>
+                        {item.kinerja?.poskamlingStatus && (
+                          <tr>
+                            <td className="text-center font-bold border border-black py-1">7</td>
+                            <td className="font-bold border border-black px-1.5 py-1">Pos Ronda / SISKAMLING (Tugas Tambahan)</td>
+                            <td className="text-center font-bold border border-black py-1">{item.kinerja.poskamlingStatus}</td>
+                            <td className="border border-black px-1.5 py-1">
+                              {item.kinerja.poskamlingLokasi ? `Lokasi: ${item.kinerja.poskamlingLokasi}. ` : ''}
+                              {item.kinerja.poskamlingPetugas ? `Petugas: ${item.kinerja.poskamlingPetugas}. ` : ''}
+                              {item.kinerja.poskamlingKeterangan || 'Patroli siskamling lingkungan kondusif dan aman'}
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -1012,39 +1067,61 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({effectivePhotos.length} FOTO):</span>
                         <span className="text-[7pt] text-slate-500 font-normal normal-case">Format Album Resmi Kedinasan</span>
                       </div>
-                      <div className="space-y-2">
-                        {groupPhotosByActivity(effectivePhotos.slice(0, 6)).map((group) => (
-                          <div key={group.key}>
-                            <div className="text-[7.5pt] font-bold font-sans text-slate-800 uppercase mb-1 flex items-center justify-between border-b border-slate-200 pb-0.5">
-                              <span>• {group.title} ({group.photos.length} Foto)</span>
-                            </div>
-                            <div className={`grid ${group.photos.length === 1 ? 'grid-cols-1 max-w-[280px]' : group.photos.length === 2 ? 'grid-cols-2' : 'grid-cols-3'} gap-2.5`}>
-                              {group.photos.map((foto, idx) => (
-                                <div
-                                  key={foto.id || idx}
-                                  className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center shadow-xs"
-                                >
-                                  <div className={`w-full ${group.photos.length === 1 ? 'h-[150px]' : 'h-[135px]'} rounded-md overflow-hidden bg-slate-100 flex items-center justify-center p-0.5`}>
-                                    <img
-                                      src={foto.url}
-                                      alt={getProperFotoLabel(foto, idx)}
-                                      crossOrigin="anonymous"
-                                      className="w-full h-full object-contain object-center"
-                                    />
-                                  </div>
+                      <div className="flex flex-wrap gap-2.5">
+                        {groupPhotosByActivity(effectivePhotos.slice(0, 6)).map((group, groupIdx, allGroups) => {
+                          const isFullWidthGroup = allGroups.length === 1 || (allGroups.length % 2 !== 0 && groupIdx === allGroups.length - 1);
+                          return (
+                            <div
+                              key={group.key}
+                              className={isFullWidthGroup ? 'w-full mb-1' : 'w-full sm:w-[calc(50%-5px)] mb-1'}
+                            >
+                              <div className="text-[7.5pt] font-bold font-sans text-slate-800 uppercase mb-1 flex items-center justify-between border-b border-slate-200 pb-0.5">
+                                <span>• {group.title} ({group.photos.length} Foto)</span>
+                              </div>
+                              <div
+                                className={`grid ${
+                                  !isFullWidthGroup
+                                    ? group.photos.length === 1
+                                      ? 'grid-cols-1'
+                                      : group.photos.length === 2
+                                      ? 'grid-cols-2'
+                                      : 'grid-cols-3'
+                                    : group.photos.length === 1
+                                    ? 'grid-cols-1 max-w-[260px]'
+                                    : group.photos.length === 2
+                                    ? 'grid-cols-2'
+                                    : group.photos.length === 4
+                                    ? 'grid-cols-4'
+                                    : 'grid-cols-3'
+                                } gap-2`}
+                              >
+                                {group.photos.map((foto, idx) => (
                                   <div
-                                    className="text-[7.5pt] font-bold text-slate-800 mt-1 truncate w-full text-center font-sans"
-                                    title={getProperFotoLabel(foto, idx)}
+                                    key={foto.id || idx}
+                                    className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center shadow-xs"
                                   >
-                                    {getProperFotoLabel(foto, idx)}
+                                    <div className="w-full h-[115px] rounded-md overflow-hidden bg-slate-50 flex items-center justify-center p-0.5 border border-slate-200">
+                                      <img
+                                        src={foto.url}
+                                        alt={getProperFotoLabel(foto, idx)}
+                                        crossOrigin="anonymous"
+                                        className="w-full h-full object-contain object-center"
+                                      />
+                                    </div>
+                                    <div
+                                      className="text-[7.5pt] font-bold text-slate-800 mt-1 truncate w-full text-center font-sans"
+                                      title={getProperFotoLabel(foto, idx)}
+                                    >
+                                      {getProperFotoLabel(foto, idx)}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
-                      {item.dokumentasiFoto.length > 6 && (
+                      {effectivePhotos.length > 6 && (
                         <div className="text-[7.5pt] text-slate-500 italic mt-1.5">
                           * 6 Foto dokumentasi utama dicantumkan pada Halaman 1, sisa foto lainnya tercantum pada Lembar Lampiran (Halaman 2).
                         </div>
@@ -1474,12 +1551,159 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               </div>
             </div>
 
-            {/* 5. POSKAMLING / SISKAMLING */}
+            {/* 5. Kegiatan Lapangan Lainnya */}
+            <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+              <span className="font-bold text-slate-700 block mb-1">5. Kegiatan Lapangan Lainnya:</span>
+              {isEditing ? (
+                <textarea
+                  rows={2}
+                  value={editKegiatanLainnya}
+                  onChange={(e) => setEditKegiatanLainnya(e.target.value)}
+                  placeholder="Pemantauan kebersihan lingkungan, penanganan drainase, dll..."
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-emerald-500"
+                />
+              ) : (
+                <p className="text-slate-600">{item.kinerja?.kegiatanLainnya || 'Tidak ada kegiatan tambahan.'}</p>
+              )}
+            </div>
+
+            {/* 6. Kegiatan Pemantauan Kondisi Infrastruktur Wilayah */}
+            <div className="mt-3 p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-emerald-900 flex items-center gap-1.5 uppercase text-[11px]">
+                  <span className="w-4 h-4 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[9px] font-black">
+                    6
+                  </span>
+                  Kegiatan Pemantauan Kondisi Infrastruktur Wilayah
+                </span>
+                {item.kinerja?.infrastrukturSubjek ? (
+                  <span className="px-2 py-0.5 rounded bg-emerald-700 text-white font-bold text-[10px]">
+                    Ada Giat Pemantauan
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-600 text-[10px]">
+                    Nihil
+                  </span>
+                )}
+              </div>
+
+              {isEditing ? (
+                <div className="space-y-2 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        1. SUBJEK :
+                      </label>
+                      <input
+                        type="text"
+                        value={editInfrastrukturSubjek}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setEditInfrastrukturSubjek(e.target.value)}
+                        placeholder="Contoh: Jalan Berlubang / Rusak, Drainase Tersumbat"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        2. LOKASI :
+                      </label>
+                      <input
+                        type="text"
+                        value={editInfrastrukturLokasi}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setEditInfrastrukturLokasi(e.target.value)}
+                        placeholder="( Jalan Jamin Ginting Lk ... Kelurahan Mangga Kecamatan Medan Tuntungan )"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                      3. Titik Koordinat :
+                    </label>
+                    <input
+                      type="text"
+                      value={editInfrastrukturTitikKoordinat}
+                      onChange={(e) => setEditInfrastrukturTitikKoordinat(e.target.value)}
+                      placeholder="https://maps.google.com/?q=..."
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800 font-mono"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        4. Tanggal Pelaporan :
+                      </label>
+                      <input
+                        type="text"
+                        value={editInfrastrukturTanggalPelaporan}
+                        onChange={(e) => setEditInfrastrukturTanggalPelaporan(e.target.value)}
+                        placeholder="Contoh: 18 September 2026"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        5. Pelapor :
+                      </label>
+                      <input
+                        type="text"
+                        value={editInfrastrukturPelapor}
+                        onChange={(e) => setEditInfrastrukturPelapor(e.target.value)}
+                        placeholder="Nama Kepling"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : item.kinerja?.infrastrukturSubjek ? (
+                <div className="space-y-1.5 text-slate-700 bg-white/80 p-2.5 rounded-lg border border-emerald-100">
+                  <p>
+                    <strong>1. SUBJEK :</strong> {item.kinerja.infrastrukturSubjek}
+                  </p>
+                  <p>
+                    <strong>2. LOKASI :</strong> {item.kinerja.infrastrukturLokasi || '-'}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="truncate">
+                      <strong>3. Titik Koordinat :</strong> {item.kinerja.infrastrukturTitikKoordinat || '-'}
+                    </p>
+                    {item.kinerja.infrastrukturTitikKoordinat && (
+                      <a
+                        href={item.kinerja.infrastrukturTitikKoordinat}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 hover:text-emerald-950 underline shrink-0"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Buka Maps</span>
+                      </a>
+                    )}
+                  </div>
+                  <p>
+                    <strong>4. Tanggal Pelaporan :</strong>{' '}
+                    {item.kinerja.infrastrukturTanggalPelaporan || item.tanggal || '-'}
+                  </p>
+                  <p>
+                    <strong>5. Pelapor :</strong>{' '}
+                    {item.kinerja.infrastrukturPelapor || item.namaKepling || 'Kepling'}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-slate-500 italic">
+                  Tidak ada catatan pemantauan infrastruktur untuk laporan ini.
+                </p>
+              )}
+            </div>
+
+            {/* 7. POSKAMLING / SISKAMLING */}
             <div className="mt-3 p-3.5 bg-amber-50/60 border border-amber-200 rounded-xl text-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-amber-900 flex items-center gap-1.5 uppercase text-[11px]">
                   <Shield className="w-3.5 h-3.5 text-amber-600" />
-                  5. TUGAS TAMBAHAN: POSKAMLING / SISKAMLING
+                  7. TUGAS TAMBAHAN: POSKAMLING / SISKAMLING
                 </span>
                 {item.kinerja?.poskamlingStatus && (
                   <span className="px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[10px]">
@@ -1562,22 +1786,6 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     {item.kinerja?.poskamlingKeterangan || 'Situasi lingkungan aman dan kondusif.'}
                   </p>
                 </div>
-              )}
-            </div>
-
-            {/* 6. Kegiatan Lapangan Lainnya */}
-            <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-              <span className="font-bold text-slate-700 block mb-1">6. Kegiatan Lapangan Lainnya / Catatan:</span>
-              {isEditing ? (
-                <textarea
-                  rows={3}
-                  value={editKegiatanLainnya}
-                  onChange={(e) => setEditKegiatanLainnya(e.target.value)}
-                  placeholder="Pemantauan kebersihan lingkungan, penanganan drainase, dll..."
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-emerald-500"
-                />
-              ) : (
-                <p className="text-slate-600">{item.kinerja?.kegiatanLainnya || 'Tidak ada kegiatan tambahan.'}</p>
               )}
             </div>
           </div>
@@ -2060,22 +2268,46 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   </tr>
                   <tr>
                     <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>5</td>
-                    <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Pos Ronda / SISKAMLING</td>
-                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
-                      {item.kinerja?.poskamlingStatus || 'Aktif Ronda Malam'}
-                    </td>
-                    <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>
-                      {item.kinerja?.poskamlingLokasi ? `Lokasi: ${item.kinerja.poskamlingLokasi}. ` : ''}
-                      {item.kinerja?.poskamlingPetugas ? `Petugas: ${item.kinerja.poskamlingPetugas}. ` : ''}
-                      {item.kinerja?.poskamlingKeterangan || 'Patroli siskamling lingkungan kondusif dan aman'}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>6</td>
-                    <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Kegiatan Kebersihan & Lainnya</td>
+                    <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Kegiatan Lapangan Lainnya</td>
                     <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>Terlaksana</td>
                     <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.kegiatanLainnya || '-'}</td>
                   </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>6</td>
+                    <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Pemantauan Kondisi Infrastruktur Wilayah</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
+                      {item.kinerja?.infrastrukturSubjek ? 'Terpantau' : 'Nihil'}
+                    </td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 6px', fontSize: '7.5pt' }}>
+                      {item.kinerja?.infrastrukturSubjek ? (
+                        <div>
+                          <div><strong>1. Subjek:</strong> {item.kinerja.infrastrukturSubjek}</div>
+                          <div><strong>2. Lokasi:</strong> {item.kinerja.infrastrukturLokasi || '-'}</div>
+                          {item.kinerja.infrastrukturTitikKoordinat && (
+                            <div><strong>3. Titik Koordinat:</strong> {item.kinerja.infrastrukturTitikKoordinat}</div>
+                          )}
+                          <div><strong>4. Tanggal Pelaporan:</strong> {item.kinerja.infrastrukturTanggalPelaporan || item.tanggal || '-'}</div>
+                          <div><strong>5. Pelapor:</strong> {item.kinerja.infrastrukturPelapor || item.namaKepling || '-'}</div>
+                        </div>
+                      ) : (
+                        'Tidak ada temuan kondisi infrastruktur rusak / nihil.'
+                      )}
+                    </td>
+                  </tr>
+                  {item.kinerja?.poskamlingStatus && (
+                    <tr>
+                      <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>7</td>
+                      <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Pos Ronda / SISKAMLING (Tugas Tambahan)</td>
+                      <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
+                        {item.kinerja.poskamlingStatus}
+                      </td>
+                      <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>
+                        {item.kinerja.poskamlingLokasi ? `Lokasi: ${item.kinerja.poskamlingLokasi}. ` : ''}
+                        {item.kinerja.poskamlingPetugas ? `Petugas: ${item.kinerja.poskamlingPetugas}. ` : ''}
+                        {item.kinerja.poskamlingKeterangan || 'Patroli siskamling lingkungan kondusif dan aman'}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2096,99 +2328,126 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     flexWrap: 'wrap',
                     gap: '8px',
                     width: '100%',
+                    boxSizing: 'border-box',
                   }}
                 >
-                  {groupPhotosByActivity(effectivePhotos.slice(0, 6)).map((group) => (
-                    <div
-                      key={group.key}
-                      style={{
-                        flex: groupPhotosByActivity(item.dokumentasiFoto.slice(0, 6)).length === 1 ? '1 1 100%' : '1 1 calc(50% - 6px)',
-                        minWidth: '220px',
-                        marginBottom: '4px',
-                      }}
-                    >
-                      <div style={{ fontSize: '7.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#1e293b', borderBottom: '1px solid #cbd5e1', paddingBottom: '2px' }}>
-                        • {group.title} ({group.photos.length} Foto)
-                      </div>
+                  {groupPhotosByActivity(effectivePhotos.slice(0, 6)).map((group, groupIdx, allGroups) => {
+                    const isFullWidthGroup = allGroups.length === 1 || (allGroups.length % 2 !== 0 && groupIdx === allGroups.length - 1);
+                    const isHalfWidth = !isFullWidthGroup;
+
+                    let gridCols = 'repeat(3, 1fr)';
+                    if (isHalfWidth) {
+                      if (group.photos.length === 1) gridCols = 'repeat(1, 1fr)';
+                      else if (group.photos.length === 2) gridCols = 'repeat(2, 1fr)';
+                      else gridCols = 'repeat(3, 1fr)';
+                    } else {
+                      if (group.photos.length === 1) gridCols = 'repeat(1, minmax(0, 260px))';
+                      else if (group.photos.length === 2) gridCols = 'repeat(2, 1fr)';
+                      else if (group.photos.length === 3) gridCols = 'repeat(3, 1fr)';
+                      else if (group.photos.length === 4) gridCols = 'repeat(4, 1fr)';
+                      else gridCols = 'repeat(3, 1fr)';
+                    }
+
+                    return (
                       <div
+                        key={group.key}
                         style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: '6px',
+                          flex: isFullWidthGroup ? '0 0 100%' : '0 0 calc(50% - 4px)',
+                          maxWidth: isFullWidthGroup ? '100%' : 'calc(50% - 4px)',
+                          width: isFullWidthGroup ? '100%' : 'calc(50% - 4px)',
+                          boxSizing: 'border-box',
+                          marginBottom: '4px',
                         }}
                       >
-                        {group.photos.map((foto, idx) => (
-                          <div
-                            key={foto.id || idx}
-                            className="rounded border border-slate-300 p-1.5 bg-white flex flex-col items-center avoid-break"
-                            style={{
-                              flex: group.photos.length === 1 ? '1 1 100%' : '1 1 calc(50% - 4px)',
-                              minWidth: '130px',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '6px',
-                              padding: '4px',
-                              backgroundColor: '#ffffff',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              pageBreakInside: 'avoid',
-                              breakInside: 'avoid',
-                            }}
-                          >
+                        <div style={{ fontSize: '7.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '3px', color: '#1e293b', borderBottom: '1px solid #cbd5e1', paddingBottom: '2px' }}>
+                          • {group.title} ({group.photos.length} Foto)
+                        </div>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: gridCols,
+                            gap: '6px',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {group.photos.map((foto, idx) => (
                             <div
+                              key={foto.id || idx}
+                              className="rounded border border-slate-300 bg-white flex flex-col items-center avoid-break"
                               style={{
                                 width: '100%',
-                                height: '115px',
-                                minHeight: '115px',
-                                borderRadius: '4px',
-                                backgroundColor: '#f8fafc',
+                                boxSizing: 'border-box',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '6px',
+                                padding: '3px',
+                                backgroundColor: '#ffffff',
                                 display: 'flex',
+                                flexDirection: 'column',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '2px',
-                                border: '1px solid #e2e8f0',
+                                pageBreakInside: 'avoid',
+                                breakInside: 'avoid',
                               }}
                             >
-                              <img
-                                src={foto.url}
-                                alt={getProperFotoLabel(foto, idx)}
-                                crossOrigin="anonymous"
+                              <div
                                 style={{
-                                  maxWidth: '100%',
+                                  width: '100%',
+                                  height: '110px',
+                                  minHeight: '110px',
                                   maxHeight: '110px',
-                                  width: 'auto',
-                                  height: 'auto',
-                                  objectFit: 'contain',
-                                  display: 'block',
-                                  margin: '0 auto',
+                                  borderRadius: '4px',
+                                  backgroundColor: '#f8fafc',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '2px',
+                                  border: '1px solid #e2e8f0',
+                                  overflow: 'hidden',
+                                  boxSizing: 'border-box',
                                 }}
-                              />
+                              >
+                                <img
+                                  src={foto.url}
+                                  alt={getProperFotoLabel(foto, idx)}
+                                  crossOrigin="anonymous"
+                                  style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '106px',
+                                    width: 'auto',
+                                    height: 'auto',
+                                    objectFit: 'contain',
+                                    display: 'block',
+                                    margin: '0 auto',
+                                  }}
+                                />
+                              </div>
+                              <div
+                                className="text-[7pt] text-slate-800 font-bold mt-1 truncate w-full text-center font-sans"
+                                style={{
+                                  fontSize: '7pt',
+                                  fontWeight: 'bold',
+                                  color: '#1e293b',
+                                  marginTop: '2px',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'nowrap',
+                                  textOverflow: 'ellipsis',
+                                  width: '100%',
+                                  textAlign: 'center',
+                                  fontFamily: 'sans-serif',
+                                  boxSizing: 'border-box',
+                                }}
+                                title={getProperFotoLabel(foto, idx)}
+                              >
+                                {getProperFotoLabel(foto, idx)}
+                              </div>
                             </div>
-                            <div
-                              className="text-[7.5pt] text-slate-800 font-bold mt-1 truncate w-full text-center font-sans"
-                              style={{
-                                fontSize: '7.5pt',
-                                fontWeight: 'bold',
-                                color: '#1e293b',
-                                marginTop: '3px',
-                                overflow: 'hidden',
-                                whiteSpace: 'nowrap',
-                                textOverflow: 'ellipsis',
-                                width: '100%',
-                                textAlign: 'center',
-                                fontFamily: 'sans-serif',
-                              }}
-                              title={getProperFotoLabel(foto, idx)}
-                            >
-                              {getProperFotoLabel(foto, idx)}
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-                {item.dokumentasiFoto.length > 6 && (
+                {effectivePhotos.length > 6 && (
                   <div style={{ fontSize: '7.5pt', color: '#64748b', fontStyle: 'italic', marginTop: '4px' }}>
                     * 6 Foto dokumentasi utama dicantumkan pada Halaman 1, sisa foto lainnya tercantum lengkap pada Lembar Lampiran (Halaman 2).
                   </div>

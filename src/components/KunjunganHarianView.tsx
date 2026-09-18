@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { printOfficialDocument } from '../utils/printHelper';
 import {
   Users,
   Calendar,
@@ -46,7 +47,14 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const [records, setRecords] = useState<KunjunganWargaData[]>(() =>
     safeGetLocalStorage<KunjunganWargaData[]>(STORAGE_CACHE_KEY, [])
   );
+  const [dateFilterMode, setDateFilterMode] = useState<'SINGLE' | 'RANGE' | 'ALL'>('SINGLE');
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [startDate, setStartDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState<string>(todayStr);
   const [selectedLingkungan, setSelectedLingkungan] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showAddForm, setShowAddForm] = useState<boolean>(true);
@@ -54,6 +62,24 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false);
   const [isSharingExcel, setIsSharingExcel] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Label tampilan tanggal/periode terpilih untuk Laporan/WA/Print/Excel
+  const dateDisplayLabel = useMemo(() => {
+    if (dateFilterMode === 'SINGLE') {
+      return selectedDate ? selectedDate : 'Semua Tanggal';
+    } else if (dateFilterMode === 'RANGE') {
+      if (startDate && endDate) {
+        return `${startDate} s/d ${endDate}`;
+      } else if (startDate) {
+        return `Mulai ${startDate}`;
+      } else if (endDate) {
+        return `Sampai ${endDate}`;
+      }
+      return 'Sebagian Tanggal';
+    } else {
+      return 'Semua Tanggal (Keseluruhan)';
+    }
+  }, [dateFilterMode, selectedDate, startDate, endDate]);
 
   // View mode for mobile (cards vs table)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
@@ -120,7 +146,21 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const filtered = useMemo(() => {
     const qLower = searchQuery.toLowerCase().trim();
     return records.filter((r) => {
-      const isDate = !selectedDate || r.tanggal === selectedDate;
+      let isDate = true;
+      if (dateFilterMode === 'SINGLE') {
+        isDate = !selectedDate || r.tanggal === selectedDate;
+      } else if (dateFilterMode === 'RANGE') {
+        if (startDate && endDate) {
+          isDate = r.tanggal >= startDate && r.tanggal <= endDate;
+        } else if (startDate) {
+          isDate = r.tanggal >= startDate;
+        } else if (endDate) {
+          isDate = r.tanggal <= endDate;
+        }
+      } else if (dateFilterMode === 'ALL') {
+        isDate = true;
+      }
+
       const isLingkungan =
         selectedLingkungan === 'ALL' ||
         r.lingkunganNomor === Number(selectedLingkungan) ||
@@ -134,7 +174,17 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         r.namaKepling.toLowerCase().includes(qLower);
       return isDate && isLingkungan && isRole && isSearch;
     });
-  }, [records, selectedDate, selectedLingkungan, searchQuery, isAdmin, currentUser.id]);
+  }, [
+    records,
+    dateFilterMode,
+    selectedDate,
+    startDate,
+    endDate,
+    selectedLingkungan,
+    searchQuery,
+    isAdmin,
+    currentUser.id,
+  ]);
 
   const photosCount = useMemo(
     () => filtered.filter((r) => Boolean(r.fotoDokumentasi)).length,
@@ -144,12 +194,13 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const handleCopyWA = () => {
     let text = `*REKAP KUNJUNGAN HARIAN DOOR-TO-DOOR*\n`;
     text += `*KELURAHAN MANGGA, KEC. MEDAN TUNTUNGAN*\n`;
-    text += `Hari/Tanggal: ${selectedDate || 'Semua Tanggal'}\n`;
+    text += `Periode / Tanggal: ${dateDisplayLabel}\n`;
     text += `Total Kunjungan: ${filtered.length} Rumah\n\n`;
     text += `----------------------------------------\n`;
 
     filtered.forEach((item, index) => {
       text += `${index + 1}. *${item.namaWarga}*\n`;
+      text += `   - Tanggal: ${item.tanggal}\n`;
       text += `   - Alamat: ${item.alamat} (${item.lingkungan})\n`;
       text += `   - Kepling: ${item.namaKepling}\n`;
       text += `   - Keterangan: ${item.keterangan}\n\n`;
@@ -186,7 +237,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
 
     if (
       !window.confirm(
-        `Unduh seluruh ${itemsWithPhotos.length} foto kunjungan warga pada tanggal ${selectedDate}?`
+        `Unduh seluruh ${itemsWithPhotos.length} foto kunjungan warga (${dateDisplayLabel})?`
       )
     ) {
       return;
@@ -221,7 +272,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     }
     setIsExportingExcel(true);
     try {
-      await exportKunjunganWargaToExcel(filtered, selectedDate, false);
+      await exportKunjunganWargaToExcel(filtered, dateDisplayLabel, false);
       showToast('File Excel kunjungan warga berhasil diunduh.');
     } catch (e) {
       console.error(e);
@@ -239,7 +290,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     }
     setIsSharingExcel(true);
     try {
-      const result = await exportKunjunganWargaToExcel(filtered, selectedDate, true);
+      const result = await exportKunjunganWargaToExcel(filtered, dateDisplayLabel, true);
       if (result.method === 'share' && result.success) {
         showToast('Berhasil membuka menu share ke WhatsApp / Aplikasi HP!');
       } else {
@@ -254,7 +305,28 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   };
 
   return (
-    <div className="space-y-5">
+    <div id="lembar-cetak-kunjungan-harian" className="space-y-5">
+      {/* Kop Surat Resmi Pemko Medan (Hanya Tampak Saat Cetak PDF/Printer) */}
+      <div className="hidden print:block border-b-2 border-black pb-3 mb-4 text-center">
+        <div className="flex items-center justify-between">
+          <img src="/logo_pemko_medan.svg" alt="Logo Pemko Medan" className="w-16 h-16 object-contain" />
+          <div className="text-center flex-1 px-4">
+            <h3 className="font-extrabold text-sm uppercase tracking-wide">PEMERINTAH KOTA MEDAN</h3>
+            <h2 className="font-black text-base uppercase tracking-wider">KECAMATAN MEDAN TUNTUNGAN</h2>
+            <h1 className="font-black text-lg uppercase tracking-wider">KELURAHAN MANGGA</h1>
+            <p className="text-[10px] font-medium text-slate-700">Jl. Keuangan No. 1, Medan Tuntungan, Kota Medan, Sumatera Utara</p>
+          </div>
+          <div className="w-16 h-16" />
+        </div>
+        <div className="mt-2 pt-1 border-t border-black text-center">
+          <h4 className="font-black text-sm uppercase tracking-wider text-slate-900">
+            BUKU REKAPITULASI KUNJUNGAN HARIAN LAPANGAN (DOOR-TO-DOOR)
+          </h4>
+          <p className="text-xs font-bold text-slate-700">
+            Periode / Tanggal: {dateDisplayLabel} • Total: {filtered.length} Kunjungan
+          </p>
+        </div>
+      </div>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 border border-slate-700 animate-in fade-in slide-in-from-bottom-2">
@@ -312,15 +384,58 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         {/* Row 1: Filters */}
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            {/* Tanggal Picker */}
-            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 flex-1 sm:flex-initial">
-              <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer w-full sm:w-auto text-xs"
-              />
+            {/* Opsi Filter Tanggal */}
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 flex-1 sm:flex-initial">
+              <div className="flex items-center gap-1 px-1.5 py-0.5">
+                <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
+                <select
+                  value={dateFilterMode}
+                  onChange={(e) => setDateFilterMode(e.target.value as 'SINGLE' | 'RANGE' | 'ALL')}
+                  className="bg-transparent font-extrabold text-slate-800 focus:outline-none cursor-pointer text-xs pr-1"
+                >
+                  <option value="SINGLE">Tanggal Tertentu</option>
+                  <option value="RANGE">Rentang / Sebagian Tanggal</option>
+                  <option value="ALL">Semua Tanggal</option>
+                </select>
+              </div>
+
+              {/* Dynamic Inputs Based on Date Mode */}
+              {dateFilterMode === 'SINGLE' && (
+                <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="bg-transparent font-extrabold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  />
+                </div>
+              )}
+
+              {dateFilterMode === 'RANGE' && (
+                <div className="flex flex-wrap items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                  <span className="text-[10px] text-slate-500 font-semibold">Dari:</span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  />
+                  <span className="text-[10px] text-slate-400 font-extrabold">s/d</span>
+                  <span className="text-[10px] text-slate-500 font-semibold">Sampai:</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  />
+                </div>
+              )}
+
+              {dateFilterMode === 'ALL' && (
+                <div className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-lg text-[11px] font-extrabold">
+                  Semua Data
+                </div>
+              )}
             </div>
 
             {/* Filter Lingkungan (Super Admin & Kasi) */}
@@ -328,7 +443,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               <select
                 value={selectedLingkungan}
                 onChange={(e) => setSelectedLingkungan(e.target.value)}
-                className="bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 focus:outline-none flex-1 sm:flex-initial"
+                className="bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 focus:outline-none flex-1 sm:flex-initial"
               >
                 <option value="ALL">Semua 24 Lingkungan</option>
                 {KEPLING_ACCOUNTS.map((k) => (
@@ -340,7 +455,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
             )}
 
             {/* Search Input */}
-            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 text-xs w-full sm:w-48 lg:w-60">
+            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-200 text-xs w-full sm:w-48 lg:w-56">
               <Search className="w-4 h-4 text-slate-400 shrink-0" />
               <input
                 type="text"
@@ -444,7 +559,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
             {/* Cetak Tabel */}
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => printOfficialDocument('lembar-cetak-kunjungan-harian', `REKAP_KUNJUNGAN_HARIAN_${dateDisplayLabel.replace(/[/\\?%*:|"<> ]/g, '_')}`)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-xs cursor-pointer"
               title="Cetak tabel kunjungan ke PDF atau printer fisik"
             >
@@ -461,7 +576,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         <div className="space-y-3">
           {filtered.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 font-medium">
-              Belum ada catatan kunjungan pada tanggal {selectedDate}. Gunakan formulir di atas untuk menambahkan.
+              Belum ada catatan kunjungan pada {dateDisplayLabel}. Gunakan formulir di atas untuk menambahkan.
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -575,7 +690,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-10 text-center text-slate-400 font-medium">
-                      Belum ada catatan kunjungan pada tanggal {selectedDate}. Gunakan formulir di atas untuk menambahkan.
+                      Belum ada catatan kunjungan pada {dateDisplayLabel}. Gunakan formulir di atas untuk menambahkan.
                     </td>
                   </tr>
                 ) : (

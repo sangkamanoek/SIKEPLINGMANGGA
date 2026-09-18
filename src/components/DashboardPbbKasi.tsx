@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { printOfficialDocument } from '../utils/printHelper';
 import {
   Landmark,
   Calendar,
@@ -322,11 +323,11 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   };
 
   const handlePrint = () => {
-    window.print();
+    printOfficialDocument('lembar-cetak-rekap-pbb', `REKAP_PBB_KELURAHAN_MANGGA_${new Date().toISOString().split('T')[0]}`);
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div id="lembar-cetak-rekap-pbb" className="space-y-6 pb-12">
       {/* Header Banner Khusus Seksi Pemerintahan */}
       <div className="bg-linear-to-r from-emerald-800 via-teal-800 to-emerald-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
@@ -369,14 +370,14 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
 
         {/* Sub-view Navigation Tabs */}
         <div className="mt-6 pt-5 border-t border-emerald-700/60 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 bg-emerald-950/60 p-1 rounded-xl border border-emerald-700/60">
+          <div className="flex items-center gap-1.5 bg-emerald-950/80 p-1.5 rounded-xl border border-emerald-700/60">
             <button
               type="button"
               onClick={() => setSubView('pbb')}
               className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
                 subView === 'pbb'
-                  ? 'bg-emerald-400 text-slate-950 shadow-xs'
-                  : 'text-emerald-200 hover:text-white'
+                  ? 'bg-white text-emerald-950 shadow-md'
+                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
               }`}
             >
               <Landmark className="w-4 h-4" />
@@ -388,8 +389,8 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
               onClick={() => setSubView('ikd')}
               className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
                 subView === 'ikd'
-                  ? 'bg-emerald-400 text-slate-950 shadow-xs'
-                  : 'text-emerald-200 hover:text-white'
+                  ? 'bg-white text-emerald-950 shadow-md'
+                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
               }`}
             >
               <Smartphone className="w-4 h-4" />
@@ -401,8 +402,8 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
               onClick={() => setSubView('presensi_apel')}
               className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
                 subView === 'presensi_apel'
-                  ? 'bg-emerald-400 text-slate-950 shadow-xs'
-                  : 'text-emerald-200 hover:text-white'
+                  ? 'bg-white text-emerald-950 shadow-md'
+                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
               }`}
             >
               <UserCheck className="w-4 h-4" />
@@ -412,12 +413,14 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
 
           {(subView === 'pbb' || subView === 'ikd') && (
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1.5 bg-emerald-950/40 p-1 rounded-xl border border-emerald-700/50 text-xs">
+              <div className="flex items-center gap-1 bg-emerald-950/80 p-1 rounded-xl border border-emerald-700/60 text-xs">
                 <button
                   type="button"
                   onClick={() => setPeriod('all')}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                    period === 'all' ? 'bg-emerald-500 text-white font-black' : 'text-emerald-200 hover:text-white'
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                    period === 'all'
+                      ? 'bg-white text-emerald-950 shadow-xs'
+                      : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
                   }`}
                 >
                   Semua Waktu
@@ -425,8 +428,10 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
                 <button
                   type="button"
                   onClick={() => setPeriod('today')}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                    period === 'today' ? 'bg-emerald-500 text-white font-black' : 'text-emerald-200 hover:text-white'
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                    period === 'today'
+                      ? 'bg-white text-emerald-950 shadow-xs'
+                      : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
                   }`}
                 >
                   Hari Ini
@@ -434,8 +439,10 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
                 <button
                   type="button"
                   onClick={() => setPeriod('7days')}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                    period === '7days' ? 'bg-emerald-500 text-white font-black' : 'text-emerald-200 hover:text-white'
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                    period === '7days'
+                      ? 'bg-white text-emerald-950 shadow-xs'
+                      : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
                   }`}
                 >
                   7 Hari
@@ -443,8 +450,10 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
                 <button
                   type="button"
                   onClick={() => setPeriod('month')}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                    period === 'month' ? 'bg-emerald-500 text-white font-black' : 'text-emerald-200 hover:text-white'
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                    period === 'month'
+                      ? 'bg-white text-emerald-950 shadow-xs'
+                      : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
                   }`}
                 >
                   Bulan Ini

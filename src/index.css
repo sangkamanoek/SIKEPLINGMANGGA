@@ -3,7 +3,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 6mm 8mm 6mm 8mm;
+    margin: 6mm 6mm 6mm 6mm;
   }
 
   html, body {
@@ -18,13 +18,26 @@
     print-color-adjust: exact !important;
   }
 
-  /* Hilangkan backdrop gelap modal dan scrollbar saat cetak */
-  .fixed.inset-0 {
+  /* 1. KETIKA MODE CETAK RESMI AKTIF: SEMBUNYIKAN SELURUH ELEMEN APLIKASI DI LUAR PRINT PORTAL */
+  body[data-print-mode="true"] #root,
+  body[data-print-mode="true"] > *:not(#print-portal-container) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body[data-print-mode="true"] #print-portal-container {
+    display: block !important;
+    visibility: visible !important;
     position: static !important;
-    background: transparent !important;
+    width: 100% !important;
+    max-width: 198mm !important;
+    margin: 0 auto !important;
     padding: 0 !important;
-    margin: 0 !important;
-    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
   }
 
   /* Hilangkan efek blur, shadow, background yang tidak diinginkan */
@@ -45,33 +58,74 @@
   button,
   input,
   textarea,
-  select {
+  select,
+  .modal-backdrop {
     display: none !important;
   }
 
-  /* Tampilkan lembar cetak */
+  /* Tampilkan lembar cetak standar jika dipanggil langsung */
   #lembar-cetak-laporan-kepling,
+  #lembar-cetak-rekap-absensi,
+  #lembar-cetak-rekap-pbb,
+  #lembar-cetak-rekap-perlinsos,
+  #lembar-cetak-rekap-trantibum,
+  #lembar-cetak-kunjungan-harian,
+  #lembar-cetak-rekap-capaian,
   .print\:block {
     display: block !important;
     visibility: visible !important;
     width: 100% !important;
-    max-width: 195mm !important;
+    max-width: 198mm !important;
     margin: 0 auto !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
   }
 
-  /* Kontainer wajib pas 1 lembar kertas A4 (tinggi maks ~275mm) */
+  /* Hilangkan overflow clipping pada semua kontainer pembungkus tabel saat dicetak */
+  .overflow-x-auto,
+  .overflow-hidden,
+  .overflow-x-scroll,
+  div {
+    overflow: visible !important;
+    max-width: 100% !important;
+  }
+
+  /* Optimasi Tabel Cetak A4: Mencegah Terpotong dan Menyesuaikan Ukuran Kolom Secara Otomatis */
+  table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: auto !important;
+    font-size: 7.5pt !important;
+    line-height: 1.15 !important;
+    border-collapse: collapse !important;
+  }
+
+  th, td {
+    padding: 2.5px 3.5px !important;
+    font-size: 7.5pt !important;
+    word-wrap: break-word !important;
+    word-break: normal !important;
+    white-space: normal !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Sesuaikan Lencana / Badge Status di dalam Tabel Cetak */
+  td span, th span, .inline-block, .rounded, .rounded-full, .rounded-md, .rounded-lg {
+    white-space: normal !important;
+    max-width: 100% !important;
+    word-break: break-word !important;
+    display: inline-block !important;
+    font-size: 7pt !important;
+    padding: 1px 3px !important;
+    line-height: 1.1 !important;
+  }
+
+  /* Kontainer wajib pas lembar kertas A4 */
   .page-print-single {
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
-    max-height: 275mm !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-    page-break-after: avoid !important;
-    page-break-before: avoid !important;
     box-sizing: border-box !important;
   }
 
@@ -79,6 +133,11 @@
   table, tr, td, th, .avoid-break {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+
+  .page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
   }
 
   .print-table {
@@ -89,6 +148,7 @@
   .print-table th,
   .print-table td {
     border: 1px solid #000000 !important;
-    padding: 3px 6px !important;
+    padding: 3px 5px !important;
   }
 }
+
