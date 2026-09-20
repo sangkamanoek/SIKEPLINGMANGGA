@@ -95,6 +95,15 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
   let totalWp = 0;
   let totalWpLunas = 0;
 
+  // Pre-calculate sample counts per lingkungan to detect "extra" WP added by user
+  const sampleCountsByLk: Record<number, number> = {};
+  const sampleNominalsByLk: Record<number, number> = {};
+  
+  SAMPLE_SPPT_ITEMS.forEach(item => {
+    sampleCountsByLk[item.lingkungan] = (sampleCountsByLk[item.lingkungan] || 0) + 1;
+    sampleNominalsByLk[item.lingkungan] = (sampleNominalsByLk[item.lingkungan] || 0) + (Number(item.pbbTerutang) || 0);
+  });
+
   for (let n = 1; n <= 24; n++) {
     const base = INITIAL_PBB_SUMMARY[n] || {
       targetNominal: 300000000,
@@ -107,10 +116,20 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
     const spptLunas = spptLingkungan.filter((s) => s.status === 'Sudah Bayar');
 
     const sampleNominalLunas = spptLunas.reduce((acc, curr) => acc + (Number(curr.pbbTerutang) || 0), 0);
-    const sampleNominalTotal = spptLingkungan.reduce((acc, curr) => acc + (Number(curr.pbbTerutang) || 0), 0);
+    const currentNominalTotal = spptLingkungan.reduce((acc, curr) => acc + (Number(curr.pbbTerutang) || 0), 0);
 
-    const lkTargetNominal = base.targetNominal > 0 ? base.targetNominal : (sampleNominalTotal || 100000000);
-    const lkTotalWp = base.totalWp > 0 ? base.totalWp : spptLingkungan.length;
+    // Logic: 
+    // Total WP = Official Target + (Actual records in DB - Sample records in DB)
+    // This way, if they add a new WP, the total increases.
+    const lkSampleCount = sampleCountsByLk[n] || 0;
+    const lkExtraWp = Math.max(0, spptLingkungan.length - lkSampleCount);
+    const lkTotalWp = base.totalWp + lkExtraWp;
+
+    // Target Nominal = Official Target + (Actual nominal in DB - Sample nominal in DB)
+    const lkSampleNominal = sampleNominalsByLk[n] || 0;
+    const lkExtraNominal = Math.max(0, currentNominalTotal - lkSampleNominal);
+    const lkTargetNominal = base.targetNominal + lkExtraNominal;
+
     const lkWpLunas = spptLunas.length;
     const lkRealisasiNominal = sampleNominalLunas;
     const lkSisaNominal = Math.max(0, lkTargetNominal - lkRealisasiNominal);
@@ -292,4 +311,43 @@ export function subscribePbbSpptFromFirestore(
       console.warn(`Firestore PBB onSnapshot notice for ${year}:`, err);
     }
   );
+}
+
+/**
+ * Format raw NOP digits (up to 18 digits) into XX.XX.XXX.XXX.XXX-XXXX.X dynamically as-you-type
+ */
+export function formatNop(nop: string): string {
+  if (!nop) return '';
+  const digits = nop.replace(/[^0-9]/g, '').substring(0, 18);
+  let res = '';
+  if (digits.length > 0) {
+    res += digits.substring(0, 2);
+  }
+  if (digits.length > 2) {
+    res += '.' + digits.substring(2, 4);
+  }
+  if (digits.length > 4) {
+    res += '.' + digits.substring(4, 7);
+  }
+  if (digits.length > 7) {
+    res += '.' + digits.substring(7, 10);
+  }
+  if (digits.length > 10) {
+    res += '.' + digits.substring(10, 13);
+  }
+  if (digits.length > 13) {
+    res += '-' + digits.substring(13, 17);
+  }
+  if (digits.length > 17) {
+    res += '.' + digits.substring(17, 18);
+  }
+  return res;
+}
+
+/**
+ * Remove dots and hyphens from NOP for comparison
+ */
+export function stripNonDigits(val: string): string {
+  if (!val) return '';
+  return val.replace(/[^0-9]/g, '');
 }

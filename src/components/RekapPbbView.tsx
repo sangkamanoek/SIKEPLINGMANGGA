@@ -45,6 +45,8 @@ import {
   deletePbbSpptFromFirestore,
   subscribePbbSpptFromFirestore,
   fetchPbbSpptFromFirestore,
+  formatNop,
+  stripNonDigits,
 } from '../lib/pbbService';
 
 interface RekapPbbViewProps {
@@ -230,9 +232,10 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
     if (editingWpItem) {
       // Update Existing Item
+      const formattedNop = formatNop(formNop.trim());
       const updatedItem: SpptPbbItem = {
         ...editingWpItem,
-        nop: formNop.trim(),
+        nop: formattedNop,
         namaWp: formNamaWp.trim().toUpperCase(),
         alamatOp: formAlamatOp.trim().toUpperCase() || 'KELURAHAN MANGGA',
         buku: formBuku,
@@ -248,10 +251,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       notify(`Data WP "${formNamaWp.trim().toUpperCase()}" berhasil diperbarui dan tersimpan ke Firebase!`, 'success');
     } else {
       // Create New Item
+      const formattedNop = formatNop(formNop.trim());
       const newWp: SpptPbbItem = {
         id: `wp_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         no: spptList.length + 1,
-        nop: formNop.trim(),
+        nop: formattedNop,
         namaWp: formNamaWp.trim().toUpperCase(),
         alamatOp: formAlamatOp.trim().toUpperCase() || 'KELURAHAN MANGGA',
         buku: formBuku,
@@ -421,8 +425,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       // Search query
       if (searchQuery.trim() !== '') {
         const q = searchQuery.toLowerCase();
+        const cleanQ = stripNonDigits(q);
         const matchNama = item.namaWp.toLowerCase().includes(q);
-        const matchNop = item.nop.toLowerCase().includes(q);
+        const cleanNop = stripNonDigits(item.nop);
+        
+        const matchNop = cleanQ && cleanNop.includes(cleanQ) || item.nop.toLowerCase().includes(q);
         const matchAlamat = item.alamatOp.toLowerCase().includes(q);
         if (!matchNama && !matchNop && !matchAlamat) return false;
       }
@@ -1161,8 +1168,9 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   <input
                     type="text"
                     required
+                    maxLength={24}
                     value={formNop}
-                    onChange={(e) => setFormNop(e.target.value)}
+                    onChange={(e) => setFormNop(formatNop(e.target.value))}
                     placeholder="Contoh: 12.75.010.009.005-0012.0"
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />

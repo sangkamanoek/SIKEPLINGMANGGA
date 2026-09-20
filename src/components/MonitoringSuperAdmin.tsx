@@ -220,23 +220,22 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
   // Extract all distinct dates available in reports, with report counts
   const availableDates = useMemo(() => {
     if (!reports || reports.length === 0) return [];
-    const map = new Map<string, { count: number; dateStr: string; hari: string }>();
+    const dateCounts: Record<string, { count: number; dateStr: string; hari: string }> = {};
     reports.forEach((r) => {
       const iso = getReportIsoDate(r);
       if (iso) {
-        const existing = map.get(iso);
-        if (existing) {
-          existing.count++;
+        if (dateCounts[iso]) {
+          dateCounts[iso].count++;
         } else {
-          map.set(iso, {
+          dateCounts[iso] = {
             count: 1,
             dateStr: r.tanggal || iso,
             hari: r.hari || '',
-          });
+          };
         }
       }
     });
-    return Array.from(map.entries())
+    return Object.entries(dateCounts)
       .map(([iso, data]) => ({
         iso,
         count: data.count,
