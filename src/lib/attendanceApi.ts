@@ -1,4 +1,4 @@
-import { AbsenApelItem, StatusAbsenApel, UserAccount } from '../types';
+import { AbsenApelItem, StatusAbsenApel, UserAccount, CustomEvent, EventAttendance } from '../types';
 import { safeSetLocalStorage } from './safeStorage';
 import {
   fetchAttendanceFromFirestore,
@@ -325,7 +325,9 @@ export interface AbsentDaysResult {
 export function calculateAbsentDays(
   attendanceList: AbsenApelItem[],
   accountId: string,
-  referenceDateStr?: string
+  referenceDateStr?: string,
+  eventList?: CustomEvent[],
+  eventAttendanceList?: EventAttendance[]
 ): AbsentDaysResult {
   const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
   const timeStat = checkApelTimeStatus();
@@ -354,9 +356,20 @@ export function calculateAbsentDays(
       const rec = attendanceList.find((a) => a.accountId === accountId && a.tanggal === dateStr);
       const isToday = dateStr === todayStr;
 
+      // Check if there's a required event today
+      const hasRequiredEvent = eventList && eventAttendanceList && eventList.some(e => e.date === dateStr && e.required);
+      const attendedEvent = hasRequiredEvent && eventAttendanceList!.some(att => 
+        att.accountId === accountId && 
+        eventList!.some(e => e.id === att.eventId && e.date === dateStr) && 
+        att.status !== 'Tidak Hadir'
+      );
+
       let isAbsent = false;
 
-      if (rec) {
+      if (attendedEvent) {
+        // If attended required event, not absent
+        isAbsent = false;
+      } else if (rec) {
         if (rec.status === 'Tidak Mengikuti Apel') {
           isAbsent = true;
         } else {

@@ -203,7 +203,9 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       text += `   - Tanggal: ${item.tanggal}\n`;
       text += `   - Alamat: ${item.alamat} (${item.lingkungan})\n`;
       text += `   - Kepling: ${item.namaKepling}\n`;
-      text += `   - Keterangan: ${item.keterangan}\n\n`;
+      text += `   - Perlinsos: ${item.perlinsos}\n`;
+      text += `   - IKD: ${item.ikd}\n`;
+      text += `   - Pembayaran PBB: ${item.pbb}\n\n`;
     });
 
     navigator.clipboard.writeText(text);
@@ -681,7 +683,9 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                   <th className="py-3 px-3">NAMA WARGA</th>
                   <th className="py-3 px-3">ALAMAT LENGKAP</th>
                   <th className="py-3 px-3 text-center">LINGKUNGAN</th>
-                  <th className="py-3 px-3 text-center">KETERANGAN</th>
+                  <th className="py-3 px-3 text-center">PERLINSOS</th>
+                  <th className="py-3 px-3 text-center">IKD</th>
+                  <th className="py-3 px-3 text-center">PBB</th>
                   <th className="py-3 px-3 text-center">DOKUMENTASI FOTO</th>
                   <th className="py-3 px-3 text-center">AKSI</th>
                 </tr>
@@ -711,18 +715,18 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                         <div className="text-[10px] text-slate-400 font-normal">{item.namaKepling}</div>
                       </td>
                       <td className="py-3 px-3 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase whitespace-nowrap ${
-                            item.keterangan === 'Sudah'
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                              : item.keterangan === 'Belum'
-                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                              : item.keterangan === 'Menolak'
-                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                              : 'bg-amber-100 text-amber-800 border border-amber-200'
-                          }`}
-                        >
-                          {item.keterangan}
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase whitespace-nowrap ${item.perlinsos === 'Sudah' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                          {item.perlinsos}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase whitespace-nowrap ${item.ikd === 'Sudah' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                          {item.ikd}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase whitespace-nowrap ${item.pbb === 'Sudah' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                          {item.pbb}
                         </span>
                       </td>
                       <td className="py-3 px-3 text-center">
@@ -832,8 +836,16 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                   <span className="font-bold text-slate-900">{previewPhotoItem.namaKepling}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Status Kunjungan:</span>
-                  <span className="font-bold text-emerald-700">{previewPhotoItem.keterangan}</span>
+                  <span className="text-slate-500">Perlinsos:</span>
+                  <span className={`font-bold ${previewPhotoItem.perlinsos === 'Sudah' ? 'text-emerald-700' : 'text-rose-700'}`}>{previewPhotoItem.perlinsos}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">IKD:</span>
+                  <span className={`font-bold ${previewPhotoItem.ikd === 'Sudah' ? 'text-emerald-700' : 'text-rose-700'}`}>{previewPhotoItem.ikd}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">PBB:</span>
+                  <span className={`font-bold ${previewPhotoItem.pbb === 'Sudah' ? 'text-emerald-700' : 'text-rose-700'}`}>{previewPhotoItem.pbb}</span>
                 </div>
               </div>
 

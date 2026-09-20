@@ -46,10 +46,13 @@ import { PWAInstallModal } from './components/PWAInstallModal';
 import { PanduanPPTModal } from './components/PanduanPPTModal';
 import { AbsenKegiatanKhusus } from './components/AbsenKegiatanKhusus';
 import { SmartHubDashboard } from './components/SmartHubDashboard';
+import { RekapPbbView } from './components/RekapPbbView';
+import { PemetaanWilayahView } from './components/PemetaanWilayahView';
 import { LoginPage } from './components/LoginPage';
 import { UbahPasswordModal } from './components/UbahPasswordModal';
 import { EditProfileModal } from './components/EditProfileModal';
 import { AbsenApelModal } from './components/AbsenApelModal';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AbsenApelItem } from './types';
 import { loadAllAttendance } from './lib/attendanceApi';
@@ -132,10 +135,24 @@ export default function App() {
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
 
-  // Active view tab: hub | form | capaian | monitoring | capaian_admin | riwayat | kunjungan | dashboard_kasi | kegiatan_khusus
+  // Active view tab: hub | form | capaian | monitoring | capaian_admin | riwayat | kunjungan | dashboard_kasi | kegiatan_khusus | pemetaan
   const [activeTab, setActiveTab] = useState<
-    'hub' | 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus'
+    'hub' | 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb'
   >('hub');
+
+  // Targeted lingkungan for Pemetaan WebGIS deep-linking
+  const [pemetaanTargetLingkungan, setPemetaanTargetLingkungan] = useState<string | undefined>(undefined);
+
+  const handleNavigateToPemetaan = (lingkunganNomor?: number | string) => {
+    if (lingkunganNomor !== undefined && lingkunganNomor !== null && String(lingkunganNomor).trim() !== '') {
+      const rawStr = String(lingkunganNomor).trim();
+      const idVal = rawStr.startsWith('kepling_') ? rawStr : `kepling_${rawStr}`;
+      setPemetaanTargetLingkungan(idVal);
+    } else {
+      setPemetaanTargetLingkungan(undefined);
+    }
+    setActiveTab('pemetaan');
+  };
 
   // Kasi Dashboard Target Mapping and Pemerintahan date states
   const [targetsMap, setTargetsMap] = useState<TargetsCapaianMap>(getDefaultTargetsCapaianMap);
@@ -636,6 +653,14 @@ export default function App() {
     );
   }
 
+  const todayDateStr = new Date().toISOString().split('T')[0];
+  const hasAbsenToday = attendanceList.some(
+    (a) => a.accountId === activeAccount.id && a.tanggal?.startsWith(todayDateStr)
+  );
+  const hasLaporToday = reports.some(
+    (r) => r.petugasNama === activeAccount.nama && r.tanggalLaporan?.startsWith(todayDateStr)
+  );
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
       {/* Header Banner */}
@@ -712,19 +737,19 @@ export default function App() {
                   </span>
                 </button>
 
-                {/* Kepling Tab 1: Formulir Laporan */}
+                {/* Kepling Tab Khusus: Absen Kegiatan */}
                 <button
-                  id="tab-input-laporan"
+                  id="tab-kegiatan-khusus"
                   type="button"
-                  onClick={() => setActiveTab('form')}
+                  onClick={() => setActiveTab('kegiatan_khusus')}
                   className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                    activeTab === 'form'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
+                    activeTab === 'kegiatan_khusus'
+                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
                       : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                   }`}
                 >
-                  <FileText className="w-4 h-4 text-emerald-700" />
-                  <span>Formulir Laporan</span>
+                  <UserCheck className="w-4 h-4 text-emerald-700" />
+                  <span>Absen Kegiatan Khusus</span>
                 </button>
 
                 {/* Kepling Tab 1b: Kunjungan Harian Warga */}
@@ -742,6 +767,39 @@ export default function App() {
                   <span>Kunjungan Harian</span>
                   <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
                     WARGA
+                  </span>
+                </button>
+
+                {/* Kepling Tab 1: Formulir Laporan */}
+                <button
+                  id="tab-input-laporan"
+                  type="button"
+                  onClick={() => setActiveTab('form')}
+                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === 'form'
+                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
+                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <FileText className="w-4 h-4 text-emerald-700" />
+                  <span>Formulir Laporan</span>
+                </button>
+
+                {/* Kepling Tab 1c: Pemetaan Wilayah WebGIS & WRS */}
+                <button
+                  id="tab-pemetaan-kepling"
+                  type="button"
+                  onClick={() => setActiveTab('pemetaan')}
+                  className={`inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === 'pemetaan'
+                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
+                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <Compass className="w-4 h-4 text-emerald-700" />
+                  <span>Peta &amp; WRS</span>
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-300 text-slate-950">
+                    GIS
                   </span>
                 </button>
 
@@ -763,6 +821,24 @@ export default function App() {
                   </span>
                 </button>
 
+                {/* Kepling Tab 2b: Data PBB Lingkungan */}
+                <button
+                  id="tab-pbb-kepling"
+                  type="button"
+                  onClick={() => setActiveTab('rekap_pbb')}
+                  className={`inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === 'rekap_pbb'
+                      ? 'border-emerald-600 text-emerald-900 bg-emerald-50/70 font-black'
+                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                  <span>PBB Lingkungan {activeAccount.nomorLingkungan || ''}</span>
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                    2026
+                  </span>
+                </button>
+
                 {/* Kepling Tab 3: Riwayat Laporan Saya */}
                 <button
                   id="tab-riwayat-laporan"
@@ -779,20 +855,6 @@ export default function App() {
                 >
                   <History className="w-4 h-4 text-emerald-700" />
                   <span>Riwayat Laporan Saya</span>
-                </button>
-
-                <button
-                  id="tab-kegiatan-khusus"
-                  type="button"
-                  onClick={() => setActiveTab('kegiatan_khusus')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                    activeTab === 'kegiatan_khusus'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <UserCheck className="w-4 h-4 text-emerald-700" />
-                  <span>Absen Kegiatan Khusus</span>
                 </button>
               </>
             ) : (
@@ -834,6 +896,24 @@ export default function App() {
                         : activeAccount.role === 'kasi_pembangunan'
                         ? 'PERLINSOS'
                         : 'TRANTIB'}
+                    </span>
+                  </button>
+                )}
+                {(activeAccount.role === 'kasi_pemerintahan' || activeAccount.role === 'super_admin') && (
+                  <button
+                    id="tab-rekap-pbb-kasi"
+                    type="button"
+                    onClick={() => setActiveTab('rekap_pbb')}
+                    className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                      activeTab === 'rekap_pbb'
+                        ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
+                        : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                    <span>Realisasi PBB</span>
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                      2026
                     </span>
                   </button>
                 )}
@@ -931,6 +1011,24 @@ export default function App() {
                       </span>
                     </button>
 
+                    {/* Super Admin Tab 4b: Pemetaan WebGIS 24 Lingkungan */}
+                    <button
+                      id="tab-pemetaan-admin"
+                      type="button"
+                      onClick={() => setActiveTab('pemetaan')}
+                      className={`inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                        activeTab === 'pemetaan'
+                          ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Compass className="w-4 h-4 text-emerald-700" />
+                      <span>WebGIS &amp; WRS</span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-400 text-slate-950 shadow-2xs">
+                        PETA 24
+                      </span>
+                    </button>
+
                     {/* Super Admin Tab 5: Input Formulir (Bantuan/Asistensi) */}
                     <button
                       id="tab-input-laporan"
@@ -960,6 +1058,21 @@ export default function App() {
                       <UserCheck className="w-4 h-4 text-amber-600" />
                       <span>Kegiatan Khusus</span>
                     </button>
+
+                    {/* Super Admin Tab 7: Realisasi PBB */}
+                    <button
+                      id="tab-rekap-pbb-admin"
+                      type="button"
+                      onClick={() => setActiveTab('rekap_pbb')}
+                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                        activeTab === 'rekap_pbb'
+                          ? 'border-amber-500 text-amber-900 bg-amber-50/80 font-black'
+                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      <FileSpreadsheet className="w-4 h-4 text-amber-600" />
+                      <span>Realisasi PBB</span>
+                    </button>
                   </>
                 )}
               </>
@@ -983,7 +1096,7 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <main className={`flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 ${isModalOpen ? 'print:hidden' : ''}`}>
+      <main className={`flex-1 max-w-6xl w-full mx-auto p-3.5 sm:p-6 pb-24 md:pb-8 ${isModalOpen ? 'print:hidden' : ''}`}>
         {/* Smart Hub Dashboard Tab */}
         {activeTab === 'hub' && (
           <ErrorBoundary fallbackTitle="Gagal Memuat Pusat Menu">
@@ -1073,6 +1186,7 @@ export default function App() {
               setIsModalOpen(true);
             }}
             onNavigateToForm={() => setActiveTab('form')}
+            onNavigateToPemetaan={handleNavigateToPemetaan}
           />
         )}
 
@@ -1091,6 +1205,7 @@ export default function App() {
               setIsModalOpen(true);
             }}
             onNavigateToForm={() => setActiveTab('form')}
+            onNavigateToPemetaan={handleNavigateToPemetaan}
           />
         )}
 
@@ -1117,6 +1232,7 @@ export default function App() {
               onResetReports={handleResetAllReports}
               onSeedInitialReports={handleSeedInitialReports}
               onOpenCapaianDashboard={() => setActiveTab('capaian_admin')}
+              onOpenPemetaan={handleNavigateToPemetaan}
               sheetMeta={sheetMeta}
             />
           </ErrorBoundary>
@@ -1160,7 +1276,40 @@ export default function App() {
             />
           </ErrorBoundary>
         )}
+
+        {/* Tab Pemetaan Wilayah WebGIS & WRS */}
+        {activeTab === 'pemetaan' && (
+          <ErrorBoundary fallbackTitle="Gagal Memuat Sistem Pemetaan WebGIS">
+            <PemetaanWilayahView
+              currentUser={activeAccount}
+              onShowToast={showToast}
+              initialLingkunganFilter={pemetaanTargetLingkungan}
+            />
+          </ErrorBoundary>
+        )}
+
+        {/* Tab Rekap Realisasi PBB */}
+        {activeTab === 'rekap_pbb' && (
+          <ErrorBoundary fallbackTitle="Gagal Memuat Realisasi PBB">
+            <RekapPbbView activeAccount={activeAccount} onShowToast={showToast} />
+          </ErrorBoundary>
+        )}
       </main>
+
+      {/* Mobile Bottom Navigation Bar (Thumb-friendly for Kepling & Staff) */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          if (tab === 'riwayat') {
+            setRiwayatFilterPetugas(activeAccount.role === 'kepling' ? activeAccount.nama : undefined);
+          }
+          setActiveTab(tab);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        activeAccount={activeAccount}
+        hasAbsenToday={hasAbsenToday}
+        hasLaporToday={hasLaporToday}
+      />
 
       {/* Account Selector Modal */}
       <AccountSelectorModal

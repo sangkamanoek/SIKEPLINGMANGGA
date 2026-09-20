@@ -69,6 +69,11 @@ service cloud.firestore {
       allow delete: if true;
     }
 
+    // PBB SPPT Data per Tahun Pajak
+    match /{pbbCollection}/{spptId} {
+      allow read, write: if pbbCollection.matches('^pbb_sppt_.*');
+    }
+
     // Default Fallback Match
     match /{document=**} {
       allow read: if true;

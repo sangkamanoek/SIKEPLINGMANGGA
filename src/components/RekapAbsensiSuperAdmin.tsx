@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { KopSuratResmi } from './KopSuratResmi';
 import { printOfficialDocument } from '../utils/printHelper';
 import {
   Calendar,
@@ -243,27 +244,17 @@ export const RekapAbsensiSuperAdmin: React.FC<RekapAbsensiSuperAdminProps> = ({
       {/* Kontainer Cetak Resmi Terisolasi */}
       <div id="lembar-cetak-rekap-absensi" className="space-y-4">
         {/* Kop Surat Resmi Pemko Medan (Tampak Saat Cetak) */}
-        <div className="hidden print:block border-b-2 border-black pb-3 mb-4 text-center">
-          <div className="flex items-center justify-between">
-            <img src="/logo_pemko_medan.svg" alt="Logo Pemko Medan" className="w-16 h-16 object-contain" />
-            <div className="text-center flex-1 px-4">
-              <h3 className="font-extrabold text-sm uppercase tracking-wide">PEMERINTAH KOTA MEDAN</h3>
-              <h2 className="font-black text-base uppercase tracking-wider">KECAMATAN MEDAN TUNTUNGAN</h2>
-              <h1 className="font-black text-lg uppercase tracking-wider">KELURAHAN MANGGA</h1>
-              <p className="text-[10px] font-medium text-slate-700">Jl. Keuangan No. 1, Medan Tuntungan, Kota Medan, Sumatera Utara</p>
-            </div>
-            <div className="w-16 h-16" />
-          </div>
-          <div className="mt-2 pt-1 border-t border-black text-center">
-            <h4 className="font-black text-sm uppercase tracking-wider text-slate-900">
-              REKAPITULASI PRESENSI APEL PAGI KEPALA LINGKUNGAN
-            </h4>
-            <p className="text-xs font-bold text-slate-700">
-              {activeSubTab === 'harian' && `Tanggal: ${selectedDate}`}
-              {activeSubTab === 'mingguan' && `Periode Minggu Acuan: ${weekRefDate}`}
-              {activeSubTab === 'bulanan' && `Bulan ${monthNames[selectedMonth - 1]} ${selectedYear}`}
-            </p>
-          </div>
+        <KopSuratResmi />
+        <div className="mt-2 pt-1 border-t border-black text-center">
+          <h4 className="font-black text-sm uppercase tracking-wider text-slate-900">
+            REKAPITULASI PRESENSI APEL PAGI KEPALA LINGKUNGAN
+          </h4>
+          <p className="text-xs font-bold text-slate-700">
+            {activeSubTab === 'harian' && `Tanggal: ${selectedDate}`}
+            {activeSubTab === 'mingguan' && `Periode Minggu Acuan: ${weekRefDate}`}
+            {activeSubTab === 'bulanan' && `Bulan ${monthNames[selectedMonth - 1]} ${selectedYear}`}
+          </p>
+        </div>
         </div>
 
       {/* ======================= TAB 1: REKAPAN HARIAN ======================= */}
@@ -737,7 +728,6 @@ export const RekapAbsensiSuperAdmin: React.FC<RekapAbsensiSuperAdminProps> = ({
           </div>
         </div>
       )}
-      </div>
 
       {/* Zoom / Lightbox Photo Modal */}
       {previewPhoto && (

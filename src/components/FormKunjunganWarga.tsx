@@ -14,7 +14,7 @@ import { UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { sanitizeText, safeSetLocalStorage, safeGetLocalStorage } from '../lib/safeStorage';
 
-export type KeteranganKunjunganType = 'Sudah' | 'Belum' | 'Menolak' | 'Tidak Ditempat';
+export type KeteranganKunjunganType = 'Sudah' | 'Belum';
 
 export interface KunjunganWargaData {
   id: string;
@@ -25,8 +25,10 @@ export interface KunjunganWargaData {
   lingkunganNomor: number;
   namaKepling: string;
   keplingId: string;
-  statusPerlinsos?: boolean;
-  keterangan: KeteranganKunjunganType;
+  perlinsos: 'Sudah' | 'Belum';
+  ikd: 'Sudah' | 'Belum';
+  pbb: 'Sudah' | 'Belum';
+  keterangan?: string;
   fotoDokumentasi?: string;
   createdAt: string;
 }
@@ -60,7 +62,9 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const [targetKeplingId, setTargetKeplingId] = useState<string>(
     isSuperAdmin ? 'kepling_1' : currentUser.id
   );
-  const [keterangan, setKeterangan] = useState<KeteranganKunjunganType>('Sudah');
+  const [perlinsos, setPerlinsos] = useState<'Sudah' | 'Belum'>('Sudah');
+  const [ikd, setIkd] = useState<'Sudah' | 'Belum'>('Sudah');
+  const [pbb, setPbb] = useState<'Sudah' | 'Belum'>('Sudah');
   const [fotoDokumentasi, setFotoDokumentasi] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string>('');
@@ -132,7 +136,9 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       lingkunganNomor: selectedKepling.nomorLingkungan || 1,
       namaKepling: selectedKepling.nama,
       keplingId: selectedKepling.id,
-      keterangan,
+      perlinsos,
+      ikd,
+      pbb,
       fotoDokumentasi: fotoDokumentasi || '',
       createdAt: nowIso,
     };
@@ -146,7 +152,9 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       lingkunganNomor: selectedKepling.nomorLingkungan || 1,
       namaKepling: selectedKepling.nama,
       keplingId: selectedKepling.id,
-      keterangan: keterangan || 'Sudah',
+      perlinsos,
+      ikd,
+      pbb,
       createdAt: nowIso,
     };
 
@@ -172,7 +180,9 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       // Reset form fields
       setNamaWarga('');
       setAlamat('');
-      setKeterangan('Sudah');
+      setPerlinsos('Sudah');
+      setIkd('Sudah');
+      setPbb('Sudah');
       setFotoDokumentasi('');
 
       if (onSuccess) {
@@ -290,21 +300,41 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
           />
         </div>
 
-        {/* Dropdown Keterangan */}
-        <div>
-          <label className="font-extrabold text-slate-700 block mb-1">
-            Keterangan Kunjungan:
-          </label>
-          <select
-            value={keterangan}
-            onChange={(e) => setKeterangan(e.target.value as KeteranganKunjunganType)}
-            className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 focus:outline-emerald-500"
-          >
-            <option value="Sudah">Sudah (Berhasil ditemui & terdata)</option>
-            <option value="Belum">Belum (Perlu tindak lanjut / proses)</option>
-            <option value="Menolak">Menolak (Warga menolak didata)</option>
-            <option value="Tidak Ditempat">Tidak Ditempat (Rumah kosong / tutup)</option>
-          </select>
+        {/* Dropdown Keterangan Baru */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="font-extrabold text-slate-700 block mb-1">Perlinsos:</label>
+            <select
+              value={perlinsos}
+              onChange={(e) => setPerlinsos(e.target.value as 'Sudah' | 'Belum')}
+              className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 focus:outline-emerald-500"
+            >
+              <option value="Sudah">Sudah</option>
+              <option value="Belum">Belum</option>
+            </select>
+          </div>
+          <div>
+            <label className="font-extrabold text-slate-700 block mb-1">IKD:</label>
+            <select
+              value={ikd}
+              onChange={(e) => setIkd(e.target.value as 'Sudah' | 'Belum')}
+              className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 focus:outline-emerald-500"
+            >
+              <option value="Sudah">Sudah</option>
+              <option value="Belum">Belum</option>
+            </select>
+          </div>
+          <div>
+            <label className="font-extrabold text-slate-700 block mb-1">Pembayaran PBB:</label>
+            <select
+              value={pbb}
+              onChange={(e) => setPbb(e.target.value as 'Sudah' | 'Belum')}
+              className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 focus:outline-emerald-500"
+            >
+              <option value="Sudah">Sudah</option>
+              <option value="Belum">Belum</option>
+            </select>
+          </div>
         </div>
 
         {/* Unggah Dokumentasi */}

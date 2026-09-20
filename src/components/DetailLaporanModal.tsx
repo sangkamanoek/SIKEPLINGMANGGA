@@ -24,11 +24,18 @@ import {
   Maximize2,
   RefreshCw,
   MapPin,
+  Users,
+  Home,
+  UserCheck,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, AbsenApelItem } from '../types';
 import { formatTanggalIndonesia, generateReportPdfFileName, formatReportToText } from '../lib/formatter';
 import { loadAllAttendance } from '../lib/attendanceApi';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import { db } from '../lib/firebase';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { safeGetLocalStorage, safeSetLocalStorage } from '../lib/safeStorage';
+import { KunjunganWargaData } from './FormKunjunganWarga';
 
 interface DetailLaporanModalProps {
   item: LaporanHarianItem | null;
@@ -158,6 +165,102 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     });
   }, [item, attendanceList]);
 
+  const displayTanggal = React.useMemo(() => {
+    if (!item?.tanggal) return '';
+    if (item.tanggal.includes('-')) {
+      const parts = item.tanggal.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        if (!isNaN(d.getTime())) {
+          return formatTanggalIndonesia(d);
+        }
+      }
+    }
+    return item.tanggal;
+  }, [item?.tanggal]);
+
+  // Real-time listener for door-to-door visits (Kunjungan Warga)
+  const [kunjunganList, setKunjunganList] = useState<KunjunganWargaData[]>(() =>
+    safeGetLocalStorage<KunjunganWargaData[]>('sikepling_kunjungan_harian_list_v1', [])
+  );
+
+  useEffect(() => {
+    if (!db) return;
+    try {
+      const q = query(collection(db, 'kunjungan_warga'), orderBy('createdAt', 'desc'));
+      const unsub = onSnapshot(
+        q,
+        (snapshot) => {
+          const list: KunjunganWargaData[] = [];
+          snapshot.forEach((d) => {
+            list.push({ ...(d.data() as KunjunganWargaData), id: d.id });
+          });
+          setKunjunganList(list);
+          safeSetLocalStorage('sikepling_kunjungan_harian_list_v1', JSON.stringify(list));
+        },
+        (err) => {
+          console.warn('Firestore snapshot error on kunjungan_warga in DetailModal:', err);
+        }
+      );
+      return () => unsub();
+    } catch (e) {
+      console.warn('Error subscribing to kunjungan_warga in DetailModal:', e);
+    }
+  }, []);
+
+  // Filter Kunjungan Warga that match this specific report (Kepling & Date)
+  const relevantKunjungan = React.useMemo(() => {
+    if (!item) return [];
+
+    const rawDate = (item.tanggal || '').trim();
+    let isoDateFromRaw = '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+      isoDateFromRaw = rawDate;
+    }
+
+    let isoDateFromCreatedAt = '';
+    if (item.createdAt) {
+      try {
+        isoDateFromCreatedAt = new Date(item.createdAt).toISOString().split('T')[0];
+      } catch {}
+    }
+
+    const lkMatch = (item.jabatan || '').match(/Lingkungan\s+([IVXLCDM\d]+)/i) ||
+                    (item.namaKepling || '').match(/Lingkungan\s+([IVXLCDM\d]+)/i);
+    const itemLingkunganStr = lkMatch ? `Lingkungan ${lkMatch[1]}`.toLowerCase() : '';
+    const itemNamaKeplingLower = (item.namaKepling || '').trim().toLowerCase();
+
+    return kunjunganList.filter((k) => {
+      const kDate = (k.tanggal || '').trim();
+      let kCreatedIso = '';
+      if (k.createdAt) {
+        try {
+          kCreatedIso = new Date(k.createdAt).toISOString().split('T')[0];
+        } catch {}
+      }
+
+      const dateMatch =
+        (isoDateFromRaw && kDate === isoDateFromRaw) ||
+        (isoDateFromCreatedAt && kDate === isoDateFromCreatedAt) ||
+        (isoDateFromRaw && kCreatedIso === isoDateFromRaw) ||
+        (displayTanggal && kDate === displayTanggal) ||
+        kDate === rawDate;
+
+      if (!dateMatch) return false;
+
+      const kKeplingId = (k.keplingId || '').trim();
+      const kNamaKepling = (k.namaKepling || '').trim().toLowerCase();
+      const kLingkungan = (k.lingkungan || '').trim().toLowerCase();
+
+      const keplingMatch =
+        (item.keplingId && kKeplingId && item.keplingId === kKeplingId) ||
+        (itemNamaKeplingLower && kNamaKepling && (itemNamaKeplingLower.includes(kNamaKepling) || kNamaKepling.includes(itemNamaKeplingLower))) ||
+        (itemLingkunganStr && kLingkungan && itemLingkunganStr === kLingkungan);
+
+      return keplingMatch;
+    });
+  }, [kunjunganList, item, displayTanggal]);
+
   // Combined photos array for lightbox and printing
   const effectivePhotos = React.useMemo(() => {
     const list = [...(item?.dokumentasiFoto || [])];
@@ -173,8 +276,25 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         });
       }
     }
+
+    // Also include photos from relevant Kunjungan Warga if not already present
+    relevantKunjungan.forEach((kunj, kIdx) => {
+      if (kunj.fotoDokumentasi) {
+        const alreadyHas = list.some((p) => p.url === kunj.fotoDokumentasi);
+        if (!alreadyHas) {
+          list.push({
+            id: `kunj_foto_${kunj.id || kIdx}`,
+            url: kunj.fotoDokumentasi,
+            name: `[KUNJUNGAN] ${kunj.namaWarga} - ${kunj.alamat}`,
+            timestamp: kunj.createdAt || new Date().toISOString(),
+            kategori: 'perlinsos',
+          });
+        }
+      }
+    });
+
     return list;
-  }, [item?.dokumentasiFoto, absenApelData]);
+  }, [item?.dokumentasiFoto, absenApelData, relevantKunjungan]);
 
   // All photos array for easy lightbox flipping
   const allDokumentasi = effectivePhotos;
@@ -326,20 +446,6 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       setSaveSuccessMsg('');
     }
   }, [item]);
-
-  const displayTanggal = React.useMemo(() => {
-    if (!item?.tanggal) return '';
-    if (item.tanggal.includes('-')) {
-      const parts = item.tanggal.split('-');
-      if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        if (!isNaN(d.getTime())) {
-          return formatTanggalIndonesia(d);
-        }
-      }
-    }
-    return item.tanggal;
-  }, [item?.tanggal]);
 
   const getProperFotoLabel = (foto: { name?: string; kategori?: string }, idx: number) => {
     if (!foto?.name && !foto?.kategori) return `Dokumentasi Lapangan ${idx + 1}`;
@@ -1060,11 +1166,88 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     </table>
                   </div>
 
+                  {/* HASIL KUNJUNGAN / SAMBANG WARGA (DOOR-TO-DOOR) */}
+                  {relevantKunjungan.length > 0 ? (
+                    <div className="mb-2">
+                      <div className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900 flex items-center justify-between">
+                        <span>B. HASIL KUNJUNGAN / SAMBANG WARGA DOOR-TO-DOOR ({relevantKunjungan.length} RUMAH / KK):</span>
+                        <span className="text-[7pt] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          Data Terverifikasi Lapangan
+                        </span>
+                      </div>
+                      <table className="w-full text-left text-[7.5pt] font-sans border border-black border-collapse mb-1">
+                        <thead>
+                          <tr className="bg-slate-100 text-black font-bold">
+                            <th className="border border-black w-7 text-center py-1">NO</th>
+                            <th className="border border-black w-36 px-1.5 py-1">NAMA WARGA / KK</th>
+                            <th className="border border-black px-1.5 py-1">ALAMAT LENGKAP</th>
+                            <th className="border border-black w-28 text-center py-1">STATUS</th>
+                            <th className="border border-black w-14 text-center py-1">FOTO</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {relevantKunjungan.map((kunj, kIdx) => (
+                            <tr key={kunj.id || kIdx} className="hover:bg-slate-50">
+                              <td className="border border-black text-center font-bold py-1">{kIdx + 1}</td>
+                              <td className="border border-black font-bold px-1.5 py-1 uppercase">{kunj.namaWarga}</td>
+                              <td className="border border-black px-1.5 py-1">{kunj.alamat}</td>
+                              <td className="border border-black text-center font-bold px-1 py-1">
+                                <span
+                                  className={
+                                    kunj.keterangan === 'Sudah'
+                                      ? 'text-emerald-700'
+                                      : kunj.keterangan === 'Menolak'
+                                      ? 'text-rose-700'
+                                      : kunj.keterangan === 'Tidak Ditempat'
+                                      ? 'text-amber-700'
+                                      : 'text-slate-700'
+                                  }
+                                >
+                                  {kunj.keterangan === 'Sudah'
+                                    ? '✓ SUDAH'
+                                    : kunj.keterangan === 'Menolak'
+                                    ? '✕ MENOLAK'
+                                    : kunj.keterangan === 'Tidak Ditempat'
+                                    ? '⚠ TDK DI TEMPAT'
+                                    : (kunj.keterangan || '-').toUpperCase()}
+                                </span>
+                              </td>
+                              <td className="border border-black text-center py-1 px-1">
+                                {kunj.fotoDokumentasi ? (
+                                  <div className="w-6 h-6 mx-auto rounded overflow-hidden border border-slate-300">
+                                    <img
+                                      src={kunj.fotoDokumentasi}
+                                      alt={kunj.namaWarga}
+                                      crossOrigin="anonymous"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 text-[6.5pt]">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : item?.kinerja?.perlinsosKk && Number(item.kinerja.perlinsosKk) > 0 ? (
+                    <div className="mb-2 p-1.5 bg-slate-50 border border-slate-300 rounded text-[7.5pt] text-slate-700 font-sans">
+                      <strong>B. REKAPITULASI KUNJUNGAN:</strong> Realisasi kunjungan door-to-door sebanyak <strong>{item.kinerja.perlinsosKk} KK</strong> ({item.kinerja?.perlinsosKeterangan || 'Pendataan / Verifikasi Lapangan'}).
+                      {item.kinerja?.perlinsosMenolakKk && String(item.kinerja.perlinsosMenolakKk) !== '0' && (
+                        <span className="text-rose-700 ml-1">| Menolak: {item.kinerja.perlinsosMenolakKk} KK</span>
+                      )}
+                      {item.kinerja?.perlinsosTidakDiTempatKk && String(item.kinerja.perlinsosTidakDiTempatKk) !== '0' && (
+                        <span className="text-amber-800 ml-1">| Tidak di Tempat: {item.kinerja.perlinsosTidakDiTempatKk} KK</span>
+                      )}
+                    </div>
+                  ) : null}
+
                   {/* Foto Dokumentasi - Terkelompok Per Kegiatan & Adaptif Kedinasan */}
                   {effectivePhotos && effectivePhotos.length > 0 && (
                     <div className="mb-2">
                       <div className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1.5 text-slate-900 flex items-center justify-between">
-                        <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({effectivePhotos.length} FOTO):</span>
+                        <span>{relevantKunjungan.length > 0 || (item?.kinerja?.perlinsosKk && Number(item.kinerja.perlinsosKk) > 0) ? 'C.' : 'B.'} DOKUMENTASI LAPANGAN TERLAMPIR ({effectivePhotos.length} FOTO):</span>
                         <span className="text-[7pt] text-slate-500 font-normal normal-case">Format Album Resmi Kedinasan</span>
                       </div>
                       <div className="flex flex-wrap gap-2.5">
@@ -1788,6 +1971,78 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 </div>
               )}
             </div>
+
+            {/* HASIL KUNJUNGAN / SAMBANG WARGA DOOR-TO-DOOR */}
+            {relevantKunjungan.length > 0 && (
+              <div className="mt-3 p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-900 flex items-center gap-1.5 uppercase text-[11px]">
+                    <Users className="w-3.5 h-3.5 text-emerald-700" />
+                    HASIL KUNJUNGAN / SAMBANG WARGA ({relevantKunjungan.length} RUMAH / KK)
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-emerald-600 text-white font-bold text-[10px]">
+                    Sinkron Door-to-Door
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border border-emerald-200 bg-white">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-emerald-100/70 text-emerald-950 font-bold border-b border-emerald-200 text-[10px] uppercase">
+                        <th className="py-1.5 px-2 text-center w-8">No</th>
+                        <th className="py-1.5 px-2">Nama Warga / KK</th>
+                        <th className="py-1.5 px-2">Alamat Lengkap</th>
+                        <th className="py-1.5 px-2 text-center">Status</th>
+                        <th className="py-1.5 px-2 text-center w-14">Foto</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-emerald-100">
+                      {relevantKunjungan.map((kunj, kIdx) => (
+                        <tr key={kunj.id || kIdx} className="hover:bg-emerald-50/50">
+                          <td className="py-1.5 px-2 text-center font-bold text-slate-500">{kIdx + 1}</td>
+                          <td className="py-1.5 px-2 font-bold text-slate-800 uppercase text-[11px]">{kunj.namaWarga}</td>
+                          <td className="py-1.5 px-2 text-slate-600 text-[11px]">{kunj.alamat}</td>
+                          <td className="py-1.5 px-2 text-center">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                kunj.keterangan === 'Sudah'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : kunj.keterangan === 'Menolak'
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                  : kunj.keterangan === 'Tidak Ditempat'
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  : 'bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {kunj.keterangan}
+                            </span>
+                          </td>
+                          <td className="py-1 px-2 text-center">
+                            {kunj.fotoDokumentasi ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPhotoPreview(kunj.fotoDokumentasi!, `Kunjungan - ${kunj.namaWarga}`)}
+                                className="w-7 h-7 mx-auto rounded overflow-hidden border border-emerald-300 hover:ring-2 hover:ring-emerald-500 block transition-transform hover:scale-105 cursor-pointer"
+                                title="Lihat Foto Kunjungan"
+                              >
+                                <img
+                                  src={kunj.fotoDokumentasi}
+                                  alt={kunj.namaWarga}
+                                  crossOrigin="anonymous"
+                                  className="w-full h-full object-cover"
+                                />
+                              </button>
+                            ) : (
+                              <span className="text-slate-400 text-[10px]">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Attached photos */}
@@ -2312,6 +2567,90 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               </table>
             </div>
 
+            {/* HASIL REKAPITULASI KUNJUNGAN / SAMBANG WARGA (DOOR-TO-DOOR) UNTUK PDF / CETAK */}
+            {relevantKunjungan.length > 0 ? (
+              <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '8px' }}>
+                <div
+                  className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900"
+                  style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <span>B. HASIL KUNJUNGAN / SAMBANG WARGA DOOR-TO-DOOR ({relevantKunjungan.length} RUMAH / KK):</span>
+                  <span style={{ fontSize: '7pt', color: '#047857', fontWeight: 'bold' }}>Data Terverifikasi Lapangan</span>
+                </div>
+                <table
+                  className="print-table w-full text-left text-[7.5pt] font-sans border-[1.5px] border-black"
+                  style={{ width: '100%', textAlign: 'left', fontSize: '7.5pt', fontFamily: 'sans-serif', borderCollapse: 'collapse', border: '1.5px solid #000000', marginBottom: '4px' }}
+                >
+                  <thead>
+                    <tr style={{ backgroundColor: '#ffffff', color: '#000000', fontWeight: 'bold' }}>
+                      <th style={{ border: '1px solid #000000', width: '28px', textAlign: 'center', padding: '3px 2px' }}>NO</th>
+                      <th style={{ border: '1px solid #000000', width: '140px', padding: '3px 6px' }}>NAMA WARGA / KK</th>
+                      <th style={{ border: '1px solid #000000', padding: '3px 6px' }}>ALAMAT LENGKAP</th>
+                      <th style={{ border: '1px solid #000000', width: '110px', textAlign: 'center', padding: '3px 4px' }}>STATUS KUNJUNGAN</th>
+                      <th style={{ border: '1px solid #000000', width: '70px', textAlign: 'center', padding: '3px 4px' }}>DOKUMENTASI</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {relevantKunjungan.map((kunj, kIdx) => (
+                      <tr key={kunj.id || kIdx}>
+                        <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '2px' }}>{kIdx + 1}</td>
+                        <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '2px 6px', textTransform: 'uppercase' }}>
+                          {kunj.namaWarga}
+                        </td>
+                        <td style={{ border: '1px solid #000000', padding: '2px 6px' }}>
+                          {kunj.alamat}
+                        </td>
+                        <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '2px 4px' }}>
+                          <span style={{
+                            color:
+                              kunj.keterangan === 'Sudah'
+                                ? '#065f46'
+                                : kunj.keterangan === 'Menolak'
+                                ? '#9f1239'
+                                : kunj.keterangan === 'Tidak Ditempat'
+                                ? '#b45309'
+                                : '#334155',
+                          }}>
+                            {kunj.keterangan === 'Sudah'
+                              ? '✓ SUDAH'
+                              : kunj.keterangan === 'Menolak'
+                              ? '✕ MENOLAK'
+                              : kunj.keterangan === 'Tidak Ditempat'
+                              ? '⚠ TDK DI TEMPAT'
+                              : (kunj.keterangan || '-').toUpperCase()}
+                          </span>
+                        </td>
+                        <td style={{ border: '1px solid #000000', textAlign: 'center', padding: '2px' }}>
+                          {kunj.fotoDokumentasi ? (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <img
+                                src={kunj.fotoDokumentasi}
+                                alt={kunj.namaWarga}
+                                crossOrigin="anonymous"
+                                style={{ width: '26px', height: '26px', objectFit: 'cover', borderRadius: '2px', border: '1px solid #94a3b8' }}
+                              />
+                            </div>
+                          ) : (
+                            <span style={{ color: '#94a3b8', fontSize: '6.5pt' }}>-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : item?.kinerja?.perlinsosKk && Number(item.kinerja.perlinsosKk) > 0 ? (
+              <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '6px', border: '1px solid #000000', padding: '4px 8px', fontSize: '7.5pt', backgroundColor: '#ffffff', fontFamily: 'sans-serif' }}>
+                <strong>B. CATATAN HASIL KUNJUNGAN:</strong> Realisasi kunjungan door-to-door sebanyak <strong>{item.kinerja.perlinsosKk} KK</strong> ({item.kinerja?.perlinsosKeterangan || 'Pendataan / Verifikasi Lapangan'}).
+                {item.kinerja?.perlinsosMenolakKk && String(item.kinerja.perlinsosMenolakKk) !== '0' ? (
+                  <span style={{ color: '#9f1239', marginLeft: '4px' }}>| Warga Menolak: {item.kinerja.perlinsosMenolakKk} KK</span>
+                ) : ''}
+                {item.kinerja?.perlinsosTidakDiTempatKk && String(item.kinerja.perlinsosTidakDiTempatKk) !== '0' ? (
+                  <span style={{ color: '#b45309', marginLeft: '4px' }}>| Tidak di Tempat: {item.kinerja.perlinsosTidakDiTempatKk} KK</span>
+                ) : ''}
+              </div>
+            ) : null}
+
             {/* DOKUMENTASI FOTO KEGIATAN - SELALU DITAMPILKAN DI HALAMAN 1 */}
             {effectivePhotos && effectivePhotos.length > 0 && (
               <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '8px' }}>
@@ -2319,7 +2658,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900"
                   style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '5px', color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
-                  <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({effectivePhotos.length} FOTO):</span>
+                  <span>{relevantKunjungan.length > 0 || (item?.kinerja?.perlinsosKk && Number(item.kinerja.perlinsosKk) > 0) ? 'C.' : 'B.'} DOKUMENTASI LAPANGAN TERLAMPIR ({effectivePhotos.length} FOTO):</span>
                   <span style={{ fontSize: '7pt', color: '#64748b', fontWeight: 'normal', textTransform: 'none' }}>Format Album Resmi Kedinasan</span>
                 </div>
                 <div

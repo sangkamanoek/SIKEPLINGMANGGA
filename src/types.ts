@@ -218,3 +218,97 @@ export interface AbsenApelItem {
   updatedAt?: string;
 }
 
+// ==========================================
+// WEBGIS & PEMETAAN LINGKUNGAN TYPES
+// ==========================================
+
+export interface LingkunganPolygon {
+  id: string; // e.g. "poly_kepling_1"
+  lingkunganId: string; // e.g. "kepling_1"
+  lingkunganNomor: number; // 1 - 24
+  lingkunganNama: string; // "Lingkungan I"
+  keplingNama: string;
+  coordinates: [number, number][]; // array of [lat, lng]
+  color?: string; // Hex / CSS color
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export type StatusWrs = 'AKTIF' | 'BELUM_MENOLAK' | 'MANDIRI';
+export type StatusPbb = 'LUNAS' | 'BELUM_LUNAS' | 'BEBAS_PAJAK';
+
+export interface TitikRumahBangunan {
+  id: string;
+  lingkunganId: string; // "kepling_1"
+  lingkunganNomor: number;
+  namaJalan: string; // e.g. "Jl. Bunga Raya Gg. Melati"
+  nomorRumah: string; // e.g. "No. 14A"
+  namaKepalaKeluarga: string;
+  nikKk?: string;
+  // Status Kartu Keluarga (KK)
+  isKkMangga?: boolean; // true: KK Kelurahan Mangga, false: Bukan KK Mangga (Luar)
+  asalKk?: string;
+  lat: number;
+  lng: number;
+  // Demografi
+  jumlahJiwa: number;
+  jumlahLakiLaki: number;
+  jumlahPerempuan: number;
+  jumlahLansia: number;
+  jumlahAnak: number;
+  pekerjaanKk: string;
+  // Bansos
+  penerimaBansos: boolean;
+  jenisBansos?: string[]; // ['PKH', 'BPNT', 'BLT', 'PBI-JK', 'Lainnya']
+  desilBansos?: string; // 'Desil 1', 'Desil 2', 'Desil 3', 'Desil 4', 'Desil 5', 'Desil 6-10'
+  kategoriRentan?: boolean;
+  // WRS (Wajib Retribusi Sampah)
+  statusWrs: StatusWrs;
+  tarifRetribusi?: number; // e.g. 15000
+  petugasSampah?: string;
+  // Usaha Rumah / UMKM
+  memilikiUsaha?: boolean;
+  jenisUsaha?: string;
+  namaUsaha?: string;
+  // Luas Tanah & Bangunan (m²)
+  luasTanahM2?: number;
+  luasBangunanM2?: number;
+  // Kategori Bangunan & Fasilitas Publik (Rumah Ibadah, Sekolah, dll)
+  kategoriBangunan?: 'RUMAH_TINGGAL' | 'RUMAH_USAHA' | 'RUMAH_IBADAH' | 'SEKOLAH' | 'KANTOR_FASUM';
+  jenisFasilitas?: string; // e.g. "Gereja", "Masjid", "SD Negeri", "SMP", "Universitas", "Mushola"
+  // PBB (Pajak Bumi & Bangunan)
+  nopPbb?: string; // e.g. "12.71.010.001.001-0001.0"
+  statusPbb?: StatusPbb;
+  nominalPbb?: number; // e.g. 150000
+  tahunPbb?: number; // e.g. 2026
+  fotoRumahUrl?: string;
+  catatan?: string;
+  createdAt: string;
+  updatedAt?: string;
+  createdByName?: string;
+}
+
+export type KondisiJalanType = 'BAIK' | 'RUSAK_SEDANG' | 'RUSAK_BERAT';
+export type KondisiDrainaseType = 'LANCAR' | 'TERSUMBAT' | 'TIDAK_ADA';
+
+export interface RuasJalanLingkungan {
+  id: string;
+  lingkunganId: string;
+  lingkunganNomor: number;
+  namaJalan: string;
+  panjangMeter: number;
+  lebarMeter: number;
+  jenisPerkerasan: 'Aspal Hotmix' | 'Rabat Beton' | 'Paving Block' | 'Tanah / Batu' | string;
+  kondisiJalan: KondisiJalanType;
+  kondisiDrainase: KondisiDrainaseType;
+  titikKoordinat?: [number, number]; // center [lat, lng]
+  garisKoordinat?: [number, number][]; // line vertices
+  jumlahHunianRumah?: number;
+  jumlahUsahaToko?: number;
+  fotoJalanUrl?: string;
+  catatan?: string;
+  createdAt: string;
+  updatedAt?: string;
+  createdByName?: string;
+}
+

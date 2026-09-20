@@ -1,5 +1,16 @@
-import React from 'react';
-import { ShieldCheck, ChevronDown, UserCheck, KeyRound, Smartphone, LogOut, UserCircle, Presentation } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  ShieldCheck,
+  ChevronDown,
+  UserCheck,
+  KeyRound,
+  Smartphone,
+  LogOut,
+  UserCircle,
+  Presentation,
+  MoreVertical,
+  X,
+} from 'lucide-react';
 import { GoogleUser, SheetMetadata, UserAccount } from '../types';
 
 interface HeaderBannerProps {
@@ -33,6 +44,20 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   onOpenPPTModal,
   onOpenAbsenApel,
 }) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    if (isMobileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMobileMenuOpen]);
   return (
     <header className="bg-emerald-800 text-white shadow-lg print:hidden">
       {/* Top Banner with Medan Logo Replica and Tagline */}
@@ -116,21 +141,23 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
         </div>
 
         {/* Header Actions Toolbar (Right) */}
-        <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap justify-start lg:justify-end w-full lg:w-auto pt-1 lg:pt-0 border-t lg:border-t-0 border-emerald-700/50">
+        <div className="flex items-center gap-1.5 sm:gap-2 justify-end w-auto">
           {onOpenAbsenApel && (
             <button
               id="btn-open-absen-apel-header"
               type="button"
               onClick={onOpenAbsenApel}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer shrink-0 border border-amber-300 hover:scale-[1.02] active:scale-[0.98]"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer shrink-0 border border-amber-300 hover:scale-[1.02] active:scale-[0.98]"
               title="Absen Apel Pagi Kepling Kelurahan Mangga"
             >
               <UserCheck className="w-4 h-4 text-slate-950 shrink-0" />
               <div className="flex flex-col text-left">
-                <span className="text-[9px] uppercase tracking-wider text-slate-900/80 font-black leading-none">
+                <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-900/80 font-black leading-none">
                   PRESENSI
                 </span>
-                <span className="leading-tight whitespace-nowrap">Absen Apel Pagi</span>
+                <span className="leading-tight whitespace-nowrap text-[11px] sm:text-xs">
+                  Apel Pagi
+                </span>
               </div>
             </button>
           )}
@@ -140,7 +167,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               id="btn-open-ppt-modal"
               type="button"
               onClick={onOpenPPTModal}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-700 hover:bg-teal-600 border border-teal-500/50 text-white font-bold text-xs shadow-md transition-all cursor-pointer shrink-0 hover:scale-[1.02] active:scale-[0.98]"
+              className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-700 hover:bg-teal-600 border border-teal-500/50 text-white font-bold text-xs shadow-md transition-all cursor-pointer shrink-0 hover:scale-[1.02] active:scale-[0.98]"
               title="Buka Slide Presentation & Download File PowerPoint (.pptx) Panduan Kepling"
             >
               <Presentation className="w-4 h-4 text-emerald-300 shrink-0" />
@@ -158,7 +185,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               id="btn-open-install-apk-modal"
               type="button"
               onClick={onOpenInstallModal}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-900/80 hover:bg-emerald-700 border border-emerald-600/60 text-white font-bold text-xs shadow-md transition-all cursor-pointer shrink-0 hover:scale-[1.02] active:scale-[0.98]"
+              className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-900/80 hover:bg-emerald-700 border border-emerald-600/60 text-white font-bold text-xs shadow-md transition-all cursor-pointer shrink-0 hover:scale-[1.02] active:scale-[0.98]"
               title="Pasang aplikasi SI-KEPLING MANGGA di HP Android / iOS"
             >
               <Smartphone className="w-4 h-4 text-amber-300 shrink-0" />
@@ -172,12 +199,12 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
           )}
 
           {/* Unified User Account Profile Card & Quick Actions */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-emerald-950/70 border border-emerald-600/60 shadow-md shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 p-1 rounded-xl bg-emerald-950/70 border border-emerald-600/60 shadow-md shrink-0">
             <button
               id="btn-open-account-modal-header"
               type="button"
               onClick={activeAccount.role === 'super_admin' ? onOpenAccountModal : onOpenUbahPassword}
-              className="px-2.5 py-1.5 rounded-lg hover:bg-emerald-800/80 transition-colors flex items-center gap-2 cursor-pointer group text-left"
+              className="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg hover:bg-emerald-800/80 transition-colors flex items-center gap-1.5 sm:gap-2 cursor-pointer group text-left"
               title={activeAccount.role === 'super_admin' ? 'Klik untuk kelola akun atau lihat buku sandi' : 'Klik untuk ubah kata sandi profil'}
             >
               <div
@@ -193,7 +220,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                   activeAccount.nomorLingkungan || 'KL'
                 )}
               </div>
-              <div className="min-w-0 max-w-[120px] sm:max-w-[150px]">
+              <div className="hidden sm:block min-w-0 max-w-[120px] sm:max-w-[150px]">
                 <div className="text-[9px] font-black uppercase tracking-wider text-emerald-300 truncate leading-none">
                   {activeAccount.role === 'super_admin' ? 'SUPER ADMIN' : activeAccount.lingkungan}
                 </div>
@@ -204,11 +231,8 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               <ChevronDown className="w-3.5 h-3.5 text-emerald-300 group-hover:text-white transition-transform shrink-0" />
             </button>
 
-            {/* Subtle Divider */}
-            <div className="w-[1px] h-6 bg-emerald-700/60 shrink-0" />
-
-            {/* Quick Icon Buttons */}
-            <div className="flex items-center gap-1 pr-1">
+            {/* Desktop Quick Icon Buttons */}
+            <div className="hidden md:flex items-center gap-1 border-l border-emerald-700/60 pl-1 pr-1">
               {onOpenEditProfile && (
                 <button
                   id="btn-open-edit-profile"
@@ -246,6 +270,104 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
+              )}
+            </div>
+
+            {/* Mobile Overflow Menu Toggle Button */}
+            <div className="md:hidden relative" ref={mobileMenuRef}>
+              <button
+                id="btn-mobile-header-menu"
+                type="button"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-1.5 rounded-lg hover:bg-emerald-800 text-emerald-200 hover:text-white transition-colors cursor-pointer"
+                title="Menu Lainnya"
+                aria-label="Menu Opsi Lainnya"
+              >
+                {isMobileMenuOpen ? <X className="w-4 h-4" /> : <MoreVertical className="w-4 h-4" />}
+              </button>
+
+              {/* Mobile Dropdown Popover */}
+              {isMobileMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-2 z-50 text-left">
+                  <div className="px-3 py-2 border-b border-slate-800 mb-1">
+                    <p className="text-[10px] font-black uppercase text-amber-400">
+                      {activeAccount.role === 'super_admin' ? 'SUPER ADMIN' : activeAccount.lingkungan}
+                    </p>
+                    <p className="text-xs font-bold text-white truncate">{activeAccount.nama}</p>
+                  </div>
+
+                  {onOpenPPTModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onOpenPPTModal();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <Presentation className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Buku Panduan PPT</span>
+                    </button>
+                  )}
+
+                  {onOpenInstallModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onOpenInstallModal();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <Smartphone className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Pasang Aplikasi (APK)</span>
+                    </button>
+                  )}
+
+                  {onOpenEditProfile && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onOpenEditProfile();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <UserCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Edit Profil Pengguna</span>
+                    </button>
+                  )}
+
+                  {onOpenUbahPassword && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onOpenUbahPassword();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <KeyRound className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Ubah Kata Sandi</span>
+                    </button>
+                  )}
+
+                  {onLogout && (
+                    <div className="pt-1 mt-1 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          onLogout();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-red-400 hover:bg-red-950/50 rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <LogOut className="w-4 h-4 text-red-400 shrink-0" />
+                        <span>Keluar (Logout)</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>

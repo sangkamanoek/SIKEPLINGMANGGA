@@ -39,6 +39,29 @@ import {
 import { ModalEditTargetCapaian } from './ModalEditTargetCapaian';
 import { GrafikTrenBulanan } from './GrafikTrenBulanan';
 import { isReportMatchingKepling, getReportIsoDate } from '../lib/formatter';
+import {
+  Map,
+  MapPin,
+  Compass,
+  Layers,
+  Navigation,
+  ExternalLink,
+  Trash,
+  Home,
+  Check,
+  Phone,
+} from 'lucide-react';
+import {
+  getLocalHouses,
+  getLocalRoads,
+  getLocalPolygons,
+  subscribeWebgisData,
+} from '../lib/webgisService';
+import {
+  computeLingkunganPemetaanStats,
+  computeKelurahanPemetaanOverview,
+} from '../lib/pemetaanStatsHelper';
+import { TitikRumahBangunan, RuasJalanLingkungan, LingkunganPolygon } from '../types';
 
 interface DashboardCapaianKeplingProps {
   reports: LaporanHarianItem[];
@@ -47,6 +70,7 @@ interface DashboardCapaianKeplingProps {
   onSelectKeplingRiwayat?: (namaKepling: string) => void;
   onOpenReportDetail?: (report: LaporanHarianItem) => void;
   onNavigateToForm?: () => void;
+  onNavigateToPemetaan?: (lingkunganNomor?: number) => void;
 }
 
 type PeriodFilter = 'TODAY' | '7_DAYS' | 'THIS_MONTH' | 'ALL';
@@ -58,10 +82,40 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   onSelectKeplingRiwayat,
   onOpenReportDetail,
   onNavigateToForm,
+  onNavigateToPemetaan,
 }) => {
   const [period, setPeriod] = useState<PeriodFilter>('THIS_MONTH');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedKeplingCard, setSelectedKeplingCard] = useState<string | null>(null);
+
+  // WebGIS Data State for Real-time Spatial Integration
+  const [gisHouses, setGisHouses] = useState<TitikRumahBangunan[]>(getLocalHouses);
+  const [gisRoads, setGisRoads] = useState<RuasJalanLingkungan[]>(getLocalRoads);
+  const [gisPolygons, setGisPolygons] = useState<LingkunganPolygon[]>(getLocalPolygons);
+
+  useEffect(() => {
+    const unsub = subscribeWebgisData(
+      (p) => setGisPolygons(p),
+      (h) => setGisHouses(h),
+      (r) => setGisRoads(r)
+    );
+    return () => unsub();
+  }, []);
+
+  // Compute Pemetaan Stats for Kepling
+  const myLingkunganStats = useMemo(() => {
+    return computeLingkunganPemetaanStats(
+      activeAccount.nomorLingkungan || 1,
+      gisHouses,
+      gisRoads,
+      gisPolygons
+    );
+  }, [activeAccount.nomorLingkungan, gisHouses, gisRoads, gisPolygons]);
+
+  // Compute Pemetaan Stats for Super Admin
+  const kelurahanPemetaanOverview = useMemo(() => {
+    return computeKelurahanPemetaanOverview(gisHouses, gisRoads, gisPolygons);
+  }, [gisHouses, gisRoads, gisPolygons]);
 
   // Target & Capaian Management State
   const [targetsMap, setTargetsMap] = useState<TargetsCapaianMap>(getDefaultTargetsCapaianMap);
@@ -651,6 +705,345 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             );
           })()}
 
+          {/* ========================================================================= */}
+          {/* HASIL PEMETAAN SPASIAL & POTENSI LINGKUNGAN (WEBGIS, DEMOGRAFI & WRS)     */}
+          {/* ========================================================================= */}
+          <div className="bg-white rounded-2xl border border-emerald-200/80 shadow-sm overflow-hidden">
+            {/* Header Banner */}
+            <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 p-5 sm:p-6 text-white relative">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center shrink-0 shadow-inner">
+                    <Map className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-slate-950 px-2 py-0.5 rounded shadow-xs">
+                        WebGIS & Pemetaan Spasial
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                        myLingkunganStats.hasPolygon
+                          ? 'bg-emerald-900/80 text-emerald-200 border-emerald-600/60'
+                          : 'bg-amber-950/80 text-amber-200 border-amber-500/50'
+                      }`}>
+                        {myLingkunganStats.hasPolygon
+                          ? `✓ Batas Poligon Terpetakan (${myLingkunganStats.polygonPointsCount} Sudut)`
+                          : '⚠ Batas Poligon Belum Digambar'}
+                      </span>
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white mt-1">
+                      Hasil Pemetaan Spasial & Potensi {activeAccount.lingkungan}
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Kelurahan Mangga • Terintegrasi langsung dengan Peta Spasial, Wajib Retribusi Sampah (WRS), & PBB
+                    </p>
+                  </div>
+                </div>
+
+                {onNavigateToPemetaan && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToPemetaan(activeAccount.nomorLingkungan)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-colors cursor-pointer shadow-md shrink-0"
+                  >
+                    <Compass className="w-4 h-4" />
+                    <span>Buka Peta WebGIS Lingkungan</span>
+                    <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 6 Key Pemetaan Summary Cards */}
+            <div className="p-5 sm:p-6 bg-slate-50/50 border-b border-slate-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* 1. Titik Rumah & Bangunan */}
+                <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs hover:border-emerald-300 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Titik Rumah Terpetakan
+                    </span>
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                      <Home className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2.5">
+                    <div className="text-2xl sm:text-3xl font-black text-slate-900">
+                      {myLingkunganStats.totalRumah}
+                      <span className="text-xs font-semibold text-slate-500 ml-1.5">Bangunan</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      {myLingkunganStats.totalRumah > 0
+                        ? `Memiliki titik koordinat GPS akurat di ${activeAccount.lingkungan}`
+                        : 'Belum ada titik rumah yang dipetakan di peta'}
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Bansos Terdata:</span>
+                    <strong className="text-emerald-700 font-bold">{myLingkunganStats.bansosKk} KK</strong>
+                  </div>
+                </div>
+
+                {/* 2. Demografi Kependudukan */}
+                <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs hover:border-blue-300 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">
+                      Demografi Penduduk
+                    </span>
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2.5">
+                    <div className="text-2xl sm:text-3xl font-black text-blue-950">
+                      {myLingkunganStats.totalJiwa}
+                      <span className="text-xs font-semibold text-slate-500 ml-1.5">Jiwa</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      L: <strong className="text-slate-800">{myLingkunganStats.totalLakiLaki}</strong> • P: <strong className="text-slate-800">{myLingkunganStats.totalPerempuan}</strong> Jiwa
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Anak: {myLingkunganStats.totalAnak}</span>
+                    <span className="text-slate-500">Lansia: <strong className="text-slate-800">{myLingkunganStats.totalLansia}</strong></span>
+                  </div>
+                </div>
+
+                {/* 3. Status KK (KTP Mangga vs Luar) */}
+                <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs hover:border-purple-300 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-purple-900 uppercase tracking-wider">
+                      Status KK Warga
+                    </span>
+                    <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center">
+                      <Shield className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2.5">
+                    <div className="text-2xl sm:text-3xl font-black text-purple-950">
+                      {myLingkunganStats.persenKkMangga}%
+                      <span className="text-xs font-semibold text-slate-500 ml-1.5">KTP Mangga</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      {myLingkunganStats.kkMangga} KK Asli • {myLingkunganStats.kkLuar} KK Luar/Pendatang
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Total KK Terdata:</span>
+                    <strong className="text-purple-800 font-bold">{myLingkunganStats.totalRumah} KK</strong>
+                  </div>
+                </div>
+
+                {/* 4. Kepatuhan WRS (Retribusi Sampah) */}
+                <div className="bg-white rounded-xl p-4 border-2 border-amber-300 shadow-2xs hover:border-amber-400 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-amber-900 uppercase tracking-wider">
+                      Wajib Retribusi Sampah (WRS)
+                    </span>
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2.5">
+                    <div className="text-2xl sm:text-3xl font-black text-amber-950">
+                      {myLingkunganStats.wrsAktif}
+                      <span className="text-xs font-semibold text-amber-800 ml-1.5">
+                        Aktif ({myLingkunganStats.persenWrsAktif}%)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-1">
+                      Mandiri: {myLingkunganStats.wrsMandiri} • Belum: {myLingkunganStats.wrsBelum}
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-amber-200/60 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-600">Potensi Retribusi:</span>
+                    <strong className="text-emerald-800 font-black">
+                      Rp {myLingkunganStats.potensiRetribusiWrs.toLocaleString('id-ID')}/bln
+                    </strong>
+                  </div>
+                </div>
+
+                {/* 5. Status PBB */}
+                <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs hover:border-emerald-300 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
+                      Status Pajak PBB
+                    </span>
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2.5">
+                    <div className="text-2xl sm:text-3xl font-black text-emerald-800">
+                      {myLingkunganStats.pbbLunas}
+                      <span className="text-xs font-semibold text-slate-500 ml-1.5">
+                        Lunas ({myLingkunganStats.persenPbbLunas}%)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Belum Lunas: {myLingkunganStats.pbbBelumLunas} • Bebas Pajak: {myLingkunganStats.pbbBebas}
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Nominal Terdata:</span>
+                    <strong className="text-emerald-700 font-bold">
+                      Rp {myLingkunganStats.totalNominalPbb.toLocaleString('id-ID')}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* 6. Ruas Jalan & Gang */}
+                <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs hover:border-teal-300 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider">
+                      Infrastruktur Jalan & Gang
+                    </span>
+                    <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center">
+                      <Navigation className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2.5">
+                    <div className="text-2xl sm:text-3xl font-black text-teal-900">
+                      {myLingkunganStats.totalRuasJalan}
+                      <span className="text-xs font-semibold text-slate-500 ml-1.5">Ruas</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Total Panjang: <strong className="text-slate-800">{myLingkunganStats.totalPanjangJalanMeter}</strong> meter
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Kondisi:</span>
+                    <span className="text-xs">
+                      <strong className="text-emerald-700">{myLingkunganStats.jalanBaik} Baik</strong>
+                      {' • '}
+                      <strong className="text-rose-600">{myLingkunganStats.jalanRusak} Rusak</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Riwayat / Daftar Rumah Terpetakan Terbaru */}
+            <div className="p-5 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3.5">
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-emerald-600" />
+                    <span>Daftar Titik Rumah Warga Terpetakan ({myLingkunganStats.totalRumah} Data)</span>
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Data spasial rumah warga yang telah didata oleh {activeAccount.nama} di {activeAccount.lingkungan}
+                  </p>
+                </div>
+                {onNavigateToPemetaan && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToPemetaan(activeAccount.nomorLingkungan)}
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer flex items-center gap-1 self-start sm:self-auto"
+                  >
+                    <span>Buka Semua di WebGIS</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {myLingkunganStats.recentHouses.length === 0 ? (
+                <div className="p-6 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center text-slate-500 space-y-2">
+                  <Home className="w-8 h-8 mx-auto text-slate-400" />
+                  <p className="text-xs font-bold text-slate-700">
+                    Belum ada titik rumah yang dipetakan untuk {activeAccount.lingkungan}.
+                  </p>
+                  <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+                    Gunakan fitur Pemetaan WebGIS untuk menandai titik rumah warga door-to-door, mencatat status WRS, PBB, dan demografi keluarga.
+                  </p>
+                  {onNavigateToPemetaan && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToPemetaan(activeAccount.nomorLingkungan)}
+                      className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                    >
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>Mulai Petakan Rumah Sekarang</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
+                  {myLingkunganStats.recentHouses.slice(0, 5).map((house) => (
+                    <div
+                      key={house.id}
+                      className="p-3.5 sm:p-4 hover:bg-emerald-50/40 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-xs text-slate-900">
+                            {house.namaKepalaKeluarga || 'Tanpa Nama KK'}
+                          </span>
+                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                            house.isKkMangga !== false
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {house.isKkMangga !== false ? 'KTP Mangga' : 'KTP Luar'}
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            house.statusWrs === 'AKTIF'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : house.statusWrs === 'MANDIRI'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-rose-100 text-rose-800'
+                          }`}>
+                            WRS: {house.statusWrs || 'BELUM'}
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            house.statusPbb === 'LUNAS'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            PBB: {house.statusPbb || 'BELUM'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-1">
+                          {house.alamat || house.namaJalan || 'Alamat belum dispesifikasi'}
+                          {house.nomorRumah ? ` No. ${house.nomorRumah}` : ''}
+                          {house.namaGang ? ` (${house.namaGang})` : ''}
+                        </p>
+                        <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-1">
+                          <span>Jiwa: {house.jumlahJiwa || (Number(house.jumlahLakiLaki || 0) + Number(house.jumlahPerempuan || 0)) || 1} orang</span>
+                          <span>•</span>
+                          <span>
+                            Koordinat:{' '}
+                            {(() => {
+                              const rawLat = house.lat ?? (house as any).latitude;
+                              const rawLng = house.lng ?? (house as any).longitude;
+                              const numLat = typeof rawLat === 'number' ? rawLat : (rawLat ? parseFloat(String(rawLat)) : NaN);
+                              const numLng = typeof rawLng === 'number' ? rawLng : (rawLng ? parseFloat(String(rawLng)) : NaN);
+                              return !isNaN(numLat) && !isNaN(numLng)
+                                ? `${numLat.toFixed(5)}, ${numLng.toFixed(5)}`
+                                : 'Belum ditentukan';
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {onNavigateToPemetaan && (
+                        <button
+                          type="button"
+                          onClick={() => onNavigateToPemetaan(activeAccount.nomorLingkungan)}
+                          className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-800 text-xs font-bold transition-colors cursor-pointer self-start sm:self-auto flex items-center gap-1 shrink-0"
+                          title="Buka titik ini di Peta WebGIS"
+                        >
+                          <Compass className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Peta</span>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Grafik Batang Tren Laporan Bulanan (Recharts) */}
           <GrafikTrenBulanan
             reports={reports}
@@ -837,6 +1230,134 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             activeAccount={activeAccount}
             mode="super_admin"
           />
+
+          {/* ========================================================================= */}
+          {/* REKAPITULASI HASIL PEMETAAN SPASIAL 24 LINGKUNGAN (WEBGIS & WRS)         */}
+          {/* ========================================================================= */}
+          <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 rounded-3xl p-5 sm:p-7 text-white border border-emerald-800/40 shadow-xl relative overflow-hidden">
+            <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-emerald-800/60">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 flex items-center justify-center font-black shrink-0 shadow-inner">
+                  <Map className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-slate-950 px-2 py-0.5 rounded shadow-xs">
+                      WebGIS Spasial Kelurahan
+                    </span>
+                    <span className="text-[10px] font-bold bg-white/10 text-emerald-200 px-2 py-0.5 rounded border border-white/15">
+                      {kelurahanPemetaanOverview.totalLingkunganTerpetakan} dari 24 Lingkungan Aktif
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white mt-1">
+                    Rekapitulasi Hasil Pemetaan WebGIS & WRS 24 Lingkungan
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Data spasial titik bangunan warga, kepatuhan Wajib Retribusi Sampah (WRS), dan demografi se-Kelurahan Mangga
+                  </p>
+                </div>
+              </div>
+
+              {onNavigateToPemetaan && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToPemetaan()}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-colors cursor-pointer shadow-md shrink-0 self-start md:self-auto"
+                >
+                  <Compass className="w-4 h-4" />
+                  <span>Buka Peta WebGIS Kelurahan</span>
+                  <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Quick KPI Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-5">
+              <div className="bg-white/5 backdrop-blur-xs rounded-xl p-3 border border-white/10">
+                <span className="text-[10px] font-bold text-emerald-300 uppercase block">
+                  Rumah Terpetakan
+                </span>
+                <div className="text-xl sm:text-2xl font-black text-white mt-1">
+                  {kelurahanPemetaanOverview.totalRumahAll}
+                  <span className="text-xs font-normal text-slate-300 ml-1">Rumah</span>
+                </div>
+                <p className="text-[10px] text-slate-300 mt-0.5">
+                  Titik GPS akurat
+                </p>
+              </div>
+
+              <div className="bg-white/5 backdrop-blur-xs rounded-xl p-3 border border-white/10">
+                <span className="text-[10px] font-bold text-blue-300 uppercase block">
+                  Total Penduduk
+                </span>
+                <div className="text-xl sm:text-2xl font-black text-white mt-1">
+                  {kelurahanPemetaanOverview.totalJiwaAll}
+                  <span className="text-xs font-normal text-slate-300 ml-1">Jiwa</span>
+                </div>
+                <p className="text-[10px] text-slate-300 mt-0.5">
+                  L: {kelurahanPemetaanOverview.totalLakiLakiAll} • P: {kelurahanPemetaanOverview.totalPerempuanAll}
+                </p>
+              </div>
+
+              <div className="bg-white/5 backdrop-blur-xs rounded-xl p-3 border border-white/10">
+                <span className="text-[10px] font-bold text-purple-300 uppercase block">
+                  Status KK
+                </span>
+                <div className="text-xl sm:text-2xl font-black text-white mt-1">
+                  {kelurahanPemetaanOverview.persenKkManggaAll}%
+                  <span className="text-xs font-normal text-slate-300 ml-1">KTP Mangga</span>
+                </div>
+                <p className="text-[10px] text-slate-300 mt-0.5">
+                  {kelurahanPemetaanOverview.totalKkManggaAll} Asli / {kelurahanPemetaanOverview.totalKkLuarAll} Luar
+                </p>
+              </div>
+
+              <div className="bg-white/5 backdrop-blur-xs rounded-xl p-3 border border-white/10">
+                <span className="text-[10px] font-bold text-amber-300 uppercase block">
+                  WRS Aktif
+                </span>
+                <div className="text-xl sm:text-2xl font-black text-amber-300 mt-1">
+                  {kelurahanPemetaanOverview.totalWrsAktifAll}
+                  <span className="text-xs font-normal text-slate-300 ml-1">
+                    ({kelurahanPemetaanOverview.persenWrsAktifAll}%)
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-300 mt-0.5">
+                  Rp {kelurahanPemetaanOverview.potensiRetribusiWrsAll.toLocaleString('id-ID')}/bln
+                </p>
+              </div>
+
+              <div className="bg-white/5 backdrop-blur-xs rounded-xl p-3 border border-white/10">
+                <span className="text-[10px] font-bold text-emerald-300 uppercase block">
+                  PBB Lunas
+                </span>
+                <div className="text-xl sm:text-2xl font-black text-emerald-300 mt-1">
+                  {kelurahanPemetaanOverview.totalPbbLunasAll}
+                  <span className="text-xs font-normal text-slate-300 ml-1">
+                    ({kelurahanPemetaanOverview.persenPbbLunasAll}%)
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-300 mt-0.5">
+                  Rp {kelurahanPemetaanOverview.totalNominalPbbAll.toLocaleString('id-ID')}
+                </p>
+              </div>
+
+              <div className="bg-white/5 backdrop-blur-xs rounded-xl p-3 border border-white/10">
+                <span className="text-[10px] font-bold text-teal-300 uppercase block">
+                  Ruas Jalan & Gang
+                </span>
+                <div className="text-xl sm:text-2xl font-black text-teal-300 mt-1">
+                  {kelurahanPemetaanOverview.totalRuasJalanAll}
+                  <span className="text-xs font-normal text-slate-300 ml-1">Ruas</span>
+                </div>
+                <p className="text-[10px] text-slate-300 mt-0.5">
+                  {kelurahanPemetaanOverview.totalPanjangJalanMeterAll} Meter terdata
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Leaderboard & Ranking Section */}
           <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-7 shadow-sm">
@@ -1050,9 +1571,19 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                         <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" title="Capaian disesuaikan Super Admin" />
                       )}
                     </div>
-                    <div className="text-[11px] text-slate-500 font-medium">
-                      {item.kepling.lingkungan}
-                    </div>
+                    {(() => {
+                      const lingStats = kelurahanPemetaanOverview.perLingkunganMap[item.kepling.id];
+                      return (
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mt-0.5">
+                          <span>{item.kepling.lingkungan}</span>
+                          {lingStats && lingStats.totalRumah > 0 && (
+                            <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.5 rounded border border-emerald-200">
+                              {lingStats.totalRumah} Rumah
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Perlinsos: Capaian & Target & Persentase (Kolom Utama Ranking) */}
@@ -1110,8 +1641,19 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </div>
                   </div>
 
-                  {/* Aksi Buttons: Edit Target & Riwayat */}
+                  {/* Aksi Buttons: Edit Target & Riwayat & Peta */}
                   <div className="col-span-1 flex items-center justify-end gap-1.5 w-full md:w-auto">
+                    {onNavigateToPemetaan && (
+                      <button
+                        type="button"
+                        onClick={() => onNavigateToPemetaan(item.kepling.nomorLingkungan)}
+                        className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors cursor-pointer border border-emerald-200"
+                        title={`Buka Peta WebGIS ${item.kepling.lingkungan}`}
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-emerald-700" />
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => {

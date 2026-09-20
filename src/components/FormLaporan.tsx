@@ -17,7 +17,11 @@ import {
 } from 'lucide-react';
 import { getMaximumAccuracyPosition } from '../lib/geoService';
 import { FormKunjunganWarga, KunjunganWargaData } from './FormKunjunganWarga';
-import { LaporanHarianItem, FotoDokumentasi, KinerjaHarian, UserAccount, AbsenApelItem } from '../types';
+import { LaporanHarianItem, FotoDokumentasi, KinerjaHarian, UserAccount, AbsenApelItem, CustomEvent, EventAttendance } from '../types';
+import {
+  subscribeCustomEventsFromFirestore,
+  subscribeEventAttendanceFromFirestore,
+} from '../lib/firestoreService';
 import {
   getNamaHariIndonesia,
   formatTanggalIndonesia,
@@ -43,6 +47,7 @@ interface FormLaporanProps {
 const STORAGE_KEY_PROFILE = 'kepling_profile_data';
 
 const LAINNYA_OPTIONS_PRESET = [
+  'Gotong Royong',
   'Posko Trantibum Kelurahan',
   'Posko Bersemi',
   'Posko Patam',
@@ -75,6 +80,17 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
   // Attendance Apel state
   const [todayApel, setTodayApel] = useState<AbsenApelItem | null>(null);
+  const [eventList, setEventList] = useState<CustomEvent[]>([]);
+  const [eventAttendanceList, setEventAttendanceList] = useState<EventAttendance[]>([]);
+
+  useEffect(() => {
+    const unsubEvents = subscribeCustomEventsFromFirestore((data) => setEventList(data));
+    const unsubAttendance = subscribeEventAttendanceFromFirestore((data) => setEventAttendanceList(data));
+    return () => {
+      unsubEvents();
+      unsubAttendance();
+    };
+  }, []);
 
   // Selected account in form dropdown
   const initialAccount = preselectedKepling || activeAccount || KEPLING_ACCOUNTS[0];
@@ -176,7 +192,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     return `( Jalan ${displayJalan} ${lkStr} Kelurahan Mangga Kecamatan Medan Tuntungan )`;
   };
 
-  const [infrastrukturAdaGiat, setInfrastrukturAdaGiat] = useState<boolean>(true);
+  // Poin 6: Kegiatan Pemantauan Kondisi Infrastruktur Wilayah (Default false / Manual, tidak otomatis centang)
+  const [infrastrukturAdaGiat, setInfrastrukturAdaGiat] = useState<boolean>(false);
   const [infrastrukturSubjek, setInfrastrukturSubjek] = useState<string>('Jalan Berlubang / Rusak');
   const [infrastrukturNamaJalan, setInfrastrukturNamaJalan] = useState<string>('');
   const [infrastrukturLokasi, setInfrastrukturLokasi] = useState<string>(() =>
@@ -614,6 +631,9 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       setKegiatanLainnya('');
       setSelectedLainnyaOptions([]);
       setKegiatanLainnyaCustomText('');
+      setInfrastrukturAdaGiat(false);
+      setInfrastrukturNamaJalan('');
+      setInfrastrukturTitikKoordinat('');
       setFotoList([]);
       setShowPhotoValidationModal(false);
     } catch (err) {
@@ -712,6 +732,10 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
             {/* Presensi Apel Pagi Status Card */}
             {(() => {
+              const date = new Date();
+              const day = date.getDay();
+              if (day === 0 || day === 6) return null;
+
               const timeStat = checkApelTimeStatus();
               const isPastWindow = timeStat.isLate || !timeStat.isWorkDay;
               const isAbsent = !todayApel && isPastWindow;
@@ -769,7 +793,9 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                             const absentStat = calculateAbsentDays(
                               attendanceList,
                               selectedAccountId,
-                              rawDate
+                              rawDate,
+                              eventList,
+                              eventAttendanceList
                             );
                             return (
                               <span className="inline-block px-2.5 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10px] tracking-wide shadow-2xs">
@@ -805,14 +831,14 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
             })()}
 
             {/* Information Banner: Kumulatif Harian */}
-            <div className="bg-blue-50/80 p-3.5 rounded-xl border border-blue-200 flex items-start gap-2.5 text-xs text-blue-900">
-              <span className="text-base shrink-0">📊</span>
+            <div className="bg-blue-50/80 p-5 rounded-2xl border border-blue-200 flex items-start gap-4 text-blue-900 shadow-sm">
+              <span className="text-3xl shrink-0">📊</span>
               <div>
-                <span className="font-bold block text-blue-950">
-                  Laporan Bersifat Kumulatif & Akumulatif Harian
+                <span className="font-black block text-blue-950 text-base mb-1">
+                  Laporan Pelaksanaan Kegiatan Harian (Full-Day)
                 </span>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-blue-800">
-                  Anda dapat mengisi laporan beberapa kali di jam yang berbeda dalam hari yang sama (misal: pkl 09.30 & pkl 12.00). Sistem secara otomatis mengumpulkan & menggabungkan seluruh angka kinerja, rincian catatan, serta foto menjadi <strong>1 Laporan Akhir Konsolidasi Hari Ini</strong>.
+                <p className="text-sm leading-relaxed text-blue-900">
+                  Sistem ini mencatat seluruh aktivitas Anda selama <strong>1 hari penuh</strong>. Anda dapat melakukan pengisian data secara bertahap di jam yang berbeda dalam hari yang sama. Sistem secara otomatis mengonsolidasikan seluruh angka kinerja, catatan, dan dokumentasi foto ke dalam <strong>1 Laporan Akhir yang utuh untuk hari ini</strong>.
                 </p>
               </div>
             </div>

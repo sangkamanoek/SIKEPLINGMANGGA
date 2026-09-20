@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { printOfficialDocument } from '../utils/printHelper';
 import {
   Landmark,
@@ -19,6 +19,7 @@ import {
   FileText,
   UserCheck,
   Smartphone,
+  Coins,
   X,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -26,12 +27,21 @@ import { LaporanHarianItem, TargetsCapaianMap, UserAccount, AbsenApelItem } from
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { RekapAbsensiSuperAdmin } from './RekapAbsensiSuperAdmin';
 import { calculateEffectiveKinerja } from '../data/targetsData';
+import {
+  AVAILABLE_PBB_YEARS,
+  DEFAULT_PBB_YEAR,
+  getLocalSpptForYear,
+  computePbbOverview,
+  subscribePbbSpptFromFirestore,
+} from '../lib/pbbService';
+import { SpptPbbItem } from '../data/pbbSampleData';
 
 interface DashboardPbbKasiProps {
   reports: LaporanHarianItem[];
   targetsMap: TargetsCapaianMap;
   currentUser: UserAccount;
   onSelectKeplingRiwayat?: (namaKepling: string) => void;
+  onOpenRekapPbb?: () => void;
   attendanceList: AbsenApelItem[];
   selectedDate: string;
   onDateChange: (date: string) => void;
@@ -46,6 +56,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   targetsMap,
   currentUser,
   onSelectKeplingRiwayat,
+  onOpenRekapPbb,
   attendanceList,
   selectedDate,
   onDateChange,
@@ -54,6 +65,35 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   const [period, setPeriod] = useState<PeriodFilter>('all');
   const [subView, setSubView] = useState<ActiveSubView>('pbb');
   const [searchQuery, setSearchQuery] = useState('');
+  const [pbbYear, setPbbYear] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('sikepling_pbb_selected_year');
+      if (saved) {
+        const num = parseInt(saved, 10);
+        if (AVAILABLE_PBB_YEARS.includes(num)) return num;
+      }
+    } catch {}
+    return DEFAULT_PBB_YEAR;
+  });
+
+  // Real-time SPPT & Realisasi Data
+  const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => getLocalSpptForYear(pbbYear));
+
+  useEffect(() => {
+    setSpptList(getLocalSpptForYear(pbbYear));
+    const unsub = subscribePbbSpptFromFirestore(pbbYear, (items) => {
+      if (items && items.length > 0) setSpptList(items);
+    });
+    return () => unsub();
+  }, [pbbYear]);
+
+  const pbbOverview = useMemo(() => {
+    return computePbbOverview(spptList, pbbYear);
+  }, [spptList, pbbYear]);
+
+  const formatRupiah = (val: number) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+  };
 
   // 1. Filter reports based on selected period
   const filteredReports = useMemo(() => {
@@ -469,7 +509,123 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
 
       {subView === 'pbb' && (
         <>
-          {/* KPI Cards Ringkasan PBB */}
+          {/* Realisasi Penerimaan Ketetapan PBB-P2 24 Lingkungan (SPPT Nominal & Kepatuhan) */}
+          <div className="bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 rounded-3xl p-6 text-white border border-emerald-800/60 shadow-xl space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0">
+                  <Coins className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase tracking-wider">
+                      Database SPPT Resmi
+                    </span>
+                    <span className="text-xs text-emerald-300 font-bold">24 Lingkungan</span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-white mt-1">
+                    Realisasi Penerimaan PBB-P2 Kelurahan Mangga
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Year Selector */}
+                <div className="flex items-center gap-1.5 bg-emerald-900/80 border border-emerald-500/50 px-3 py-1.5 rounded-xl shadow-xs">
+                  <Calendar className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-300">Tahun:</span>
+                  <select
+                    value={pbbYear}
+                    onChange={(e) => {
+                      const yr = parseInt(e.target.value, 10);
+                      setPbbYear(yr);
+                      try {
+                        localStorage.setItem('sikepling_pbb_selected_year', String(yr));
+                      } catch {}
+                    }}
+                    className="bg-emerald-950 text-amber-300 text-xs font-black rounded-lg px-2 py-1 border border-emerald-400/50 focus:outline-none cursor-pointer"
+                  >
+                    {AVAILABLE_PBB_YEARS.map((yr) => (
+                      <option key={yr} value={yr} className="bg-slate-900 text-white font-bold">
+                        {yr} {yr === 2026 ? '★ (Default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {onOpenRekapPbb && (
+                  <button
+                    type="button"
+                    onClick={onOpenRekapPbb}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-98 text-slate-950 text-xs font-black transition-all cursor-pointer shadow-md"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>Buka Rincian SPPT & Rekap</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Realisasi KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
+                  Target Ketetapan PBB ({pbbYear})
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-white block mt-1">
+                  {formatRupiah(pbbOverview.totalTargetNominal)}
+                </span>
+                <span className="text-[11px] text-emerald-300 mt-1 block">
+                  Dari 24 Lingkungan Kelurahan
+                </span>
+              </div>
+
+              <div className="bg-emerald-900/50 backdrop-blur-md p-4 rounded-2xl border border-emerald-500/40">
+                <span className="text-[11px] font-bold text-emerald-200 uppercase tracking-wider block">
+                  Realisasi Terbayar (Lunas)
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-amber-300 block mt-1">
+                  {formatRupiah(pbbOverview.totalRealisasiNominal)}
+                </span>
+                <div className="flex items-center justify-between text-[11px] text-emerald-200 mt-1">
+                  <span>Capaian:</span>
+                  <span className="font-bold text-white">{pbbOverview.persentaseRealisasiNominal.toFixed(2)}%</span>
+                </div>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                <span className="text-[11px] font-bold text-rose-300 uppercase tracking-wider block">
+                  Sisa Belum Bayar
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-rose-200 block mt-1">
+                  {formatRupiah(pbbOverview.totalSisaNominal)}
+                </span>
+                <span className="text-[11px] text-slate-300 mt-1 block">
+                  Tunggakan Wajib Pajak
+                </span>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
+                  Kepatuhan Wajib Pajak
+                </span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-xl sm:text-2xl font-black text-white">
+                    {pbbOverview.totalWpLunas}
+                  </span>
+                  <span className="text-xs text-slate-300">/ {pbbOverview.totalWp} WP Lunas</span>
+                </div>
+                <div className="mt-2 w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-amber-400 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(pbbOverview.persentaseWpLunas, 100)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI Cards Ringkasan Opsir Harian PBB */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Card 1: Total Realisasi WP */}
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">

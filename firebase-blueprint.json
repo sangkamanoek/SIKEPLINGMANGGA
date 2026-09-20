@@ -179,6 +179,22 @@
         "lokasiGps": "string",
         "catatan": "string"
       }
+    },
+    {
+      "name": "pbb_sppt",
+      "description": "Data SPPT Wajib Pajak PBB-P2 24 Lingkungan Kelurahan Mangga per tahun pajak",
+      "fields": {
+        "id": "string",
+        "no": "number",
+        "nop": "string",
+        "buku": "string",
+        "namaWp": "string",
+        "alamatOp": "string",
+        "pbbTerutang": "number",
+        "status": "string",
+        "lingkungan": "number",
+        "keterangan": "string"
+      }
     }
   ]
 }
