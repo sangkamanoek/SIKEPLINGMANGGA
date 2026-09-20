@@ -3,6 +3,7 @@ import {
   doc,
   getDocs,
   setDoc,
+  deleteDoc,
   writeBatch,
   onSnapshot,
   Unsubscribe,
@@ -240,6 +241,21 @@ export async function batchSavePbbSpptToFirestore(items: SpptPbbItem[], year: nu
   } catch (err) {
     console.warn('Error batch saving SPPT to Firestore:', err);
     return 0;
+  }
+}
+
+/**
+ * Delete SPPT item from Firebase Firestore
+ */
+export async function deletePbbSpptFromFirestore(id: string, year: number = DEFAULT_PBB_YEAR): Promise<boolean> {
+  try {
+    const colName = `${PBB_COLLECTION_PREFIX}${year}`;
+    const docRef = doc(db, colName, id);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err) {
+    console.warn(`Error deleting SPPT ${id} from Firestore:`, err);
+    return false;
   }
 }
 

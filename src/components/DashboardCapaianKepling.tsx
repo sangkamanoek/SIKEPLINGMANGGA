@@ -50,6 +50,8 @@ import {
   Home,
   Check,
   Phone,
+  Coins,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   getLocalHouses,
@@ -62,6 +64,14 @@ import {
   computeKelurahanPemetaanOverview,
 } from '../lib/pemetaanStatsHelper';
 import { TitikRumahBangunan, RuasJalanLingkungan, LingkunganPolygon } from '../types';
+import {
+  AVAILABLE_PBB_YEARS,
+  DEFAULT_PBB_YEAR,
+  getLocalSpptForYear,
+  computePbbOverview,
+  subscribePbbSpptFromFirestore,
+} from '../lib/pbbService';
+import { SpptPbbItem } from '../data/pbbSampleData';
 
 interface DashboardCapaianKeplingProps {
   reports: LaporanHarianItem[];
@@ -71,6 +81,7 @@ interface DashboardCapaianKeplingProps {
   onOpenReportDetail?: (report: LaporanHarianItem) => void;
   onNavigateToForm?: () => void;
   onNavigateToPemetaan?: (lingkunganNomor?: number) => void;
+  onOpenRekapPbb?: () => void;
 }
 
 type PeriodFilter = 'TODAY' | '7_DAYS' | 'THIS_MONTH' | 'ALL';
@@ -83,6 +94,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   onOpenReportDetail,
   onNavigateToForm,
   onNavigateToPemetaan,
+  onOpenRekapPbb,
 }) => {
   const [period, setPeriod] = useState<PeriodFilter>('THIS_MONTH');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -121,6 +133,39 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   const [targetsMap, setTargetsMap] = useState<TargetsCapaianMap>(getDefaultTargetsCapaianMap);
   const [isModalEditOpen, setIsModalEditOpen] = useState(false);
   const [editingKepling, setEditingKepling] = useState<UserAccount | null>(null);
+
+  // Real-time SPPT & Realisasi PBB State
+  const [pbbYear, setPbbYear] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('sikepling_pbb_selected_year');
+      if (saved) {
+        const num = parseInt(saved, 10);
+        if (AVAILABLE_PBB_YEARS.includes(num)) return num;
+      }
+    } catch {}
+    return DEFAULT_PBB_YEAR;
+  });
+  const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => getLocalSpptForYear(pbbYear));
+
+  useEffect(() => {
+    setSpptList(getLocalSpptForYear(pbbYear));
+    const unsub = subscribePbbSpptFromFirestore(pbbYear, (items) => {
+      if (items && items.length > 0) setSpptList(items);
+    });
+    return () => unsub();
+  }, [pbbYear]);
+
+  const pbbOverview = useMemo(() => {
+    return computePbbOverview(spptList, pbbYear);
+  }, [spptList, pbbYear]);
+
+  const myPbbStats = useMemo(() => {
+    return pbbOverview.lingkunganSummaries.find(lk => lk.lingkungan === (activeAccount.nomorLingkungan || 1));
+  }, [pbbOverview, activeAccount.nomorLingkungan]);
+
+  const formatRupiah = (val: number) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+  };
 
   // Load targets & capaian from server / local on mount
   useEffect(() => {
@@ -704,6 +749,90 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               </div>
             );
           })()}
+
+          {/* ========================================================================= */}
+          {/* REALISASI PBB-P2 (DATABASE SPPT RESMI)                                   */}
+          {/* ========================================================================= */}
+          {myPbbStats && (
+            <div className="bg-gradient-to-br from-slate-900 to-emerald-950 rounded-3xl p-6 text-white border border-emerald-800/60 shadow-xl space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0">
+                    <Coins className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase tracking-wider">
+                        Realisasi PBB-P2 Resmi
+                      </span>
+                      <span className="text-xs text-emerald-300 font-bold">Database SPPT {pbbYear}</span>
+                    </div>
+                    <h3 className="text-lg font-black text-white mt-0.5">
+                      Status Capaian Ketetapan PBB {activeAccount.lingkungan}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 bg-emerald-900/80 border border-emerald-500/50 px-3 py-1.5 rounded-xl">
+                  <Calendar className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-300">Tahun:</span>
+                  <select
+                    value={pbbYear}
+                    onChange={(e) => setPbbYear(parseInt(e.target.value, 10))}
+                    className="bg-transparent text-amber-300 text-xs font-black focus:outline-none cursor-pointer"
+                  >
+                    {AVAILABLE_PBB_YEARS.map((yr) => (
+                      <option key={yr} value={yr} className="bg-slate-900 text-white font-bold">
+                        {yr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Target Ketetapan</span>
+                  <span className="text-lg font-black text-white block mt-0.5">{formatRupiah(myPbbStats.targetNominal)}</span>
+                </div>
+                <div className="bg-emerald-800/40 p-4 rounded-2xl border border-emerald-500/30">
+                  <span className="text-[10px] font-bold text-emerald-200 uppercase tracking-widest block">Realisasi Lunas</span>
+                  <span className="text-lg font-black text-amber-300 block mt-0.5">{formatRupiah(myPbbStats.realisasiNominal)}</span>
+                  <div className="mt-2 w-full bg-emerald-950 h-1.5 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-amber-400 h-full" 
+                      style={{ width: `${Math.min(myPbbStats.persentaseRealisasi, 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">WP Lunas</span>
+                  <div className="flex items-baseline gap-1.5 mt-0.5">
+                    <span className="text-lg font-black text-white">{myPbbStats.wpLunas}</span>
+                    <span className="text-xs text-slate-400">/ {myPbbStats.totalWp} SPPT</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-emerald-300 mt-2 font-bold">
+                    <span>Kepatuhan:</span>
+                    <span>{myPbbStats.persentaseWpLunas.toFixed(1)}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-white/10">
+                <p className="text-[11px] text-slate-400 italic">
+                  * Data disinkronisasi langsung dari database SPPT resmi Kelurahan Mangga secara real-time.
+                </p>
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold transition-all border border-white/10 flex items-center gap-1.5"
+                  onClick={() => onOpenRekapPbb?.()}
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Lihat Rincian Daftar SPPT</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* ========================================================================= */}
           {/* HASIL PEMETAAN SPASIAL & POTENSI LINGKUNGAN (WEBGIS, DEMOGRAFI & WRS)     */}

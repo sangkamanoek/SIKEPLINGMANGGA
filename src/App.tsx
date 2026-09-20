@@ -1131,6 +1131,7 @@ export default function App() {
                   setRiwayatFilterPetugas(keplingName);
                   setActiveTab('riwayat');
                 }}
+                onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
               />
             )}
             {activeAccount.role === 'kasi_pembangunan' && (
@@ -1187,6 +1188,7 @@ export default function App() {
             }}
             onNavigateToForm={() => setActiveTab('form')}
             onNavigateToPemetaan={handleNavigateToPemetaan}
+            onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
           />
         )}
 
@@ -1206,6 +1208,7 @@ export default function App() {
             }}
             onNavigateToForm={() => setActiveTab('form')}
             onNavigateToPemetaan={handleNavigateToPemetaan}
+            onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
           />
         )}
 
@@ -1233,6 +1236,7 @@ export default function App() {
               onSeedInitialReports={handleSeedInitialReports}
               onOpenCapaianDashboard={() => setActiveTab('capaian_admin')}
               onOpenPemetaan={handleNavigateToPemetaan}
+              onOpenPbb={() => setActiveTab('rekap_pbb')}
               sheetMeta={sheetMeta}
             />
           </ErrorBoundary>

@@ -32,6 +32,7 @@ import {
   Home,
   Phone,
   Filter,
+  Coins,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -700,6 +701,26 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
 
         <button
           type="button"
+          onClick={() => setActiveMainTab('PBB_REALISASI')}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
+            activeMainTab === 'PBB_REALISASI'
+              ? 'bg-amber-400 text-slate-950 shadow-sm border border-amber-300'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <Coins className="w-4 h-4 text-amber-600" />
+          <span>Realisasi PBB-P2</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold hidden sm:inline-block ${
+            activeMainTab === 'PBB_REALISASI'
+              ? 'bg-white/40 text-slate-950'
+              : 'bg-amber-100 text-amber-800'
+          }`}>
+            {pbbOverview.persentaseRealisasiNominal.toFixed(1)}% Lunas
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveMainTab('PEMETAAN')}
           className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
             activeMainTab === 'PEMETAAN'
@@ -719,7 +740,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
         </button>
       </div>
 
-      {activeMainTab === 'LAPORAN' ? (
+      {activeMainTab === 'LAPORAN' && (
         <>
           {/* Quick Notice to WebGIS Pemetaan */}
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
@@ -1150,10 +1171,189 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
         </div>
       )}
       </>
-      ) : (
-        /* ===================================================================== */
-        /* HASIL PEMETAAN SPASIAL & POTENSI 24 LINGKUNGAN (WEBGIS & WRS)         */
-        /* ===================================================================== */
+      )}
+
+      {activeMainTab === 'PBB_REALISASI' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          {/* Header & Global Stats */}
+          <div className="bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 rounded-3xl p-6 text-white border border-emerald-800/60 shadow-xl space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0">
+                  <Coins className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase tracking-wider">
+                      Database SPPT Resmi
+                    </span>
+                    <span className="text-xs text-emerald-300 font-bold">24 Lingkungan</span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-white mt-1">
+                    Monitoring Realisasi Penerimaan PBB-P2
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-emerald-900/80 border border-emerald-500/50 px-3 py-1.5 rounded-xl shadow-xs">
+                  <Calendar className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-300">Tahun:</span>
+                  <select
+                    value={pbbYear}
+                    onChange={(e) => {
+                      const yr = parseInt(e.target.value, 10);
+                      setPbbYear(yr);
+                      try {
+                        localStorage.setItem('sikepling_pbb_selected_year', String(yr));
+                      } catch {}
+                    }}
+                    className="bg-emerald-950 text-amber-300 text-xs font-black rounded-lg px-2 py-1 border border-emerald-400/50 focus:outline-none cursor-pointer"
+                  >
+                    {AVAILABLE_PBB_YEARS.map((yr) => (
+                      <option key={yr} value={yr} className="bg-slate-900 text-white font-bold">
+                        {yr} {yr === 2026 ? '★' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {onOpenPbb && (
+                  <button
+                    type="button"
+                    onClick={onOpenPbb}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-98 text-slate-950 text-xs font-black transition-all cursor-pointer shadow-md"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>Buka Rincian SPPT & Rekap</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">Target Ketetapan</span>
+                <span className="text-xl font-black text-white block mt-1">{formatRupiah(pbbOverview.totalTargetNominal)}</span>
+              </div>
+              <div className="bg-emerald-900/50 backdrop-blur-md p-4 rounded-2xl border border-emerald-500/40">
+                <span className="text-[11px] font-bold text-emerald-200 uppercase tracking-wider block">Realisasi (Lunas)</span>
+                <span className="text-xl font-black text-amber-300 block mt-1">{formatRupiah(pbbOverview.totalRealisasiNominal)}</span>
+                <div className="flex items-center justify-between text-[11px] text-emerald-200 mt-1">
+                  <span>Capaian:</span>
+                  <span className="font-bold text-white">{pbbOverview.persentaseRealisasiNominal.toFixed(2)}%</span>
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                <span className="text-[11px] font-bold text-rose-300 uppercase tracking-wider block">Sisa Belum Bayar</span>
+                <span className="text-xl font-black text-rose-200 block mt-1">{formatRupiah(pbbOverview.totalSisaNominal)}</span>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">Kepatuhan Wajib Pajak</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-xl font-black text-white">{pbbOverview.totalWpLunas}</span>
+                  <span className="text-xs text-slate-300">/ {pbbOverview.totalWp} WP</span>
+                </div>
+                <div className="mt-2 w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-amber-400 h-full"
+                    style={{ width: `${Math.min(pbbOverview.persentaseWpLunas, 100)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Detailed Table for 24 Lingkungan */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-black text-slate-900">Rincian Realisasi per Lingkungan</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Pemantauan progres ketetapan PBB-P2 24 Lingkungan</p>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari Lingkungan..."
+                  value={pbbSearch}
+                  onChange={(e) => setPbbSearch(e.target.value)}
+                  className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none w-full sm:w-64"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[800px]">
+                <thead className="bg-slate-50">
+                  <tr className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                    <th className="py-3 px-5 border-b border-slate-100">No. Lingkungan</th>
+                    <th className="py-3 px-5 border-b border-slate-100">Target Nominal</th>
+                    <th className="py-3 px-5 border-b border-slate-100">Realisasi (Lunas)</th>
+                    <th className="py-3 px-5 border-b border-slate-100 text-center">% Realisasi</th>
+                    <th className="py-3 px-5 border-b border-slate-100">Sisa Nominal</th>
+                    <th className="py-3 px-5 border-b border-slate-100 text-center">WP Lunas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pbbOverview.lingkunganSummaries
+                    .filter(lk => lk.lingkungan.toString().includes(pbbSearch))
+                    .map((lk) => (
+                    <tr key={lk.lingkungan} className="hover:bg-slate-50 transition-colors text-xs group">
+                      <td className="py-4 px-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
+                            {lk.lingkungan}
+                          </div>
+                          <span className="font-bold text-slate-700">Lingkungan {lk.lingkungan}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-5 font-semibold text-slate-600">
+                        {formatRupiah(lk.targetNominal)}
+                      </td>
+                      <td className="py-4 px-5">
+                        <span className="font-bold text-emerald-700">{formatRupiah(lk.realisasiNominal)}</span>
+                      </td>
+                      <td className="py-4 px-5 text-center">
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                            lk.persentaseRealisasi >= 90 ? 'bg-emerald-100 text-emerald-700' : 
+                            lk.persentaseRealisasi >= 50 ? 'bg-amber-100 text-amber-700' : 
+                            'bg-rose-100 text-rose-700'
+                          }`}>
+                            {lk.persentaseRealisasi.toFixed(1)}%
+                          </span>
+                          <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${
+                                lk.persentaseRealisasi >= 90 ? 'bg-emerald-500' : 
+                                lk.persentaseRealisasi >= 50 ? 'bg-amber-500' : 
+                                'bg-rose-500'
+                              }`}
+                              style={{ width: `${Math.min(lk.persentaseRealisasi, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-5 font-bold text-rose-600">
+                        {formatRupiah(lk.sisaNominal)}
+                      </td>
+                      <td className="py-4 px-5 text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="font-black text-slate-900">{lk.wpLunas}</span>
+                          <span className="text-[10px] text-slate-400">/ {lk.totalWp} WP</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeMainTab === 'PEMETAAN' && (
         <div className="space-y-6">
           {/* Header Banner */}
           <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 rounded-2xl p-5 sm:p-6 text-white border border-emerald-800/50 shadow-xl relative overflow-hidden">

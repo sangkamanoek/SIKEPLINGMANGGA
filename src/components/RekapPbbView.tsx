@@ -42,6 +42,7 @@ import {
   saveLocalSpptForYear,
   savePbbSpptToFirestore,
   batchSavePbbSpptToFirestore,
+  deletePbbSpptFromFirestore,
   subscribePbbSpptFromFirestore,
   fetchPbbSpptFromFirestore,
 } from '../lib/pbbService';
@@ -272,7 +273,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const handleDeleteWpItem = (item: SpptPbbItem) => {
     if (window.confirm(`Apakah Anda yakin ingin menghapus Wajib Pajak "${item.namaWp}" (NOP: ${item.nop})?`)) {
       setSpptList((prev) => prev.filter((i) => i.id !== item.id));
-      notify(`Wajib Pajak "${item.namaWp}" berhasil dihapus.`, 'info');
+      deletePbbSpptFromFirestore(item.id, selectedYear).catch(() => {});
+      notify(`Wajib Pajak "${item.namaWp}" berhasil dihapus dari sistem.`, 'info');
     }
   };
 
