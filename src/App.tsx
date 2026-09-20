@@ -69,6 +69,7 @@ import {
   syncLocalReportsToServer,
   seedInitialReports,
 } from './lib/reportsApi';
+import { getReportsFromIndexedDB } from './lib/indexedDbStorage';
 
 const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
 
@@ -195,17 +196,27 @@ export default function App() {
     }
   }, []);
 
-  // Load local backup reports
-  const loadLocalReports = () => {
+  // Load local backup reports from IndexedDB / LocalStorage
+  const loadLocalReports = async () => {
     try {
       const deletedIds = getLocalDeletedReportIds();
+      // 1. Try IndexedDB first (high-capacity, contains all reports & photos)
+      const idbItems = await getReportsFromIndexedDB();
+      if (Array.isArray(idbItems) && idbItems.length > 0) {
+        const active = idbItems.filter((r) => r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r));
+        if (active.length > 0) {
+          setReports(active);
+          return;
+        }
+      }
+
+      // 2. Fallback to LocalStorage
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
       if (stored) {
         const parsed: LaporanHarianItem[] = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          const active = parsed.filter((r) => r && r.id && !deletedIds.has(r.id));
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const active = parsed.filter((r) => r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r));
           setReports(active);
-          safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(active));
         }
       }
     } catch (e) {

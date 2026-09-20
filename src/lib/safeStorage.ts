@@ -4,6 +4,8 @@
  * fallback in-memory adapters, and input sanitization helpers.
  */
 
+import { saveReportsToIndexedDB } from './indexedDbStorage';
+
 const memoryFallbackStorage = new Map<string, string>();
 
 /**
@@ -34,12 +36,25 @@ export function safeGetLocalStorage<T>(key: string, defaultValue: T): T {
 }
 
 /**
- * Safely set localStorage items with defensive quota recovery
+ * Safely set localStorage items with defensive quota recovery.
+ * NEVER drops or slices records; strips heavy base64 strings on quota error to keep ALL reports intact.
  */
 export function safeSetLocalStorage(key: string, value: string): boolean {
   try {
-    localStorage.setItem(key, value);
+    // Keep in memory map first
     memoryFallbackStorage.set(key, value);
+
+    // If it's a reports array, also save full data to IndexedDB asynchronously
+    try {
+      if (key.includes('laporan') || key.includes('reports')) {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          saveReportsToIndexedDB(parsed).catch(() => {});
+        }
+      }
+    } catch {}
+
+    localStorage.setItem(key, value);
     return true;
   } catch (error: any) {
     const isQuotaError =
@@ -50,41 +65,52 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
         error.code === 1014);
 
     if (isQuotaError) {
-      console.warn(`[safeStorage] LocalStorage quota exceeded for key "${key}". Initiating defensive cleanup...`);
+      console.warn(`[safeStorage] LocalStorage quota exceeded for key "${key}". Initiating defensive compression across ALL records...`);
 
-      // 1. Remove obsolete or volatile items
+      // 1. Remove obsolete or volatile items to free space
       try {
         localStorage.removeItem('cleaned_reports_v2_kepling21');
         localStorage.removeItem('google_cached_access_token');
       } catch {}
 
-      // 2. If it's a report array, create a trimmed lightweight offline version
+      // 2. If it's a report array, compress heavy base64 photo payloads while keeping ALL items intact (NEVER slice!)
       try {
         const parsed = JSON.parse(value);
         if (Array.isArray(parsed)) {
-          const lightweight = parsed.slice(0, 20).map((item: any) => ({
-            ...item,
-            dokumentasiFoto: Array.isArray(item.dokumentasiFoto)
-              ? item.dokumentasiFoto.map((f: any) => ({
+          // Asynchronously persist full data with photos to IndexedDB
+          saveReportsToIndexedDB(parsed).catch(() => {});
+
+          // Preserve ALL items, stripping heavy base64 strings to ensure 100% fit in LocalStorage
+          const lightweight = parsed.map((item: any) => {
+            if (!item || typeof item !== 'object') return item;
+            const copy = { ...item };
+            if (Array.isArray(copy.dokumentasiFoto)) {
+              copy.dokumentasiFoto = copy.dokumentasiFoto.map((f: any) => {
+                if (!f) return f;
+                const isHeavy = typeof f.url === 'string' && f.url.startsWith('data:') && f.url.length > 500;
+                return {
                   ...f,
-                  url:
-                    typeof f.url === 'string' && f.url.startsWith('data:') && f.url.length > 20000
-                      ? f.url.substring(0, 500) + '...[truncated]'
-                      : f.url,
-                }))
-              : [],
-          }));
+                  url: isHeavy ? '' : f.url,
+                };
+              });
+            }
+            if (copy.absenApel && typeof copy.absenApel === 'object') {
+              copy.absenApel = {
+                ...copy.absenApel,
+                fotoApel: '',
+                fotoBase64: '',
+              };
+            }
+            return copy;
+          });
 
           localStorage.setItem(key, JSON.stringify(lightweight));
-          memoryFallbackStorage.set(key, JSON.stringify(lightweight));
           return true;
         }
       } catch (innerErr) {
-        console.warn('[safeStorage] Heavy array pruning attempt failed:', innerErr);
+        console.warn('[safeStorage] Heavy array compression attempt failed:', innerErr);
       }
 
-      // 3. Fallback to memory map if storage is completely full
-      memoryFallbackStorage.set(key, value);
       return true;
     }
 

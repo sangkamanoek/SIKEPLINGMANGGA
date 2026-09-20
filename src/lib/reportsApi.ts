@@ -1,11 +1,18 @@
 import { LaporanHarianItem } from '../types';
 import { safeSetLocalStorage } from './safeStorage';
 import {
+  saveReportsToIndexedDB,
+  getReportsFromIndexedDB,
+  saveSingleReportToIndexedDB,
+  deleteReportFromIndexedDB,
+} from './indexedDbStorage';
+import {
   fetchReportsFromFirestore,
   saveReportToFirestore,
   deleteReportFromFirestore,
   resetAllReportsInFirestore,
   subscribeReportsFromFirestore,
+  batchSyncReportsToFirestore,
   isBeforeSept7,
 } from './firestoreService';
 import { readLaporanFromSheet } from './sheetsService';
@@ -52,10 +59,24 @@ export const isReportBeforeSept7 = (r: LaporanHarianItem): boolean => {
   return isBeforeSept7(r);
 };
 
-// Fetch all reports with resilient multi-tier merge (LocalStorage + Google Sheets + Firestore + Server Buffer)
+// Fetch all reports with resilient multi-tier merge (IndexedDB + LocalStorage + Google Sheets + Firestore + Server Buffer)
 export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   const deletedIds = getLocalDeletedReportIds();
   const map = new Map<string, LaporanHarianItem>();
+
+  // 0. High-capacity IndexedDB recovery (Full offline store with photos)
+  try {
+    const idbReports = await getReportsFromIndexedDB();
+    if (Array.isArray(idbReports) && idbReports.length > 0) {
+      idbReports.forEach((r) => {
+        if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+          map.set(r.id, r);
+        }
+      });
+    }
+  } catch (idbErr) {
+    console.warn('IndexedDB initial read note:', idbErr);
+  }
 
   // 1. Comprehensive Local Storage multi-key recovery
   KNOWN_STORAGE_KEYS.forEach((key) => {
@@ -101,9 +122,11 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   }
 
   // 3. Fetch from Firebase Firestore
+  let firestoreCount = 0;
   try {
     const firestoreReports = await fetchReportsFromFirestore();
     if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
+      firestoreCount = firestoreReports.length;
       firestoreReports.forEach((r) => {
         if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
           map.set(r.id, r);
@@ -156,6 +179,8 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   });
 
   if (merged.length > 0) {
+    // Save to IndexedDB (Full data with photos) and LocalStorage (lightweight)
+    saveReportsToIndexedDB(merged).catch(() => {});
     safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(merged));
   }
 
@@ -169,6 +194,11 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     }).catch((err) => {
       console.warn('Notice pushing unsynced reports to server batch:', err);
     });
+  }
+
+  // 7. Background Firestore sync if Firestore is behind
+  if (firestoreCount < merged.length) {
+    batchSyncReportsToFirestore(merged).catch(() => {});
   }
 
   return merged;
@@ -185,7 +215,9 @@ export const seedInitialReports = async (): Promise<LaporanHarianItem[]> => {
       const json = await res.json();
       const serverReports = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
       if (serverReports.length > 0) {
+        saveReportsToIndexedDB(serverReports).catch(() => {});
         safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(serverReports));
+        batchSyncReportsToFirestore(serverReports).catch(() => {});
         return serverReports;
       }
     }
@@ -195,6 +227,7 @@ export const seedInitialReports = async (): Promise<LaporanHarianItem[]> => {
 
   // Fallback to client generator if server endpoint unavailable
   const clientGenerated = generateInitialReports24Kepling();
+  saveReportsToIndexedDB(clientGenerated).catch(() => {});
   safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(clientGenerated));
   try {
     await fetch('/api/reports/batch', {
@@ -209,9 +242,13 @@ export const seedInitialReports = async (): Promise<LaporanHarianItem[]> => {
 // Sync all local reports to server buffer explicitly
 export const syncLocalReportsToServer = async (): Promise<void> => {
   try {
-    const localRaw = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
-    if (!localRaw) return;
-    const items = JSON.parse(localRaw);
+    let items: LaporanHarianItem[] | null = await getReportsFromIndexedDB();
+    if (!items || items.length === 0) {
+      const localRaw = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
+      if (localRaw) {
+        items = JSON.parse(localRaw);
+      }
+    }
     if (!Array.isArray(items) || items.length === 0) return;
     const deletedIds = getLocalDeletedReportIds();
     const validItems = items.filter((r: LaporanHarianItem) => r && r.id && !deletedIds.has(r.id));
@@ -235,8 +272,9 @@ export const saveReportToServer = async (item: LaporanHarianItem): Promise<boole
     return false;
   }
 
-  // 1. Update local storage immediately
+  // 1. Update IndexedDB & local storage immediately
   try {
+    saveSingleReportToIndexedDB(item).catch(() => {});
     const existingRaw = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
     const existing: LaporanHarianItem[] = existingRaw ? JSON.parse(existingRaw) : [];
     const index = existing.findIndex((r) => r.id === item.id);
@@ -294,8 +332,9 @@ export const deleteReportFromServer = async (id: string): Promise<boolean> => {
   // 1. Register to local deleted blacklist tombstone
   addLocalDeletedReportId(id);
 
-  // 2. Remove immediately from local storage
+  // 2. Remove immediately from IndexedDB & local storage
   try {
+    deleteReportFromIndexedDB(id).catch(() => {});
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY_LAPORAN);
     if (stored) {
       const reports: LaporanHarianItem[] = JSON.parse(stored);
