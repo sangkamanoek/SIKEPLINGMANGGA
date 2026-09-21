@@ -16,8 +16,6 @@ const OVERRIDE_VERSION_KEY = 'manggajuara_perlinsos_override_v2_applied';
  * Baca target & capaian dari Firebase Firestore (dengan fallback ke server buffer, localStorage, dan defaults)
  */
 export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
-  const needsMigration = localStorage.getItem(OVERRIDE_VERSION_KEY) !== 'true';
-
   let resultMap: TargetsCapaianMap | null = null;
 
   // 1. Prioritas utama: Firebase Firestore
@@ -63,43 +61,9 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
     }
   }
 
-  // 4. Fallback defaults resmi
+  // 4. Fallback defaults resmi (Fresh baseline)
   if (!resultMap || Object.keys(resultMap).length === 0) {
     resultMap = getDefaultTargetsCapaianMap();
-  }
-
-  // Jika belum menerapkan pembaruan capaian perlinsos kepling terbaru (v2), terapkan ke seluruh 24 Kepling
-  if (needsMigration) {
-    const updatedMap: TargetsCapaianMap = { ...resultMap };
-    for (let i = 1; i <= 24; i++) {
-      const kId = `kepling_${i}`;
-      const newOverride = DEFAULT_PERLINSOS_BASELINES[i - 1];
-      if (newOverride !== undefined) {
-        updatedMap[kId] = {
-          ...updatedMap[kId],
-          keplingId: kId,
-          nomorLingkungan: i,
-          overridePerlinsos: newOverride,
-          catatanPenyesuaian: 'Override Capaian Perlinsos Kelurahan Mangga',
-          updatedAt: new Date().toISOString(),
-          updatedBy: 'Super Admin',
-        } as KeplingTargetCapaian;
-      }
-    }
-
-    resultMap = updatedMap;
-    safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(resultMap));
-    safeSetLocalStorage(OVERRIDE_VERSION_KEY, 'true');
-
-    // Simpan ke Firestore & Server API
-    saveAllTargetsToFirestore(resultMap).catch((e) => console.warn('Sync override to Firestore:', e));
-    fetch('/api/targets-capaian', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ allTargets: resultMap }),
-    }).catch((e) => console.warn('Sync override to server:', e));
-
-    return resultMap;
   }
 
   safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(resultMap));

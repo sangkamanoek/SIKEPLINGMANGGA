@@ -159,10 +159,10 @@ const DEFAULT_TARGETS_LIST = [
 ];
 
 const DEFAULT_PERLINSOS_BASELINES = [
-  252, 265, 310, 241, 189, 213,
-  163, 147, 189, 213, 179, 162,
-  246, 159, 111, 180, 222, 145,
-  239, 131, 220, 206, 215, 119
+  0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0
 ];
 
 const generateDefaultTargets = () => {
@@ -176,11 +176,11 @@ const generateDefaultTargets = () => {
       targetPbb: 100,
       targetIkd: 50,
       targetBpjs: 25,
-      overridePerlinsos: DEFAULT_PERLINSOS_BASELINES[i - 1] ?? 0,
+      overridePerlinsos: null,
       overridePbb: null,
       overrideIkd: null,
       overrideBpjs: null,
-      catatanPenyesuaian: 'Data Capaian Perlinsos awal per 7 September 2026',
+      catatanPenyesuaian: 'Baseline Data Awal Murni (Fresh Start)',
       updatedAt: new Date().toISOString(),
       updatedBy: 'Sistem',
     };
@@ -509,6 +509,65 @@ app.post('/api/targets-capaian', (req, res) => {
     return res.json({ success: true, data: targetsCache });
   } catch (err: any) {
     console.error('Error saving target capaian:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST reset all PBB SPPT records for all years to Belum Bayar
+app.post('/api/pbb/reset', (_req, res) => {
+  try {
+    for (const year of Object.keys(pbbCache)) {
+      if (Array.isArray(pbbCache[year])) {
+        pbbCache[year] = pbbCache[year].map((item) => ({
+          ...item,
+          status: 'Belum Bayar',
+          updatedAt: new Date().toISOString(),
+        }));
+      }
+    }
+    saveStoredPbb(pbbCache);
+    return res.json({ success: true, message: 'Seluruh data SPPT PBB berhasil direset ke status Belum Bayar' });
+  } catch (err: any) {
+    console.error('Error resetting PBB:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST wipe all operational data (reports, pbb, targets, attendance) while strictly keeping passwords & profiles
+app.post('/api/reset-all-system-data', (_req, res) => {
+  try {
+    // 1. Reset reports
+    reportsCache = [];
+    saveStoredReports([]);
+    deletedReportsCache = [];
+    saveStoredDeletedReports([]);
+
+    // 2. Reset targets
+    targetsCache = generateDefaultTargets();
+    saveStoredTargets(targetsCache);
+
+    // 3. Reset PBB
+    for (const year of Object.keys(pbbCache)) {
+      if (Array.isArray(pbbCache[year])) {
+        pbbCache[year] = pbbCache[year].map((item) => ({
+          ...item,
+          status: 'Belum Bayar',
+          updatedAt: new Date().toISOString(),
+        }));
+      }
+    }
+    saveStoredPbb(pbbCache);
+
+    // 4. Reset attendance
+    attendanceCache = [];
+    saveStoredAttendance([]);
+
+    return res.json({
+      success: true,
+      message: 'Seluruh data capaian, laporan, presensi, dan SPPT berhasil dibersihkan (Akun & Sandi tetap aman).',
+    });
+  } catch (err: any) {
+    console.error('Error wiping all system data:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });

@@ -56,7 +56,7 @@ import { MobileBottomNav } from './components/MobileBottomNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AbsenApelItem } from './types';
 import { loadAllAttendance } from './lib/attendanceApi';
-import { subscribeAttendanceFromFirestore } from './lib/firestoreService';
+import { subscribeAttendanceFromFirestore, wipeAllFirestoreCapaianData } from './lib/firestoreService';
 import { consolidateDailyReport } from './lib/reportConsolidator';
 import {
   fetchAllReports,
@@ -552,13 +552,36 @@ export default function App() {
     }
   };
 
-  // Reset all reports handler
+  // Reset all reports and operational achievements handler (Fresh Start)
   const handleResetAllReports = async () => {
     try {
       setReports([]);
       setSelectedReport(null);
-      await resetAllReportsOnServer();
-      showToast('Seluruh data laporan berhasil direset di server dan dashboard.', 'info');
+      const defaultTargets = getDefaultTargetsCapaianMap();
+      setTargetsCapaianMap(defaultTargets);
+
+      // 1. Wipe Firebase Firestore data (reports, deleted tombstones, attendance, targets baseline 0, PBB belum bayar)
+      await wipeAllFirestoreCapaianData();
+
+      // 2. Wipe server buffer & disk JSONs (while keeping passwords and profiles)
+      await fetch('/api/reset-all-system-data', { method: 'POST' }).catch(() => {});
+      await resetAllReportsOnServer().catch(() => {});
+
+      // 3. Clear local storage operational keys
+      try {
+        localStorage.removeItem(LOCAL_STORAGE_KEY_LAPORAN);
+        localStorage.removeItem('kepling_deleted_reports_v1');
+        localStorage.removeItem('kepling_absen_apel_list');
+        localStorage.removeItem('manggajuara_targets_capaian_v2');
+        localStorage.removeItem('manggajuara_perlinsos_override_v2_applied');
+        for (let y = 2024; y <= 2030; y++) {
+          localStorage.removeItem(`sikepling_sppt_pbb_records_${y}_v3`);
+        }
+      } catch (e) {
+        console.warn('Clear local keys warning:', e);
+      }
+
+      showToast('Seluruh data capaian & laporan berhasil direset ke 0 (Fresh Start). Akun login tetap aman.', 'success');
     } catch (err) {
       console.error('Failed to reset reports:', err);
       showToast('Gagal mereset data laporan.', 'error');

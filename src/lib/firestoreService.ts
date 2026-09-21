@@ -776,5 +776,115 @@ export function subscribeEventAttendanceFromFirestore(
   );
 }
 
+/**
+ * WIPE ALL CAPAIAN, REPORTS, ATTENDANCE, AND PBB DATA IN FIRESTORE
+ * Cleans all operational data back to a fresh 0-baseline while STRICTLY PRESERVING
+ * user accounts, credentials, and passwords.
+ */
+export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean; message: string }> {
+  try {
+    // 1. Delete all reports from 'reports'
+    try {
+      const reportsCol = collection(db, REPORTS_COLLECTION);
+      const reportsSnap = await getDocs(reportsCol);
+      if (!reportsSnap.empty) {
+        const batch = writeBatch(db);
+        reportsSnap.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn('Wipe reports error:', e);
+    }
+
+    // 2. Delete all tombstones from 'deleted_reports'
+    try {
+      const delCol = collection(db, DELETED_REPORTS_COLLECTION);
+      const delSnap = await getDocs(delCol);
+      if (!delSnap.empty) {
+        const batch = writeBatch(db);
+        delSnap.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn('Wipe deleted_reports error:', e);
+    }
+
+    // 3. Delete all attendance from 'attendance' & 'event_attendance'
+    try {
+      const attCol = collection(db, ATTENDANCE_COLLECTION);
+      const attSnap = await getDocs(attCol);
+      if (!attSnap.empty) {
+        const batch = writeBatch(db);
+        attSnap.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn('Wipe attendance error:', e);
+    }
+
+    // 4. Delete all custom events from 'custom_events'
+    try {
+      const evtCol = collection(db, CUSTOM_EVENTS_COLLECTION);
+      const evtSnap = await getDocs(evtCol);
+      if (!evtSnap.empty) {
+        const batch = writeBatch(db);
+        evtSnap.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn('Wipe custom_events error:', e);
+    }
+
+    // 5. Reset all targets_capaian in Firestore to 0 baseline
+    try {
+      const defaults = getDefaultTargetsCapaianMap();
+      const targetBatch = writeBatch(db);
+      for (const [kId, item] of Object.entries(defaults)) {
+        const docRef = doc(db, TARGETS_COLLECTION, kId);
+        targetBatch.set(docRef, {
+          ...item,
+          overridePerlinsos: null,
+          overridePbb: null,
+          overrideIkd: null,
+          overrideBpjs: null,
+          catatanPenyesuaian: 'Baseline Data Awal Murni (Fresh Start)',
+          updatedAt: new Date().toISOString(),
+          updatedBy: 'Sistem Reset',
+        });
+      }
+      await targetBatch.commit();
+    } catch (e) {
+      console.warn('Wipe targets_capaian error:', e);
+    }
+
+    // 6. Reset PBB SPPT records in Firestore (pbb_sppt / pbb_sppt_2026) to Belum Bayar
+    const pbbCols = ['pbb_sppt', 'pbb_sppt_2026', 'pbb_sppt_2025'];
+    for (const colName of pbbCols) {
+      try {
+        const pbbCol = collection(db, colName);
+        const pbbSnap = await getDocs(pbbCol);
+        if (!pbbSnap.empty) {
+          const batch = writeBatch(db);
+          pbbSnap.forEach((d) => {
+            const data = d.data();
+            batch.set(d.ref, { ...data, status: 'Belum Bayar', updatedAt: new Date().toISOString() }, { merge: true });
+          });
+          await batch.commit();
+        }
+      } catch (e) {
+        console.warn(`Wipe PBB ${colName} error:`, e);
+      }
+    }
+
+    // Clear memory cache
+    deletedReportIdsMemory.clear();
+
+    return { success: true, message: 'Seluruh capaian dan data operasional berhasil dibersihkan dari Firebase Firestore!' };
+  } catch (err: any) {
+    console.error('Fatal error in wipeAllFirestoreCapaianData:', err);
+    return { success: false, message: err?.message || 'Gagal mereset Firebase Firestore' };
+  }
+}
+
 
 

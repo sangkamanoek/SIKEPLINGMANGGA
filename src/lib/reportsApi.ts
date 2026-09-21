@@ -157,20 +157,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     console.warn('Notice reading server buffer /api/reports:', e);
   }
 
-  // 5. Fallback: If no reports exist at all, initialize the official 24 Kepling historical reports
-  if (map.size === 0) {
-    try {
-      const initial = generateInitialReports24Kepling();
-      initial.forEach((r) => {
-        if (!deletedIds.has(r.id)) {
-          map.set(r.id, r);
-        }
-      });
-    } catch (e) {
-      console.warn('Fallback initial reports generation notice:', e);
-    }
-  }
-
+  // 5. If map is empty, remain clean/empty for fresh start
   const merged = Array.from(map.values());
   merged.sort((a, b) => {
     const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
