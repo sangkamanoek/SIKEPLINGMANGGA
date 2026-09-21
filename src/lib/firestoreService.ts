@@ -17,9 +17,12 @@ import { getDefaultTargetsCapaianMap } from '../data/targetsData';
 // Local in-memory cache of deleted report IDs to prevent re-emergence
 const deletedReportIdsMemory = new Set<string>();
 
-export const isBeforeSept7 = (report: any): boolean => {
+export const shouldFilterReport = (report: any): boolean => {
   if (!report) return true;
-  if (report.id && deletedReportIdsMemory.has(report.id)) return true;
+  if (report.id && deletedReportIdsMemory.has(report.id)) {
+    console.warn(`[filter] Report ${report.id} filtered out (marked deleted).`);
+    return true;
+  }
   return false;
 };
 
@@ -74,7 +77,7 @@ export async function fetchReportsFromFirestore(): Promise<LaporanHarianItem[]> 
         return;
       }
 
-      if (!isBeforeSept7(report)) {
+      if (!shouldFilterReport(report)) {
         reports.push(report);
       }
     });
@@ -183,7 +186,7 @@ export async function batchSyncReportsToFirestore(items: LaporanHarianItem[]): P
       const batch = writeBatch(db);
 
       for (const item of chunk) {
-        if (!item || !item.namaKepling || isBeforeSept7(item) || (item.id && deletedReportIdsMemory.has(item.id))) continue;
+        if (!item || !item.namaKepling || shouldFilterReport(item) || (item.id && deletedReportIdsMemory.has(item.id))) continue;
         const id = item.id || ('lap_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6));
         const docRef = doc(db, REPORTS_COLLECTION, id);
         batch.set(docRef, { ...item, id }, { merge: true });
@@ -247,7 +250,7 @@ export function subscribeReportsFromFirestore(
           deleteDoc(docSnap.ref).catch(() => {});
           return;
         }
-        if (!isBeforeSept7(report)) {
+        if (!shouldFilterReport(report)) {
           reports.push(report);
         }
       });

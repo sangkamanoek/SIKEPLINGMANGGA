@@ -1,6 +1,6 @@
 import { LaporanHarianItem, SheetMetadata } from '../types';
 import { ALL_ACCOUNTS, getEffectivePassword } from '../data/keplingList';
-import { isReportBeforeSept7 } from './reportsApi';
+import { isReportDeleted } from './reportsApi';
 
 const SPREADSHEET_TITLE = 'SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA';
 export const USERNAME_SHEET_TAB_NAME = 'Username & Password';

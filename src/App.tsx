@@ -65,7 +65,7 @@ import {
   resetAllReportsOnServer,
   subscribeReportsFromFirestore,
   getLocalDeletedReportIds,
-  isReportBeforeSept7,
+  isReportDeleted,
   syncLocalReportsToServer,
   seedInitialReports,
 } from './lib/reportsApi';
@@ -203,7 +203,7 @@ export default function App() {
       // 1. Try IndexedDB first (high-capacity, contains all reports & photos)
       const idbItems = await getReportsFromIndexedDB();
       if (Array.isArray(idbItems) && idbItems.length > 0) {
-        const active = idbItems.filter((r) => r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r));
+        const active = idbItems.filter((r) => r && r.id && !deletedIds.has(r.id) && !isReportDeleted(r));
         if (active.length > 0) {
           setReports(active);
           return;
@@ -215,7 +215,7 @@ export default function App() {
       if (stored) {
         const parsed: LaporanHarianItem[] = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const active = parsed.filter((r) => r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r));
+          const active = parsed.filter((r) => r && r.id && !deletedIds.has(r.id) && !isReportDeleted(r));
           setReports(active);
         }
       }

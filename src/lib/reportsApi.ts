@@ -13,7 +13,7 @@ import {
   resetAllReportsInFirestore,
   subscribeReportsFromFirestore,
   batchSyncReportsToFirestore,
-  isBeforeSept7,
+  shouldFilterReport,
 } from './firestoreService';
 import { readLaporanFromSheet } from './sheetsService';
 import { generateInitialReports24Kepling } from '../data/initialReportsData';
@@ -55,8 +55,8 @@ export const addLocalDeletedReportId = (id: string) => {
   } catch {}
 };
 
-export const isReportBeforeSept7 = (r: LaporanHarianItem): boolean => {
-  return isBeforeSept7(r);
+export const isReportDeleted = (r: LaporanHarianItem): boolean => {
+  return shouldFilterReport(r);
 };
 
 // Fetch all reports with resilient multi-tier merge (IndexedDB + LocalStorage + Google Sheets + Firestore + Server Buffer)
@@ -69,7 +69,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     const idbReports = await getReportsFromIndexedDB();
     if (Array.isArray(idbReports) && idbReports.length > 0) {
       idbReports.forEach((r) => {
-        if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+        if (r && r.id && !deletedIds.has(r.id) && !shouldFilterReport(r)) {
           map.set(r.id, r);
         }
       });
@@ -86,7 +86,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           parsed.forEach((r) => {
-            if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+            if (r && r.id && !deletedIds.has(r.id) && !shouldFilterReport(r)) {
               if (!map.has(r.id)) {
                 map.set(r.id, r);
               }
