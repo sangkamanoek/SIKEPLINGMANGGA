@@ -215,9 +215,120 @@ const saveStoredTargets = (targets: any) => {
 
 let targetsCache = loadStoredTargets();
 
+// PBB SPPT Data File (Server Buffer per Tahun Pajak)
+const PBB_FILE = path.join(DATA_DIR, 'pbb_sppt.json');
+
+const loadStoredPbb = (): Record<string, any[]> => {
+  try {
+    if (fs.existsSync(PBB_FILE)) {
+      const content = fs.readFileSync(PBB_FILE, 'utf-8');
+      return JSON.parse(content) || {};
+    }
+  } catch (err) {
+    console.error('Error reading PBB file:', err);
+  }
+  return {};
+};
+
+const saveStoredPbb = (pbbData: Record<string, any[]>) => {
+  try {
+    fs.writeFileSync(PBB_FILE, JSON.stringify(pbbData, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving PBB file:', err);
+  }
+};
+
+let pbbCache: Record<string, any[]> = loadStoredPbb();
+
 // API Endpoints
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// GET PBB SPPT records for given year (e.g. ?year=2026)
+app.get('/api/pbb', (req, res) => {
+  const year = String(req.query.year || '2026');
+  const items = pbbCache[year] || [];
+  return res.json({ success: true, year: Number(year), count: items.length, data: items });
+});
+
+// POST save / update single PBB SPPT record
+app.post('/api/pbb', (req, res) => {
+  try {
+    const { item, year = 2026 } = req.body;
+    if (!item || !item.id) {
+      return res.status(400).json({ success: false, message: 'Data SPPT tidak lengkap' });
+    }
+    const yearStr = String(year);
+    if (!pbbCache[yearStr]) {
+      pbbCache[yearStr] = [];
+    }
+    const list = pbbCache[yearStr];
+    const cleanNop = item.nop ? item.nop.replace(/[^0-9]/g, '') : '';
+    const index = list.findIndex(
+      (x) => x.id === item.id || (cleanNop && x.nop && x.nop.replace(/[^0-9]/g, '') === cleanNop)
+    );
+    if (index >= 0) {
+      list[index] = { ...list[index], ...item, updatedAt: new Date().toISOString() };
+    } else {
+      list.unshift({ ...item, updatedAt: new Date().toISOString() });
+    }
+    saveStoredPbb(pbbCache);
+    return res.json({ success: true, data: list[index >= 0 ? index : 0], total: list.length });
+  } catch (err: any) {
+    console.error('Error saving PBB item to server buffer:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST batch save PBB SPPT records
+app.post('/api/pbb/batch', (req, res) => {
+  try {
+    const { items, year = 2026 } = req.body;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ success: false, message: 'items harus berupa array' });
+    }
+    const yearStr = String(year);
+    if (!pbbCache[yearStr]) {
+      pbbCache[yearStr] = [];
+    }
+    const list = pbbCache[yearStr];
+    let updatedCount = 0;
+    for (const item of items) {
+      if (!item || !item.id) continue;
+      const cleanNop = item.nop ? item.nop.replace(/[^0-9]/g, '') : '';
+      const index = list.findIndex(
+        (x) => x.id === item.id || (cleanNop && x.nop && x.nop.replace(/[^0-9]/g, '') === cleanNop)
+      );
+      if (index >= 0) {
+        list[index] = { ...list[index], ...item, updatedAt: new Date().toISOString() };
+      } else {
+        list.push({ ...item, updatedAt: new Date().toISOString() });
+      }
+      updatedCount++;
+    }
+    saveStoredPbb(pbbCache);
+    return res.json({ success: true, updatedCount, total: list.length, data: list });
+  } catch (err: any) {
+    console.error('Error batch saving PBB items to server buffer:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE PBB SPPT record
+app.delete('/api/pbb/:year/:id', (req, res) => {
+  try {
+    const { year, id } = req.params;
+    const yearStr = String(year || '2026');
+    if (pbbCache[yearStr]) {
+      pbbCache[yearStr] = pbbCache[yearStr].filter((x) => x.id !== id);
+      saveStoredPbb(pbbCache);
+    }
+    return res.json({ success: true, message: `Item ${id} dihapus dari tahun ${yearStr}` });
+  } catch (err: any) {
+    console.error('Error deleting PBB item from server buffer:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // GET all reports

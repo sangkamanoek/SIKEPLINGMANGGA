@@ -1,0 +1,16 @@
+{
+  "2026": [
+    {
+      "id": "4",
+      "no": 4,
+      "nop": "12.75.010.009.001-0004.0",
+      "buku": "I, II, III",
+      "namaWp": "Drs. H. M. YUSUF NASUTION",
+      "alamatOp": "JL. FLAMBOYAN NO. 12",
+      "pbbTerutang": 245000,
+      "status": "Sudah Bayar",
+      "lingkungan": 1,
+      "updatedAt": "2026-09-21T08:27:02.267Z"
+    }
+  ]
+}

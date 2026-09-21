@@ -104,15 +104,26 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => {
     return getLocalSpptForYear(selectedYear);
   });
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  // Subscribe to Firebase Firestore real-time updates for active year
+  // Subscribe to Firebase Firestore & Server Buffer real-time updates for active year
   useEffect(() => {
-    // 1. Initial fetch from Firestore
+    // 0. Auto-push local modifications (e.g. status changes done in offline/local state)
+    const local = getLocalSpptForYear(selectedYear);
+    const hasCustomEdits = local.some((item) => {
+      const sample = SAMPLE_SPPT_ITEMS.find((s) => s.id === item.id);
+      return sample && sample.status !== item.status;
+    });
+    if (hasCustomEdits) {
+      batchSavePbbSpptToFirestore(local, selectedYear).catch(() => {});
+    }
+
+    // 1. Initial fetch from Firestore & Server Buffer
     fetchPbbSpptFromFirestore(selectedYear).then((items) => {
       if (items && items.length > 0) {
         setSpptList(items);
       }
-    });
+    }).catch(() => {});
 
     // 2. Real-time subscription
     const unsubscribe = subscribePbbSpptFromFirestore(selectedYear, (items) => {
@@ -128,6 +139,23 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   useEffect(() => {
     saveLocalSpptForYear(spptList, selectedYear);
   }, [spptList, selectedYear]);
+
+  // Manual Full Sync handler (reconciles server buffer, Firestore, and client state)
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      await batchSavePbbSpptToFirestore(spptList, selectedYear);
+      const items = await fetchPbbSpptFromFirestore(selectedYear);
+      if (items && items.length > 0) {
+        setSpptList(items);
+      }
+      notify(`Data PBB Tahun ${selectedYear} berhasil disinkronkan ke seluruh sistem!`, 'success');
+    } catch {
+      notify('Gagal sinkronisasi data PBB', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Handle Year Change
   const handleYearChange = (newYear: number) => {
@@ -939,6 +967,17 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   👑 Reset ke Lingk {keplingLingkunganNum}
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                title="Sinkronisasi Data Real-time (Firestore & Server Buffer)"
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 active:scale-98 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-emerald-700 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Data'}</span>
+              </button>
 
               {canManageWp && (
                 <button

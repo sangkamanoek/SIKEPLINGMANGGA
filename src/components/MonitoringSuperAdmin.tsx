@@ -67,6 +67,7 @@ import {
   getLocalSpptForYear,
   computePbbOverview,
   subscribePbbSpptFromFirestore,
+  fetchPbbSpptFromFirestore,
 } from '../lib/pbbService';
 import { SpptPbbItem } from '../data/pbbSampleData';
 
@@ -122,6 +123,9 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
 
   useEffect(() => {
     setSpptList(getLocalSpptForYear(pbbYear));
+    fetchPbbSpptFromFirestore(pbbYear).then((items) => {
+      if (items && items.length > 0) setSpptList(items);
+    }).catch(() => {});
     const unsub = subscribePbbSpptFromFirestore(pbbYear, (items) => {
       if (items && items.length > 0) setSpptList(items);
     });

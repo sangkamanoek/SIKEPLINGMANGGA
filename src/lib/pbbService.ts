@@ -174,144 +174,10 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
 }
 
 // ====================================================
-// FIRESTORE SYNC FOR PBB
+// SMART MERGE & DUAL-TIER SYNC (SERVER BUFFER + FIRESTORE)
 // ====================================================
 
 const PBB_COLLECTION_PREFIX = 'pbb_sppt_';
-
-/**
- * Fetch SPPT data from Firebase Firestore for given year
- */
-export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR): Promise<SpptPbbItem[]> {
-  try {
-    const colName = `${PBB_COLLECTION_PREFIX}${year}`;
-    const colRef = collection(db, colName);
-    const snapshot = await getDocs(colRef);
-    const items: SpptPbbItem[] = [];
-
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data() as SpptPbbItem;
-      if (data && data.id) {
-        items.push({ ...data, id: docSnap.id || data.id });
-      }
-    });
-
-    if (items.length > 0) {
-      // Sort by lingkungan then no
-      items.sort((a, b) => {
-        if (a.lingkungan !== b.lingkungan) return a.lingkungan - b.lingkungan;
-        return a.no - b.no;
-      });
-      // Save to local cache as well
-      saveLocalSpptForYear(items, year);
-      return items;
-    }
-
-    // Auto-seed default to Firestore if empty
-    const defaults = getLocalSpptForYear(year);
-    if (defaults.length > 0) {
-      await batchSavePbbSpptToFirestore(defaults, year);
-    }
-    return defaults;
-  } catch (err) {
-    console.warn(`Firestore PBB fetch notice for ${year}:`, err);
-    return getLocalSpptForYear(year);
-  }
-}
-
-/**
- * Save single SPPT item to Firebase Firestore
- */
-export async function savePbbSpptToFirestore(item: SpptPbbItem, year: number = DEFAULT_PBB_YEAR): Promise<boolean> {
-  try {
-    const colName = `${PBB_COLLECTION_PREFIX}${year}`;
-    const docRef = doc(db, colName, item.id);
-    await setDoc(docRef, item, { merge: true });
-    return true;
-  } catch (err) {
-    console.warn(`Error saving SPPT ${item.id} to Firestore:`, err);
-    return false;
-  }
-}
-
-/**
- * Batch save SPPT items to Firebase Firestore
- */
-export async function batchSavePbbSpptToFirestore(items: SpptPbbItem[], year: number = DEFAULT_PBB_YEAR): Promise<number> {
-  try {
-    if (!Array.isArray(items) || items.length === 0) return 0;
-    const colName = `${PBB_COLLECTION_PREFIX}${year}`;
-    let savedCount = 0;
-
-    for (let i = 0; i < items.length; i += 400) {
-      const chunk = items.slice(i, i + 400);
-      const batch = writeBatch(db);
-
-      for (const item of chunk) {
-        if (!item || !item.id) continue;
-        const docRef = doc(db, colName, item.id);
-        batch.set(docRef, item, { merge: true });
-        savedCount++;
-      }
-
-      await batch.commit();
-    }
-    return savedCount;
-  } catch (err) {
-    console.warn('Error batch saving SPPT to Firestore:', err);
-    return 0;
-  }
-}
-
-/**
- * Delete SPPT item from Firebase Firestore
- */
-export async function deletePbbSpptFromFirestore(id: string, year: number = DEFAULT_PBB_YEAR): Promise<boolean> {
-  try {
-    const colName = `${PBB_COLLECTION_PREFIX}${year}`;
-    const docRef = doc(db, colName, id);
-    await deleteDoc(docRef);
-    return true;
-  } catch (err) {
-    console.warn(`Error deleting SPPT ${id} from Firestore:`, err);
-    return false;
-  }
-}
-
-/**
- * Real-time listener for SPPT from Firebase Firestore
- */
-export function subscribePbbSpptFromFirestore(
-  year: number = DEFAULT_PBB_YEAR,
-  onData: (items: SpptPbbItem[]) => void
-): Unsubscribe {
-  const colName = `${PBB_COLLECTION_PREFIX}${year}`;
-  const colRef = collection(db, colName);
-
-  return onSnapshot(
-    colRef,
-    (snapshot) => {
-      const items: SpptPbbItem[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data() as SpptPbbItem;
-        if (data && data.id) {
-          items.push({ ...data, id: docSnap.id || data.id });
-        }
-      });
-      if (items.length > 0) {
-        items.sort((a, b) => {
-          if (a.lingkungan !== b.lingkungan) return a.lingkungan - b.lingkungan;
-          return a.no - b.no;
-        });
-        saveLocalSpptForYear(items, year);
-        onData(items);
-      }
-    },
-    (err) => {
-      console.warn(`Firestore PBB onSnapshot notice for ${year}:`, err);
-    }
-  );
-}
 
 /**
  * Format raw NOP digits (up to 18 digits) into XX.XX.XXX.XXX.XXX-XXXX.X dynamically as-you-type
@@ -350,4 +216,381 @@ export function formatNop(nop: string): string {
 export function stripNonDigits(val: string): string {
   if (!val) return '';
   return val.replace(/[^0-9]/g, '');
+}
+
+/**
+ * Smart merge SPPT items: overlays updates on top of base items without losing other records
+ */
+export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbItem[]): SpptPbbItem[] {
+  if (!Array.isArray(updates) || updates.length === 0) return baseList;
+  const map = new Map<string, SpptPbbItem>();
+  const nopMap = new Map<string, string>(); // cleaned nop -> canonical id
+
+  // 1. Fill map with base items
+  for (const item of baseList) {
+    if (!item || !item.id) continue;
+    map.set(item.id, { ...item });
+    if (item.nop) {
+      nopMap.set(stripNonDigits(item.nop), item.id);
+    }
+  }
+
+  // 2. Overlay updates (matched by id or canonical stripped NOP)
+  for (const update of updates) {
+    if (!update || !update.id) continue;
+    const cleanNop = update.nop ? stripNonDigits(update.nop) : '';
+    let targetId = update.id;
+    if (!map.has(targetId) && cleanNop && nopMap.has(cleanNop)) {
+      targetId = nopMap.get(cleanNop)!;
+    }
+
+    if (map.has(targetId)) {
+      const existing = map.get(targetId)!;
+      map.set(targetId, {
+        ...existing,
+        ...update,
+        id: targetId,
+      });
+    } else {
+      // New record added by user
+      map.set(update.id, { ...update });
+      if (cleanNop) {
+        nopMap.set(cleanNop, update.id);
+      }
+    }
+  }
+
+  const merged = Array.from(map.values());
+  merged.sort((a, b) => {
+    if (a.lingkungan !== b.lingkungan) return a.lingkungan - b.lingkungan;
+    return a.no - b.no;
+  });
+  return merged;
+}
+
+// Cross-tab broadcast channel for immediate 0ms sync between Super Admin & Kasi Pem on same device
+const PBB_BROADCAST_CHANNEL_NAME = 'sikepling_pbb_sync_channel';
+let pbbBroadcastChannel: BroadcastChannel | null = null;
+try {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    pbbBroadcastChannel = new BroadcastChannel(PBB_BROADCAST_CHANNEL_NAME);
+  }
+} catch {
+  // ignore
+}
+
+export function broadcastPbbChange(item: SpptPbbItem, year: number) {
+  try {
+    if (pbbBroadcastChannel) {
+      pbbBroadcastChannel.postMessage({ type: 'UPDATE_ITEM', item, year, timestamp: Date.now() });
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pbb-item-synced', { detail: { item, year } }));
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// ----------------------------------------------------
+// SERVER API BUFFER CLIENT (/api/pbb)
+// ----------------------------------------------------
+
+export async function fetchPbbFromApi(year: number = DEFAULT_PBB_YEAR): Promise<SpptPbbItem[]> {
+  try {
+    const res = await fetch(`/api/pbb?year=${year}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json && Array.isArray(json.data) && json.data.length > 0) {
+        return json.data;
+      }
+    }
+  } catch (err) {
+    console.warn(`Notice fetching PBB from /api/pbb for ${year}:`, err);
+  }
+  return [];
+}
+
+export async function savePbbToApi(item: SpptPbbItem, year: number = DEFAULT_PBB_YEAR): Promise<boolean> {
+  try {
+    const res = await fetch('/api/pbb', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item, year }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn(`Notice saving PBB to /api/pbb:`, err);
+    return false;
+  }
+}
+
+export async function batchSavePbbToApi(items: SpptPbbItem[], year: number = DEFAULT_PBB_YEAR): Promise<boolean> {
+  try {
+    if (!Array.isArray(items) || items.length === 0) return true;
+    const res = await fetch('/api/pbb/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items, year }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn(`Notice batch saving PBB to /api/pbb:`, err);
+    return false;
+  }
+}
+
+export async function deletePbbFromApi(id: string, year: number = DEFAULT_PBB_YEAR): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/pbb/${year}/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn(`Notice deleting PBB from /api/pbb:`, err);
+    return false;
+  }
+}
+
+// ----------------------------------------------------
+// COMBINED FETCH & PERSISTENCE (FIRESTORE + API BUFFER)
+// ----------------------------------------------------
+
+/**
+ * Fetch SPPT data with multi-tier fallback: Local Cache -> Server API Buffer -> Cloud Firestore
+ */
+export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR): Promise<SpptPbbItem[]> {
+  const baseDefaults = SAMPLE_SPPT_ITEMS;
+  let currentList = getLocalSpptForYear(year);
+  currentList = smartMergeSpptItems(baseDefaults, currentList);
+
+  // 1. Fetch from Express Server Buffer (/api/pbb)
+  try {
+    const apiItems = await fetchPbbFromApi(year);
+    if (apiItems.length > 0) {
+      currentList = smartMergeSpptItems(currentList, apiItems);
+      saveLocalSpptForYear(currentList, year);
+    }
+  } catch (err) {
+    console.warn(`Notice reading PBB server buffer for ${year}:`, err);
+  }
+
+  // 2. Fetch from Firebase Firestore
+  try {
+    const colName = `${PBB_COLLECTION_PREFIX}${year}`;
+    const colRef = collection(db, colName);
+    const snapshot = await getDocs(colRef);
+    const firestoreItems: SpptPbbItem[] = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as SpptPbbItem;
+      if (data && data.id) {
+        firestoreItems.push({ ...data, id: docSnap.id || data.id });
+      }
+    });
+
+    if (firestoreItems.length > 0) {
+      currentList = smartMergeSpptItems(currentList, firestoreItems);
+      saveLocalSpptForYear(currentList, year);
+      // Sync to Server API buffer as well so all devices have it
+      batchSavePbbToApi(currentList, year).catch(() => {});
+      return currentList;
+    }
+
+    // Auto-seed to Firestore if empty
+    if (currentList.length > 0) {
+      batchSavePbbSpptToFirestore(currentList, year).catch(() => {});
+      batchSavePbbToApi(currentList, year).catch(() => {});
+    }
+    return currentList;
+  } catch (err) {
+    console.warn(`Firestore PBB fetch notice for ${year}:`, err);
+    return currentList;
+  }
+}
+
+/**
+ * Save single SPPT item to Firebase Firestore AND Server Buffer AND broadcast
+ */
+export async function savePbbSpptToFirestore(item: SpptPbbItem, year: number = DEFAULT_PBB_YEAR): Promise<boolean> {
+  // 1. Immediately update Local Cache
+  const currentList = getLocalSpptForYear(year);
+  const updatedList = smartMergeSpptItems(currentList, [item]);
+  saveLocalSpptForYear(updatedList, year);
+
+  // 2. Broadcast to other open tabs on same device (e.g. Super Admin vs Kasi Pem)
+  broadcastPbbChange(item, year);
+
+  // 3. Save to Express Server Buffer (/api/pbb) for zero-latency multi-user sync
+  savePbbToApi(item, year).catch(() => {});
+
+  // 4. Save to Cloud Firestore
+  try {
+    const colName = `${PBB_COLLECTION_PREFIX}${year}`;
+    const docRef = doc(db, colName, item.id);
+    await setDoc(docRef, item, { merge: true });
+    return true;
+  } catch (err) {
+    console.warn(`Firestore saving notice for SPPT ${item.id}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Batch save SPPT items to Firebase Firestore & Server Buffer
+ */
+export async function batchSavePbbSpptToFirestore(items: SpptPbbItem[], year: number = DEFAULT_PBB_YEAR): Promise<number> {
+  // 1. Save to Server Buffer
+  batchSavePbbToApi(items, year).catch(() => {});
+
+  // 2. Save to Firestore in chunks of 400
+  try {
+    if (!Array.isArray(items) || items.length === 0) return 0;
+    const colName = `${PBB_COLLECTION_PREFIX}${year}`;
+    let savedCount = 0;
+
+    for (let i = 0; i < items.length; i += 400) {
+      const chunk = items.slice(i, i + 400);
+      const batch = writeBatch(db);
+
+      for (const item of chunk) {
+        if (!item || !item.id) continue;
+        const docRef = doc(db, colName, item.id);
+        batch.set(docRef, item, { merge: true });
+        savedCount++;
+      }
+
+      await batch.commit();
+    }
+    return savedCount;
+  } catch (err) {
+    console.warn('Error batch saving SPPT to Firestore:', err);
+    return 0;
+  }
+}
+
+/**
+ * Delete SPPT item from Firebase Firestore & Server Buffer
+ */
+export async function deletePbbSpptFromFirestore(id: string, year: number = DEFAULT_PBB_YEAR): Promise<boolean> {
+  // 1. Remove from local cache
+  const currentList = getLocalSpptForYear(year).filter((i) => i.id !== id);
+  saveLocalSpptForYear(currentList, year);
+
+  // 2. Remove from Server Buffer
+  deletePbbFromApi(id, year).catch(() => {});
+
+  // 3. Remove from Firestore
+  try {
+    const colName = `${PBB_COLLECTION_PREFIX}${year}`;
+    const docRef = doc(db, colName, id);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err) {
+    console.warn(`Error deleting SPPT ${id} from Firestore:`, err);
+    return false;
+  }
+}
+
+/**
+ * Real-time listener for SPPT from Firebase Firestore + Server Polling + Cross-tab Broadcast
+ */
+export function subscribePbbSpptFromFirestore(
+  year: number = DEFAULT_PBB_YEAR,
+  onData: (items: SpptPbbItem[]) => void
+): Unsubscribe {
+  const colName = `${PBB_COLLECTION_PREFIX}${year}`;
+  const colRef = collection(db, colName);
+
+  let activeList = smartMergeSpptItems(SAMPLE_SPPT_ITEMS, getLocalSpptForYear(year));
+
+  // 1. Firestore Real-time listener
+  const firestoreUnsub = onSnapshot(
+    colRef,
+    (snapshot) => {
+      const firestoreItems: SpptPbbItem[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as SpptPbbItem;
+        if (data && data.id) {
+          firestoreItems.push({ ...data, id: docSnap.id || data.id });
+        }
+      });
+      if (firestoreItems.length > 0) {
+        activeList = smartMergeSpptItems(activeList, firestoreItems);
+        saveLocalSpptForYear(activeList, year);
+        onData(activeList);
+      }
+    },
+    (err) => {
+      console.warn(`Firestore PBB onSnapshot notice for ${year}:`, err);
+    }
+  );
+
+  // 2. Cross-tab BroadcastChannel listener (instant 0ms update between Super Admin and Kasi Pem)
+  const handleBroadcast = (msg: any) => {
+    if (msg?.data?.year === year && msg?.data?.item) {
+      activeList = smartMergeSpptItems(activeList, [msg.data.item]);
+      saveLocalSpptForYear(activeList, year);
+      onData(activeList);
+    }
+  };
+  if (pbbBroadcastChannel) {
+    pbbBroadcastChannel.addEventListener('message', handleBroadcast);
+  }
+
+  // 3. Window Storage event listener (syncs across browser tabs on same domain)
+  const handleStorage = (e: StorageEvent) => {
+    if (e.key === getPbbStorageKey(year) && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          activeList = smartMergeSpptItems(activeList, parsed);
+          onData(activeList);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  };
+  window.addEventListener('storage', handleStorage);
+
+  // 4. Custom DOM event in same tab / window
+  const handleCustomEvent = (e: any) => {
+    const detail = e.detail;
+    if (detail?.year === year && detail?.item) {
+      activeList = smartMergeSpptItems(activeList, [detail.item]);
+      saveLocalSpptForYear(activeList, year);
+      onData(activeList);
+    }
+  };
+  window.addEventListener('pbb-item-synced', handleCustomEvent);
+
+  // 5. Periodic polling from Server API buffer every 8 seconds as safety net
+  const pollInterval = setInterval(async () => {
+    try {
+      const apiItems = await fetchPbbFromApi(year);
+      if (apiItems && apiItems.length > 0) {
+        const prevStatusStr = activeList.map((x) => `${x.id}:${x.status}`).join('|');
+        const merged = smartMergeSpptItems(activeList, apiItems);
+        const newStatusStr = merged.map((x) => `${x.id}:${x.status}`).join('|');
+        if (prevStatusStr !== newStatusStr || merged.length !== activeList.length) {
+          activeList = merged;
+          saveLocalSpptForYear(activeList, year);
+          onData(activeList);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, 8000);
+
+  return () => {
+    firestoreUnsub();
+    if (pbbBroadcastChannel) {
+      pbbBroadcastChannel.removeEventListener('message', handleBroadcast);
+    }
+    window.removeEventListener('storage', handleStorage);
+    window.removeEventListener('pbb-item-synced', handleCustomEvent);
+    clearInterval(pollInterval);
+  };
 }

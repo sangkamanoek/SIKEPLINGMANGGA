@@ -159,6 +159,7 @@ export default function App() {
   const [targetsMap, setTargetsMap] = useState<TargetsCapaianMap>(getDefaultTargetsCapaianMap);
   const todayStr = new Date().toISOString().split('T')[0];
   const [pemerintahanDate, setPemerintahanDate] = useState<string>(todayStr);
+  const [adminSektoralView, setAdminSektoralView] = useState<'pemerintahan' | 'pembangunan' | 'trantibum'>('pemerintahan');
 
   // Reports data
   const [reports, setReports] = useState<LaporanHarianItem[]>([]);
@@ -890,7 +891,8 @@ export default function App() {
                 {/* Kasi Sektoral Dashboard Tab */}
                 {(activeAccount.role === 'kasi_pemerintahan' ||
                   activeAccount.role === 'kasi_pembangunan' ||
-                  activeAccount.role === 'kasi_trantibum') && (
+                  activeAccount.role === 'kasi_trantibum' ||
+                  activeAccount.role === 'super_admin') && (
                   <button
                     id="tab-dashboard-kasi"
                     type="button"
@@ -908,7 +910,9 @@ export default function App() {
                         ? 'PBB'
                         : activeAccount.role === 'kasi_pembangunan'
                         ? 'PERLINSOS'
-                        : 'TRANTIB'}
+                        : activeAccount.role === 'kasi_trantibum'
+                        ? 'TRANTIB'
+                        : 'SEKTORAL'}
                     </span>
                   </button>
                 )}
@@ -1132,7 +1136,52 @@ export default function App() {
         {/* Dashboard Kasi Sektoral */}
         {activeTab === 'dashboard_kasi' && (
           <ErrorBoundary fallbackTitle="Gagal Memuat Dashboard Kasi">
-            {activeAccount.role === 'kasi_pemerintahan' && (
+            {activeAccount.role === 'super_admin' && (
+              <div className="mb-4 bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                  <Award className="w-4 h-4 text-teal-600" />
+                  <span>Mode Monitoring Sektoral Lurah:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdminSektoralView('pemerintahan')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      adminSektoralView === 'pemerintahan'
+                        ? 'bg-teal-700 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Kasi Pemerintahan (PBB, IKD & Apel)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdminSektoralView('pembangunan')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      adminSektoralView === 'pembangunan'
+                        ? 'bg-teal-700 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Kasi Pembangunan & Kesos (Perlinsos)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdminSektoralView('trantibum')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      adminSektoralView === 'trantibum'
+                        ? 'bg-teal-700 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Kasi Trantibum & Linmas
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(activeAccount.role === 'kasi_pemerintahan' ||
+              (activeAccount.role === 'super_admin' && adminSektoralView === 'pemerintahan')) && (
               <DashboardPbbKasi
                 reports={reports}
                 targetsMap={targetsMap}
@@ -1147,7 +1196,8 @@ export default function App() {
                 onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
               />
             )}
-            {activeAccount.role === 'kasi_pembangunan' && (
+            {(activeAccount.role === 'kasi_pembangunan' ||
+              (activeAccount.role === 'super_admin' && adminSektoralView === 'pembangunan')) && (
               <DashboardPerlinsosKasi
                 reports={reports}
                 targetsMap={targetsMap}
@@ -1159,7 +1209,8 @@ export default function App() {
                 onOpenKunjunganWarga={() => setActiveTab('kunjungan')}
               />
             )}
-            {activeAccount.role === 'kasi_trantibum' && (
+            {(activeAccount.role === 'kasi_trantibum' ||
+              (activeAccount.role === 'super_admin' && adminSektoralView === 'trantibum')) && (
               <DashboardTrantibumKasi
                 reports={reports}
                 currentUser={activeAccount}
