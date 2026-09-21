@@ -303,14 +303,16 @@ export default function App() {
 
           // 1. First add all Firestore incoming reports
           firestoreReports.forEach((r) => {
-            if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+            if (r && r.id && !deletedIds.has(r.id) && !isReportDeleted(r)) {
               reportMap.set(r.id, r);
             }
           });
+          
+          console.log(`[App State Sync] Merged ${reportMap.size} reports from Firestore subscription.`);
 
           // 2. Retain any freshly saved reports from local memory that may not have arrived in Firestore yet
           prev.forEach((r) => {
-            if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+            if (r && r.id && !deletedIds.has(r.id) && !isReportDeleted(r)) {
               if (!reportMap.has(r.id)) {
                 reportMap.set(r.id, r);
               }
@@ -359,7 +361,7 @@ export default function App() {
           const serverReports = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
           if (serverReports.length > 0) {
             const deletedIds = getLocalDeletedReportIds();
-            const cleaned = serverReports.filter((r: LaporanHarianItem) => !isReportBeforeSept7(r) && !deletedIds.has(r.id));
+            const cleaned = serverReports.filter((r: LaporanHarianItem) => !isReportDeleted(r) && !deletedIds.has(r.id));
             setReports((prev) => {
               const map = new Map<string, LaporanHarianItem>();
               prev.forEach((r) => {

@@ -238,6 +238,7 @@ export function subscribeReportsFromFirestore(
     colRef,
     (snapshot) => {
       const reports: LaporanHarianItem[] = [];
+      console.log(`[Firestore Sync] Received ${snapshot.size} reports from Firestore.`);
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as LaporanHarianItem;
         const reportId = docSnap.id || data.id;
@@ -247,14 +248,18 @@ export function subscribeReportsFromFirestore(
         };
         if (deletedReportIdsMemory.has(reportId) || deletedReportIdsMemory.has(data.id)) {
           // If deleted, ignore and clean up in background
+          console.log(`[Firestore Sync] Filtering out deleted report: ${reportId}`);
           deleteDoc(docSnap.ref).catch(() => {});
           return;
         }
         if (!shouldFilterReport(report)) {
           reports.push(report);
+        } else {
+          console.log(`[Firestore Sync] Filtering out report due to shouldFilterReport: ${reportId}`);
         }
       });
 
+      console.log(`[Firestore Sync] Final merged count after filtering: ${reports.length}`);
       reports.sort((a, b) => {
         const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;

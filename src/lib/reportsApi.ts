@@ -107,7 +107,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
         const sheetReports = await readLaporanFromSheet(tokenRaw, sheetMeta.spreadsheetId);
         if (Array.isArray(sheetReports) && sheetReports.length > 0) {
           sheetReports.forEach((r) => {
-            if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+            if (r && r.id && !deletedIds.has(r.id) && !isReportDeleted(r)) {
               // Only add if not already present or if sheet has newer row
               if (!map.has(r.id)) {
                 map.set(r.id, r);
@@ -128,7 +128,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
       firestoreCount = firestoreReports.length;
       firestoreReports.forEach((r) => {
-        if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+        if (r && r.id && !deletedIds.has(r.id) && !isReportDeleted(r)) {
           map.set(r.id, r);
         }
       });
@@ -146,7 +146,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
       const serverReports = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
       if (Array.isArray(serverReports) && serverReports.length > 0) {
         serverReports.forEach((r: LaporanHarianItem) => {
-          if (r && r.id && !deletedIds.has(r.id) && !isReportBeforeSept7(r)) {
+          if (r && r.id && !deletedIds.has(r.id) && !isReportDeleted(r)) {
             map.set(r.id, r);
             serverReportIds.add(r.id);
           }

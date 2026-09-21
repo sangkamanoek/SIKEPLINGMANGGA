@@ -389,7 +389,7 @@ export async function purgePreSept7ReportsFromSheet(
         },
         jumlahDokumentasi: 0,
       };
-      return !isReportBeforeSept7(dummyReport);
+      return !isReportDeleted(dummyReport);
     });
 
     if (validRows.length < rows.length) {
