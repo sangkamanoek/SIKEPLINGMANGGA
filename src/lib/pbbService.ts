@@ -41,7 +41,7 @@ export const DEFAULT_PBB_YEAR = 2026;
 const STORAGE_KEY_PREFIX = 'sikepling_sppt_pbb_records_';
 
 export const getPbbStorageKey = (year: number): string => {
-  return `${STORAGE_KEY_PREFIX}${year}_v2`;
+  return `${STORAGE_KEY_PREFIX}${year}_v3`;
 };
 
 /**
@@ -298,7 +298,13 @@ export function broadcastPbbChange(item: SpptPbbItem, year: number) {
 
 export async function fetchPbbFromApi(year: number = DEFAULT_PBB_YEAR): Promise<SpptPbbItem[]> {
   try {
-    const res = await fetch(`/api/pbb?year=${year}`);
+    const res = await fetch(`/api/pbb?year=${year}&_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    });
     if (res.ok) {
       const json = await res.json();
       if (json && Array.isArray(json.data) && json.data.length > 0) {

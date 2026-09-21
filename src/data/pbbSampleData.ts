@@ -55,7 +55,7 @@ export const SAMPLE_SPPT_ITEMS: SpptPbbItem[] = [
   { id: '1', no: 1, nop: '12.75.010.009.001-0001.0', buku: 'IV, V', namaWp: 'MULIA MELIALA', alamatOp: 'JL LETJEN DJAMIN GINTING 88', pbbTerutang: 2835604, status: 'Belum Bayar', lingkungan: 1 },
   { id: '2', no: 2, nop: '12.75.010.009.001-0002.0', buku: 'IV, V', namaWp: 'PANTAS MELIALA', alamatOp: 'JL LETJEN DJAMIN GINTING 86', pbbTerutang: 3209724, status: 'Belum Bayar', lingkungan: 1 },
   { id: '3', no: 3, nop: '12.75.010.009.001-0003.0', buku: 'I, II, III', namaWp: 'NG BANGUN', alamatOp: 'JL LETJEN DJAMIN GINTING 84', pbbTerutang: 442425, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '4', no: 4, nop: '12.75.010.009.001-0004.0', buku: 'I, II, III', namaWp: 'JALAN GINTING', alamatOp: 'JL LADANG 01', pbbTerutang: 227594, status: 'Belum Bayar', lingkungan: 1 },
+  { id: '4', no: 4, nop: '12.75.010.009.001-0004.0', buku: 'I, II, III', namaWp: 'Drs. H. M. YUSUF NASUTION', alamatOp: 'JL. FLAMBOYAN NO. 12', pbbTerutang: 245000, status: 'Sudah Bayar', lingkungan: 1 },
   { id: '5', no: 5, nop: '12.75.010.009.001-0005.0', buku: 'I, II, III', namaWp: 'OPONG GINTING', alamatOp: 'JL LADANG 3', pbbTerutang: 237619, status: 'Belum Bayar', lingkungan: 1 },
   { id: '6', no: 6, nop: '12.75.010.009.001-0006.0', buku: 'I, II, III', namaWp: 'ADUNTA SEMBIRING', alamatOp: 'JL LADANG 5', pbbTerutang: 247644, status: 'Belum Bayar', lingkungan: 1 },
   { id: '7', no: 7, nop: '12.75.010.009.001-0007.0', buku: 'I, II, III', namaWp: 'L GINTING, BA', alamatOp: 'JL LADANG 7', pbbTerutang: 213375, status: 'Belum Bayar', lingkungan: 1 },

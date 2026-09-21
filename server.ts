@@ -249,6 +249,9 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/pbb', (req, res) => {
   const year = String(req.query.year || '2026');
   const items = pbbCache[year] || [];
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   return res.json({ success: true, year: Number(year), count: items.length, data: items });
 });
 

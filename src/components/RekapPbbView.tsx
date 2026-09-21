@@ -108,16 +108,6 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
   // Subscribe to Firebase Firestore & Server Buffer real-time updates for active year
   useEffect(() => {
-    // 0. Auto-push local modifications (e.g. status changes done in offline/local state)
-    const local = getLocalSpptForYear(selectedYear);
-    const hasCustomEdits = local.some((item) => {
-      const sample = SAMPLE_SPPT_ITEMS.find((s) => s.id === item.id);
-      return sample && sample.status !== item.status;
-    });
-    if (hasCustomEdits) {
-      batchSavePbbSpptToFirestore(local, selectedYear).catch(() => {});
-    }
-
     // 1. Initial fetch from Firestore & Server Buffer
     fetchPbbSpptFromFirestore(selectedYear).then((items) => {
       if (items && items.length > 0) {
@@ -537,6 +527,18 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   ))}
                 </select>
               </div>
+
+              {/* Tombol Sinkronkan Data Realtime */}
+              <button
+                type="button"
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                title="Sinkronisasi Data Real-time (Server Buffer & Cloud Firestore)"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white text-xs font-bold transition-all shadow-md cursor-pointer border border-emerald-300"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-300' : 'text-white'}`} />
+                <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Data'}</span>
+              </button>
 
               {isKepling && selectedLingkungan !== String(keplingLingkunganNum) && (
                 <button

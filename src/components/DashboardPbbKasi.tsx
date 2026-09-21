@@ -79,6 +79,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
 
   // Real-time SPPT & Realisasi Data
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => getLocalSpptForYear(pbbYear));
+  const [isSyncingPbb, setIsSyncingPbb] = useState(false);
 
   useEffect(() => {
     setSpptList(getLocalSpptForYear(pbbYear));
@@ -90,6 +91,18 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
     });
     return () => unsub();
   }, [pbbYear]);
+
+  const handleManualSyncPbb = async () => {
+    setIsSyncingPbb(true);
+    try {
+      const items = await fetchPbbSpptFromFirestore(pbbYear);
+      if (items && items.length > 0) {
+        setSpptList(items);
+      }
+    } catch {} finally {
+      setIsSyncingPbb(false);
+    }
+  };
 
   const pbbOverview = useMemo(() => {
     return computePbbOverview(spptList, pbbYear);
@@ -556,6 +569,18 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
                     ))}
                   </select>
                 </div>
+
+                {/* Tombol Sinkronkan Data Realtime */}
+                <button
+                  type="button"
+                  onClick={handleManualSyncPbb}
+                  disabled={isSyncingPbb}
+                  title="Sinkronkan data PBB dari Server Buffer & Cloud Firestore"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold border border-emerald-500/50 transition-all cursor-pointer shadow-xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPbb ? 'animate-spin text-amber-300' : 'text-emerald-300'}`} />
+                  <span className="hidden sm:inline">{isSyncingPbb ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
+                </button>
 
                 {onOpenRekapPbb && (
                   <button
