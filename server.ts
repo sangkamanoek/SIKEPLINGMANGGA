@@ -159,10 +159,10 @@ const DEFAULT_TARGETS_LIST = [
 ];
 
 const DEFAULT_PERLINSOS_BASELINES = [
-  0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0
+  256, 278, 328, 249, 194, 218,
+  164, 154, 192, 218, 186, 164,
+  253, 164, 116, 175, 222, 149,
+  242, 132, 233, 215, 218, 123
 ];
 
 const generateDefaultTargets = () => {
@@ -176,13 +176,13 @@ const generateDefaultTargets = () => {
       targetPbb: 100,
       targetIkd: 50,
       targetBpjs: 25,
-      overridePerlinsos: null,
+      overridePerlinsos: DEFAULT_PERLINSOS_BASELINES[i - 1] ?? null,
       overridePbb: null,
       overrideIkd: null,
       overrideBpjs: null,
-      catatanPenyesuaian: 'Baseline Data Awal Murni (Fresh Start)',
-      updatedAt: new Date().toISOString(),
-      updatedBy: 'Sistem',
+      catatanPenyesuaian: 'Data Capaian Perlinsos per 21 September 2026',
+      updatedAt: '2026-09-21T00:00:00.000Z',
+      updatedBy: 'Super Admin',
     };
   }
   return map;

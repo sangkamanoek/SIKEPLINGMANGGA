@@ -783,17 +783,20 @@ export function subscribeEventAttendanceFromFirestore(
  */
 export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean; message: string }> {
   try {
-    // 1. Delete all reports from 'reports'
-    try {
-      const reportsCol = collection(db, REPORTS_COLLECTION);
-      const reportsSnap = await getDocs(reportsCol);
-      if (!reportsSnap.empty) {
-        const batch = writeBatch(db);
-        reportsSnap.forEach((d) => batch.delete(d.ref));
-        await batch.commit();
+    // 1. Delete all reports from 'reports' and legacy collection 'SIKEPLINGMANGGA'
+    const reportColNames = [REPORTS_COLLECTION, 'SIKEPLINGMANGGA', 'kunjungan_warga'];
+    for (const colName of reportColNames) {
+      try {
+        const c = collection(db, colName);
+        const snap = await getDocs(c);
+        if (!snap.empty) {
+          const batch = writeBatch(db);
+          snap.forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
+      } catch (e) {
+        console.warn(`Wipe ${colName} error:`, e);
       }
-    } catch (e) {
-      console.warn('Wipe reports error:', e);
     }
 
     // 2. Delete all tombstones from 'deleted_reports'
@@ -835,7 +838,7 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
       console.warn('Wipe custom_events error:', e);
     }
 
-    // 5. Reset all targets_capaian in Firestore to 0 baseline
+    // 5. Reset all targets_capaian in Firestore to 21 September 2026 baseline
     try {
       const defaults = getDefaultTargetsCapaianMap();
       const targetBatch = writeBatch(db);
@@ -843,11 +846,6 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
         const docRef = doc(db, TARGETS_COLLECTION, kId);
         targetBatch.set(docRef, {
           ...item,
-          overridePerlinsos: null,
-          overridePbb: null,
-          overrideIkd: null,
-          overrideBpjs: null,
-          catatanPenyesuaian: 'Baseline Data Awal Murni (Fresh Start)',
           updatedAt: new Date().toISOString(),
           updatedBy: 'Sistem Reset',
         });

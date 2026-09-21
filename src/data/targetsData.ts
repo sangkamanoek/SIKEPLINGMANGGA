@@ -37,23 +37,24 @@ export const DEFAULT_PERLINSOS_TARGETS: number[] = [
 ];
 
 /**
- * Baseline Capaian Perlinsos awal/override berturut-turut Lk 1 s/d 24 (Semua 0 / Fresh Start):
+ * Baseline Capaian Perlinsos awal/override berturut-turut Lk 1 s/d 24 per 21 September 2026:
  */
 export const DEFAULT_PERLINSOS_BASELINES: number[] = [
-  0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0
+  256, 278, 328, 249, 194, 218,
+  164, 154, 192, 218, 186, 164,
+  253, 164, 116, 175, 222, 149,
+  242, 132, 233, 215, 218, 123
 ];
 
 /**
- * Generate default Targets & Capaian map for all 24 Kepling (Clean / Fresh Baseline)
+ * Generate default Targets & Capaian map for all 24 Kepling (per 21 September 2026)
  */
 export function getDefaultTargetsCapaianMap(): TargetsCapaianMap {
   const map: TargetsCapaianMap = {};
 
   KEPLING_ACCOUNTS.forEach((k, index) => {
     const targetPerlinsos = DEFAULT_PERLINSOS_TARGETS[index] ?? 300;
+    const baselinePerlinsos = DEFAULT_PERLINSOS_BASELINES[index] ?? 0;
     map[k.id] = {
       keplingId: k.id,
       nomorLingkungan: k.nomorLingkungan || (index + 1),
@@ -63,13 +64,13 @@ export function getDefaultTargetsCapaianMap(): TargetsCapaianMap {
       targetPbb: 100, // target default WP
       targetIkd: 50,  // target default aktivasi IKD
       targetBpjs: 25, // target default BPJS TK
-      overridePerlinsos: null,
+      overridePerlinsos: baselinePerlinsos,
       overridePbb: null,
       overrideIkd: null,
       overrideBpjs: null,
-      catatanPenyesuaian: 'Baseline Data Awal Murni (Fresh Start)',
-      updatedAt: new Date().toISOString(),
-      updatedBy: 'Sistem',
+      catatanPenyesuaian: 'Data Capaian Perlinsos per 21 September 2026',
+      updatedAt: '2026-09-21T00:00:00.000Z',
+      updatedBy: 'Super Admin',
     };
   });
 

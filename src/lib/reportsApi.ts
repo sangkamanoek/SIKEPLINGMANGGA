@@ -364,13 +364,13 @@ export const resetAllReportsOnServer = async (): Promise<boolean> => {
     console.warn('Notice resetting Firebase Firestore reports:', err);
   }
 
-  // Reset in server
+  // Reset in server (if available, e.g. local / container environment)
   try {
     const res = await fetch('/api/reports/reset', { method: 'POST' });
     return res.ok;
   } catch (err) {
-    console.error('Error resetting reports on server:', err);
-    return false;
+    // Expected to be ignored on serverless static hosting like Vercel
+    return true;
   }
 };
 
