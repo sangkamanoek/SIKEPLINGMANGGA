@@ -12,20 +12,21 @@ service cloud.firestore {
     // Koleksi Laporan Kinerja Utama
     match /SIKEPLINGMANGGA/{docId} {
       allow read: if true;
-      allow write: if request.resource.data.keys().hasAll(['id', 'tanggalLaporan'])
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'tanggalLaporan'])
                    && isValidString(request.resource.data.id, 1, 100);
+      allow delete: if true;
     }
 
     match /reports/{reportId} {
       allow read: if true;
-      allow write: if request.resource.data.keys().hasAll(['id'])
+      allow create, update: if request.resource.data.keys().hasAll(['id'])
                    && isValidString(request.resource.data.id, 1, 100);
+      allow delete: if true;
     }
 
     // Target Capaian Kinerja (PBB, Perlinsos, IKD, dll.)
     match /targets_capaian/{keplingId} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if true;
     }
 
     // Passwords & Profile Sync
@@ -53,8 +54,9 @@ service cloud.firestore {
     // Absensi Harian & Apel
     match /attendance/{attendanceId} {
       allow read: if true;
-      allow write: if request.resource.data.keys().hasAll(['id', 'tanggal'])
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'tanggal'])
                    && isValidString(request.resource.data.id, 1, 100);
+      allow delete: if true;
     }
 
     // Agenda & Kegiatan Khusus
@@ -73,6 +75,19 @@ service cloud.firestore {
                             && isValidString(request.resource.data.namaWarga, 1, 150)
                             && isValidString(request.resource.data.alamat, 1, 300);
       allow delete: if true;
+    }
+
+    // WebGIS Batas Lingkungan, Titik Rumah & Ruas Jalan
+    match /webgis_polygons/{docId} {
+      allow read, write: if true;
+    }
+
+    match /webgis_houses/{docId} {
+      allow read, write: if true;
+    }
+
+    match /webgis_roads/{docId} {
+      allow read, write: if true;
     }
 
     // PBB SPPT Data per Tahun Pajak

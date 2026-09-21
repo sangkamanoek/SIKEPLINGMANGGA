@@ -41,7 +41,7 @@ import { DashboardPbbKasi } from './components/DashboardPbbKasi';
 import { DashboardPerlinsosKasi } from './components/DashboardPerlinsosKasi';
 import { DashboardTrantibumKasi } from './components/DashboardTrantibumKasi';
 import { getDefaultTargetsCapaianMap } from './data/targetsData';
-import { fetchTargetsCapaian } from './lib/targetsApi';
+import { fetchTargetsCapaian, subscribeTargetsFromFirestore } from './lib/targetsApi';
 import { PWAInstallModal } from './components/PWAInstallModal';
 import { PanduanPPTModal } from './components/PanduanPPTModal';
 import { AbsenKegiatanKhusus } from './components/AbsenKegiatanKhusus';
@@ -290,6 +290,13 @@ export default function App() {
       if (data) setTargetsMap(data);
     });
 
+    // Subscribe to real-time targets & capaian directly from Firebase Firestore
+    const unsubscribeTargets = subscribeTargetsFromFirestore((data) => {
+      if (data && Object.keys(data).length > 0) {
+        setTargetsMap((prev) => ({ ...prev, ...data }));
+      }
+    });
+
     // Subscribe to real-time reports directly from Firebase Firestore with safe non-destructive merge
     const unsubscribeFirestoreReports = subscribeReportsFromFirestore((firestoreReports) => {
       if (Array.isArray(firestoreReports)) {
@@ -405,6 +412,7 @@ export default function App() {
     );
 
     return () => {
+      unsubscribeTargets();
       unsubscribeFirestoreReports();
       unsubscribeAttendance();
       clearInterval(pollInterval);

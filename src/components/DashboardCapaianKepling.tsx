@@ -52,6 +52,7 @@ import {
   Phone,
   Coins,
   FileSpreadsheet,
+  RefreshCw,
 } from 'lucide-react';
 import {
   getLocalHouses,
@@ -147,6 +148,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     return DEFAULT_PBB_YEAR;
   });
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => getLocalSpptForYear(pbbYear));
+  const [isSyncingPbb, setIsSyncingPbb] = useState(false);
 
   useEffect(() => {
     setSpptList(getLocalSpptForYear(pbbYear));
@@ -158,6 +160,18 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     });
     return () => unsub();
   }, [pbbYear]);
+
+  const handleManualSyncPbb = async () => {
+    setIsSyncingPbb(true);
+    try {
+      const items = await fetchPbbSpptFromFirestore(pbbYear);
+      if (items && items.length > 0) {
+        setSpptList(items);
+      }
+    } catch {} finally {
+      setIsSyncingPbb(false);
+    }
+  };
 
   const pbbOverview = useMemo(() => {
     return computePbbOverview(spptList, pbbYear);
@@ -777,20 +791,39 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 bg-emerald-900/80 border border-emerald-500/50 px-3 py-1.5 rounded-xl">
-                  <Calendar className="w-4 h-4 text-amber-400" />
-                  <span className="text-xs font-bold text-amber-300">Tahun:</span>
-                  <select
-                    value={pbbYear}
-                    onChange={(e) => setPbbYear(parseInt(e.target.value, 10))}
-                    className="bg-transparent text-amber-300 text-xs font-black focus:outline-none cursor-pointer"
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-emerald-900/80 border border-emerald-500/50 px-3 py-1.5 rounded-xl">
+                    <Calendar className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold text-amber-300">Tahun:</span>
+                    <select
+                      value={pbbYear}
+                      onChange={(e) => {
+                        const yr = parseInt(e.target.value, 10);
+                        setPbbYear(yr);
+                        try {
+                          localStorage.setItem('sikepling_pbb_selected_year', String(yr));
+                        } catch {}
+                      }}
+                      className="bg-transparent text-amber-300 text-xs font-black focus:outline-none cursor-pointer"
+                    >
+                      {AVAILABLE_PBB_YEARS.map((yr) => (
+                        <option key={yr} value={yr} className="bg-slate-900 text-white font-bold">
+                          {yr}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleManualSyncPbb}
+                    disabled={isSyncingPbb}
+                    title="Sinkronkan data PBB dari Server Buffer & Cloud Firestore"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold border border-emerald-500/50 transition-all cursor-pointer shadow-xs"
                   >
-                    {AVAILABLE_PBB_YEARS.map((yr) => (
-                      <option key={yr} value={yr} className="bg-slate-900 text-white font-bold">
-                        {yr}
-                      </option>
-                    ))}
-                  </select>
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPbb ? 'animate-spin text-amber-300' : 'text-emerald-300'}`} />
+                    <span className="hidden sm:inline">{isSyncingPbb ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
+                  </button>
                 </div>
               </div>
 

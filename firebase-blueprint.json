@@ -195,6 +195,42 @@
         "lingkungan": "number",
         "keterangan": "string"
       }
+    },
+    {
+      "name": "webgis_polygons",
+      "description": "Batas poligon spasial 24 Lingkungan Kelurahan Mangga",
+      "fields": {
+        "id": "string",
+        "lingkungan": "number",
+        "nama": "string",
+        "warna": "string",
+        "coordinates": "array"
+      }
+    },
+    {
+      "name": "webgis_houses",
+      "description": "Titik rumah dan bangunan warga hasil pendataan door-to-door Kepling",
+      "fields": {
+        "id": "string",
+        "lingkungan": "number",
+        "namaKepalaKeluarga": "string",
+        "alamat": "string",
+        "statusPbb": "string",
+        "statusWrs": "string",
+        "lat": "number",
+        "lng": "number"
+      }
+    },
+    {
+      "name": "webgis_roads",
+      "description": "Data ruas jalan lingkungan kelurahan",
+      "fields": {
+        "id": "string",
+        "lingkungan": "number",
+        "namaJalan": "string",
+        "kondisi": "string",
+        "panjangMeter": "number"
+      }
     }
   ]
 }

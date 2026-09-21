@@ -119,6 +119,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
     return DEFAULT_PBB_YEAR;
   });
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => getLocalSpptForYear(pbbYear));
+  const [isSyncingPbb, setIsSyncingPbb] = useState(false);
   const [pbbSearch, setPbbSearch] = useState<string>('');
 
   useEffect(() => {
@@ -131,6 +132,18 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
     });
     return () => unsub();
   }, [pbbYear]);
+
+  const handleManualSyncPbb = async () => {
+    setIsSyncingPbb(true);
+    try {
+      const items = await fetchPbbSpptFromFirestore(pbbYear);
+      if (items && items.length > 0) {
+        setSpptList(items);
+      }
+    } catch {} finally {
+      setIsSyncingPbb(false);
+    }
+  };
 
   const pbbOverview = useMemo(() => {
     return computePbbOverview(spptList, pbbYear);
@@ -1220,6 +1233,18 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                     ))}
                   </select>
                 </div>
+
+                {/* Tombol Sinkronkan Data Realtime */}
+                <button
+                  type="button"
+                  onClick={handleManualSyncPbb}
+                  disabled={isSyncingPbb}
+                  title="Sinkronkan data PBB dari Server Buffer & Cloud Firestore"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold border border-emerald-500/50 transition-all cursor-pointer shadow-xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPbb ? 'animate-spin text-amber-300' : 'text-emerald-300'}`} />
+                  <span>{isSyncingPbb ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
+                </button>
 
                 {onOpenPbb && (
                   <button
