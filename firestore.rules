@@ -30,9 +30,15 @@ service cloud.firestore {
 
     // Passwords & Profile Sync
     match /account_passwords/{accountId} {
-      allow read: if true;
-      allow write: if request.resource.data.keys().hasAll(['id'])
-                   && isValidString(request.resource.data.id, 1, 50);
+      allow read, write: if true;
+    }
+
+    match /account_profiles/{accountId} {
+      allow read, write: if true;
+    }
+
+    match /deleted_reports/{reportId} {
+      allow read, write: if true;
     }
 
     // Reminders & Notification Logs

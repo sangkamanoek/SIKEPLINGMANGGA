@@ -7,7 +7,13 @@ import {
   User,
   signOut,
 } from 'firebase/auth';
-import { initializeFirestore, Firestore, doc, getDoc } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  Firestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  setLogLevel,
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Flexible config: use environment variables if provided in Vercel, fallback to bundled config
@@ -25,25 +31,23 @@ const activeConfig = {
 const app = !getApps().length ? initializeApp(activeConfig) : getApp();
 export const auth = getAuth(app);
 
-// Initialize Firestore with auto-detected long polling fallback for max network compatibility
+// Suppress transient backend offline connection logs in production console
+try {
+  setLogLevel('error');
+} catch {}
+
+// Initialize Firestore with forced long polling and persistent IndexedDB local cache.
+// Using experimentalForceLongPolling eliminates failed WebSocket handshakes on proxies/cellular networks.
 export const db: Firestore = initializeFirestore(
   app,
   {
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
   },
   activeConfig.firestoreDatabaseId || undefined
 );
-
-// Test connection on boot gracefully without throwing console errors when offline
-export async function testConnection() {
-  try {
-    await getDoc(doc(db, 'SIKEPLINGMANGGA', 'info'));
-    console.log('Firebase Firestore SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA ready.');
-  } catch {
-    // Silent fallback to local storage / server buffer
-  }
-}
-testConnection();
 
 export enum OperationType {
   CREATE = 'create',
