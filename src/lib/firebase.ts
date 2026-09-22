@@ -10,6 +10,7 @@ import {
 import {
   initializeFirestore,
   Firestore,
+  getFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
   setLogLevel,
@@ -36,18 +37,24 @@ try {
   setLogLevel('error');
 } catch {}
 
-// Initialize Firestore with forced long polling and persistent IndexedDB local cache.
-// Using experimentalForceLongPolling eliminates failed WebSocket handshakes on proxies/cellular networks.
-export const db: Firestore = initializeFirestore(
-  app,
-  {
-    experimentalForceLongPolling: true,
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager(),
-    }),
-  },
-  activeConfig.firestoreDatabaseId || undefined
-);
+let firestoreInstance: Firestore;
+
+try {
+  // Initialize Firestore with forced long polling for ultra-stable connection on cellular networks.
+  // We omit complex IndexedDB tab persistence to prevent silent offline write-queuing and browser hangs on mobile Safari/WebViews.
+  firestoreInstance = initializeFirestore(
+    app,
+    {
+      experimentalForceLongPolling: true,
+    },
+    activeConfig.firestoreDatabaseId || undefined
+  );
+} catch (e) {
+  console.warn('initializeFirestore failed, falling back to standard getFirestore:', e);
+  firestoreInstance = getFirestore(app);
+}
+
+export const db: Firestore = firestoreInstance;
 
 export enum OperationType {
   CREATE = 'create',

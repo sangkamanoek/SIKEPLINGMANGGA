@@ -352,7 +352,9 @@ export const deleteReportFromServer = async (id: string): Promise<boolean> => {
 // Reset all reports in Firebase Firestore, server, and local storage
 export const resetAllReportsOnServer = async (): Promise<boolean> => {
   try {
+    KNOWN_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
     localStorage.removeItem(LOCAL_STORAGE_KEY_LAPORAN);
+    saveReportsToIndexedDB([]).catch(() => {});
   } catch (e) {
     console.warn(e);
   }
@@ -372,6 +374,10 @@ export const resetAllReportsOnServer = async (): Promise<boolean> => {
     // Expected to be ignored on serverless static hosting like Vercel
     return true;
   }
+};
+
+export const clearAllReportsEverywhere = async (): Promise<boolean> => {
+  return resetAllReportsOnServer();
 };
 
 export { subscribeReportsFromFirestore };

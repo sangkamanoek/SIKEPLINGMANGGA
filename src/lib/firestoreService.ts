@@ -230,7 +230,7 @@ export async function resetAllReportsInFirestore(): Promise<boolean> {
  * Real-time listener for reports in Firebase Firestore
  */
 export function subscribeReportsFromFirestore(
-  onData: (reports: LaporanHarianItem[]) => void,
+  onData: (reports: LaporanHarianItem[], isFromCache: boolean) => void,
   onError?: (err: any) => void
 ): Unsubscribe {
   const colRef = collection(db, REPORTS_COLLECTION);
@@ -238,7 +238,8 @@ export function subscribeReportsFromFirestore(
     colRef,
     (snapshot) => {
       const reports: LaporanHarianItem[] = [];
-      console.log(`[Firestore Sync] Received ${snapshot.size} reports from Firestore.`);
+      const isFromCache = snapshot.metadata.fromCache;
+      console.log(`[Firestore Sync] Received ${snapshot.size} reports from Firestore. isFromCache: ${isFromCache}`);
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as LaporanHarianItem;
         const reportId = docSnap.id || data.id;
@@ -266,7 +267,7 @@ export function subscribeReportsFromFirestore(
         return timeB - timeA;
       });
 
-      onData(reports);
+      onData(reports, isFromCache);
     },
     (err) => {
       console.warn('Firestore onSnapshot error reports (switching to server fallback):', err);
@@ -631,13 +632,14 @@ export async function saveAttendanceToFirestore(item: AbsenApelItem): Promise<bo
 }
 
 export function subscribeAttendanceFromFirestore(
-  onData: (items: AbsenApelItem[]) => void
+  onData: (items: AbsenApelItem[], isFromCache: boolean) => void
 ): Unsubscribe {
   const colRef = collection(db, ATTENDANCE_COLLECTION);
   return onSnapshot(
     colRef,
     (snapshot) => {
       const list: AbsenApelItem[] = [];
+      const isFromCache = snapshot.metadata.fromCache;
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as AbsenApelItem;
         if (data && data.id) {
@@ -645,7 +647,7 @@ export function subscribeAttendanceFromFirestore(
         }
       });
       list.sort((a, b) => new Date(b.waktuLengkap || b.createdAt).getTime() - new Date(a.waktuLengkap || a.createdAt).getTime());
-      onData(list);
+      onData(list, isFromCache);
     },
     (err) => {
       console.warn('Firestore onSnapshot attendance notice (using server fallback):', err?.message || err);
@@ -855,18 +857,15 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
       console.warn('Wipe targets_capaian error:', e);
     }
 
-    // 6. Reset PBB SPPT records in Firestore (pbb_sppt / pbb_sppt_2026) to Belum Bayar
-    const pbbCols = ['pbb_sppt', 'pbb_sppt_2026', 'pbb_sppt_2025'];
+    // 6. Delete all PBB SPPT records from Firestore completely (pbb_sppt, pbb_sppt_2026, pbb_sppt_2025, pbb_sppt_2027)
+    const pbbCols = ['pbb_sppt', 'pbb_sppt_2026', 'pbb_sppt_2025', 'pbb_sppt_2027'];
     for (const colName of pbbCols) {
       try {
         const pbbCol = collection(db, colName);
         const pbbSnap = await getDocs(pbbCol);
         if (!pbbSnap.empty) {
           const batch = writeBatch(db);
-          pbbSnap.forEach((d) => {
-            const data = d.data();
-            batch.set(d.ref, { ...data, status: 'Belum Bayar', updatedAt: new Date().toISOString() }, { merge: true });
-          });
+          pbbSnap.forEach((d) => batch.delete(d.ref));
           await batch.commit();
         }
       } catch (e) {
@@ -877,7 +876,7 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
     // Clear memory cache
     deletedReportIdsMemory.clear();
 
-    return { success: true, message: 'Seluruh capaian dan data operasional berhasil dibersihkan dari Firebase Firestore!' };
+    return { success: true, message: 'Seluruh data entri laporan dan realisasi PBB berhasil dihapus bersih dari Firebase Firestore!' };
   } catch (err: any) {
     console.error('Fatal error in wipeAllFirestoreCapaianData:', err);
     return { success: false, message: err?.message || 'Gagal mereset Firebase Firestore' };

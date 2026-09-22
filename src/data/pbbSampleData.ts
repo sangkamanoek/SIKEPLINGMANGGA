@@ -22,116 +22,33 @@ export interface RekapLingkunganPbb {
   persentaseWpLunas: number;
 }
 
-// Data awal realisasi SPPT PBB 2025 Kelurahan Mangga (24 Lingkungan)
+// Data awal realisasi SPPT PBB Kelurahan Mangga (Dikosongkan 0 agar 100% terhitung otomatis dari CSV yang diimpor)
 export const INITIAL_PBB_SUMMARY: Record<number, { targetNominal: number; realisasiNominal: number; totalWp: number; wpLunas: number }> = {
-  1: { targetNominal: 485230000, realisasiNominal: 0, totalWp: 554, wpLunas: 0 },
-  2: { targetNominal: 395400000, realisasiNominal: 0, totalWp: 463, wpLunas: 0 },
-  3: { targetNominal: 421500000, realisasiNominal: 0, totalWp: 495, wpLunas: 0 },
-  4: { targetNominal: 388900000, realisasiNominal: 0, totalWp: 477, wpLunas: 0 },
-  5: { targetNominal: 2825086715, realisasiNominal: 0, totalWp: 994, wpLunas: 0 },
-  6: { targetNominal: 312800000, realisasiNominal: 0, totalWp: 363, wpLunas: 0 },
-  7: { targetNominal: 325400000, realisasiNominal: 0, totalWp: 367, wpLunas: 0 },
-  8: { targetNominal: 289100000, realisasiNominal: 0, totalWp: 308, wpLunas: 0 },
-  9: { targetNominal: 215400000, realisasiNominal: 0, totalWp: 234, wpLunas: 0 },
-  10: { targetNominal: 298700000, realisasiNominal: 0, totalWp: 319, wpLunas: 0 },
-  11: { targetNominal: 374500000, realisasiNominal: 0, totalWp: 397, wpLunas: 0 },
-  12: { targetNominal: 295100000, realisasiNominal: 0, totalWp: 308, wpLunas: 0 },
-  13: { targetNominal: 341200000, realisasiNominal: 0, totalWp: 364, wpLunas: 0 },
-  14: { targetNominal: 310800000, realisasiNominal: 0, totalWp: 320, wpLunas: 0 },
-  15: { targetNominal: 365200000, realisasiNominal: 0, totalWp: 379, wpLunas: 0 },
-  16: { targetNominal: 278400000, realisasiNominal: 0, totalWp: 298, wpLunas: 0 },
-  17: { targetNominal: 281900000, realisasiNominal: 0, totalWp: 296, wpLunas: 0 },
-  18: { targetNominal: 322600000, realisasiNominal: 0, totalWp: 343, wpLunas: 0 },
-  19: { targetNominal: 389400000, realisasiNominal: 0, totalWp: 417, wpLunas: 0 },
-  20: { targetNominal: 198500000, realisasiNominal: 0, totalWp: 198, wpLunas: 0 },
-  21: { targetNominal: 338100000, realisasiNominal: 0, totalWp: 352, wpLunas: 0 },
-  22: { targetNominal: 245200000, realisasiNominal: 0, totalWp: 255, wpLunas: 0 },
-  23: { targetNominal: 498300000, realisasiNominal: 0, totalWp: 543, wpLunas: 0 },
-  24: { targetNominal: 231500000, realisasiNominal: 0, totalWp: 246, wpLunas: 0 }
+  1: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  2: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  3: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  4: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  5: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  6: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  7: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  8: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  9: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  10: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  11: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  12: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  13: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  14: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  15: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  16: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  17: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  18: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  19: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  20: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  21: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  22: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  23: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 },
+  24: { targetNominal: 0, realisasiNominal: 0, totalWp: 0, wpLunas: 0 }
 };
 
-// Sample SPPT Detail per WP
-export const SAMPLE_SPPT_ITEMS: SpptPbbItem[] = [
-  { id: '1', no: 1, nop: '12.75.010.009.001-0001.0', buku: 'IV, V', namaWp: 'MULIA MELIALA', alamatOp: 'JL LETJEN DJAMIN GINTING 88', pbbTerutang: 2835604, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '2', no: 2, nop: '12.75.010.009.001-0002.0', buku: 'IV, V', namaWp: 'PANTAS MELIALA', alamatOp: 'JL LETJEN DJAMIN GINTING 86', pbbTerutang: 3209724, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '3', no: 3, nop: '12.75.010.009.001-0003.0', buku: 'I, II, III', namaWp: 'NG BANGUN', alamatOp: 'JL LETJEN DJAMIN GINTING 84', pbbTerutang: 442425, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '4', no: 4, nop: '12.75.010.009.001-0004.0', buku: 'I, II, III', namaWp: 'Drs. H. M. YUSUF NASUTION', alamatOp: 'JL. FLAMBOYAN NO. 12', pbbTerutang: 245000, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '5', no: 5, nop: '12.75.010.009.001-0005.0', buku: 'I, II, III', namaWp: 'OPONG GINTING', alamatOp: 'JL LADANG 3', pbbTerutang: 237619, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '6', no: 6, nop: '12.75.010.009.001-0006.0', buku: 'I, II, III', namaWp: 'ADUNTA SEMBIRING', alamatOp: 'JL LADANG 5', pbbTerutang: 247644, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '7', no: 7, nop: '12.75.010.009.001-0007.0', buku: 'I, II, III', namaWp: 'L GINTING, BA', alamatOp: 'JL LADANG 7', pbbTerutang: 213375, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '8', no: 8, nop: '12.75.010.009.001-0008.0', buku: 'I, II, III', namaWp: 'GEGET GINTING', alamatOp: 'JL LADANG 9', pbbTerutang: 207063, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '9', no: 9, nop: '12.75.010.009.001-0009.0', buku: 'I, II, III', namaWp: 'CIKEPEN GINTING', alamatOp: 'JL LADANG 09', pbbTerutang: 207063, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '10', no: 10, nop: '12.75.010.009.001-0010.0', buku: 'I, II, III', namaWp: 'LESMAN SEMBIRING', alamatOp: 'JL LADANG', pbbTerutang: 200500, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '10_1', no: 11, nop: '12.75.010.009.001-0011.0', buku: 'I, II, III', namaWp: 'SABARITA KETAREN', alamatOp: 'JL LADANG NO. 12', pbbTerutang: 310500, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '10_2', no: 12, nop: '12.75.010.009.001-0012.0', buku: 'I, II, III', namaWp: 'KARTINI SEMBIRING', alamatOp: 'JL LADANG GG BARU 4', pbbTerutang: 245000, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '10_3', no: 13, nop: '12.75.010.009.001-0013.0', buku: 'IV, V', namaWp: 'PT SUMATERA INDAH', alamatOp: 'JL LETJEN DJAMIN GINTING KM 10', pbbTerutang: 5400000, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '10_4', no: 14, nop: '12.75.010.009.001-0014.0', buku: 'I, II, III', namaWp: 'SUDARMAN PERANGIN-ANGIN', alamatOp: 'JL LADANG NO. 20', pbbTerutang: 185000, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '10_5', no: 15, nop: '12.75.010.009.001-0015.0', buku: 'I, II, III', namaWp: 'RUDI KURNIAWAN', alamatOp: 'JL LADANG NO. 22', pbbTerutang: 290000, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '10_6', no: 16, nop: '12.75.010.009.001-0016.0', buku: 'I, II, III', namaWp: 'MARIA TARIGAN', alamatOp: 'JL LADANG GG DAMAI 1', pbbTerutang: 320000, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '10_7', no: 17, nop: '12.75.010.009.001-0017.0', buku: 'I, II, III', namaWp: 'HERMANTO BRAHMANA', alamatOp: 'JL LADANG GG DAMAI 3', pbbTerutang: 210000, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '10_8', no: 18, nop: '12.75.010.009.001-0018.0', buku: 'IV, V', namaWp: 'CV MEDAN PERKASA', alamatOp: 'JL LETJEN DJAMIN GINTING 92', pbbTerutang: 4150000, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '10_9', no: 19, nop: '12.75.010.009.001-0019.0', buku: 'I, II, III', namaWp: 'USMAN KARO-KARO', alamatOp: 'JL LADANG NO. 28', pbbTerutang: 275000, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '10_10', no: 20, nop: '12.75.010.009.001-0020.0', buku: 'I, II, III', namaWp: 'NURHAYATI', alamatOp: 'JL LADANG NO. 30', pbbTerutang: 340000, status: 'Belum Bayar', lingkungan: 1 },
-  { id: '11', no: 21, nop: '12.75.010.009.007-0004.0', buku: 'I, II, III', namaWp: 'ENOS GINTING', alamatOp: 'JL LETJEN DJAMIN GINTING 88', pbbTerutang: 1297392, status: 'Belum Bayar', lingkungan: 2 },
-  { id: '12', no: 22, nop: '12.75.010.009.007-0005.0', buku: 'I, II, III', namaWp: 'PENGHUNI', alamatOp: 'JL LETJEN DJAMIN GINTING 90', pbbTerutang: 804000, status: 'Belum Bayar', lingkungan: 2 },
-  { id: '13', no: 23, nop: '12.75.010.009.005-0147.0', buku: 'I, II, III', namaWp: 'BERNIUR HALOHO', alamatOp: 'JL. KAPITEN PURBA 1 NO.6', pbbTerutang: 306525, status: 'Belum Bayar', lingkungan: 3 },
-  { id: '14', no: 24, nop: '12.75.010.009.004-0002.0', buku: 'IV, V', namaWp: 'NICOLAAS SINURAYA', alamatOp: 'JL TALI AIR 2 LK III', pbbTerutang: 2661347, status: 'Belum Bayar', lingkungan: 4 },
-  { id: '15', no: 25, nop: '12.75.010.009.008-0002.0', buku: 'I, II, III', namaWp: 'GULBAK KABAN', alamatOp: 'JL IRIGASI', pbbTerutang: 434083, status: 'Belum Bayar', lingkungan: 5 },
-  { id: '15_2', no: 151, nop: '12.75.010.009.008-0012.0', buku: 'IV, V', namaWp: 'PT ROYAL SUMATERA', alamatOp: 'KOMP ROYAL SUMATERA BLOK A NO. 1', pbbTerutang: 8450000, status: 'Belum Bayar', lingkungan: 5 },
-  { id: '15_3', no: 152, nop: '12.75.010.009.008-0018.0', buku: 'IV, V', namaWp: 'DRS. H. SURYA DARMA', alamatOp: 'KOMP ROYAL SUMATERA BLOK B NO. 12', pbbTerutang: 6250000, status: 'Belum Bayar', lingkungan: 5 },
-  { id: '15_4', no: 153, nop: '12.75.010.009.008-0025.0', buku: 'IV, V', namaWp: 'IR. BENNY SIMANJUNTAK', alamatOp: 'KOMP ROYAL SUMATERA BLOK C NO. 5', pbbTerutang: 5800000, status: 'Belum Bayar', lingkungan: 5 },
-  { id: '15_5', no: 154, nop: '12.75.010.009.008-0040.0', buku: 'I, II, III', namaWp: 'M. SITEPU', alamatOp: 'JL IRIGASI GG PASAR 2', pbbTerutang: 385000, status: 'Belum Bayar', lingkungan: 5 },
-  { id: '15_6', no: 155, nop: '12.75.010.009.008-0056.0', buku: 'IV, V', namaWp: 'H. AHMAD LUBIS', alamatOp: 'JL DJAMIN GINTING KM 11.5', pbbTerutang: 4120000, status: 'Belum Bayar', lingkungan: 5 },
-  { id: '15_7', no: 156, nop: '12.75.010.009.008-0082.0', buku: 'I, II, III', namaWp: 'SITI RAHMAH', alamatOp: 'JL IRIGASI NO. 45', pbbTerutang: 520000, status: 'Belum Bayar', lingkungan: 5 },
-  { id: '15_8', no: 157, nop: '12.75.010.009.008-0105.0', buku: 'IV, V', namaWp: 'CLUB HOUSE GOLF ROYAL', alamatOp: 'KOMP ROYAL SUMATERA', pbbTerutang: 12500000, status: 'Belum Bayar', lingkungan: 5 },
-  { id: '15_9', no: 158, nop: '12.75.010.009.008-0120.0', buku: 'I, II, III', namaWp: 'KAPTI SINULINGGA', alamatOp: 'JL IRIGASI GG SADAR', pbbTerutang: 295000, status: 'Belum Bayar', lingkungan: 5 },
-  { id: '16', no: 26, nop: '12.75.010.009.012-0001.0', buku: 'I, II, III', namaWp: 'TU SIRAIT', alamatOp: 'JL KOPI III 6/10', pbbTerutang: 87270, status: 'Belum Bayar', lingkungan: 6 },
-  { id: '17', no: 27, nop: '12.75.010.009.011-0003.0', buku: 'I, II, III', namaWp: 'SUPOMO', alamatOp: 'JL KARET IV 7/12', pbbTerutang: 133700, status: 'Belum Bayar', lingkungan: 7 },
-  { id: '18', no: 28, nop: '12.75.010.009.015-0001.0', buku: 'I, II, III', namaWp: 'DARIANUS TARIGAN', alamatOp: 'JL TEH RAYA 35', pbbTerutang: 154370, status: 'Belum Bayar', lingkungan: 8 },
-  { id: '19', no: 29, nop: '12.75.010.009.013-0527.0', buku: 'I, II, III', namaWp: 'LAURA SRI MULIANA / CS', alamatOp: 'JL KARET RAYA NO.15 HGB 2696', pbbTerutang: 185135, status: 'Belum Bayar', lingkungan: 9 },
-  { id: '20', no: 30, nop: '12.75.010.009.013-0001.0', buku: 'I, II, III', namaWp: 'JUNIMAN SIAHAAN', alamatOp: 'JL SAWIT RAYA 82', pbbTerutang: 192721, status: 'Belum Bayar', lingkungan: 10 },
-  // Lingkungan 11
-  { id: '21_1', no: 31, nop: '12.75.010.009.011-0015.0', buku: 'I, II, III', namaWp: 'BAHARUDDIN SITEPU', alamatOp: 'JL BUNGA RINTE NO. 14', pbbTerutang: 285000, status: 'Belum Bayar', lingkungan: 11 },
-  { id: '21_2', no: 32, nop: '12.75.010.009.011-0022.0', buku: 'IV, V', namaWp: 'CV RINTE SEJAHTERA', alamatOp: 'JL FLAMBOYAN RAYA NO. 8', pbbTerutang: 3850000, status: 'Belum Bayar', lingkungan: 11 },
-  { id: '21_3', no: 33, nop: '12.75.010.009.011-0045.0', buku: 'I, II, III', namaWp: 'ROSMAWATI BR KARO', alamatOp: 'JL BUNGA RINTE GG DAMAI 2', pbbTerutang: 215000, status: 'Belum Bayar', lingkungan: 11 },
-  // Lingkungan 12
-  { id: '22_1', no: 34, nop: '12.75.010.009.012-0010.0', buku: 'I, II, III', namaWp: 'FERDINAND GINTING', alamatOp: 'JL BUNGA NCOLE NO. 5', pbbTerutang: 340000, status: 'Belum Bayar', lingkungan: 12 },
-  { id: '22_2', no: 35, nop: '12.75.010.009.012-0038.0', buku: 'IV, V', namaWp: 'PT MANGGA RESIDENCE', alamatOp: 'KOMP MANGGA RESIDENCE BLOK B', pbbTerutang: 4900000, status: 'Belum Bayar', lingkungan: 12 },
-  { id: '22_3', no: 36, nop: '12.75.010.009.012-0072.0', buku: 'I, II, III', namaWp: 'HENDRA SURBAKTI', alamatOp: 'JL BUNGA NCOLE GG SEJAHTERA', pbbTerutang: 195000, status: 'Belum Bayar', lingkungan: 12 },
-  // Lingkungan 13
-  { id: '23_1', no: 37, nop: '12.75.010.009.013-0018.0', buku: 'I, II, III', namaWp: 'SASTRA PINEM', alamatOp: 'JL BUNGA RAYA NO. 88', pbbTerutang: 420000, status: 'Belum Bayar', lingkungan: 13 },
-  { id: '23_2', no: 38, nop: '12.75.010.009.013-0054.0', buku: 'I, II, III', namaWp: 'NURLELA HASIBUAN', alamatOp: 'JL BUNGA RAYA GG MESJID 3', pbbTerutang: 260000, status: 'Belum Bayar', lingkungan: 13 },
-  // Lingkungan 14
-  { id: '24_1', no: 39, nop: '12.75.010.009.014-0012.0', buku: 'IV, V', namaWp: 'KOMPLEK PURI MANGGA INDAH', alamatOp: 'JL BUNGA LAU NO. 1', pbbTerutang: 5200000, status: 'Belum Bayar', lingkungan: 14 },
-  { id: '24_2', no: 40, nop: '12.75.010.009.014-0044.0', buku: 'I, II, III', namaWp: 'JAPET KEMBAREN', alamatOp: 'JL BUNGA LAU GG RUKUN', pbbTerutang: 230000, status: 'Belum Bayar', lingkungan: 14 },
-  // Lingkungan 15
-  { id: '25_1', no: 41, nop: '12.75.010.009.015-0019.0', buku: 'I, II, III', namaWp: 'TENGKU ISMAIL', alamatOp: 'JL BUNGA RAMPE 4 NO. 25', pbbTerutang: 375000, status: 'Belum Bayar', lingkungan: 15 },
-  { id: '25_2', no: 42, nop: '12.75.010.009.015-0081.0', buku: 'I, II, III', namaWp: 'KARTIKA BR SEMBIRING', alamatOp: 'JL BUNGA RAMPE 4 GG MAWAR', pbbTerutang: 290000, status: 'Belum Bayar', lingkungan: 15 },
-  // Lingkungan 16
-  { id: '26_1', no: 43, nop: '12.75.010.009.016-0005.0', buku: 'I, II, III', namaWp: 'ALEXANDER SEBAYANG', alamatOp: 'JL BUNGA TURI I NO. 12', pbbTerutang: 245000, status: 'Belum Bayar', lingkungan: 16 },
-  { id: '26_2', no: 44, nop: '12.75.010.009.016-0033.0', buku: 'I, II, III', namaWp: 'TIURMA PANJAITAN', alamatOp: 'JL BUNGA TURI I GG BERSAMA 4', pbbTerutang: 310000, status: 'Belum Bayar', lingkungan: 16 },
-  // Lingkungan 17
-  { id: '27_1', no: 45, nop: '12.75.010.009.017-0014.0', buku: 'I, II, III', namaWp: 'DARMAWAN SINULINGGA', alamatOp: 'JL BUNGA TURI II NO. 7', pbbTerutang: 280000, status: 'Belum Bayar', lingkungan: 17 },
-  { id: '27_2', no: 46, nop: '12.75.010.009.017-0062.0', buku: 'I, II, III', namaWp: 'SRI WAHYUNI', alamatOp: 'JL BUNGA TURI II GG SUBUR', pbbTerutang: 225000, status: 'Belum Bayar', lingkungan: 17 },
-  // Lingkungan 18
-  { id: '28_1', no: 47, nop: '12.75.010.009.018-0021.0', buku: 'IV, V', namaWp: 'PT GRAHA MANGGA UTAMA', alamatOp: 'JL BUNGA HERBA NO. 100', pbbTerutang: 6100000, status: 'Belum Bayar', lingkungan: 18 },
-  { id: '28_2', no: 48, nop: '12.75.010.009.018-0055.0', buku: 'I, II, III', namaWp: 'SUHARDI PURBA', alamatOp: 'JL BUNGA HERBA GG DAMAI', pbbTerutang: 350000, status: 'Belum Bayar', lingkungan: 18 },
-  // Lingkungan 19
-  { id: '29_1', no: 49, nop: '12.75.010.009.019-0008.0', buku: 'I, II, III', namaWp: 'MARULI TUA MANURUNG', alamatOp: 'JL BUNGA ESTER NO. 32', pbbTerutang: 390000, status: 'Belum Bayar', lingkungan: 19 },
-  { id: '29_2', no: 50, nop: '12.75.010.009.019-0077.0', buku: 'I, II, III', namaWp: 'ERLINA BR TARIGAN', alamatOp: 'JL BUNGA ESTER GG KELUARGA', pbbTerutang: 265000, status: 'Belum Bayar', lingkungan: 19 },
-  // Lingkungan 20
-  { id: '30_1', no: 51, nop: '12.75.010.009.020-0011.0', buku: 'I, II, III', namaWp: 'JONNY GINTING', alamatOp: 'JL BUNGA TEROMPET NO. 45', pbbTerutang: 235000, status: 'Belum Bayar', lingkungan: 20 },
-  { id: '30_2', no: 52, nop: '12.75.010.009.020-0049.0', buku: 'I, II, III', namaWp: 'SITI AISYAH', alamatOp: 'JL BUNGA TEROMPET GG LESTARI', pbbTerutang: 180000, status: 'Belum Bayar', lingkungan: 20 },
-  // Lingkungan 21
-  { id: '31_1', no: 53, nop: '12.75.010.009.021-0016.0', buku: 'IV, V', namaWp: 'CV ASOKA JAYA', alamatOp: 'JL BUNGA ASOKA NO. 18', pbbTerutang: 4300000, status: 'Belum Bayar', lingkungan: 21 },
-  { id: '31_2', no: 54, nop: '12.75.010.009.021-0082.0', buku: 'I, II, III', namaWp: 'PARDAMEAN SIHOMBING', alamatOp: 'JL BUNGA MAWAR GG KARYA', pbbTerutang: 315000, status: 'Belum Bayar', lingkungan: 21 },
-  // Lingkungan 22
-  { id: '32_1', no: 55, nop: '12.75.010.009.022-0009.0', buku: 'I, II, III', namaWp: 'YOHANES BANGUN', alamatOp: 'JL BUNGA KANTIL NO. 15', pbbTerutang: 270000, status: 'Belum Bayar', lingkungan: 22 },
-  { id: '32_2', no: 56, nop: '12.75.010.009.022-0038.0', buku: 'I, II, III', namaWp: 'NURAINI', alamatOp: 'JL BUNGA KANTIL GG MELUR', pbbTerutang: 210000, status: 'Belum Bayar', lingkungan: 22 },
-  // Lingkungan 23
-  { id: '33_1', no: 57, nop: '12.75.010.009.023-0024.0', buku: 'IV, V', namaWp: 'PT PERMATA MANGGA', alamatOp: 'KOMP PERMATA MANGGA BLOK A', pbbTerutang: 7200000, status: 'Belum Bayar', lingkungan: 23 },
-  { id: '33_2', no: 58, nop: '12.75.010.009.023-0091.0', buku: 'I, II, III', namaWp: 'ALOYSIUS TARIGAN', alamatOp: 'JL BUNGA SAKURA NO. 44', pbbTerutang: 360000, status: 'Belum Bayar', lingkungan: 23 },
-  // Lingkungan 24
-  { id: '34_1', no: 59, nop: '12.75.010.009.024-0007.0', buku: 'I, II, III', namaWp: 'MUHAMMAD IQBAL', alamatOp: 'JL BUNGA KENANGA NO. 28', pbbTerutang: 295000, status: 'Belum Bayar', lingkungan: 24 },
-  { id: '34_2', no: 60, nop: '12.75.010.009.024-0050.0', buku: 'I, II, III', namaWp: 'DEWI KARTIKA', alamatOp: 'JL BUNGA KENANGA GG DAMAI 1', pbbTerutang: 240000, status: 'Belum Bayar', lingkungan: 24 }
-];
+// Sample SPPT Detail per WP (Dikosongkan agar pengguna dapat entri manual / import via CSV)
+export const SAMPLE_SPPT_ITEMS: SpptPbbItem[] = [];

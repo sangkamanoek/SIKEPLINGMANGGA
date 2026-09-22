@@ -57,6 +57,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { AbsenApelItem } from './types';
 import { loadAllAttendance } from './lib/attendanceApi';
 import { subscribeAttendanceFromFirestore, wipeAllFirestoreCapaianData } from './lib/firestoreService';
+import { wipeAllPbbSpptEverywhere } from './lib/pbbService';
 import { consolidateDailyReport } from './lib/reportConsolidator';
 import {
   fetchAllReports,
@@ -69,7 +70,8 @@ import {
   syncLocalReportsToServer,
   seedInitialReports,
 } from './lib/reportsApi';
-import { getReportsFromIndexedDB } from './lib/indexedDbStorage';
+import { getReportsFromIndexedDB, clearIndexedDBReports } from './lib/indexedDbStorage';
+import { KNOWN_STORAGE_KEYS } from './lib/reportsApi';
 
 const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
 
@@ -280,6 +282,25 @@ export default function App() {
 
   // Initialization: Load reports from server, sync offline cache, and set auto-sync interval
   useEffect(() => {
+    // One-time automatic clean-slate purge for client browser cache
+    const cleanSlateKey = 'sikepling_clean_slate_2026_done_v1';
+    if (!localStorage.getItem(cleanSlateKey)) {
+      try {
+        localStorage.removeItem(LOCAL_STORAGE_KEY_LAPORAN);
+        localStorage.removeItem('kepling_deleted_reports_v1');
+        localStorage.removeItem('kepling_absen_apel_list');
+        KNOWN_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
+        clearIndexedDBReports().catch(() => {});
+        setReports([]);
+        localStorage.setItem(cleanSlateKey, 'true');
+        fetch('/api/wipe-all-data', { method: 'POST' }).catch(() => {});
+        wipeAllFirestoreCapaianData().catch(() => {});
+        wipeAllPbbSpptEverywhere().catch(() => {});
+      } catch (e) {
+        console.warn('Auto-purge client cache notice:', e);
+      }
+    }
+
     syncPasswordsWithServer();
     syncProfilesWithServer();
     loadLocalReports();
@@ -298,10 +319,16 @@ export default function App() {
     });
 
     // Subscribe to real-time reports directly from Firebase Firestore with safe non-destructive merge
-    const unsubscribeFirestoreReports = subscribeReportsFromFirestore((firestoreReports) => {
+    const unsubscribeFirestoreReports = subscribeReportsFromFirestore((firestoreReports, isFromCache) => {
       if (Array.isArray(firestoreReports)) {
         setReports((prev) => {
-          // Guard: If Firestore returns empty list, never wipe out active user-submitted reports
+          // If Firestore is genuinely empty on the server, we must clear the reports to allow a fresh start (NOL)!
+          if (firestoreReports.length === 0 && !isFromCache) {
+            safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify([]));
+            return [];
+          }
+
+          // Guard: If Firestore returns empty list due to offline cache loading, never wipe out active user-submitted reports
           if (firestoreReports.length === 0 && prev.length > 0) {
             return prev;
           }
@@ -341,9 +368,13 @@ export default function App() {
     });
 
     // Subscribe to real-time attendance directly from Firebase Firestore with safe merge
-    const unsubscribeAttendance = subscribeAttendanceFromFirestore((items) => {
+    const unsubscribeAttendance = subscribeAttendanceFromFirestore((items, isFromCache) => {
       if (Array.isArray(items)) {
         setAttendanceList((prev) => {
+          if (items.length === 0 && !isFromCache) {
+            safeSetLocalStorage('kepling_absen_apel_list', JSON.stringify([]));
+            return [];
+          }
           if (items.length === 0 && prev.length > 0) return prev;
           const attMap = new Map<string, AbsenApelItem>();
           items.forEach((it) => {
@@ -558,12 +589,14 @@ export default function App() {
       setReports([]);
       setSelectedReport(null);
       const defaultTargets = getDefaultTargetsCapaianMap();
-      setTargetsCapaianMap(defaultTargets);
+      setTargetsMap(defaultTargets);
 
-      // 1. Wipe Firebase Firestore data (reports, deleted tombstones, attendance, targets baseline 0, PBB belum bayar)
+      // 1. Wipe Firebase Firestore data (reports, deleted tombstones, attendance, PBB collections)
       await wipeAllFirestoreCapaianData();
+      await wipeAllPbbSpptEverywhere();
 
       // 2. Wipe server buffer & disk JSONs (while keeping passwords and profiles)
+      await fetch('/api/wipe-all-data', { method: 'POST' }).catch(() => {});
       await fetch('/api/reset-all-system-data', { method: 'POST' }).catch(() => {});
       await resetAllReportsOnServer().catch(() => {});
 
@@ -574,6 +607,7 @@ export default function App() {
         localStorage.removeItem('kepling_absen_apel_list');
         localStorage.removeItem('manggajuara_targets_capaian_v2');
         localStorage.removeItem('manggajuara_perlinsos_override_v2_applied');
+        localStorage.removeItem('sikepling_kunjungan_harian_list_v1');
         for (let y = 2024; y <= 2030; y++) {
           localStorage.removeItem(`sikepling_sppt_pbb_records_${y}_v3`);
         }
@@ -581,7 +615,7 @@ export default function App() {
         console.warn('Clear local keys warning:', e);
       }
 
-      showToast('Seluruh data capaian & laporan berhasil direset ke 0 (Fresh Start). Akun login tetap aman.', 'success');
+      showToast('Seluruh data capaian, laporan & PBB berhasil dihapus bersih di aplikasi dan Firestore untuk entri CSV manual.', 'success');
     } catch (err) {
       console.error('Failed to reset reports:', err);
       showToast('Gagal mereset data laporan.', 'error');

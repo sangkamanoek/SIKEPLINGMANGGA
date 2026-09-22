@@ -84,10 +84,10 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   useEffect(() => {
     setSpptList(getLocalSpptForYear(pbbYear));
     fetchPbbSpptFromFirestore(pbbYear).then((items) => {
-      if (items && items.length > 0) setSpptList(items);
+      if (Array.isArray(items)) setSpptList(items);
     }).catch(() => {});
     const unsub = subscribePbbSpptFromFirestore(pbbYear, (items) => {
-      if (items && items.length > 0) setSpptList(items);
+      if (Array.isArray(items)) setSpptList(items);
     });
     return () => unsub();
   }, [pbbYear]);
@@ -96,7 +96,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
     setIsSyncingPbb(true);
     try {
       const items = await fetchPbbSpptFromFirestore(pbbYear);
-      if (items && items.length > 0) {
+      if (Array.isArray(items)) {
         setSpptList(items);
       }
     } catch {} finally {

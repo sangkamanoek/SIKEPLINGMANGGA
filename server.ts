@@ -334,6 +334,34 @@ app.delete('/api/pbb/:year/:id', (req, res) => {
   }
 });
 
+// POST clear all PBB data from server buffer
+app.post('/api/pbb/clear-all', (_req, res) => {
+  try {
+    pbbCache = {};
+    saveStoredPbb(pbbCache);
+    return res.json({ success: true, message: 'Seluruh server buffer PBB berhasil dibersihkan' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST wipe all operational and entry data on server
+app.post('/api/wipe-all-data', (_req, res) => {
+  try {
+    pbbCache = {};
+    saveStoredPbb(pbbCache);
+    reportsCache = [];
+    saveStoredReports(reportsCache);
+    attendanceCache = [];
+    saveStoredAttendance(attendanceCache);
+    deletedReportsCache = [];
+    saveStoredDeletedReports(deletedReportsCache);
+    return res.json({ success: true, message: 'Seluruh data server berhasil dikosongkan untuk entri baru' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET all reports
 app.get('/api/reports', (_req, res) => {
   const deletedSet = new Set(deletedReportsCache);

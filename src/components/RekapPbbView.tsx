@@ -35,6 +35,7 @@ import {
 import { INITIAL_PBB_SUMMARY, SAMPLE_SPPT_ITEMS, SpptPbbItem } from '../data/pbbSampleData';
 import { parsePbbCsv } from '../utils/pbbParser';
 import { UserAccount } from '../types';
+import { PbbTrendCharts } from './PbbTrendCharts';
 import {
   AVAILABLE_PBB_YEARS,
   DEFAULT_PBB_YEAR,
@@ -45,6 +46,7 @@ import {
   deletePbbSpptFromFirestore,
   subscribePbbSpptFromFirestore,
   fetchPbbSpptFromFirestore,
+  wipeAllPbbSpptEverywhere,
   formatNop,
   stripNonDigits,
 } from '../lib/pbbService';
@@ -93,7 +95,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'lingkungan' | 'persentase' | 'target'>('persentase');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [activeSubTab, setActiveTab] = useState<'rekap_lingkungan' | 'detail_sppt' | 'import_csv'>(() => {
+  const [activeSubTab, setActiveTab] = useState<'rekap_lingkungan' | 'grafik_tren' | 'detail_sppt' | 'import_csv'>(() => {
     if (activeAccount?.role === 'kepling') {
       return 'detail_sppt';
     }
@@ -110,19 +112,27 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   useEffect(() => {
     // 1. Initial fetch from Firestore & Server Buffer
     fetchPbbSpptFromFirestore(selectedYear).then((items) => {
-      if (items && items.length > 0) {
+      if (Array.isArray(items)) {
         setSpptList(items);
       }
     }).catch(() => {});
 
     // 2. Real-time subscription
     const unsubscribe = subscribePbbSpptFromFirestore(selectedYear, (items) => {
-      if (items && items.length > 0) {
+      if (Array.isArray(items)) {
         setSpptList(items);
       }
     });
 
-    return () => unsubscribe();
+    const handleWipedEvent = () => {
+      setSpptList([]);
+    };
+    window.addEventListener('pbb-wiped-all', handleWipedEvent);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('pbb-wiped-all', handleWipedEvent);
+    };
   }, [selectedYear]);
 
   // Sync state changes to localStorage for active year
@@ -136,12 +146,29 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     try {
       await batchSavePbbSpptToFirestore(spptList, selectedYear);
       const items = await fetchPbbSpptFromFirestore(selectedYear);
-      if (items && items.length > 0) {
+      if (Array.isArray(items)) {
         setSpptList(items);
       }
       notify(`Data PBB Tahun ${selectedYear} berhasil disinkronkan ke seluruh sistem!`, 'success');
     } catch {
       notify('Gagal sinkronisasi data PBB', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Clear all PBB data handler
+  const handleWipeAllPbb = async () => {
+    if (!window.confirm('PERINGATAN: Apakah Anda yakin ingin MENGHAPUS SEMUA data entri SPPT PBB di aplikasi dan Firestore? Data akan dikosongkan untuk persiapan impor CSV baru.')) {
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      const res = await wipeAllPbbSpptEverywhere();
+      setSpptList([]);
+      notify(res.message, res.success ? 'success' : 'error');
+    } catch (err: any) {
+      notify(err?.message || 'Gagal menghapus data PBB', 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -323,24 +350,26 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const summaryByLingkungan = useMemo(() => {
     const dataMap: Record<number, { targetNominal: number; realisasiNominal: number; totalWp: number; wpLunas: number }> = {};
 
-    // Initialize 24 Lingkungan
+    // Initialize 24 Lingkungan with 0 baseline
     for (let i = 1; i <= 24; i++) {
-      const init = INITIAL_PBB_SUMMARY[i] || { targetNominal: 300000000, totalWp: 300 };
       dataMap[i] = {
-        targetNominal: init.targetNominal,
+        targetNominal: 0,
         realisasiNominal: 0,
-        totalWp: init.totalWp,
+        totalWp: 0,
         wpLunas: 0,
       };
     }
 
-    // Tally values directly from spptList
+    // Tally target and realization directly from user-imported spptList
     spptList.forEach((item) => {
-      const ling = item.lingkungan;
+      const ling = Number(item.lingkungan);
+      const nominal = Number(item.pbbTerutang) || 0;
       if (ling >= 1 && ling <= 24 && dataMap[ling]) {
+        dataMap[ling].totalWp += 1;
+        dataMap[ling].targetNominal += nominal;
         if (item.status === 'Sudah Bayar') {
           dataMap[ling].wpLunas += 1;
-          dataMap[ling].realisasiNominal += item.pbbTerutang;
+          dataMap[ling].realisasiNominal += nominal;
         }
       }
     });
@@ -540,6 +569,20 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Data'}</span>
               </button>
 
+              {/* Tombol Kosongkan / Hapus Semua Data SPPT */}
+              {canManageWp && (
+                <button
+                  type="button"
+                  onClick={handleWipeAllPbb}
+                  disabled={isSyncing}
+                  title="Hapus seluruh data entri SPPT di Firestore dan Aplikasi untuk entri CSV manual baru"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/80 hover:bg-red-600 active:scale-95 text-white text-xs font-bold transition-all shadow-md cursor-pointer border border-red-400"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-200" />
+                  <span>Kosongkan Data SPPT</span>
+                </button>
+              )}
+
               {isKepling && selectedLingkungan !== String(keplingLingkunganNum) && (
                 <button
                   onClick={() => {
@@ -669,11 +712,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       </div>
 
       {/* Sub Tab Navigation */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 pt-2 rounded-xl shadow-2xs print:hidden">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 pt-2 rounded-xl shadow-2xs print:hidden overflow-x-auto">
         <div className="flex gap-2">
           <button
             onClick={() => setActiveTab('rekap_lingkungan')}
-            className={`py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+            className={`py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
               activeSubTab === 'rekap_lingkungan'
                 ? 'border-emerald-600 text-emerald-800 font-black'
                 : 'border-transparent text-slate-500 hover:text-slate-900'
@@ -686,8 +729,25 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           </button>
 
           <button
+            onClick={() => setActiveTab('grafik_tren')}
+            className={`py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'grafik_tren'
+                ? 'border-emerald-600 text-emerald-800 font-black'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+              <span>Grafik &amp; Tren Realisasi</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-black">
+                Visual
+              </span>
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('detail_sppt')}
-            className={`py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+            className={`py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
               activeSubTab === 'detail_sppt'
                 ? 'border-emerald-600 text-emerald-800 font-black'
                 : 'border-transparent text-slate-500 hover:text-slate-900'
@@ -704,7 +764,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
           <button
             onClick={() => setActiveTab('import_csv')}
-            className={`py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+            className={`py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
               activeSubTab === 'import_csv'
                 ? 'border-emerald-600 text-emerald-800 font-black'
                 : 'border-transparent text-slate-500 hover:text-slate-900'
@@ -902,6 +962,20 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             </table>
           </div>
         </div>
+      )}
+
+      {/* SUB-TAB: GRAFIK & TREN REALISASI */}
+      {activeSubTab === 'grafik_tren' && (
+        <PbbTrendCharts
+          selectedYear={selectedYear}
+          selectedLingkungan={selectedLingkungan}
+          onSelectLingkungan={setSelectedLingkungan}
+          spptList={spptList}
+          summaryByLingkungan={summaryByLingkungan}
+          kelurahanTotals={kelurahanTotals}
+          isKepling={isKepling}
+          keplingLingkunganNum={keplingLingkunganNum}
+        />
       )}
 
       {/* SUB-TAB 2: DETAIL SPPT PER WP */}

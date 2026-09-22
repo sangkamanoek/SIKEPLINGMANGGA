@@ -53,24 +53,14 @@ export function getLocalSpptForYear(year: number): SpptPbbItem[] {
     const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
-      }
-    }
-    // Fallback for legacy 2025 key if needed
-    if (year === 2025) {
-      const legacyRaw = localStorage.getItem('sikepling_sppt_pbb_records_v1');
-      if (legacyRaw) {
-        const parsed = JSON.parse(legacyRaw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
       }
     }
   } catch (err) {
     console.warn('Error reading local SPPT:', err);
   }
-  return SAMPLE_SPPT_ITEMS;
+  return [];
 }
 
 /**
@@ -95,43 +85,26 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
   let totalWp = 0;
   let totalWpLunas = 0;
 
-  // Pre-calculate sample counts per lingkungan to detect "extra" WP added by user
-  const sampleCountsByLk: Record<number, number> = {};
-  const sampleNominalsByLk: Record<number, number> = {};
-  
-  SAMPLE_SPPT_ITEMS.forEach(item => {
-    sampleCountsByLk[item.lingkungan] = (sampleCountsByLk[item.lingkungan] || 0) + 1;
-    sampleNominalsByLk[item.lingkungan] = (sampleNominalsByLk[item.lingkungan] || 0) + (Number(item.pbbTerutang) || 0);
-  });
-
   for (let n = 1; n <= 24; n++) {
     const base = INITIAL_PBB_SUMMARY[n] || {
-      targetNominal: 300000000,
+      targetNominal: 0,
       realisasiNominal: 0,
-      totalWp: 350,
+      totalWp: 0,
       wpLunas: 0,
     };
 
     const spptLingkungan = spptList.filter((s) => Number(s.lingkungan) === n);
     const spptLunas = spptLingkungan.filter((s) => s.status === 'Sudah Bayar');
 
-    const sampleNominalLunas = spptLunas.reduce((acc, curr) => acc + (Number(curr.pbbTerutang) || 0), 0);
-    const currentNominalTotal = spptLingkungan.reduce((acc, curr) => acc + (Number(curr.pbbTerutang) || 0), 0);
+    const spptNominalLunas = spptLunas.reduce((acc, curr) => acc + (Number(curr.pbbTerutang) || 0), 0);
+    const spptNominalTotal = spptLingkungan.reduce((acc, curr) => acc + (Number(curr.pbbTerutang) || 0), 0);
 
-    // Logic: 
-    // Total WP = Official Target + (Actual records in DB - Sample records in DB)
-    // This way, if they add a new WP, the total increases.
-    const lkSampleCount = sampleCountsByLk[n] || 0;
-    const lkExtraWp = Math.max(0, spptLingkungan.length - lkSampleCount);
-    const lkTotalWp = base.totalWp + lkExtraWp;
-
-    // Target Nominal = Official Target + (Actual nominal in DB - Sample nominal in DB)
-    const lkSampleNominal = sampleNominalsByLk[n] || 0;
-    const lkExtraNominal = Math.max(0, currentNominalTotal - lkSampleNominal);
-    const lkTargetNominal = base.targetNominal + lkExtraNominal;
+    // If actual SPPTs exist in database, use actual counts and sums; otherwise use target baseline
+    const lkTotalWp = spptLingkungan.length > 0 ? spptLingkungan.length : base.totalWp;
+    const lkTargetNominal = spptNominalTotal > 0 ? spptNominalTotal : base.targetNominal;
 
     const lkWpLunas = spptLunas.length;
-    const lkRealisasiNominal = sampleNominalLunas;
+    const lkRealisasiNominal = spptNominalLunas;
     const lkSisaNominal = Math.max(0, lkTargetNominal - lkRealisasiNominal);
 
     const persentaseRealisasi = lkTargetNominal > 0 ? (lkRealisasiNominal / lkTargetNominal) * 100 : 0;
@@ -366,9 +339,7 @@ export async function deletePbbFromApi(id: string, year: number = DEFAULT_PBB_YE
  * Fetch SPPT data with multi-tier fallback: Local Cache -> Server API Buffer -> Cloud Firestore
  */
 export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR): Promise<SpptPbbItem[]> {
-  const baseDefaults = SAMPLE_SPPT_ITEMS;
   let currentList = getLocalSpptForYear(year);
-  currentList = smartMergeSpptItems(baseDefaults, currentList);
 
   // 1. Fetch from Express Server Buffer (/api/pbb)
   try {
@@ -403,11 +374,6 @@ export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR)
       return currentList;
     }
 
-    // Auto-seed to Firestore if empty
-    if (currentList.length > 0) {
-      batchSavePbbSpptToFirestore(currentList, year).catch(() => {});
-      batchSavePbbToApi(currentList, year).catch(() => {});
-    }
     return currentList;
   } catch (err) {
     console.warn(`Firestore PBB fetch notice for ${year}:`, err);
@@ -508,20 +474,29 @@ export function subscribePbbSpptFromFirestore(
   const colName = `${PBB_COLLECTION_PREFIX}${year}`;
   const colRef = collection(db, colName);
 
-  let activeList = smartMergeSpptItems(SAMPLE_SPPT_ITEMS, getLocalSpptForYear(year));
+  let activeList = getLocalSpptForYear(year);
 
   // 1. Firestore Real-time listener
   const firestoreUnsub = onSnapshot(
     colRef,
     (snapshot) => {
       const firestoreItems: SpptPbbItem[] = [];
+      const isFromCache = snapshot.metadata.fromCache;
+      
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as SpptPbbItem;
         if (data && data.id) {
           firestoreItems.push({ ...data, id: docSnap.id || data.id });
         }
       });
-      if (firestoreItems.length > 0) {
+
+      // If the server is genuinely empty (database wiped / fresh start) and we are not loading from offline cache
+      if (snapshot.empty && !isFromCache) {
+        console.log(`[PBB Sync] Firestore collection is empty on the server. Clearing local cache for ${year}.`);
+        activeList = [];
+        saveLocalSpptForYear([], year);
+        onData([]);
+      } else if (firestoreItems.length > 0) {
         activeList = smartMergeSpptItems(activeList, firestoreItems);
         saveLocalSpptForYear(activeList, year);
         onData(activeList);
@@ -599,4 +574,51 @@ export function subscribePbbSpptFromFirestore(
     window.removeEventListener('pbb-item-synced', handleCustomEvent);
     clearInterval(pollInterval);
   };
+}
+
+/**
+ * Hapus seluruh data PBB SPPT dari Firestore, LocalStorage, dan Server Buffer
+ */
+export async function wipeAllPbbSpptEverywhere(years: number[] = [2025, 2026, 2027]): Promise<{ success: boolean; message: string }> {
+  try {
+    // 1. Clear LocalStorage
+    years.forEach((yr) => {
+      localStorage.removeItem(getPbbStorageKey(yr));
+    });
+    localStorage.removeItem('sikepling_sppt_pbb_records_v1');
+
+    // 2. Clear Server API buffer
+    try {
+      await fetch('/api/pbb/clear-all', { method: 'POST' });
+    } catch (e) {
+      console.warn('Server clear PBB notice:', e);
+    }
+
+    // 3. Clear Firestore Collections
+    const collectionsToClean = ['pbb_sppt', ...years.map((y) => `${PBB_COLLECTION_PREFIX}${y}`)];
+    for (const colName of collectionsToClean) {
+      try {
+        const colRef = collection(db, colName);
+        const snap = await getDocs(colRef);
+        if (!snap.empty) {
+          const batch = writeBatch(db);
+          snap.forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
+      } catch (err) {
+        console.warn(`Error cleaning collection ${colName}:`, err);
+      }
+    }
+
+    // 4. Dispatch broadcast
+    if (pbbBroadcastChannel) {
+      pbbBroadcastChannel.postMessage({ type: 'PBB_WIPED_ALL' });
+    }
+    window.dispatchEvent(new CustomEvent('pbb-wiped-all'));
+
+    return { success: true, message: 'Seluruh data SPPT PBB berhasil dihapus dari Firebase Firestore, server, dan memori aplikasi.' };
+  } catch (err: any) {
+    console.error('Error in wipeAllPbbSpptEverywhere:', err);
+    return { success: false, message: err?.message || 'Gagal menghapus data PBB' };
+  }
 }

@@ -32,56 +32,8 @@ const LINGKUNGAN_STREETS: Record<number, string> = {
 };
 
 /**
- * Menghasilkan data laporan historis resmi untuk seluruh 24 Kepala Lingkungan
- * Tanggal: Senin, 14 September 2026
+ * Menghasilkan data laporan historis resmi (Dikosongkan agar bersih untuk entri data baru)
  */
 export function generateInitialReports24Kepling(): LaporanHarianItem[] {
-  return KEPLING_ACCOUNTS.map((k, index) => {
-    const num = k.nomorLingkungan || index + 1;
-    const street = LINGKUNGAN_STREETS[num] || `Lingkungan ${num}`;
-
-    // Metric realistis per kepling
-    const pbbWp = ((num * 3) % 4) + 1; // 1 s/d 4 WP
-    const perlinsosKk = ((num * 5) % 6) + 2; // 2 s/d 7 KK
-    const ikdOrang = ((num * 2) % 3) + 1; // 1 s/d 3 Orang
-    const bpjsOrang = num % 2 === 0 ? 1 : 0; // 0 atau 1 Orang
-
-    return {
-      id: `lap_hist_kepling_${num}`,
-      keplingId: k.id,
-      hari: 'SENIN',
-      tanggal: '14 SEPTEMBER 2026',
-      namaKepling: k.nama.toUpperCase(),
-      jabatan: k.jabatan,
-      kelurahan: 'Kelurahan Mangga',
-      kecamatan: 'Kecamatan Medan Tuntungan',
-      kinerja: {
-        opsirPbbWp: String(pbbWp),
-        opsirPbbKeterangan: `Penyampaian SPPT PBB & penagihan door-to-door di ${street}`,
-        perlinsosKk: String(perlinsosKk),
-        perlinsosKeterangan: `Verifikasi faktual data terpadu Perlinsos DTKS warga di ${street}`,
-        ikdOrang: String(ikdOrang),
-        ikdKeterangan: `Pendampingan & aktivasi aplikasi IKD (Identitas Kependudukan Digital) di ${street}`,
-        bpjsKetenagakerjaanOrang: String(bpjsOrang),
-        bpjsKetenagakerjaanKeterangan:
-          bpjsOrang > 0 ? `Sosialisasi dan pendaftaran pekerja rentan/informal di ${street}` : '',
-        poskamlingAdaGiat: true,
-        poskamlingStatus: 'Aktif Ronda Malam',
-        poskamlingLokasi: `Pos Kamling ${k.lingkungan}`,
-        poskamlingPetugas: `Kepling ${k.nama} & Warga Ronda`,
-        poskamlingKeterangan: 'Patroli siskamling rutin malam hari, situasi lingkungan aman dan kondusif',
-        kegiatanLainnya: `Monitoring kebersihan drainase dan ketertiban lingkungan di wilayah ${k.lingkungan}`,
-      },
-      jumlahDokumentasi: 1,
-      dokumentasiFoto: [
-        {
-          id: `foto_hist_${num}`,
-          url: SAMPLE_PHOTO,
-          name: `Dokumentasi Kinerja ${k.lingkungan}`,
-          timestamp: '2026-09-14T10:30:00Z',
-        },
-      ],
-      createdAt: '2026-09-14T11:30:00.000Z',
-    };
-  });
+  return [];
 }

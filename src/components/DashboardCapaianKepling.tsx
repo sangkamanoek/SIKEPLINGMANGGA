@@ -153,10 +153,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   useEffect(() => {
     setSpptList(getLocalSpptForYear(pbbYear));
     fetchPbbSpptFromFirestore(pbbYear).then((items) => {
-      if (items && items.length > 0) setSpptList(items);
+      if (Array.isArray(items)) setSpptList(items);
     }).catch(() => {});
     const unsub = subscribePbbSpptFromFirestore(pbbYear, (items) => {
-      if (items && items.length > 0) setSpptList(items);
+      if (Array.isArray(items)) setSpptList(items);
     });
     return () => unsub();
   }, [pbbYear]);
@@ -165,7 +165,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     setIsSyncingPbb(true);
     try {
       const items = await fetchPbbSpptFromFirestore(pbbYear);
-      if (items && items.length > 0) {
+      if (Array.isArray(items)) {
         setSpptList(items);
       }
     } catch {} finally {
@@ -254,13 +254,16 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
   // Capaian aggregasi untuk Single Kepling
   const myStats = useMemo(() => {
-    let totalPbb = 0;
+    // Ambil realisasi PBB riil dari data SPPT (Wajib Pajak yang berstatus Sudah Bayar)
+    const pbbFromSppt = myPbbStats ? myPbbStats.wpLunas : 0;
+
+    let reportedPbb = 0;
     let totalPerlinsos = 0;
     let totalIkd = 0;
     let totalBpjs = 0;
 
     myReports.forEach((r) => {
-      totalPbb += Number(r.kinerja?.opsirPbbWp) || 0;
+      reportedPbb += Number(r.kinerja?.opsirPbbWp) || 0;
       totalPerlinsos += Number(r.kinerja?.perlinsosKk) || 0;
       totalIkd += Number(r.kinerja?.ikdOrang) || 0;
       totalBpjs += Number(r.kinerja?.bpjsKetenagakerjaanOrang) || 0;
@@ -270,7 +273,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     const allUniqueDays = new Set(myAllTimeReports.map((r) => r.createdAt?.split('T')[0] || r.tanggal));
 
     return {
-      totalPbb,
+      totalPbb: myPbbStats !== undefined ? pbbFromSppt : reportedPbb,
       totalPerlinsos,
       totalIkd,
       totalBpjs,
@@ -278,7 +281,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       hariMelapor: uniqueDays.size,
       totalHariMelaporAllTime: allUniqueDays.size,
     };
-  }, [myReports, myAllTimeReports]);
+  }, [myReports, myAllTimeReports, myPbbStats]);
 
   // Raw reported stats map for modal and calculations
   const reportedStatsMap = useMemo(() => {
@@ -290,17 +293,22 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     KEPLING_ACCOUNTS.forEach((k) => {
       const kReports = filteredReportsByPeriod.filter((r) => isReportMatchingKepling(r, k));
 
-      let pbb = 0;
+      let pbbReported = 0;
       let perlinsos = 0;
       let ikd = 0;
       let bpjs = 0;
 
       kReports.forEach((r) => {
-        pbb += Number(r.kinerja?.opsirPbbWp) || 0;
+        pbbReported += Number(r.kinerja?.opsirPbbWp) || 0;
         perlinsos += Number(r.kinerja?.perlinsosKk) || 0;
         ikd += Number(r.kinerja?.ikdOrang) || 0;
         bpjs += Number(r.kinerja?.bpjsKetenagakerjaanOrang) || 0;
       });
+
+      // Ambil Realisasi PBB riil dari data SPPT (Wajib Pajak yang berstatus Sudah Bayar di Lingkungan ini)
+      const lkNum = k.nomorLingkungan;
+      const lkSummary = pbbOverview.lingkunganSummaries.find((s) => s.lingkungan === lkNum);
+      const pbb = lkSummary !== undefined ? lkSummary.wpLunas : pbbReported;
 
       map[k.id] = {
         pbb,
@@ -312,7 +320,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     });
 
     return map;
-  }, [filteredReportsByPeriod]);
+  }, [filteredReportsByPeriod, pbbOverview.lingkunganSummaries]);
 
   // Aggregasi untuk Seluruh 24 Kepling (Menggabungkan Laporan Riil + Override Super Admin)
   const keplingSummaryList = useMemo(() => {
@@ -629,28 +637,64 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Opsir PBB */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                {/* 1. Realisasi PBB (Terkoneksi Master SPPT) */}
+                <div
+                  onClick={() => onOpenRekapPbb && onOpenRekapPbb()}
+                  className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+                  title="Klik untuk membuka detail Rekapitulasi & SPPT PBB"
+                >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
-                      1. Opsir PBB
-                    </span>
-                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
+                        1. Realisasi PBB ({pbbYear})
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold">
+                        SPPT Riil
+                      </span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                       <CreditCard className="w-4 h-4" />
                     </div>
                   </div>
-                  <div className="mt-4">
-                    <div className="text-3xl font-black text-slate-900 tracking-tight">
-                      {effectiveMyKinerja.pbb}
-                      <span className="text-xs font-semibold text-slate-500 ml-1.5">WP</span>
+                  <div className="mt-3">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black text-slate-900 tracking-tight">
+                        {effectiveMyKinerja.pbb}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">
+                        / {myPbbStats ? myPbbStats.totalWp : (activeTargetConfig?.targetPbb || 100)} WP Lunas
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Wajib Pajak yang telah membayarkan / dihimbau PBB.
+
+                    {/* Progress Bar PBB */}
+                    <div className="mt-2.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold mb-1">
+                        <span className="text-emerald-950 font-black">Realisasi Nominal</span>
+                        <span className="text-emerald-800 font-black">
+                          {myPbbStats ? `${myPbbStats.persentaseRealisasi.toFixed(1)}%` : '0%'}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                          style={{
+                            width: `${Math.min(100, Math.max(0, myPbbStats ? myPbbStats.persentaseRealisasi : 0))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500 mt-2 truncate font-medium">
+                      {myPbbStats
+                        ? `${formatRupiah(myPbbStats.realisasiNominal)} dari target ${formatRupiah(myPbbStats.targetNominal)}`
+                        : 'Wajib Pajak yang telah melunasi PBB.'}
                     </p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                    <span>Rata-rata: {(effectiveMyKinerja.pbb / (myStats.hariMelapor || 1)).toFixed(1)} WP / hari</span>
-                    <span className="text-emerald-700 font-bold">Terus Tingkatkan</span>
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                    <span>{myPbbStats ? `${myPbbStats.wpLunas} WP Lunas (${myPbbStats.persentaseWpLunas.toFixed(1)}%)` : 'Data SPPT PBB'}</span>
+                    <span className="text-emerald-700 font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                      Buka Rekap <ChevronRight className="w-3 h-3" />
+                    </span>
                   </div>
                 </div>
 
@@ -1320,17 +1364,26 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               </p>
             </div>
 
-            {/* Total PBB Kelurahan */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs">
-              <span className="text-[10px] sm:text-[11px] font-bold text-emerald-700 uppercase block">
-                Total Opsir PBB
-              </span>
-              <div className="text-2xl sm:text-3xl font-black text-emerald-800 mt-1">
-                {kelurahanTotals.totalPbb}
-                <span className="text-xs font-semibold text-slate-500 ml-1">WP</span>
+            {/* Total PBB Kelurahan (Terkoneksi Realisasi PBB SPPT) */}
+            <div
+              onClick={() => onOpenRekapPbb && onOpenRekapPbb()}
+              className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-200 shadow-xs cursor-pointer hover:border-emerald-400 hover:shadow-sm transition-all group"
+              title="Klik untuk membuka Rekapitulasi Realisasi PBB Kelurahan"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 uppercase block">
+                  Realisasi PBB ({pbbYear})
+                </span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                  {pbbOverview.persentaseRealisasiNominal.toFixed(1)}%
+                </span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Akumulasi Kelurahan Mangga
+              <div className="text-2xl sm:text-3xl font-black text-emerald-900 mt-1">
+                {pbbOverview.totalWpLunas}
+                <span className="text-xs font-semibold text-slate-500 ml-1">WP Lunas</span>
+              </div>
+              <p className="text-[11px] text-emerald-700 font-semibold mt-1 truncate">
+                {formatRupiah(pbbOverview.totalRealisasiNominal)}
               </p>
             </div>
 
@@ -1791,9 +1844,13 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
                   {/* 3 Pilar Metrics: PBB, IKD, BPJS */}
                   <div className="col-span-3 grid grid-cols-3 gap-1.5 text-center w-full text-xs font-bold">
-                    <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                      <span className="text-[9px] text-slate-400 block font-normal md:hidden">PBB</span>
-                      <span className="text-emerald-700">{item.pbb} WP</span>
+                    <div
+                      onClick={() => onOpenRekapPbb && onOpenRekapPbb()}
+                      className="bg-emerald-50/70 hover:bg-emerald-100 p-1.5 rounded-lg border border-emerald-200/80 cursor-pointer transition-colors"
+                      title={`Klik untuk lihat Rekapitulasi SPPT PBB Lingkungan ${item.kepling.nomorLingkungan}`}
+                    >
+                      <span className="text-[9px] text-emerald-700 block font-normal md:hidden">PBB Lunas</span>
+                      <span className="text-emerald-800 font-black">{item.pbb} WP</span>
                     </div>
 
                     <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">

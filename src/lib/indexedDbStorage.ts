@@ -28,7 +28,7 @@ function openDatabase(): Promise<IDBDatabase> {
  * Save all reports to IndexedDB (No 5MB quota limitation)
  */
 export async function saveReportsToIndexedDB(reports: LaporanHarianItem[]): Promise<boolean> {
-  if (!Array.isArray(reports) || reports.length === 0) return false;
+  if (!Array.isArray(reports)) return false;
   try {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
@@ -37,11 +37,13 @@ export async function saveReportsToIndexedDB(reports: LaporanHarianItem[]): Prom
 
       // Clear old and put all new items
       store.clear();
-      reports.forEach((item) => {
-        if (item && item.id) {
-          store.put(item);
-        }
-      });
+      if (reports.length > 0) {
+        reports.forEach((item) => {
+          if (item && item.id) {
+            store.put(item);
+          }
+        });
+      }
 
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
@@ -51,6 +53,13 @@ export async function saveReportsToIndexedDB(reports: LaporanHarianItem[]): Prom
     console.warn('[IndexedDB] Error saving reports:', err);
     return false;
   }
+}
+
+/**
+ * Clear all reports in IndexedDB
+ */
+export async function clearIndexedDBReports(): Promise<boolean> {
+  return saveReportsToIndexedDB([]);
 }
 
 /**
