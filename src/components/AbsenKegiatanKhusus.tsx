@@ -227,7 +227,7 @@ export const AbsenKegiatanKhusus: React.FC<AbsenKegiatanKhususProps> = ({
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.45);
         setFotoSelfie(dataUrl);
         stopCamera();
         showToast?.('Foto selfie berhasil diambil!', 'success');
@@ -248,7 +248,7 @@ export const AbsenKegiatanKhusus: React.FC<AbsenKegiatanKhususProps> = ({
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const maxDim = 800;
+        const maxDim = 720;
 
         if (width > maxDim || height > maxDim) {
           if (width > height) {
@@ -265,7 +265,7 @@ export const AbsenKegiatanKhusus: React.FC<AbsenKegiatanKhususProps> = ({
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/jpeg', 0.8);
+          const compressed = canvas.toDataURL('image/jpeg', 0.45);
           setFotoSelfie(compressed);
           showToast?.('Foto bukti berhasil diunggah & dikompres!', 'success');
         }

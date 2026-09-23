@@ -180,7 +180,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(video, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.45);
         setFotoSelfie(dataUrl);
         stopCamera();
         showToast?.('Foto selfie apel berhasil diambil dengan jelas!', 'success');
@@ -200,7 +200,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const maxDim = 1024;
+        const maxDim = 720;
         if (width > maxDim || height > maxDim) {
           if (width > height) {
             height = Math.round((height * maxDim) / width);
@@ -217,7 +217,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/jpeg', 0.8);
+          const compressed = canvas.toDataURL('image/jpeg', 0.45);
           setFotoSelfie(compressed);
           showToast?.('Foto bukti presensi berhasil diambil.', 'success');
         }

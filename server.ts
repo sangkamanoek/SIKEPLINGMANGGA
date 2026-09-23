@@ -1165,8 +1165,11 @@ app.get('/api/reverse-geocode', async (req, res) => {
 });
 
 async function startServer() {
-  // Vite middleware setup
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.join(process.cwd(), 'dist');
+  const isProd = fs.existsSync(path.join(distPath, 'index.html'));
+
+  if (!isProd) {
+    console.log('Running in development mode with Vite middleware...');
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
@@ -1179,7 +1182,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    console.log('Running in production mode, serving static files from:', distPath);
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));

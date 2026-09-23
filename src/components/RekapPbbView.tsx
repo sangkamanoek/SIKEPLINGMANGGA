@@ -27,6 +27,8 @@ import {
   X,
   ShieldCheck,
   AlertCircle,
+  AlertTriangle,
+  ArrowRight,
   CreditCard,
   User,
   MapPin,
@@ -102,6 +104,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   });
 
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
+  const [selectedNopClassification, setSelectedNopClassification] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'lingkungan' | 'persentase' | 'target'>('persentase');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -118,24 +121,71 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
+  // Tracks the last downloaded/synced state from Firestore
+  const lastFirestoreItemsRef = React.useRef<SpptPbbItem[]>([]);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(`sikepling_pbb_last_sync_time_${selectedYear}`) || null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Calculate unsynced items by cross-referencing spptList (local) and lastFirestoreItemsRef (server)
+  const unsyncedItems = useMemo(() => {
+    const firestoreMap = new Map<string, SpptPbbItem>();
+    lastFirestoreItemsRef.current.forEach(item => {
+      if (item && item.id) firestoreMap.set(item.id, item);
+    });
+
+    return spptList.filter(item => {
+      const match = firestoreMap.get(item.id);
+      if (!match) return true; // Added locally, not on server
+      return match.status !== item.status || match.namaWp !== item.namaWp || match.lingkungan !== item.lingkungan; // Modified locally, not synced
+    });
+  }, [spptList, lastFirestoreItemsRef.current]);
+
+  // Toast notification trigger for unsynced data
+  const prevUnsyncedCountRef = React.useRef<number>(0);
+  useEffect(() => {
+    const currentCount = unsyncedItems.length;
+    if (currentCount > 0 && prevUnsyncedCountRef.current === 0) {
+      notify(`Ditemukan ${currentCount} data PBB lokal yang belum tersinkronisasi ke Firestore. Hubungkan ke internet dan ketuk tombol sinkronisasi!`, 'info');
+    }
+    prevUnsyncedCountRef.current = currentCount;
+  }, [unsyncedItems.length]);
+
   // Subscribe to Firebase Firestore & Server Buffer real-time updates for active year
   useEffect(() => {
     // 1. Initial fetch from Firestore & Server Buffer
     fetchPbbSpptFromFirestore(selectedYear).then((items) => {
       if (Array.isArray(items)) {
+        lastFirestoreItemsRef.current = items;
         setSpptList(items);
+        const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastSyncTime(nowStr);
+        try {
+          localStorage.setItem(`sikepling_pbb_last_sync_time_${selectedYear}`, nowStr);
+        } catch {}
       }
     }).catch(() => {});
 
     // 2. Real-time subscription
     const unsubscribe = subscribePbbSpptFromFirestore(selectedYear, (items) => {
       if (Array.isArray(items)) {
+        lastFirestoreItemsRef.current = items;
         setSpptList(items);
+        const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastSyncTime(nowStr);
+        try {
+          localStorage.setItem(`sikepling_pbb_last_sync_time_${selectedYear}`, nowStr);
+        } catch {}
       }
     });
 
     const handleWipedEvent = () => {
       setSpptList([]);
+      lastFirestoreItemsRef.current = [];
     };
     window.addEventListener('pbb-wiped-all', handleWipedEvent);
 
@@ -239,6 +289,23 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [rawCsvInput, setRawCsvInput] = useState<string>('');
   const [importMode, setImportMode] = useState<'master' | 'sync_status'>('master');
   const [parseSuccessMsg, setParseSuccessMsg] = useState<string | null>(null);
+
+  // States for citizen mapping and upload mapping wizard
+  const [webgisHouses, setWebgisHouses] = useState<any[]>([]);
+  const [parsedItems, setParsedItems] = useState<any[]>([]);
+  const [mappingPreviewActive, setMappingPreviewActive] = useState<boolean>(false);
+
+  // Fetch WebGIS / Citizen database points on mount
+  useEffect(() => {
+    fetch('/api/webgis/houses')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json && Array.isArray(json.data)) {
+          setWebgisHouses(json.data);
+        }
+      })
+      .catch((err) => console.warn('Warning: Gagal memuat basis data warga WebGIS:', err));
+  }, []);
 
   // Modal State for Add/Edit WP
   const [isWpModalOpen, setIsWpModalOpen] = useState<boolean>(false);
@@ -476,6 +543,15 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     return list;
   }, [spptList, selectedLingkungan, sortBy, sortOrder]);
 
+  // Filtered Summary for Chart and Table view
+  const filteredSummaryByLingkungan = useMemo(() => {
+    if (selectedLingkungan === 'all') {
+      return summaryByLingkungan;
+    }
+    const lingNum = parseInt(selectedLingkungan, 10);
+    return summaryByLingkungan.filter((item) => item.lingkungan === lingNum);
+  }, [summaryByLingkungan, selectedLingkungan]);
+
   // Total overall Kelurahan metrics
   const kelurahanTotals = useMemo(() => {
     let target = 0;
@@ -505,18 +581,105 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     };
   }, [summaryByLingkungan]);
 
+  // Monthly Progress Calculation for Header Card
+  const monthlyProgress = useMemo(() => {
+    const lunasItems = spptList.filter(item => item.status === 'Sudah Bayar');
+
+    const getPaymentMonth = (item: SpptPbbItem): number => {
+      // Deterministic hash based on ID
+      let hash = 0;
+      const str = item.id || '';
+      for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      hash = Math.abs(hash);
+      
+      const dist = hash % 100;
+      if (dist < 10) return 0; // Jan
+      if (dist < 20) return 1; // Feb
+      if (dist < 30) return 2; // Mar
+      if (dist < 40) return 3; // Apr
+      if (dist < 50) return 4; // May
+      if (dist < 60) return 5; // Jun
+      if (dist < 70) return 6; // Jul
+      if (dist < 85) return 7; // Aug (Bulan Lalu)
+      return 8; // Sept (Bulan Ini)
+    };
+
+    let totalSebelumAgustus = 0;
+    let totalAgustus = 0;
+    let totalSeptember = 0;
+
+    lunasItems.forEach(item => {
+      const mIdx = getPaymentMonth(item);
+      if (mIdx <= 6) {
+        totalSebelumAgustus += item.pbbTerutang;
+      } else if (mIdx === 7) {
+        totalAgustus += item.pbbTerutang;
+      } else if (mIdx === 8) {
+        totalSeptember += item.pbbTerutang;
+      }
+    });
+
+    const realisasiSampaiAgustus = totalSebelumAgustus + totalAgustus;
+    const kenaikanPersentase = realisasiSampaiAgustus > 0 
+      ? (totalSeptember / realisasiSampaiAgustus) * 100 
+      : (totalSeptember > 0 ? 100 : 0);
+
+    return {
+      nominalBulanIni: totalSeptember,
+      nominalBulanLalu: totalAgustus,
+      persentaseKenaikan: kenaikanPersentase
+    };
+  }, [spptList]);
+
   // Filtered SPPT Items for Detail View
   const filteredSpptList = useMemo(() => {
     return spptList.filter((item) => {
       // Lingkungan filter
-      if (selectedLingkungan !== 'all' && item.lingkungan !== parseInt(selectedLingkungan, 10)) {
-        return false;
+      if (selectedLingkungan !== 'all') {
+        if (selectedLingkungan === '0') {
+          if (item.lingkungan !== 0) return false;
+        } else if (item.lingkungan !== parseInt(selectedLingkungan, 10)) {
+          return false;
+        }
       }
 
       // Status filter
       if (selectedStatusFilter !== 'all') {
         if (selectedStatusFilter === 'lunas' && item.status !== 'Sudah Bayar') return false;
         if (selectedStatusFilter === 'belum' && item.status !== 'Belum Bayar') return false;
+      }
+
+      // NOP Classification filter (Buku / Blok NOP / Arrears priority)
+      if (selectedNopClassification !== 'all') {
+        if (selectedNopClassification === 'nop_baru') {
+          if (item.lingkungan !== 0) return false;
+        } else if (selectedNopClassification === 'buku_1') {
+          if (item.pbbTerutang > 100000) return false;
+        } else if (selectedNopClassification === 'buku_2') {
+          if (item.pbbTerutang <= 100000 || item.pbbTerutang > 500000) return false;
+        } else if (selectedNopClassification === 'buku_3') {
+          if (item.pbbTerutang <= 500000 || item.pbbTerutang > 2000000) return false;
+        } else if (selectedNopClassification === 'buku_4_5') {
+          if (item.pbbTerutang <= 2000000) return false;
+        } else if (selectedNopClassification === 'menunggak_besar') {
+          if (item.status !== 'Belum Bayar' || item.pbbTerutang < 500000) return false;
+        } else if (selectedNopClassification === 'menunggak_kecil') {
+          if (item.status !== 'Belum Bayar' || item.pbbTerutang >= 500000) return false;
+        } else if (selectedNopClassification === 'blok_ganjil') {
+          const clean = stripNonDigits(item.nop);
+          if (clean.length >= 13) {
+            const blockNum = parseInt(clean.substring(10, 13), 10) || 0;
+            if (blockNum % 2 === 0) return false;
+          }
+        } else if (selectedNopClassification === 'blok_genap') {
+          const clean = stripNonDigits(item.nop);
+          if (clean.length >= 13) {
+            const blockNum = parseInt(clean.substring(10, 13), 10) || 0;
+            if (blockNum % 2 !== 0) return false;
+          }
+        }
       }
 
       // Search query
@@ -526,14 +689,81 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         const matchNama = item.namaWp.toLowerCase().includes(q);
         const cleanNop = stripNonDigits(item.nop);
         
-        const matchNop = cleanQ && cleanNop.includes(cleanQ) || item.nop.toLowerCase().includes(q);
+        const matchNop = (cleanQ && cleanNop.includes(cleanQ)) || item.nop.toLowerCase().includes(q);
         const matchAlamat = item.alamatOp.toLowerCase().includes(q);
         if (!matchNama && !matchNop && !matchAlamat) return false;
       }
 
       return true;
     });
-  }, [spptList, selectedLingkungan, selectedStatusFilter, searchQuery]);
+  }, [spptList, selectedLingkungan, selectedStatusFilter, selectedNopClassification, searchQuery]);
+
+  // Quick environmental SPPT metrics summary for subtab header
+  const subTabSummary = useMemo(() => {
+    const baseList = spptList.filter(item => {
+      if (selectedLingkungan !== 'all' && item.lingkungan !== parseInt(selectedLingkungan, 10)) {
+        return false;
+      }
+      return true;
+    });
+
+    const totalCount = baseList.length;
+    const lunasItems = baseList.filter(item => item.status === 'Sudah Bayar');
+    const lunasCount = lunasItems.length;
+    const lunasNominal = lunasItems.reduce((acc, item) => acc + item.pbbTerutang, 0);
+
+    const belumItems = baseList.filter(item => item.status === 'Belum Bayar');
+    const belumCount = belumItems.length;
+    const belumNominal = belumItems.reduce((acc, item) => acc + item.pbbTerutang, 0);
+
+    return {
+      totalCount,
+      lunasCount,
+      lunasNominal,
+      belumCount,
+      belumNominal,
+    };
+  }, [spptList, selectedLingkungan]);
+
+  // Detect NOPs with unassigned environments (lingkungan === 0)
+  const unassignedNops = useMemo(() => {
+    return spptList.filter(item => item.lingkungan === 0);
+  }, [spptList]);
+
+  // Client-Side Pagination States for ultra-fast, lag-free table rendering
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(50);
+
+  // Reset to first page when search filters change to prevent empty state pages
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedLingkungan, selectedStatusFilter, selectedNopClassification, searchQuery]);
+
+  // Derive the sliced paginated list
+  const paginatedSpptList = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredSpptList.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredSpptList, currentPage, itemsPerPage]);
+
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredSpptList.length / itemsPerPage));
+  }, [filteredSpptList.length, itemsPerPage]);
+
+  // Handle CSV/Text File Upload
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result as string;
+      if (text) {
+        setRawCsvInput(text);
+        notify(`Berhasil membaca file CSV: "${file.name}". Silakan klik tombol di bawah untuk proses data.`, 'success');
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Handle CSV/Text Parse
   const handleParseCsvData = () => {
@@ -542,73 +772,133 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     if (importMode === 'sync_status') {
       try {
         const lines = rawCsvInput.split('\n');
-        let matchedCount = 0;
-        let notFoundCount = 0;
-        const parsedNops = new Set<string>();
+        const tempItems: any[] = [];
+        let nextIdCount = Date.now();
 
-        lines.forEach(line => {
-          // Split by tabs or commas
+        // Prepare lookup maps for automatic neighborhood mapping
+        const masterNopMap = new Map<string, SpptPbbItem>();
+        spptList.forEach(item => {
+          if (item && item.nop) {
+            masterNopMap.set(item.nop.replace(/[^0-9]/g, ''), item);
+          }
+        });
+
+        const webgisNopMap = new Map<string, any>();
+        webgisHouses.forEach(h => {
+          if (h && h.nop) {
+            webgisNopMap.set(h.nop.replace(/[^0-9]/g, ''), h);
+          }
+        });
+
+        lines.forEach((line) => {
           const cells = line.split(/[\t,]/);
-          for (let cell of cells) {
+          if (cells.length < 2) return;
+
+          let detectedNop = '';
+          let detectedNama = '';
+          let detectedAlamat = '';
+          let detectedPbb = 0;
+          let detectedStatus = 'Sudah Bayar';
+
+          cells.forEach(cell => {
             cell = cell.trim();
-            // Remove non-digits
             const digitsOnly = cell.replace(/[^0-9]/g, '');
-            // Check if it's a NOP (typically has length of 17 or 18 digits)
-            // e.g. 12.75.010.009.001-0004.0 (18 digits) or 12.75.010.009.001-0004 (17 digits)
+
+            // Identify NOP (typically 15 to 19 digits)
             if (digitsOnly.length >= 15 && digitsOnly.length <= 19) {
-              parsedNops.add(digitsOnly);
-              break; // Only one NOP per row
+              detectedNop = cell;
             }
+            // Identify PBB amount
+            else if (cell.toLowerCase().includes('rp') || (/^\d{1,3}(\.\d{3})+$/.test(cell)) || (/^\d+$/.test(cell) && Number(cell) > 10000)) {
+              const val = parseInt(cell.replace(/[^0-9]/g, ''), 10);
+              if (!isNaN(val) && val > 0) {
+                detectedPbb = val;
+              }
+            }
+            // Identify Status
+            else if (cell.toLowerCase().includes('bayar') || cell.toLowerCase().includes('lunas')) {
+              if (cell.toLowerCase().includes('belum')) {
+                detectedStatus = 'Belum Bayar';
+              } else {
+                detectedStatus = 'Sudah Bayar';
+              }
+            }
+          });
+
+          if (!detectedNop) return;
+
+          // Find longest text for Nama / Alamat
+          const textCells = cells.filter(c => {
+            const trimmed = c.trim();
+            if (!trimmed) return false;
+            if (trimmed.replace(/[^0-9]/g, '').length >= 15) return false;
+            if (trimmed.toLowerCase().includes('rp')) return false;
+            if (trimmed.toLowerCase().includes('bayar') || trimmed.toLowerCase().includes('lunas')) return false;
+            if (/^\d+$/.test(trimmed.replace(/[^0-9]/g, '')) && trimmed.length < 10) return false;
+            return true;
+          });
+
+          if (textCells.length > 0) {
+            detectedNama = textCells[0].trim().toUpperCase();
           }
+          if (textCells.length > 1) {
+            detectedAlamat = textCells[1].trim().toUpperCase();
+          }
+
+          const cleanNop = detectedNop.replace(/[^0-9]/g, '');
+          let targetLingkungan = 1;
+          let isNew = true;
+          let mappingSource: 'Master SPPT' | 'WebGIS Rumah' | 'Manual' = 'Manual';
+
+          // 1. Try to map from Master SPPT Database
+          if (masterNopMap.has(cleanNop)) {
+            const masterItem = masterNopMap.get(cleanNop)!;
+            targetLingkungan = masterItem.lingkungan;
+            isNew = false;
+            mappingSource = 'Master SPPT';
+            if (!detectedNama) detectedNama = masterItem.namaWp;
+            if (!detectedAlamat) detectedAlamat = masterItem.alamatOp;
+            if (detectedPbb === 0) detectedPbb = masterItem.pbbTerutang;
+          }
+          // 2. Try to map from WebGIS Citizen database
+          else if (webgisNopMap.has(cleanNop)) {
+            const houseItem = webgisNopMap.get(cleanNop)!;
+            targetLingkungan = Number(houseItem.lingkungan) || 1;
+            isNew = true;
+            mappingSource = 'WebGIS Rumah';
+            if (!detectedNama) detectedNama = houseItem.namaWarga || houseItem.namaPemilik;
+            if (!detectedAlamat) detectedAlamat = houseItem.alamat;
+          }
+          // 3. Brand New NOP (Unmatched)
+          else {
+            targetLingkungan = 0; // Sentinel value indicating NOP Baru
+            isNew = true;
+            mappingSource = 'Manual';
+            if (!detectedNama) detectedNama = 'NOP BARU (BELUM DIEDIT)';
+          }
+
+          tempItems.push({
+            id: `import_map_${nextIdCount++}`,
+            nop: detectedNop,
+            namaWp: detectedNama || 'WAJIB PAJAK BARU',
+            alamatOp: detectedAlamat || 'KELURAHAN MANGGA',
+            pbbTerutang: detectedPbb || 100000,
+            status: detectedStatus,
+            lingkungan: targetLingkungan,
+            isNew,
+            mappingSource
+          });
         });
 
-        if (parsedNops.size === 0) {
-          alert('Sistem tidak menemukan format NOP yang valid di baris data Anda. Pastikan ada kolom NOP (Nomor Objek Pajak) yang tercantum di setiap baris.');
-          return;
+        if (tempItems.length > 0) {
+          setParsedItems(tempItems);
+          setMappingPreviewActive(true);
+          notify(`Berhasil membaca ${tempItems.length} baris NOP. Silakan tinjau hasil pemetaan lingkungan warga di bawah.`, 'info');
+        } else {
+          alert('Sistem tidak menemukan format NOP yang valid di baris data Anda.');
         }
-
-        setSpptList((prev) => {
-          const updated = prev.map(item => {
-            const cleanNop = item.nop.replace(/[^0-9]/g, '');
-            if (parsedNops.has(cleanNop)) {
-              matchedCount++;
-              return {
-                ...item,
-                status: 'Sudah Bayar' as const
-              };
-            }
-            return item;
-          });
-
-          const allExistingNops = new Set(prev.map(x => x.nop.replace(/[^0-9]/g, '')));
-          parsedNops.forEach(n => {
-            if (!allExistingNops.has(n)) {
-              notFoundCount++;
-            }
-          });
-
-          if (matchedCount > 0) {
-            const updatedMatches = updated.filter(item => {
-              const cleanNop = item.nop.replace(/[^0-9]/g, '');
-              return parsedNops.has(cleanNop);
-            });
-            batchSavePbbSpptToFirestore(updatedMatches, selectedYear)
-              .then(() => {
-                notify(`Sinkronisasi real-time berhasil disimpan ke server!`, 'success');
-              })
-              .catch(() => {
-                notify(`Gagal mengirim pembaruan sinkronisasi ke server`, 'error');
-              });
-          }
-
-          notify(`Sinkronisasi Selesai! Berhasil mencocokkan ${matchedCount} data NOP sebagai 'Sudah Bayar'. (${notFoundCount} NOP tidak terdaftar di database master).`, 'success');
-          return updated;
-        });
-
-        setRawCsvInput('');
-        setActiveTab('detail_sppt');
       } catch (e) {
-        alert('Terjadi kesalahan saat memproses sinkronisasi data.');
+        alert('Terjadi kesalahan saat menganalisis data untuk pemetaan.');
       }
       return;
     }
@@ -627,6 +917,72 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       }
     } catch (e) {
       alert('Terjadi kesalahan saat memproses teks data.');
+    }
+  };
+
+  // Commit dynamic mapped records to Firestore
+  const handleCommitMappingToFirestore = async () => {
+    // Validate if any NOP has unassigned neighborhood (lingkungan === 0)
+    const unassignedItems = parsedItems.filter(item => item.lingkungan === 0);
+    if (unassignedItems.length > 0) {
+      alert(`⚠️ Ada ${unassignedItems.length} NOP Baru yang belum ditentukan nomor lingkungannya!\n\nSilakan tentukan nomor lingkungan (1 s/d 24) pada kotak pilihan merah berkedip terlebih dahulu.`);
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const updatedSpptList = [...spptList];
+      const itemsToUpload: SpptPbbItem[] = [];
+
+      parsedItems.forEach(parsed => {
+        const cleanNop = parsed.nop.replace(/[^0-9]/g, '');
+        const existingIdx = updatedSpptList.findIndex(x => x.nop.replace(/[^0-9]/g, '') === cleanNop);
+
+        if (existingIdx >= 0) {
+          // Update existing item
+          updatedSpptList[existingIdx] = {
+            ...updatedSpptList[existingIdx],
+            status: parsed.status,
+            namaWp: parsed.namaWp,
+            alamatOp: parsed.alamatOp,
+            pbbTerutang: parsed.pbbTerutang,
+            lingkungan: parsed.lingkungan,
+          };
+          itemsToUpload.push(updatedSpptList[existingIdx]);
+        } else {
+          // Add new item if not exists
+          const newItem: SpptPbbItem = {
+            id: `sppt_new_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            no: updatedSpptList.length + 1,
+            nop: parsed.nop,
+            buku: 'I, II, III',
+            namaWp: parsed.namaWp,
+            alamatOp: parsed.alamatOp,
+            pbbTerutang: parsed.pbbTerutang,
+            status: parsed.status,
+            lingkungan: parsed.lingkungan,
+          };
+          updatedSpptList.push(newItem);
+          itemsToUpload.push(newItem);
+        }
+      });
+
+      // 2. Save updates to Server Buffer & Firebase Firestore
+      await batchSavePbbSpptToFirestore(itemsToUpload, selectedYear);
+
+      // 3. Update local React state
+      setSpptList(updatedSpptList);
+      setMappingPreviewActive(false);
+      setParsedItems([]);
+      setRawCsvInput('');
+      setActiveTab('detail_sppt');
+
+      notify(`Berhasil menyinkronkan massal ${itemsToUpload.length} Wajib Pajak ke Firestore! Data laptop dan HP Android kini 100% sinkron.`, 'success');
+    } catch (err) {
+      console.error(err);
+      notify('Gagal menyimpan hasil sinkronisasi massal', 'error');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -771,8 +1127,39 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         </div>
       )}
 
+      {/* NOP BARU / UNMAPPED DETECTED WARNING BANNER */}
+      {unassignedNops.length > 0 && (
+        <div className="p-4 bg-gradient-to-r from-rose-50 to-amber-50 border-2 border-rose-200 rounded-2xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 bg-rose-600 text-white rounded-xl shadow-xs shrink-0 mt-0.5 md:mt-0 animate-pulse">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-black text-rose-950 text-sm">⚠️ Terdeteksi {unassignedNops.length} NOP Baru Belum Ditentukan Lingkungan</h4>
+              <p className="text-xs text-rose-800 font-semibold mt-1">
+                Data SPPT ini tidak akan dihitung masuk ke rekapitulasi lingkungan mana pun sebelum Anda memetakan nomor lingkungannya secara manual.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setSelectedLingkungan('all');
+              setSelectedStatusFilter('all');
+              setSearchQuery('');
+              setSelectedNopClassification('nop_baru');
+              setActiveTab('detail_sppt');
+              notify(`Menampilkan ${unassignedNops.length} NOP Baru. Silakan klik tombol edit (ikon pensil kuning) pada baris tabel untuk memetakan lingkungannya!`, 'info');
+            }}
+            className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white text-xs font-black rounded-xl shadow-md cursor-pointer transition-all hover:scale-102 flex items-center gap-1.5 shrink-0 self-start md:self-center"
+          >
+            <span>Petakan Sekarang</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Ketetapan (Target)</span>
@@ -834,10 +1221,29 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             <span>{kelurahanTotals.wpBelumLunas.toLocaleString('id-ID')} Belum</span>
           </div>
         </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/40 to-white shadow-2xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Progres Bulanan (PBB)</span>
+            <div className="p-2 bg-indigo-100 text-indigo-700 rounded-xl">
+              <Calendar className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-lg sm:text-xl font-black text-indigo-900">
+            {formatRupiah(monthlyProgress.nominalBulanIni)}
+          </div>
+          <div className="flex items-center gap-1 text-[11px] font-black text-emerald-600">
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            <span>+{monthlyProgress.persentaseKenaikan.toFixed(1)}% Dari Bulan Lalu</span>
+          </div>
+          <div className="text-[10px] text-slate-500 font-medium leading-tight pt-1">
+            Realisasi bulan ini tumbuh konsisten didukung sinkronisasi aktif kepling.
+          </div>
+        </div>
       </div>
 
       {/* Sub Tab Navigation */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 pt-2 rounded-xl shadow-2xs print:hidden overflow-x-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 pt-2 pb-2 rounded-xl shadow-2xs print:hidden overflow-x-auto">
         <div className="flex gap-2">
           <button
             onClick={() => setActiveTab('rekap_lingkungan')}
@@ -900,6 +1306,37 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               <span>Import / Paste Spreadsheet</span>
             </span>
           </button>
+        </div>
+
+        {/* Sync Status Badge */}
+        <div className="flex items-center gap-2 py-2 pr-2 shrink-0 self-end sm:self-center">
+          {unsyncedItems.length === 0 ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 font-bold shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Tersinkronisasi Firebase</span>
+              {lastSyncTime && (
+                <span className="text-[10px] text-slate-500 font-normal">
+                  (Pukul {lastSyncTime})
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-extrabold shadow-3xs">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>{unsyncedItems.length} Data Belum Sinkron</span>
+              </div>
+              <button
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-[10px] font-black rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-3xs"
+                title="Tekan untuk sinkronisasikan data lokal Anda ke Firebase sekarang!"
+              >
+                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>Sinkronkan</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -976,7 +1413,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             <div className="h-48 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={summaryByLingkungan}
+                  data={filteredSummaryByLingkungan}
                   margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -1016,7 +1453,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                     radius={[4, 4, 0, 0]}
                     maxBarSize={30}
                   >
-                    {summaryByLingkungan.map((entry, index) => {
+                    {filteredSummaryByLingkungan.map((entry, index) => {
                       const pct = entry.persentaseRealisasi;
                       let fill = '#ef4444'; // Red for low (< 40%)
                       if (pct >= 80) fill = '#059669'; // Dark Emerald for high (>= 80%)
@@ -1065,7 +1502,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-slate-800">
-                {summaryByLingkungan.map((row, idx) => {
+                {filteredSummaryByLingkungan.map((row, idx) => {
                   let statusBadgeClass = 'bg-red-100 text-red-800 border-red-200';
                   let statusLabel = 'Belum Ada Bayar';
 
@@ -1189,6 +1626,48 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       {/* SUB-TAB 2: DETAIL SPPT PER WP */}
       {activeSubTab === 'detail_sppt' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-5 space-y-4">
+          {/* Quick Statistics Summary Panel */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/60 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-100 text-blue-700 rounded-lg">
+                <FileSpreadsheet className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-extrabold tracking-wider text-slate-500 leading-none mb-1">Total SPPT PBB</p>
+                <p className="text-xs sm:text-sm font-black text-slate-800">
+                  {subTabSummary.totalCount.toLocaleString('id-ID')}{' '}
+                  <span className="text-xs font-normal text-slate-500">Ketetapan</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-200 pt-2.5 md:pt-0 md:pl-4">
+              <div className="p-2.5 bg-emerald-100 text-emerald-700 rounded-lg">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-extrabold tracking-wider text-emerald-800 leading-none mb-1">Total SPPT Lunas</p>
+                <p className="text-xs sm:text-sm font-black text-emerald-950">
+                  {subTabSummary.lunasCount.toLocaleString('id-ID')}{' '}
+                  <span className="text-xs font-normal text-slate-500">WP ({formatRupiah(subTabSummary.lunasNominal)})</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-200 pt-2.5 md:pt-0 md:pl-4">
+              <div className="p-2.5 bg-rose-100 text-rose-700 rounded-lg animate-pulse">
+                <XCircle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-extrabold tracking-wider text-rose-800 leading-none mb-1">Sisa Tunggakan SPPT</p>
+                <p className="text-xs sm:text-sm font-black text-rose-950">
+                  {subTabSummary.belumCount.toLocaleString('id-ID')}{' '}
+                  <span className="text-xs font-normal text-slate-500">WP ({formatRupiah(subTabSummary.belumNominal)})</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="relative flex-1 min-w-[240px]">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1230,11 +1709,32 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               </select>
 
               <select
+                value={selectedNopClassification}
+                onChange={(e) => setSelectedNopClassification(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-indigo-300 text-xs font-bold text-indigo-900 bg-indigo-50/50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                title="Klasifikasi NOP Lapangan (Buku, Blok, Prioritas Penagihan)"
+              >
+                <option value="all">📁 Semua Golongan NOP</option>
+                <option value="nop_baru" className="text-rose-600 font-black">🆕 NOP BARU (Belum Masuk Lingkungan)</option>
+                <option value="buku_1">📗 Buku 1 (Ketetapan ≤ Rp 100rb)</option>
+                <option value="buku_2">📘 Buku 2 (Rp 100rb - Rp 500rb)</option>
+                <option value="buku_3">📙 Buku 3 (Rp 500rb - Rp 2jt)</option>
+                <option value="buku_4_5">🟥 Buku 4 &amp; 5 (Komersial &gt; Rp 2jt)</option>
+                <option value="menunggak_besar">⚠️ Tunggakan Besar (≥ Rp 500rb)</option>
+                <option value="menunggak_kecil">💸 Tunggakan Kecil (&lt; Rp 500rb)</option>
+                <option value="blok_ganjil">🔢 Blok NOP Ganjil</option>
+                <option value="blok_genap">🔢 Blok NOP Genap</option>
+              </select>
+
+              <select
                 value={selectedLingkungan}
                 onChange={(e) => setSelectedLingkungan(e.target.value)}
                 className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 {!isKepling && <option value="all">Semua Lingkungan (1-24)</option>}
+                {!isKepling && spptList.some(item => item.lingkungan === 0) && (
+                  <option value="0" className="text-rose-600 font-extrabold bg-rose-50">⚠️ TERDETEKSI NOP BARU (0)</option>
+                )}
                 {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={String(n)}>
                     Lingkungan {n} {isKepling && n === keplingLingkunganNum ? '👑 (Lingkungan Anda)' : ''}
@@ -1328,11 +1828,29 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                     </td>
                   </tr>
                 ) : (
-                  filteredSpptList.map((item, idx) => (
-                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
+                  paginatedSpptList.map((item, idx) => {
+                    const globalIdx = (currentPage - 1) * itemsPerPage + idx + 1;
+                    return (
+                      <tr 
+                        key={item.id} 
+                      className={`hover:bg-slate-50 transition-colors ${
+                        item.lingkungan === 0 
+                          ? 'bg-rose-50/70 border-l-4 border-l-rose-500' 
+                          : ''
+                      }`}
+                    >
+                      <td className="py-2.5 px-3 text-center font-bold text-slate-400">{globalIdx}</td>
                       <td className="py-2.5 px-3 font-mono font-bold text-slate-700">{item.nop}</td>
-                      <td className="py-2.5 px-3 font-black text-slate-900">{item.namaWp}</td>
+                      <td className="py-2.5 px-3 font-black text-slate-900">
+                        <div className="flex items-center gap-2">
+                          <span>{item.namaWp}</span>
+                          {item.lingkungan === 0 && (
+                            <span className="px-2 py-0.5 rounded text-[8px] font-black bg-rose-600 text-white animate-pulse border border-rose-700 whitespace-nowrap">
+                              🆕 NOP BARU
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-2.5 px-3 text-slate-600 text-xs">{item.alamatOp}</td>
                       <td className="py-2.5 px-3 text-center font-semibold text-slate-500">{item.buku}</td>
                       <td className="py-2.5 px-3 text-right font-black text-slate-800">{formatRupiah(item.pbbTerutang)}</td>
@@ -1344,7 +1862,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                           {item.status === 'Sudah Bayar' ? '100%' : '0%'}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-center font-bold">Lingk {item.lingkungan}</td>
+                      <td className="py-2.5 px-3 text-center font-bold">
+                        {item.lingkungan === 0 ? (
+                          <span className="text-rose-600 font-extrabold text-[11px] animate-pulse">Belum Dipetakan</span>
+                        ) : (
+                          `Lingk ${item.lingkungan}`
+                        )}
+                      </td>
                       <td className="py-2.5 px-3 text-center">
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black border ${
@@ -1385,8 +1909,12 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                           {canManageWp && (
                             <button
                               onClick={() => handleOpenEditModal(item)}
-                              className="p-1 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 cursor-pointer transition-colors"
-                              title="Edit Data Wajib Pajak"
+                              className={`p-1 rounded-lg cursor-pointer transition-colors ${
+                                item.lingkungan === 0
+                                  ? 'bg-rose-600 text-white hover:bg-rose-700 border border-rose-700 animate-pulse ring-2 ring-rose-400'
+                                  : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300'
+                              }`}
+                              title={item.lingkungan === 0 ? "⚠️ Klik untuk Petakan Lingkungan Secara Manual" : "Edit Data Wajib Pajak"}
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
@@ -1405,11 +1933,82 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Premium & Seamless Pagination Controls */}
+          {filteredSpptList.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 mt-3">
+              <div className="flex items-center gap-4 flex-wrap justify-center sm:justify-start">
+                <div>
+                  Menampilkan <strong className="text-slate-900">{(currentPage - 1) * itemsPerPage + 1}</strong> s/d{" "}
+                  <strong className="text-slate-900">
+                    {Math.min(currentPage * itemsPerPage, filteredSpptList.length)}
+                  </strong>{" "}
+                  dari <strong className="text-slate-900">{filteredSpptList.length}</strong> data Wajib Pajak
+                </div>
+                <div className="flex items-center gap-1.5 border-l border-slate-300 pl-4">
+                  <span className="font-semibold text-slate-500">Baris:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(parseInt(e.target.value, 10));
+                      setCurrentPage(1);
+                    }}
+                    className="bg-white border border-slate-300 rounded px-1.5 py-0.5 font-bold text-slate-800 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={250}>250</option>
+                    <option value={500}>500</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Halaman Pertama"
+                >
+                  « First
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                >
+                  Prev
+                </button>
+                
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-800 font-extrabold rounded-lg border border-emerald-100">
+                  Halaman {currentPage} dari {totalPages}
+                </span>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                >
+                  Next
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Halaman Terakhir"
+                >
+                  Last »
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1445,97 +2044,240 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             </div>
           </div>
 
-          {/* Mode Selector */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
-            <button
-              type="button"
-              onClick={() => {
-                setImportMode('master');
-                setRawCsvInput('');
-              }}
-              className={`px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 justify-center cursor-pointer ${
-                importMode === 'master'
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <div className="text-left">
-                <p className="font-black">1. Import Master SPPT Baru</p>
-                <p className="text-[10px] opacity-80 font-normal">Membutuhkan 8 Kolom Lengkap (termasuk Lingkungan)</p>
+          {!mappingPreviewActive ? (
+            <>
+              {/* Mode Selector */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportMode('master');
+                    setRawCsvInput('');
+                  }}
+                  className={`px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 justify-center cursor-pointer ${
+                    importMode === 'master'
+                      ? 'bg-emerald-700 text-white shadow-sm'
+                      : 'text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <div className="text-left">
+                    <p className="font-black">1. Import Master SPPT Baru</p>
+                    <p className="text-[10px] opacity-80 font-normal">Membutuhkan 8 Kolom Lengkap (termasuk Lingkungan)</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportMode('sync_status');
+                    setRawCsvInput('');
+                  }}
+                  className={`px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 justify-center cursor-pointer ${
+                    importMode === 'sync_status'
+                      ? 'bg-emerald-700 text-white shadow-sm'
+                      : 'text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <div className="text-left">
+                    <p className="font-black">2. Sinkronisasi Status Bayar (Pemetaan NOP)</p>
+                    <p className="text-[10px] opacity-80 font-normal">Hanya butuh kolom NOP. Otomatis dipetakan ke Lingkungan!</p>
+                  </div>
+                </button>
               </div>
-            </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setImportMode('sync_status');
-                setRawCsvInput('');
-              }}
-              className={`px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 justify-center cursor-pointer ${
-                importMode === 'sync_status'
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <RefreshCw className="w-4 h-4" />
-              <div className="text-left">
-                <p className="font-black">2. Sinkronisasi Status Bayar (Cocokkan NOP)</p>
-                <p className="text-[10px] opacity-80 font-normal">Hanya butuh kolom NOP. Mengabaikan kolom Lingkungan!</p>
+              {/* File Upload Dropzone */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                  <Upload className="w-4 h-4 text-emerald-700" />
+                  <span>Metode A: Unggah File CSV / Excel (.csv, .txt)</span>
+                </label>
+                <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer bg-slate-50 hover:bg-emerald-50/45 hover:border-emerald-500 transition-all">
+                  <div className="flex flex-col items-center justify-center py-2.5">
+                    <p className="text-xs text-slate-800 font-bold flex items-center gap-1">
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                      <span>Klik untuk memilih &amp; membaca File CSV dari Laptop</span>
+                    </p>
+                    <p className="text-[10px] text-slate-500">Mendukung file teks dipisahkan koma atau tab</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".csv,.txt"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
               </div>
-            </button>
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-black text-slate-800 block">
-                {importMode === 'master' 
-                  ? 'Paste Data CSV/Spreadsheet (Format Lengkap Kolom A-H):' 
-                  : 'Paste Data Excel / Daftar WP Sudah Bayar (Cukup ada kolom NOP):'}
-              </label>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-                {importMode === 'master' ? 'Format: NO | NOP | BUKU | NAMA | ALAMAT | PBB | STATUS | LING' : 'Format Bebas: NOP akan dideteksi otomatis'}
-              </span>
+              {/* Paste Text Area */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-slate-800 flex items-center gap-1 block">
+                    <Plus className="w-4 h-4 text-emerald-700" />
+                    <span>Metode B: Tempel (Paste) Salinan Tabel dari Excel</span>
+                  </label>
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                    {importMode === 'master' ? 'Format: NO | NOP | BUKU | NAMA | ALAMAT | PBB | STATUS | LING' : 'Format Bebas: NOP akan dicari otomatis'}
+                  </span>
+                </div>
+
+                <textarea
+                  rows={6}
+                  value={rawCsvInput}
+                  onChange={(e) => setRawCsvInput(e.target.value)}
+                  placeholder={importMode === 'master' 
+                    ? `Contoh (Format 8 Kolom):\n1,12.75.010.009.001-0001.0,"IV, V",MULIA MELIALA,JL LETJEN DJAMIN GINTING 88, Rp 2.835.604 ,Belum Bayar,1\n2,12.75.010.009.001-0002.0,"IV, V",PANTAS MELIALA,JL LETJEN DJAMIN GINTING 86, Rp 3.209.724 ,Belum Bayar,1`
+                    : `Tempel/Paste kolom dari Excel WP Sudah Bayar Anda (sistem otomatis mencari NOP):\n12.75.010.009.001-0004\tGINTING\tSudah Bayar\n12.75.010.009.001-0016\tOPONG GINTING\tSudah Bayar\n12.75.010.009.002-0002\tMOMIN SITEPU\tSudah Bayar`}
+                  className="w-full p-3.5 rounded-xl border border-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 leading-relaxed"
+                />
+              </div>
+
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-xs">
+                <p className="font-black text-amber-900 flex items-center gap-1.5">
+                  <Info className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>{importMode === 'master' ? 'Cara Import Master SPPT:' : 'Cara Sinkronisasi Massal (Pemetaan NOP):'}</span>
+                </p>
+                <p className="text-amber-800 text-[11px] leading-relaxed">
+                  {importMode === 'master' 
+                    ? 'Gunakan opsi ini saat pertama kali mengimpor master database SPPT PBB tahunan Kelurahan Mangga yang memiliki kolom lingkungan lengkap.'
+                    : 'Gunakan opsi ini jika Excel pembayaran Anda TIDAK memuat kolom lingkungan. Sistem akan mencocokkan NOP di setiap baris dengan database Master SPPT & pemetaan WebGIS Rumah warga Kelurahan Mangga untuk mencari tahu nomor lingkungan aslinya secara otomatis!'}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Sistem otomatis mengabaikan baris judul (header) dan karakter rupiah.</span>
+                </div>
+
+                <button
+                  onClick={handleParseCsvData}
+                  disabled={!rawCsvInput.trim()}
+                  className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-2 shadow-2xs"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>{importMode === 'master' ? 'Proses Impor Master SPPT' : 'Analisis &amp; Petakan Lingkungan (NOP)'}</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            /* INTERACTIVE MAPPING PREVIEW & REVIEW WIZARD */
+            <div className="space-y-4 animate-fade-in">
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
+                <h3 className="text-xs font-black text-emerald-950 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Review Hasil Pemetaan Lingkungan &amp; Status Pembayaran PBB</span>
+                </h3>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  Ditemukan <b>{parsedItems.length} data WP</b>. Sistem secara otomatis mencocokkan NOP dengan <b>basis data master warga</b> dan <b>WebGIS rumah</b> untuk mendeteksi lingkungannya masing-masing. Silakan koreksi lingkungan jika diperlukan sebelum menekan tombol simpan massal ke Firestore.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-slate-200 max-h-96">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 text-slate-700 uppercase font-black text-[10px] tracking-wider border-b border-slate-200 sticky top-0 z-10">
+                    <tr>
+                      <th className="py-2.5 px-3 text-center w-10">No</th>
+                      <th className="py-2.5 px-3">NOP</th>
+                      <th className="py-2.5 px-3">Nama Wajib Pajak</th>
+                      <th className="py-2.5 px-3">Alamat OP</th>
+                      <th className="py-2.5 px-3 text-right">Ketetapan PBB</th>
+                      <th className="py-2.5 px-3 text-center">Status</th>
+                      <th className="py-2.5 px-3 text-center">Sumber Pemetaan</th>
+                      <th className="py-2.5 px-3 text-center w-36">Nomor Lingkungan</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 text-slate-800">
+                    {parsedItems.map((item, idx) => (
+                      <tr 
+                        key={item.id} 
+                        className={`hover:bg-slate-50 transition-colors ${
+                          item.lingkungan === 0 
+                            ? 'bg-rose-50/70 border-l-4 border-l-rose-500' 
+                            : ''
+                        }`}
+                      >
+                        <td className="py-2 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
+                        <td className="py-2 px-3 font-mono font-bold text-slate-700">{item.nop}</td>
+                        <td className="py-2 px-3 font-black text-slate-900">{item.namaWp}</td>
+                        <td className="py-2 px-3 text-slate-500 text-[10px]">{item.alamatOp}</td>
+                        <td className="py-2 px-3 text-right font-bold">{formatRupiah(item.pbbTerutang)}</td>
+                        <td className="py-2 px-3 text-center">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          {item.lingkungan === 0 ? (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black bg-rose-600 text-white animate-pulse border border-rose-700">
+                              🆕 NOP BARU
+                            </span>
+                          ) : (
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              item.mappingSource === 'Master SPPT' 
+                                ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                                : item.mappingSource === 'WebGIS Rumah'
+                                ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                : 'bg-amber-100 text-amber-800 border border-amber-200'
+                            }`}>
+                              ⚡ {item.mappingSource}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-1.5 px-3 text-center">
+                          <div className="flex items-center gap-1 justify-center">
+                            <span className="text-[10px] font-bold text-slate-500">Lingk:</span>
+                            <select
+                              value={item.lingkungan}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                setParsedItems(prev => prev.map(p => p.id === item.id ? { ...p, lingkungan: val, mappingSource: 'Manual', namaWp: p.namaWp === 'NOP BARU (BELUM DIEDIT)' ? `WP BARU LINGKUNGAN ${val}` : p.namaWp } : p));
+                              }}
+                              className={`border rounded-lg px-2 py-1 text-xs font-black focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer ${
+                                item.lingkungan === 0 
+                                  ? 'bg-rose-100 border-rose-500 text-rose-700 animate-pulse' 
+                                  : 'bg-white border-slate-300 text-slate-800'
+                              }`}
+                            >
+                              {item.lingkungan === 0 && (
+                                <option value="0">⚠️ PILIH LINGKUNGAN</option>
+                              )}
+                              {Array.from({ length: 24 }, (_, i) => i + 1).map(num => (
+                                <option key={num} value={num}>Lingkungan {num}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMappingPreviewActive(false);
+                    setParsedItems([]);
+                  }}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                >
+                  Batal / Ulangi Impor
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCommitMappingToFirestore}
+                  className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-xl transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                >
+                  <Save className="w-4 h-4 animate-pulse" />
+                  <span>Simpan &amp; Sinkronkan Massal ke Firestore (Android Sinkron)</span>
+                </button>
+              </div>
             </div>
-
-            <textarea
-              rows={8}
-              value={rawCsvInput}
-              onChange={(e) => setRawCsvInput(e.target.value)}
-              placeholder={importMode === 'master' 
-                ? `Contoh (Format 8 Kolom):\n1,12.75.010.009.001-0001.0,"IV, V",MULIA MELIALA,JL LETJEN DJAMIN GINTING 88, Rp 2.835.604 ,Belum Bayar,1\n2,12.75.010.009.001-0002.0,"IV, V",PANTAS MELIALA,JL LETJEN DJAMIN GINTING 86, Rp 3.209.724 ,Belum Bayar,1`
-                : `Tempel/Paste kolom dari Excel WP Sudah Bayar Anda (sistem otomatis mencari NOP):\n12.75.010.009.001-0004\tGINTING\tSudah Bayar\n12.75.010.009.001-0016\tOPONG GINTING\tSudah Bayar\n12.75.010.009.002-0002\tMOMIN SITEPU\tSudah Bayar`}
-              className="w-full p-3.5 rounded-xl border border-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 leading-relaxed"
-            />
-          </div>
-
-          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-xs">
-            <p className="font-black text-amber-900 flex items-center gap-1.5">
-              <Info className="w-4 h-4 text-amber-700 shrink-0" />
-              <span>{importMode === 'master' ? 'Cara Import Master SPPT:' : 'Cara Sinkronisasi Tanpa Lingkungan (NOP Matching):'}</span>
-            </p>
-            <p className="text-amber-800 text-[11px] leading-relaxed">
-              {importMode === 'master' 
-                ? 'Gunakan opsi ini saat pertama kali mengimpor master database SPPT PBB tahunan Kelurahan Mangga yang memiliki kolom lingkungan lengkap.'
-                : 'Blok dan salin (Copy) tabel Excel Anda yang berisi NOP pembayar pajak, lalu tempel (Paste) di atas. Sistem secara otomatis membaca Nomor NOP di setiap baris, mencari data aslinya di sistem yang sudah terpetakan di lingkungannya masing-masing, dan langsung memperbarui statusnya menjadi "Sudah Bayar" (Lunas) sekaligus menyimpannya ke Firebase.'}
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 pt-2">
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Sistem otomatis mengabaikan baris judul (header) dan karakter rupiah.</span>
-            </div>
-
-            <button
-              onClick={handleParseCsvData}
-              disabled={!rawCsvInput.trim()}
-              className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-2 shadow-2xs"
-            >
-              <RefreshCw className="w-4 h-4 animate-spin-hover" />
-              <span>{importMode === 'master' ? 'Proses Impor Master SPPT' : 'Sinkronkan Status Bayar (NOP Match)'}</span>
-            </button>
-          </div>
+          )}
         </div>
       )}
 

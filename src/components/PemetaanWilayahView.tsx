@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import JSZip from 'jszip';
 import type * as LTypes from 'leaflet';
 import * as LeafletModule from 'leaflet';
+import { fetchAllReports } from '../lib/reportsApi';
+import { extractNomorLingkungan } from '../lib/formatter';
 
 // Resilient Leaflet resolver (supports global window.L, default export, or module namespace)
 const getL = (): any => {
@@ -127,7 +129,55 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       setFilterLingkungan(initialLingkunganFilter);
     }
   }, [initialLingkunganFilter]);
-  const [filterTheme, setFilterTheme] = useState<'ALL' | 'WRS' | 'PBB' | 'BANSOS' | 'JALAN'>('ALL');
+  const [filterTheme, setFilterTheme] = useState<'ALL' | 'WRS' | 'PBB' | 'BANSOS' | 'JALAN' | 'HEATMAP'>('ALL');
+  const [reports, setReports] = useState<any[]>([]);
+  const [loadingReports, setLoadingReports] = useState<boolean>(false);
+
+  useEffect(() => {
+    setLoadingReports(true);
+    fetchAllReports()
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setReports(data);
+        }
+      })
+      .catch((err) => console.error('Error loading reports for heatmap:', err))
+      .finally(() => setLoadingReports(false));
+  }, []);
+
+  const reportsCountByLingkungan = useMemo(() => {
+    const counts = Array(25).fill(0);
+    reports.forEach((report) => {
+      if (!report) return;
+      let lNum: number | null = null;
+      if (report.jabatan) {
+        lNum = extractNomorLingkungan(report.jabatan);
+      }
+      if (lNum === null && report.kinerja?.lingkungan) {
+        lNum = extractNomorLingkungan(report.kinerja.lingkungan);
+      }
+      if (lNum === null && report.namaKepling) {
+        const matchKepling = KEPLING_ACCOUNTS.find(
+          k => k.nama.toLowerCase().trim() === report.namaKepling.toLowerCase().trim()
+        );
+        if (matchKepling && matchKepling.nomorLingkungan) {
+          lNum = matchKepling.nomorLingkungan;
+        }
+      }
+      if (lNum !== null && lNum >= 1 && lNum <= 24) {
+        counts[lNum]++;
+      }
+    });
+    return counts;
+  }, [reports]);
+
+  const getHeatmapColor = (count: number): string => {
+    if (count === 0) return '#10b981'; // Green
+    if (count <= 2) return '#eab308';  // Amber
+    if (count <= 5) return '#f97316';  // Orange
+    return '#ef4444';                  // Red
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
 
   // Selection & Modal States
@@ -576,17 +626,35 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       if (!poly.coordinates || poly.coordinates.length < 3) return;
 
       const isCurrentSelected = selectedPolygon?.id === poly.id;
+      
+      const lkNum = parseInt(poly.lingkunganId, 10) || 0;
+      const count = reportsCountByLingkungan[lkNum] || 0;
+      const isHeatmapMode = filterTheme === 'HEATMAP';
+      
+      const polyColor = isHeatmapMode ? getHeatmapColor(count) : (poly.color || '#10b981');
+      const polyFillOpacity = isHeatmapMode 
+        ? (isCurrentSelected ? 0.8 : 0.55) 
+        : (isCurrentSelected ? 0.45 : 0.2);
+
       const polygonShape = L.polygon(poly.coordinates, {
-        color: isCurrentSelected ? '#ffffff' : poly.color || '#10b981',
+        color: isCurrentSelected ? '#ffffff' : polyColor,
         weight: isCurrentSelected ? 4 : 2.5,
         opacity: 0.95,
-        fillColor: poly.color || '#10b981',
-        fillOpacity: isCurrentSelected ? 0.45 : 0.2,
+        fillColor: polyColor,
+        fillOpacity: polyFillOpacity,
       });
 
       // Tooltip label
+      const tooltipContent = isHeatmapMode
+        ? `<div class="font-sans font-black text-xs text-slate-950">${poly.lingkunganNama.toUpperCase()}</div>
+           <div class="text-[10px] text-red-700 font-black bg-red-50 border border-red-200 px-2 py-0.5 rounded shadow-2xs mt-1 flex items-center gap-1">
+             🔥 <span>${count} Kejadian Laporan</span>
+           </div>`
+        : `<div class="font-sans font-black text-xs text-slate-900">${poly.lingkunganNama.toUpperCase()}</div>
+           <div class="text-[10px] text-slate-600 font-semibold">${poly.keplingNama}</div>`;
+
       polygonShape.bindTooltip(
-        `<div class="font-sans font-black text-xs text-slate-900">${poly.lingkunganNama.toUpperCase()}</div><div class="text-[10px] text-slate-600 font-semibold">${poly.keplingNama}</div>`,
+        tooltipContent,
         {
           sticky: true,
           direction: 'top',
@@ -603,7 +671,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
       polyGroup.addLayer(polygonShape);
     });
-  }, [polygons, filterLingkungan, selectedPolygon]);
+  }, [polygons, filterLingkungan, selectedPolygon, filterTheme, reportsCountByLingkungan]);
 
   // 7. Render Roads (Ruas Jalan & Kondisi)
   useEffect(() => {
@@ -1651,6 +1719,18 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
             >
               🛣️ Kondisi Jalan
             </button>
+            <button
+              type="button"
+              onClick={() => setFilterTheme('HEATMAP')}
+              className={`px-2.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                filterTheme === 'HEATMAP'
+                  ? 'bg-rose-600 text-white shadow-xs animate-pulse'
+                  : 'text-rose-700 hover:bg-rose-50'
+              }`}
+              title="Mewarnai lingkungan berdasarkan intensitas laporan harian Kepling"
+            >
+              <span>🔥 Heatmap Kejadian</span>
+            </button>
           </div>
         </div>
 
@@ -1746,23 +1826,50 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
           {/* Floating Map Legend (Bottom-Left) */}
           <div className="absolute bottom-3 left-3 z-[1000] bg-slate-900/90 backdrop-blur-md text-white p-3 rounded-2xl border border-slate-700/80 shadow-lg text-[10px] space-y-1.5 max-w-[240px]">
-            <p className="font-black uppercase tracking-wider text-emerald-400">Legenda Peta:</p>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-emerald-500 border border-white" />
-              <span>WRS Aktif / PBB Lunas / Jalan Baik</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-rose-500 border border-white" />
-              <span>Belum WRS / PBB Belum / Jalan Rusak</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-purple-500 border border-white" />
-              <span>Penerima Bantuan Sosial</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-1.5 bg-amber-400 border border-white" />
-              <span>Garis Batas Lingkungan</span>
-            </div>
+            {filterTheme === 'HEATMAP' ? (
+              <>
+                <p className="font-black uppercase tracking-wider text-rose-400">🔥 Heatmap Kejadian:</p>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-[#10b981] border border-white" />
+                  <span>0 Laporan (Aman / Kondusif)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-[#eab308] border border-white" />
+                  <span>1 - 2 Laporan (Kerawanan Rendah)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-[#f97316] border border-white" />
+                  <span>3 - 5 Laporan (Kerawanan Sedang)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-[#ef4444] border border-white animate-pulse" />
+                  <span>&gt; 5 Laporan (Rawan / Padat Kejadian)</span>
+                </div>
+                <p className="text-[9px] text-slate-400 pt-1 leading-tight font-medium border-t border-slate-700 mt-1">
+                  Warna merefleksikan total Laporan Harian yang dikirimkan Kepling.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-black uppercase tracking-wider text-emerald-400">Legenda Peta:</p>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-emerald-500 border border-white" />
+                  <span>WRS Aktif / PBB Lunas / Jalan Baik</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-rose-500 border border-white" />
+                  <span>Belum WRS / PBB Belum / Jalan Rusak</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full bg-purple-500 border border-white" />
+                  <span>Penerima Bantuan Sosial</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3.5 h-1.5 bg-amber-400 border border-white" />
+                  <span>Garis Batas Lingkungan</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

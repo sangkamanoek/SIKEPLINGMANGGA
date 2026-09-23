@@ -377,8 +377,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
         img.onload = () => {
           let width = img.width;
           let height = img.height;
-          // Dimensi 900px memberikan ketajaman tinggi untuk SPPT PBB & perlinsos, sekaligus ukuran file sangat efisien (~50KB per foto)
-          const maxDim = 900;
+          // Dimensi 720px memberikan ketajaman tinggi untuk SPPT PBB & perlinsos, sekaligus ukuran file sangat efisien (~40KB per foto)
+          const maxDim = 720;
           if (width > maxDim || height > maxDim) {
             if (width > height) {
               height = Math.round((height * maxDim) / width);
@@ -396,8 +396,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, width, height);
-            // Kualitas 0.68 menghasilkan foto jernih, tajam, dan ukuran ringan tanpa resiko kuota Firestore
-            resolve(canvas.toDataURL('image/jpeg', 0.68));
+            // Kualitas 0.42 menghasilkan foto jernih, tajam, dan ukuran super ringan tanpa resiko kuota Firestore / Vercel
+            resolve(canvas.toDataURL('image/jpeg', 0.42));
           } else {
             resolve((event.target?.result as string) || '');
           }

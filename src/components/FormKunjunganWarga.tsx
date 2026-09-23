@@ -42,8 +42,8 @@ interface FormKunjunganWargaProps {
 }
 
 const STORAGE_CACHE_KEY = 'sikepling_kunjungan_harian_list_v1';
-const MAX_IMAGE_DIMENSION = 800;
-const IMAGE_JPEG_QUALITY = 0.7;
+const MAX_IMAGE_DIMENSION = 720;
+const IMAGE_JPEG_QUALITY = 0.45;
 
 export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   currentUser,
