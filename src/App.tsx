@@ -285,19 +285,17 @@ export default function App() {
 
   // Initialization: Load reports from server, sync offline cache, and set auto-sync interval
   useEffect(() => {
-    // Purge any stale client device cache to enforce 100% online state, then register service worker
-    purgeAllClientCache()
-      .catch(() => {})
-      .finally(() => {
-        // Register aggressive cache-clearing service worker
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('/sw.js').then((registration) => {
-            console.log('[App] Service worker registered:', registration.scope);
-          }).catch((err) => {
-            console.error('[App] Service worker registration failed:', err);
-          });
-        }
+    // Register aggressive cache-clearing service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((registration) => {
+        console.log('[App] Service worker registered:', registration.scope);
+      }).catch((err) => {
+        console.error('[App] Service worker registration failed:', err);
       });
+    }
+
+    // Instantly load cached local reports to populate the UI in 10ms (Buttery-smooth startup)
+    loadLocalReports();
 
     syncPasswordsWithServer();
     syncProfilesWithServer();
@@ -321,6 +319,9 @@ export default function App() {
         setReports((prev) => {
           // If Firestore is genuinely empty on the server, we must clear the reports to allow a fresh start (NOL)!
           if (firestoreReports.length === 0 && !isFromCache) {
+            try {
+              safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify([]));
+            } catch {}
             return [];
           }
 
@@ -357,6 +358,11 @@ export default function App() {
             return timeB - timeA;
           });
 
+          // Cache merged reports to LocalStorage for offline speed on next reload
+          try {
+            safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(merged));
+          } catch {}
+
           return merged;
         });
       }
@@ -383,43 +389,6 @@ export default function App() {
         });
       }
     });
-
-    // Auto-sync polling every 15 seconds via lightweight Server Buffer with safe merge
-    const pollInterval = setInterval(async () => {
-      try {
-        const res = await customFetch(`/api/reports?_t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            Pragma: 'no-cache',
-          },
-        });
-        if (res.ok) {
-          const json = await res.json();
-          const serverReports = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
-          if (serverReports.length > 0) {
-            const deletedIds = getLocalDeletedReportIds();
-            const cleaned = serverReports.filter((r: LaporanHarianItem) => !isReportDeleted(r) && !deletedIds.has(r.id));
-            setReports((prev) => {
-              const map = new Map<string, LaporanHarianItem>();
-              prev.forEach((r) => {
-                if (r && r.id && !deletedIds.has(r.id)) map.set(r.id, r);
-              });
-              cleaned.forEach((r: LaporanHarianItem) => {
-                if (r && r.id && !deletedIds.has(r.id)) map.set(r.id, r);
-              });
-              const merged = Array.from(map.values());
-              merged.sort((a, b) => {
-                const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                return timeB - timeA;
-              });
-              return merged;
-            });
-          }
-        }
-      } catch {}
-    }, 15000);
 
     // Subscribe to events and check for notifications
     const unsubscribeEvents = subscribeCustomEventsFromFirestore((data) => {
@@ -471,7 +440,6 @@ export default function App() {
       unsubscribeFirestoreReports();
       unsubscribeAttendance();
       unsubscribeEvents();
-      clearInterval(pollInterval);
       clearInterval(pollNotifications);
       unsubscribe();
     };
