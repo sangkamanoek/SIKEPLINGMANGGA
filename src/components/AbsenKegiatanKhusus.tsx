@@ -54,6 +54,7 @@ export const AbsenKegiatanKhusus: React.FC<AbsenKegiatanKhususProps> = ({
   const [newLocation, setNewLocation] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newRequired, setNewRequired] = useState(true);
+  const [selectedKeplings, setSelectedKeplings] = useState<string[]>([]);
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
 
   // Check-In Form State (Kepling Only)
@@ -127,6 +128,7 @@ export const AbsenKegiatanKhusus: React.FC<AbsenKegiatanKhususProps> = ({
       location: newLocation.trim(),
       description: newDescription.trim() || undefined,
       required: newRequired,
+      targetKeplingIds: newRequired ? undefined : selectedKeplings,
       createdBy: activeAccount.nama,
       createdAt: new Date().toISOString()
     };
@@ -143,6 +145,7 @@ export const AbsenKegiatanKhusus: React.FC<AbsenKegiatanKhususProps> = ({
       setNewLocation('');
       setNewDescription('');
       setNewRequired(true);
+      setSelectedKeplings([]);
     } else {
       showToast?.('Gagal menyimpan kegiatan ke database.', 'error');
     }
@@ -415,17 +418,38 @@ export const AbsenKegiatanKhusus: React.FC<AbsenKegiatanKhususProps> = ({
                     />
                   </div>
 
-                  <div className="flex items-center gap-2 bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
-                    <input
-                      id="required-checkbox"
-                      type="checkbox"
-                      className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
-                      checked={newRequired}
-                      onChange={(e) => setNewRequired(e.target.checked)}
-                    />
-                    <label htmlFor="required-checkbox" className="text-xs font-extrabold text-slate-800 cursor-pointer">
-                      Wajib Diikuti 24 Kepling
-                    </label>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
+                      <input
+                        id="required-checkbox"
+                        type="checkbox"
+                        className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
+                        checked={newRequired}
+                        onChange={(e) => setNewRequired(e.target.checked)}
+                      />
+                      <label htmlFor="required-checkbox" className="text-xs font-extrabold text-slate-800 cursor-pointer">
+                        Wajib Diikuti 24 Kepling
+                      </label>
+                    </div>
+
+                    {!newRequired && (
+                      <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2 space-y-1">
+                        {KEPLING_ACCOUNTS.map((k) => (
+                          <label key={k.id} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer p-1 hover:bg-slate-50 rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedKeplings.includes(k.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedKeplings([...selectedKeplings, k.id]);
+                                else setSelectedKeplings(selectedKeplings.filter(id => id !== k.id));
+                              }}
+                              className="w-3.5 h-3.5 text-emerald-600"
+                            />
+                            {k.lingkungan} - {k.nama}
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -629,6 +653,9 @@ export const AbsenKegiatanKhusus: React.FC<AbsenKegiatanKhususProps> = ({
               <div className="space-y-4">
                 {events.map((event) => {
                   // Find all attendance for this event
+                  const isTargeted = event.required || event.targetKeplingIds?.includes(activeAccount.id);
+                  if (!isAdmin && !isTargeted) return null; // Only show targeted events to Kepling
+
                   const eventAttList = attendanceList.filter((a) => a.eventId === event.id);
                   const isCheckedIn = !isAdmin && eventAttList.some((a) => a.accountId === activeAccount.id);
                   const myAttendance = !isAdmin ? eventAttList.find((a) => a.accountId === activeAccount.id) : null;

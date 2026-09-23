@@ -29,7 +29,7 @@ import {
   appendLaporanToSheet,
 } from './lib/sheetsService';
 import { uploadMakalahToGoogleDrive } from './lib/driveService';
-import { SUPER_ADMIN_ACCOUNT, getAccountById, syncPasswordsWithServer, syncProfilesWithServer } from './data/keplingList';
+import { SUPER_ADMIN_ACCOUNT, getAccountById, syncPasswordsWithServer, syncProfilesWithServer, syncAccountsWithServer } from './data/keplingList';
 import { HeaderBanner } from './components/HeaderBanner';
 import { FormLaporan } from './components/FormLaporan';
 import { RiwayatLaporan } from './components/RiwayatLaporan';
@@ -44,6 +44,7 @@ import { getDefaultTargetsCapaianMap } from './data/targetsData';
 import { fetchTargetsCapaian, subscribeTargetsFromFirestore } from './lib/targetsApi';
 import { PWAInstallModal } from './components/PWAInstallModal';
 import { PanduanPPTModal } from './components/PanduanPPTModal';
+import { customFetch } from './lib/fetchInterceptor';
 import { AbsenKegiatanKhusus } from './components/AbsenKegiatanKhusus';
 import { SmartHubDashboard } from './components/SmartHubDashboard';
 import { RekapPbbView } from './components/RekapPbbView';
@@ -56,7 +57,8 @@ import { MobileBottomNav } from './components/MobileBottomNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AbsenApelItem } from './types';
 import { loadAllAttendance } from './lib/attendanceApi';
-import { subscribeAttendanceFromFirestore, wipeAllFirestoreCapaianData } from './lib/firestoreService';
+import { subscribeAttendanceFromFirestore, wipeAllFirestoreCapaianData, subscribeCustomEventsFromFirestore } from './lib/firestoreService';
+import { CustomEvent } from './types';
 import { wipeAllPbbSpptEverywhere } from './lib/pbbService';
 import { consolidateDailyReport } from './lib/reportConsolidator';
 import {
@@ -67,11 +69,11 @@ import {
   subscribeReportsFromFirestore,
   getLocalDeletedReportIds,
   isReportDeleted,
-  syncLocalReportsToServer,
   seedInitialReports,
 } from './lib/reportsApi';
 import { getReportsFromIndexedDB, clearIndexedDBReports } from './lib/indexedDbStorage';
 import { KNOWN_STORAGE_KEYS } from './lib/reportsApi';
+import { purgeAllClientCache } from './lib/purgeCache';
 
 const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
 
@@ -134,6 +136,7 @@ export default function App() {
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isPPTModalOpen, setIsPPTModalOpen] = useState(false);
   const [isAbsenApelModalOpen, setIsAbsenApelModalOpen] = useState(false);
+  const [customEvents, setCustomEvents] = useState<CustomEvent[]>([]);
   const [attendanceList, setAttendanceList] = useState<AbsenApelItem[]>([]);
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
@@ -282,29 +285,23 @@ export default function App() {
 
   // Initialization: Load reports from server, sync offline cache, and set auto-sync interval
   useEffect(() => {
-    // One-time automatic clean-slate purge for client browser cache
-    const cleanSlateKey = 'sikepling_clean_slate_2026_done_v1';
-    if (!localStorage.getItem(cleanSlateKey)) {
-      try {
-        localStorage.removeItem(LOCAL_STORAGE_KEY_LAPORAN);
-        localStorage.removeItem('kepling_deleted_reports_v1');
-        localStorage.removeItem('kepling_absen_apel_list');
-        KNOWN_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
-        clearIndexedDBReports().catch(() => {});
-        setReports([]);
-        localStorage.setItem(cleanSlateKey, 'true');
-        fetch('/api/wipe-all-data', { method: 'POST' }).catch(() => {});
-        wipeAllFirestoreCapaianData().catch(() => {});
-        wipeAllPbbSpptEverywhere().catch(() => {});
-      } catch (e) {
-        console.warn('Auto-purge client cache notice:', e);
-      }
-    }
+    // Purge any stale client device cache to enforce 100% online state, then register service worker
+    purgeAllClientCache()
+      .catch(() => {})
+      .finally(() => {
+        // Register aggressive cache-clearing service worker
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js').then((registration) => {
+            console.log('[App] Service worker registered:', registration.scope);
+          }).catch((err) => {
+            console.error('[App] Service worker registration failed:', err);
+          });
+        }
+      });
 
     syncPasswordsWithServer();
     syncProfilesWithServer();
-    loadLocalReports();
-    syncLocalReportsToServer();
+    syncAccountsWithServer();
     refreshAllReports(false);
     loadAllAttendance().then((items) => setAttendanceList(items));
     fetchTargetsCapaian().then((data) => {
@@ -324,7 +321,6 @@ export default function App() {
         setReports((prev) => {
           // If Firestore is genuinely empty on the server, we must clear the reports to allow a fresh start (NOL)!
           if (firestoreReports.length === 0 && !isFromCache) {
-            safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify([]));
             return [];
           }
 
@@ -361,7 +357,6 @@ export default function App() {
             return timeB - timeA;
           });
 
-          safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(merged));
           return merged;
         });
       }
@@ -372,7 +367,6 @@ export default function App() {
       if (Array.isArray(items)) {
         setAttendanceList((prev) => {
           if (items.length === 0 && !isFromCache) {
-            safeSetLocalStorage('kepling_absen_apel_list', JSON.stringify([]));
             return [];
           }
           if (items.length === 0 && prev.length > 0) return prev;
@@ -393,8 +387,13 @@ export default function App() {
     // Auto-sync polling every 15 seconds via lightweight Server Buffer with safe merge
     const pollInterval = setInterval(async () => {
       try {
-        syncLocalReportsToServer();
-        const res = await fetch('/api/reports');
+        const res = await customFetch(`/api/reports?_t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+          },
+        });
         if (res.ok) {
           const json = await res.json();
           const serverReports = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
@@ -415,13 +414,38 @@ export default function App() {
                 const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
                 return timeB - timeA;
               });
-              safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(merged));
               return merged;
             });
           }
         }
       } catch {}
     }, 15000);
+
+    // Subscribe to events and check for notifications
+    const unsubscribeEvents = subscribeCustomEventsFromFirestore((data) => {
+      setCustomEvents(data);
+    });
+
+    const pollNotifications = setInterval(() => {
+      if (typeof window === 'undefined' || !('Notification' in window)) return;
+      if (window.Notification.permission !== 'granted') return;
+      
+      const now = new Date();
+      customEvents.forEach(event => {
+        const eventTime = new Date(`${event.date}T${event.time}`);
+        const diffMs = eventTime.getTime() - now.getTime();
+        
+        // 5 minutes = 300,000 ms. Check range: [4 mins, 5 mins]
+        if (diffMs > 240000 && diffMs <= 300000) {
+          // Check if targeted
+          const isTargeted = event.required || event.targetKeplingIds?.includes(activeAccount?.id);
+          if (isTargeted) {
+             new window.Notification("BELUM ABSEN KEGIATAN KHUSUS", { body: `Agenda: ${event.title} dimulai dalam 5 menit!` });
+             if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+          }
+        }
+      });
+    }, 60000); // Poll every minute
 
     const unsubscribe = initAuth(
       async (firebaseUser, accessToken) => {
@@ -446,7 +470,9 @@ export default function App() {
       unsubscribeTargets();
       unsubscribeFirestoreReports();
       unsubscribeAttendance();
+      unsubscribeEvents();
       clearInterval(pollInterval);
+      clearInterval(pollNotifications);
       unsubscribe();
     };
   }, [syncSpreadsheet, refreshAllReports]);
@@ -596,11 +622,11 @@ export default function App() {
       await wipeAllPbbSpptEverywhere();
 
       // 2. Wipe server buffer & disk JSONs (while keeping passwords and profiles)
-      await fetch('/api/wipe-all-data', { method: 'POST' }).catch(() => {});
-      await fetch('/api/reset-all-system-data', { method: 'POST' }).catch(() => {});
+      await customFetch('/api/wipe-all-data', { method: 'POST' }).catch(() => {});
+      await customFetch('/api/reset-all-system-data', { method: 'POST' }).catch(() => {});
       await resetAllReportsOnServer().catch(() => {});
 
-      // 3. Clear local storage operational keys
+      // 3. Clear local storage operational keys and IndexedDB cache
       try {
         localStorage.removeItem(LOCAL_STORAGE_KEY_LAPORAN);
         localStorage.removeItem('kepling_deleted_reports_v1');
@@ -611,6 +637,7 @@ export default function App() {
         for (let y = 2024; y <= 2030; y++) {
           localStorage.removeItem(`sikepling_sppt_pbb_records_${y}_v3`);
         }
+        await clearIndexedDBReports().catch(() => {});
       } catch (e) {
         console.warn('Clear local keys warning:', e);
       }

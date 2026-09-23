@@ -273,12 +273,26 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // REQUIREMENT: Izin/Sakit must have Catatan
+    if ((status === 'Izin' || status === 'Sakit') && !catatan.trim()) {
+      showToast?.(`Catatan/Alasan wajib diisi untuk status ${status}.`, 'error');
+      return;
+    }
+
+    // REQUIREMENT: Warning if no photo for Izin/Sakit
+    if ((status === 'Izin' || status === 'Sakit') && !fotoSelfie) {
+      showToast?.(`Harap lampirkan foto surat izin/bukti sakit untuk status ${status}.`, 'error');
+      return;
+    }
+
     const isSuperAdmin = activeAccount.role === 'super_admin';
     const timeStat = checkApelTimeStatus();
     const isPresensiLocked = !isSuperAdmin && (timeStat.isLate || !timeStat.isWorkDay);
-
+    
+    // REQUIREMENT: Jika presensi sudah ditutup (lewat jam 08.30), tampilkan pesan khusus
     if (isPresensiLocked) {
-      showToast?.('Akses presensi apel pagi sudah ditutup (lewat pukul 08.30 WIB).', 'error');
+      showToast?.('Akses presensi apel pagi sudah ditutup (lewat pukul 08.30 WIB). Segera menghadap Sekretaris Lurah!', 'error');
       return;
     }
 
@@ -421,55 +435,57 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
           {activeTab === 'form' && (() => {
             const isSuperAdmin = activeAccount.role === 'super_admin';
             const timeStat = checkApelTimeStatus();
-            const isPresensiLocked = !isSuperAdmin && (timeStat.isLate || !timeStat.isWorkDay);
+            const isPresensiLocked = !isSuperAdmin && (!timeStat.isWithinWindow || !timeStat.isWorkDay);
 
             // Case 1: Past 08.30 WIB and Kepling did not submit attendance -> Locked
             if (isPresensiLocked && !myTodayRecord) {
               return (
                 <div className="space-y-5 max-w-2xl mx-auto">
-                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center justify-between">
+                  <div className="bg-rose-600 border border-rose-700 rounded-2xl p-4 flex items-center justify-between text-white shadow-lg">
                     <div>
-                      <span className="text-xs text-rose-700 font-bold uppercase tracking-wider block">
+                      <span className="text-xs text-rose-100 font-bold uppercase tracking-wider block">
                         Status Presensi Saya ({selectedKeplingAccount.lingkungan})
                       </span>
-                      <h3 className="text-sm font-black text-rose-950">
+                      <h3 className="text-sm font-black">
                         {selectedKeplingAccount.nama}
                       </h3>
                     </div>
-                    <span className="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-black shadow-xs">
+                    <span className="px-3 py-1 rounded-full bg-white text-rose-700 text-xs font-black shadow-md">
                       TIDAK MENGIKUTI APEL
                     </span>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl border bg-rose-50/70 border-rose-300 text-rose-950 flex items-center justify-between gap-3 text-xs font-bold">
+                  <div className="p-3.5 rounded-2xl border bg-rose-100 border-rose-400 text-rose-950 flex items-center justify-between gap-3 text-xs font-bold shadow-sm">
                     <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-rose-600 shrink-0" />
+                      <Clock className="w-4 h-4 text-rose-700 shrink-0" />
                       <div>
                         <span className="block font-extrabold">
                           Jadwal Absen Resmi: Senin s/d Jumat (07.30 - 08.30 WIB)
                         </span>
-                        <span className="text-[11px] font-semibold opacity-90 text-rose-800">
+                        <span className="text-[11px] font-semibold opacity-90 text-rose-900">
                           {timeStat.statusLabel}
                         </span>
                       </div>
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-white border border-rose-200 text-rose-900 font-mono text-[11px] font-black shrink-0">
+                    <span className="px-2.5 py-1 rounded-lg bg-rose-700 text-white font-mono text-[11px] font-black shrink-0">
                       {timeStat.formattedTime}
                     </span>
                   </div>
 
-                  <div className="bg-white border-2 border-rose-200 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-sm">
-                    <div className="w-16 h-16 bg-rose-100 border border-rose-200 rounded-2xl flex items-center justify-center mx-auto text-rose-600 shadow-inner">
+                  <div className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-md">
+                    <div className="w-16 h-16 bg-rose-600 border border-rose-700 rounded-2xl flex items-center justify-center mx-auto text-white shadow-lg animate-pulse">
                       <Lock className="w-8 h-8" />
                     </div>
 
                     <div className="space-y-2">
                       <h3 className="text-base sm:text-lg font-black text-rose-950 uppercase tracking-tight">
-                        Akses Presensi Apel Pagi Ditutup
+                        Akses Presensi Apel Pagi Terkunci
                       </h3>
                       <p className="text-xs text-slate-600 max-w-lg mx-auto leading-relaxed">
                         Batas waktu pengisian presensi apel pagi resmi adalah pukul <strong>07.30 s/d 08.30 WIB</strong>.
-                        Karena waktu saat ini telah melewati batas resmi ({timeStat.formattedTime}), formulir presensi telah ditutup dan dikunci secara otomatis.
+                        Karena waktu saat ini ({timeStat.formattedTime}) berada di luar jadwal resmi, formulir presensi telah ditutup dan dikunci secara otomatis.
+                        <br /><br />
+                        <strong className="text-rose-700 text-sm">HARAP SEGERA MENGHADAP SEKRETARIS LURAH UNTUK KONFIRMASI KEHADIRAN.</strong>
                       </p>
                     </div>
 
@@ -873,7 +889,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
               {/* Catatan / Keterangan */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 block">
-                  Catatan / Alasan {status !== 'Hadir' && <span className="text-red-500">*</span>}
+                  Catatan / Alasan {(status === 'Izin' || status === 'Sakit') && <span className="text-red-500">*</span>}
                 </label>
                 <textarea
                   rows={2}
@@ -882,7 +898,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                   placeholder={
                     status === 'Hadir'
                       ? 'Catatan singkat presensi (Opsional)...'
-                      : `Tuliskan alasan singkat status ${status}...`
+                      : `Tuliskan alasan/keterangan ${status}...`
                   }
                   className="w-full p-3 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />

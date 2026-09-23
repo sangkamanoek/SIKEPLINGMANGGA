@@ -1,236 +1,106 @@
 {
-  "collections": [
-    {
-      "name": "SIKEPLINGMANGGA",
-      "description": "Master data identitas dan konfigurasi aplikasi SI KEPLING MANGGA serta salinan laporan resmi",
-      "fields": {
-        "namaAplikasi": "string",
-        "kodeAplikasi": "string",
-        "deskripsi": "string",
-        "kelurahan": "string",
-        "kecamatan": "string",
-        "kota": "string",
-        "jumlahLingkungan": "number",
-        "databaseTersambung": "string",
-        "statusDatabase": "string",
-        "createdAt": "string",
-        "updatedAt": "string"
-      }
+  "entities": {
+    "Report": {
+      "title": "Laporan Harian",
+      "description": "Laporan kegiatan harian yang dikirim oleh Kepala Lingkungan.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik laporan" },
+        "keplingId": { "type": "string", "description": "ID Kepling yang mengirim" },
+        "tanggal": { "type": "string", "description": "Tanggal laporan" },
+        "namaKepling": { "type": "string", "description": "Nama Kepling" },
+        "jabatan": { "type": "string", "description": "Jabatan Kepling" },
+        "kinerja": {
+          "type": "object",
+          "properties": {
+            "pbb": { "type": "number" },
+            "perlinsos": { "type": "number" },
+            "ikd": { "type": "number" },
+            "bpjs": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "namaKepling", "tanggal"]
     },
-    {
-      "name": "reports",
-      "description": "Laporan kinerja harian 24 Kepala Lingkungan Kelurahan Mangga",
-      "fields": {
-        "id": "string",
-        "namaKepling": "string",
-        "jabatan": "string",
-        "lingkungan": "string",
-        "tanggal": "string",
-        "kategori": "string",
-        "uraian": "string",
-        "lokasi": "string",
-        "jumlahWarga": "number",
-        "fotoUrl": "string",
-        "status": "string",
-        "capaianPerlinsos": "number",
-        "capaianPbb": "number",
-        "capaianIkd": "number",
-        "capaianBpjs": "number",
-        "createdAt": "string",
-        "updatedAt": "string"
-      }
+    "Attendance": {
+      "title": "Presensi Apel",
+      "description": "Catatan kehadiran apel pagi Kepling.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accountId": { "type": "string" },
+        "namaKepling": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "status": { "type": "string", "enum": ["Hadir", "Izin", "Sakit", "Dinas Luar", "Tidak Mengikuti Apel"] },
+        "waktuLengkap": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "accountId", "tanggal", "status"]
     },
-    {
-      "name": "targets_capaian",
-      "description": "Konfigurasi target dan override capaian per Kepling (kepling_1 s/d kepling_24)",
-      "fields": {
-        "keplingId": "string",
-        "nomorLingkungan": "number",
-        "targetPerlinsos": "number",
-        "targetPbb": "number",
-        "targetIkd": "number",
-        "targetBpjs": "number",
-        "overridePerlinsos": "number",
-        "overridePbb": "number",
-        "overrideIkd": "number",
-        "overrideBpjs": "number",
-        "catatanPenyesuaian": "string",
-        "updatedAt": "string",
-        "updatedBy": "string"
-      }
+    "Target": {
+      "title": "Target Capaian",
+      "description": "Target kinerja dan penyesuaian (override) untuk tiap Kepling.",
+      "type": "object",
+      "properties": {
+        "keplingId": { "type": "string" },
+        "targetPerlinsos": { "type": "number" },
+        "targetPbb": { "type": "number" },
+        "targetIkd": { "type": "number" },
+        "targetBpjs": { "type": "number" },
+        "overridePerlinsos": { "type": ["number", "null"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["keplingId"]
     },
-    {
-      "name": "account_passwords",
-      "description": "Penyimpanan kata sandi akun kustom yang diperbarui",
-      "fields": {
-        "accountId": "string",
-        "password": "string",
-        "updatedAt": "string"
-      }
+    "AccountPassword": {
+      "title": "Sandi Akun",
+      "description": "Sinkronisasi sandi kustom antar perangkat.",
+      "type": "object",
+      "properties": {
+        "accountId": { "type": "string" },
+        "password": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["accountId", "password"]
     },
-    {
-      "name": "reminders",
-      "description": "Jadwal dan pengingat tugas harian Kepling",
-      "fields": {
-        "id": "string",
-        "title": "string",
-        "time": "string",
-        "description": "string",
-        "category": "string",
-        "enabled": "boolean",
-        "daysOfWeek": "array"
-      }
-    },
-    {
-      "name": "notification_logs",
-      "description": "Riwayat notifikasi sistem",
-      "fields": {
-        "id": "string",
-        "timestamp": "string",
-        "title": "string",
-        "message": "string",
-        "category": "string",
-        "read": "boolean"
-      }
-    },
-    {
-      "name": "account_profiles",
-      "description": "Profil kustom nama dan nomor telepon Kepala Lingkungan",
-      "fields": {
-        "accountId": "string",
-        "nama": "string",
-        "telepon": "string",
-        "updatedAt": "string"
-      }
-    },
-    {
-      "name": "deleted_reports",
-      "description": "Daftar ID laporan yang telah dihapus permanen oleh admin",
-      "fields": {
-        "id": "string",
-        "deletedAt": "string"
-      }
-    },
-    {
-      "name": "attendance",
-      "description": "Data presensi dan absensi Apel Pagi Kepala Lingkungan Kelurahan Mangga",
-      "fields": {
-        "id": "string",
-        "accountId": "string",
-        "namaKepling": "string",
-        "lingkungan": "string",
-        "nomorLingkungan": "number",
-        "tanggal": "string",
-        "jam": "string",
-        "waktuLengkap": "string",
-        "status": "string",
-        "fotoSelfieUrl": "string",
-        "lokasiGps": "string",
-        "catatan": "string",
-        "createdAt": "string"
-      }
-    },
-    {
-      "name": "kunjungan_warga",
-      "description": "Pencatatan kegiatan kunjungan warga lapangan door-to-door oleh 24 Kepling",
-      "fields": {
-        "id": "string",
-        "tanggal": "string",
-        "namaWarga": "string",
-        "alamat": "string",
-        "lingkungan": "string",
-        "lingkunganNomor": "number",
-        "namaKepling": "string",
-        "keplingId": "string",
-        "statusPerlinsos": "boolean",
-        "keterangan": "string",
-        "fotoDokumentasi": "string",
-        "createdAt": "string"
-      }
-    },
-    {
-      "name": "custom_events",
-      "description": "Daftar kegiatan khusus / acara yang dibuat oleh admin untuk diabsensi oleh Kepling",
-      "fields": {
-        "id": "string",
-        "title": "string",
-        "date": "string",
-        "time": "string",
-        "location": "string",
-        "description": "string",
-        "required": "boolean",
-        "createdBy": "string",
-        "createdAt": "string"
-      }
-    },
-    {
-      "name": "event_attendance",
-      "description": "Data rekap absensi / kehadiran Kepala Lingkungan pada kegiatan khusus yang dibuat Admin",
-      "fields": {
-        "id": "string",
-        "eventId": "string",
-        "accountId": "string",
-        "namaKepling": "string",
-        "lingkungan": "string",
-        "nomorLingkungan": "number",
-        "status": "string",
-        "timestamp": "string",
-        "fotoSelfieUrl": "string",
-        "lokasiGps": "string",
-        "catatan": "string"
-      }
-    },
-    {
-      "name": "pbb_sppt",
-      "description": "Data SPPT Wajib Pajak PBB-P2 24 Lingkungan Kelurahan Mangga per tahun pajak",
-      "fields": {
-        "id": "string",
-        "no": "number",
-        "nop": "string",
-        "buku": "string",
-        "namaWp": "string",
-        "alamatOp": "string",
-        "pbbTerutang": "number",
-        "status": "string",
-        "lingkungan": "number",
-        "keterangan": "string"
-      }
-    },
-    {
-      "name": "webgis_polygons",
-      "description": "Batas poligon spasial 24 Lingkungan Kelurahan Mangga",
-      "fields": {
-        "id": "string",
-        "lingkungan": "number",
-        "nama": "string",
-        "warna": "string",
-        "coordinates": "array"
-      }
-    },
-    {
-      "name": "webgis_houses",
-      "description": "Titik rumah dan bangunan warga hasil pendataan door-to-door Kepling",
-      "fields": {
-        "id": "string",
-        "lingkungan": "number",
-        "namaKepalaKeluarga": "string",
-        "alamat": "string",
-        "statusPbb": "string",
-        "statusWrs": "string",
-        "lat": "number",
-        "lng": "number"
-      }
-    },
-    {
-      "name": "webgis_roads",
-      "description": "Data ruas jalan lingkungan kelurahan",
-      "fields": {
-        "id": "string",
-        "lingkungan": "number",
-        "namaJalan": "string",
-        "kondisi": "string",
-        "panjangMeter": "number"
-      }
+    "AccountProfile": {
+      "title": "Profil Akun",
+      "description": "Sinkronisasi nama dan telepon kustom.",
+      "type": "object",
+      "properties": {
+        "accountId": { "type": "string" },
+        "nama": { "type": "string" },
+        "telepon": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["accountId"]
     }
-  ]
+  },
+  "firestore": {
+    "reports/{reportId}": {
+      "schema": "Report",
+      "description": "Koleksi utama laporan harian."
+    },
+    "attendance/{attendanceId}": {
+      "schema": "Attendance",
+      "description": "Koleksi presensi apel pagi."
+    },
+    "targets_capaian/{keplingId}": {
+      "schema": "Target",
+      "description": "Konfigurasi target dan penyesuaian capaian."
+    },
+    "account_passwords/{accountId}": {
+      "schema": "AccountPassword",
+      "description": "Penyimpanan sandi kustom."
+    },
+    "account_profiles/{accountId}": {
+      "schema": "AccountProfile",
+      "description": "Penyimpanan profil kustom."
+    },
+    "deleted_reports/{reportId}": {
+      "schema": { "type": "object", "properties": { "id": { "type": "string" }, "deletedAt": { "type": "string" } } },
+      "description": "Tombstone untuk laporan yang dihapus."
+    }
+  }
 }

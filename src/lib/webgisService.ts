@@ -134,52 +134,67 @@ export function getLocalHouses(): TitikRumahBangunan[] {
   return DEFAULT_TITIK_RUMAH;
 }
 
-export function saveLocalHouses(houses: TitikRumahBangunan[]): void {
-  safeSetLocalStorage(STORAGE_KEY_HOUSES, JSON.stringify(houses));
+export function saveLocalHouses(_houses: TitikRumahBangunan[]): void {
+  // Deliberately no-op: Houses are stored online on server and Firestore
 }
 
 export async function fetchAllHouses(): Promise<TitikRumahBangunan[]> {
+  const map = new Map<string, TitikRumahBangunan>();
+
+  // 1. Fetch from Server API buffer
+  try {
+    const res = await fetch(`/api/webgis/houses?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (Array.isArray(json?.data) && json.data.length > 0) {
+        json.data.forEach((h: TitikRumahBangunan) => {
+          if (h && h.id) map.set(h.id, h);
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('Notice fetch houses from server:', e);
+  }
+
+  // 2. Fetch from Firebase Firestore
   try {
     const colRef = collection(db, COLLECTION_HOUSES);
     const snap = await getDocs(colRef);
     if (!snap.empty) {
-      const list: TitikRumahBangunan[] = [];
       snap.forEach((d) => {
-        list.push({ ...(d.data() as TitikRumahBangunan), id: d.id });
+        const item = { ...(d.data() as TitikRumahBangunan), id: d.id };
+        if (item && item.id) map.set(item.id, item);
       });
-      const hasJuan = list.some(
-        (h) =>
-          h.id === 'rumah_juan_lingk1' ||
-          (h.namaKepalaKeluarga && h.namaKepalaKeluarga.toLowerCase() === 'juan')
-      );
-      if (!hasJuan && DEFAULT_TITIK_RUMAH.length > 0) {
-        list.push(...DEFAULT_TITIK_RUMAH);
-        saveHouseToFirestore(DEFAULT_TITIK_RUMAH[0]).catch(() => {});
-      }
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      saveLocalHouses(list);
-      return list;
-    } else if (DEFAULT_TITIK_RUMAH.length > 0) {
-      saveHouseToFirestore(DEFAULT_TITIK_RUMAH[0]).catch(() => {});
     }
   } catch (e) {
-    console.warn('Notice fetch houses Firestore, using local fallback:', e);
+    console.warn('Notice fetch houses Firestore:', e);
   }
-  return getLocalHouses();
+
+  const list = Array.from(map.values());
+  if (list.length > 0) {
+    list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return list;
+  }
+  return DEFAULT_TITIK_RUMAH;
 }
 
 export async function saveHouseToFirestore(house: TitikRumahBangunan): Promise<boolean> {
-  const current = getLocalHouses();
-  const index = current.findIndex((h) => h.id === house.id);
-  let updated: TitikRumahBangunan[];
-  if (index >= 0) {
-    updated = [...current];
-    updated[index] = house;
-  } else {
-    updated = [house, ...current];
-  }
-  saveLocalHouses(updated);
+  // 1. Save online to Server Buffer
+  fetch('/api/webgis/houses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item: house }),
+  }).catch((err) => {
+    console.warn('Notice saving house to server:', err);
+  });
 
+  // 2. Save online to Firestore
   try {
     const docRef = doc(db, COLLECTION_HOUSES, house.id);
     await setDoc(docRef, house, { merge: true });
@@ -191,10 +206,14 @@ export async function saveHouseToFirestore(house: TitikRumahBangunan): Promise<b
 }
 
 export async function deleteHouseFromFirestore(houseId: string): Promise<boolean> {
-  const current = getLocalHouses();
-  const updated = current.filter((h) => h.id !== houseId);
-  saveLocalHouses(updated);
+  // 1. Delete on Server Buffer
+  fetch(`/api/webgis/houses/${encodeURIComponent(houseId)}`, {
+    method: 'DELETE',
+  }).catch((err) => {
+    console.warn('Notice deleting house from server:', err);
+  });
 
+  // 2. Delete on Firestore
   try {
     const docRef = doc(db, COLLECTION_HOUSES, houseId);
     await deleteDoc(docRef);
@@ -226,8 +245,8 @@ export function getLocalRoads(): RuasJalanLingkungan[] {
   return DEFAULT_RUAS_JALAN;
 }
 
-export function saveLocalRoads(roads: RuasJalanLingkungan[]): void {
-  safeSetLocalStorage(STORAGE_KEY_ROADS, JSON.stringify(roads));
+export function saveLocalRoads(_roads: RuasJalanLingkungan[]): void {
+  // Deliberately no-op: Roads are stored online
 }
 
 export async function fetchAllRoads(): Promise<RuasJalanLingkungan[]> {
@@ -325,10 +344,8 @@ export function subscribeWebgisData(
         if (!hasJuan && DEFAULT_TITIK_RUMAH.length > 0) {
           list.push(...DEFAULT_TITIK_RUMAH);
         }
-        saveLocalHouses(list);
         onHousesUpdate(list);
       } else if (DEFAULT_TITIK_RUMAH.length > 0) {
-        saveLocalHouses(DEFAULT_TITIK_RUMAH);
         onHousesUpdate(DEFAULT_TITIK_RUMAH);
       }
     });
@@ -342,7 +359,6 @@ export function subscribeWebgisData(
       if (!snap.empty) {
         const list: RuasJalanLingkungan[] = [];
         snap.forEach((d) => list.push({ ...(d.data() as RuasJalanLingkungan), id: d.id }));
-        saveLocalRoads(list);
         onRoadsUpdate(list);
       }
     });

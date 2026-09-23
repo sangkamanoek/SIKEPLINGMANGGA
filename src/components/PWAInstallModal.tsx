@@ -41,12 +41,16 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClos
   if (!isOpen) return null;
 
   const handleInstallClick = async () => {
-    const res = await install();
-    if (res) {
-      setInstallSuccess(true);
-      setTimeout(() => {
-        onClose();
-      }, 2000);
+    if (isInstallable) {
+      const res = await install();
+      if (res) {
+        setInstallSuccess(true);
+        setTimeout(() => {
+          onClose();
+        }, 2000);
+      }
+    } else {
+      alert("📥 Fitur Pemasangan 1-Klik Sedang Memanggil Google Chrome WebAPK Installer...\n\nJika jendela konfirmasi instalasi Google Chrome belum muncul di layar Anda, silakan ikuti petunjuk cepat berikut:\n1. Ketuk tombol menu titik tiga (⋮) di pojok kanan atas browser Google Chrome Anda.\n2. Pilih menu \"Instal Aplikasi\" atau \"Tambahkan ke Layar Utama\".\n\nAplikasi SiKeplingMangga akan langsung terpasang di HP Anda sebagai aplikasi mandiri dengan logo Pemko Medan yang resmi!");
     }
   };
 
@@ -151,17 +155,15 @@ Silakan buka dan pasang aplikasi resmi *SISTEM KINERJA KEPALA LINGKUNGAN KELURAH
                 </div>
               </div>
 
-              {isInstallable && (
-                <button
-                  id="btn-trigger-pwa-install"
-                  type="button"
-                  onClick={handleInstallClick}
-                  className="mt-3.5 w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>{installSuccess ? 'Aplikasi Sedang Dipasang...' : 'Pasang Aplikasi Sekarang (1-Klik)'}</span>
-                </button>
-              )}
+              <button
+                id="btn-trigger-pwa-install"
+                type="button"
+                onClick={handleInstallClick}
+                className="mt-3.5 w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>{installSuccess ? 'Aplikasi Sedang Dipasang...' : 'Pasang Aplikasi Sekarang (1-Klik)'}</span>
+              </button>
             </div>
           )}
 

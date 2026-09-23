@@ -63,7 +63,7 @@ export function getDefaultTargetsCapaianMap(): TargetsCapaianMap {
       targetPerlinsos,
       targetPbb: 100, // target default WP
       targetIkd: 50,  // target default aktivasi IKD
-      targetBpjs: 25, // target default BPJS TK
+      targetBpjs: 10, // target default BPJS TK
       overridePerlinsos: baselinePerlinsos,
       overridePbb: null,
       overrideIkd: null,

@@ -62,9 +62,9 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const [targetKeplingId, setTargetKeplingId] = useState<string>(
     isSuperAdmin ? 'kepling_1' : currentUser.id
   );
-  const [perlinsos, setPerlinsos] = useState<'Sudah' | 'Belum'>('Sudah');
-  const [ikd, setIkd] = useState<'Sudah' | 'Belum'>('Sudah');
-  const [pbb, setPbb] = useState<'Sudah' | 'Belum'>('Sudah');
+  const [perlinsos, setPerlinsos] = useState<'Sudah' | 'Belum'>('Belum');
+  const [ikd, setIkd] = useState<'Sudah' | 'Belum'>('Belum');
+  const [pbb, setPbb] = useState<'Sudah' | 'Belum'>('Belum');
   const [fotoDokumentasi, setFotoDokumentasi] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string>('');
@@ -169,20 +169,23 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
         await setDoc(docRef, firestorePayload);
       }
 
-      // 2. Local Cache Update
-      const existing = safeGetLocalStorage<KunjunganWargaData[]>(STORAGE_CACHE_KEY, []);
-      const filteredList = existing.filter((item) => item && item.id !== id);
-      filteredList.unshift(data);
-      safeSetLocalStorage(STORAGE_CACHE_KEY, JSON.stringify(filteredList.slice(0, 500)));
+      // 2. Server API Buffer Persistence
+      fetch('/api/kunjungan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item: firestorePayload }),
+      }).catch((err) => {
+        console.warn('Notice saving kunjungan to /api/kunjungan:', err);
+      });
 
-      setSuccessMessage('Data kunjungan warga berhasil disimpan ke Firestore!');
+      setSuccessMessage('Data kunjungan warga berhasil disimpan secara online!');
 
       // Reset form fields
       setNamaWarga('');
       setAlamat('');
-      setPerlinsos('Sudah');
-      setIkd('Sudah');
-      setPbb('Sudah');
+      setPerlinsos('Belum');
+      setIkd('Belum');
+      setPbb('Belum');
       setFotoDokumentasi('');
 
       if (onSuccess) {

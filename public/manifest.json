@@ -1,0 +1,32 @@
+{
+  "id": "/sikeplingmangga-v3",
+  "name": "SiKeplingMangga",
+  "short_name": "SiKeplingMangga",
+  "description": "SI-KEPLING MANGGA - Sistem Informasi & Pelaporan Kegiatan Harian Kepala Lingkungan Kelurahan Mangga Kecamatan Medan Tuntungan.",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#065f46",
+  "theme_color": "#065f46",
+  "icons": [
+    {
+      "src": "/logo_192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo_512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo_maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

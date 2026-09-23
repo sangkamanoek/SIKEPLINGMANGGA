@@ -5,6 +5,15 @@ import fs from 'fs';
 const app = express();
 const PORT = 3000;
 
+// Anti-Cache Headers: Ensure 100% online operation and zero client-side caching
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  next();
+});
+
 // Enable JSON body parsing with large limit for compressed photo attachments
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -240,9 +249,329 @@ const saveStoredPbb = (pbbData: Record<string, any[]>) => {
 
 let pbbCache: Record<string, any[]> = loadStoredPbb();
 
+// Accounts Data File (Dynamic accounts & soft-deleted IDs)
+const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
+
+interface StoredAccountsData {
+  dynamicAccounts: any[];
+  deletedAccountIds: string[];
+}
+
+const loadStoredAccounts = (): StoredAccountsData => {
+  try {
+    if (fs.existsSync(ACCOUNTS_FILE)) {
+      const content = fs.readFileSync(ACCOUNTS_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      return {
+        dynamicAccounts: Array.isArray(parsed?.dynamicAccounts) ? parsed.dynamicAccounts : [],
+        deletedAccountIds: Array.isArray(parsed?.deletedAccountIds) ? parsed.deletedAccountIds : [],
+      };
+    }
+  } catch (err) {
+    console.error('Error reading accounts file:', err);
+  }
+  return { dynamicAccounts: [], deletedAccountIds: [] };
+};
+
+const saveStoredAccounts = (data: StoredAccountsData) => {
+  try {
+    fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving accounts file:', err);
+  }
+};
+
+let accountsCache = loadStoredAccounts();
+
+// Kunjungan Warga Data File (Door-to-door visits)
+const KUNJUNGAN_FILE = path.join(DATA_DIR, 'kunjungan.json');
+
+const loadStoredKunjungan = (): any[] => {
+  try {
+    if (fs.existsSync(KUNJUNGAN_FILE)) {
+      const content = fs.readFileSync(KUNJUNGAN_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.error('Error reading kunjungan file:', err);
+  }
+  return [];
+};
+
+const saveStoredKunjungan = (items: any[]) => {
+  try {
+    fs.writeFileSync(KUNJUNGAN_FILE, JSON.stringify(items, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving kunjungan file:', err);
+  }
+};
+
+let kunjunganCache = loadStoredKunjungan();
+
+// WebGIS Houses Data File (Titik Rumah Bangunan)
+const WEBGIS_HOUSES_FILE = path.join(DATA_DIR, 'webgis_houses.json');
+
+const loadStoredWebgisHouses = (): any[] => {
+  try {
+    if (fs.existsSync(WEBGIS_HOUSES_FILE)) {
+      const content = fs.readFileSync(WEBGIS_HOUSES_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.error('Error reading webgis houses file:', err);
+  }
+  return [];
+};
+
+const saveStoredWebgisHouses = (items: any[]) => {
+  try {
+    fs.writeFileSync(WEBGIS_HOUSES_FILE, JSON.stringify(items, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving webgis houses file:', err);
+  }
+};
+
+let webgisHousesCache = loadStoredWebgisHouses();
+
+// Strict Anti-Cache Headers Middleware for all /api calls
+app.use('/api', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 // API Endpoints
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// =========================================================================
+// ACCOUNTS & USERNAMES CRUD ENDPOINTS
+// =========================================================================
+
+// GET all active dynamic accounts and deleted account IDs
+app.get('/api/accounts', (_req, res) => {
+  return res.json({
+    success: true,
+    dynamicAccounts: accountsCache.dynamicAccounts,
+    deletedAccountIds: accountsCache.deletedAccountIds,
+  });
+});
+
+// POST save or update account
+app.post('/api/accounts', (req, res) => {
+  try {
+    const { account, dynamicAccounts, deletedAccountIds } = req.body;
+
+    // Full replacement / batch sync
+    if (Array.isArray(dynamicAccounts) || Array.isArray(deletedAccountIds)) {
+      if (Array.isArray(dynamicAccounts)) {
+        accountsCache.dynamicAccounts = dynamicAccounts;
+      }
+      if (Array.isArray(deletedAccountIds)) {
+        accountsCache.deletedAccountIds = deletedAccountIds;
+      }
+      saveStoredAccounts(accountsCache);
+      return res.json({
+        success: true,
+        dynamicAccounts: accountsCache.dynamicAccounts,
+        deletedAccountIds: accountsCache.deletedAccountIds,
+      });
+    }
+
+    if (!account || !account.id) {
+      return res.status(400).json({ success: false, message: 'Data akun tidak lengkap' });
+    }
+
+    const cleanId = String(account.id).trim().toLowerCase();
+    const idx = accountsCache.dynamicAccounts.findIndex((a) => a.id.toLowerCase() === cleanId);
+    if (idx >= 0) {
+      accountsCache.dynamicAccounts[idx] = { ...accountsCache.dynamicAccounts[idx], ...account };
+    } else {
+      accountsCache.dynamicAccounts.push({ ...account, id: cleanId });
+    }
+
+    // If ID was in deleted list, remove it
+    accountsCache.deletedAccountIds = accountsCache.deletedAccountIds.filter((id) => id.toLowerCase() !== cleanId);
+
+    saveStoredAccounts(accountsCache);
+    return res.json({
+      success: true,
+      data: account,
+      dynamicAccounts: accountsCache.dynamicAccounts,
+      deletedAccountIds: accountsCache.deletedAccountIds,
+    });
+  } catch (err: any) {
+    console.error('Error saving account to server:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE account by ID
+app.delete('/api/accounts/:id', (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim().toLowerCase();
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'ID akun diperlukan' });
+    }
+
+    // 1. Remove from dynamicAccounts if present
+    accountsCache.dynamicAccounts = accountsCache.dynamicAccounts.filter((a) => a.id.toLowerCase() !== id);
+
+    // 2. Add to deletedAccountIds
+    if (!accountsCache.deletedAccountIds.some((delId) => delId.toLowerCase() === id)) {
+      accountsCache.deletedAccountIds.push(id);
+    }
+
+    saveStoredAccounts(accountsCache);
+    return res.json({
+      success: true,
+      message: `Akun ${id} berhasil dihapus / dinonaktifkan`,
+      dynamicAccounts: accountsCache.dynamicAccounts,
+      deletedAccountIds: accountsCache.deletedAccountIds,
+    });
+  } catch (err: any) {
+    console.error('Error deleting account on server:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST restore deleted account
+app.post('/api/accounts/restore', (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'ID akun diperlukan' });
+    }
+    const cleanId = String(id).trim().toLowerCase();
+    accountsCache.deletedAccountIds = accountsCache.deletedAccountIds.filter((d) => d.toLowerCase() !== cleanId);
+    saveStoredAccounts(accountsCache);
+    return res.json({
+      success: true,
+      message: `Akun ${cleanId} berhasil dipulihkan`,
+      deletedAccountIds: accountsCache.deletedAccountIds,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// =========================================================================
+// KUNJUNGAN WARGA (DOOR-TO-DOOR) CRUD ENDPOINTS
+// =========================================================================
+
+// GET all kunjungan records
+app.get('/api/kunjungan', (_req, res) => {
+  return res.json({
+    success: true,
+    count: kunjunganCache.length,
+    data: kunjunganCache,
+  });
+});
+
+// POST save single or batch kunjungan records
+app.post('/api/kunjungan', (req, res) => {
+  try {
+    const { item, items } = req.body;
+
+    // Batch save
+    if (Array.isArray(items)) {
+      for (const it of items) {
+        if (!it || !it.id) continue;
+        const idx = kunjunganCache.findIndex((k) => k.id === it.id);
+        if (idx >= 0) {
+          kunjunganCache[idx] = { ...kunjunganCache[idx], ...it, updatedAt: new Date().toISOString() };
+        } else {
+          kunjunganCache.unshift({ ...it, updatedAt: new Date().toISOString() });
+        }
+      }
+      saveStoredKunjungan(kunjunganCache);
+      return res.json({ success: true, count: kunjunganCache.length, data: kunjunganCache });
+    }
+
+    if (!item) {
+      return res.status(400).json({ success: false, message: 'Data kunjungan tidak lengkap' });
+    }
+
+    if (!item.id) {
+      item.id = 'kunj_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    }
+    if (!item.createdAt) {
+      item.createdAt = new Date().toISOString();
+    }
+
+    const idx = kunjunganCache.findIndex((k) => k.id === item.id);
+    if (idx >= 0) {
+      kunjunganCache[idx] = { ...kunjunganCache[idx], ...item, updatedAt: new Date().toISOString() };
+    } else {
+      kunjunganCache.unshift({ ...item, updatedAt: new Date().toISOString() });
+    }
+
+    saveStoredKunjungan(kunjunganCache);
+    return res.json({ success: true, data: item, count: kunjunganCache.length });
+  } catch (err: any) {
+    console.error('Error saving kunjungan:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE kunjungan by ID
+app.delete('/api/kunjungan/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    kunjunganCache = kunjunganCache.filter((k) => k.id !== id);
+    saveStoredKunjungan(kunjunganCache);
+    return res.json({ success: true, count: kunjunganCache.length, message: `Kunjungan ${id} dihapus` });
+  } catch (err: any) {
+    console.error('Error deleting kunjungan:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// =========================================================================
+// WEBGIS HOUSES CRUD ENDPOINTS
+// =========================================================================
+
+app.get('/api/webgis/houses', (_req, res) => {
+  return res.json({ success: true, count: webgisHousesCache.length, data: webgisHousesCache });
+});
+
+app.post('/api/webgis/houses', (req, res) => {
+  try {
+    const { item, items } = req.body;
+    if (Array.isArray(items)) {
+      webgisHousesCache = items;
+      saveStoredWebgisHouses(webgisHousesCache);
+      return res.json({ success: true, count: webgisHousesCache.length, data: webgisHousesCache });
+    }
+    if (!item || !item.id) {
+      return res.status(400).json({ success: false, message: 'Data rumah tidak lengkap' });
+    }
+    const idx = webgisHousesCache.findIndex((h) => h.id === item.id);
+    if (idx >= 0) {
+      webgisHousesCache[idx] = { ...webgisHousesCache[idx], ...item };
+    } else {
+      webgisHousesCache.push(item);
+    }
+    saveStoredWebgisHouses(webgisHousesCache);
+    return res.json({ success: true, data: item, count: webgisHousesCache.length });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/webgis/houses/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    webgisHousesCache = webgisHousesCache.filter((h) => h.id !== id);
+    saveStoredWebgisHouses(webgisHousesCache);
+    return res.json({ success: true, count: webgisHousesCache.length });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // GET PBB SPPT records for given year (e.g. ?year=2026)
@@ -742,6 +1071,19 @@ app.post('/api/attendance/batch', (req, res) => {
     return res.json({ success: true, addedCount, total: attendanceCache.length, data: attendanceCache });
   } catch (err: any) {
     console.error('Error batch syncing attendance:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE attendance record by ID
+app.delete('/api/attendance/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    attendanceCache = attendanceCache.filter((a) => a.id !== id);
+    saveStoredAttendance(attendanceCache);
+    return res.json({ success: true, message: `Presensi ${id} berhasil dihapus`, total: attendanceCache.length });
+  } catch (err: any) {
+    console.error('Error deleting attendance:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });

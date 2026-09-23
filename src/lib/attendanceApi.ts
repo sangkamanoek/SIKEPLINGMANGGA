@@ -45,34 +45,50 @@ export interface WibTimeStatus {
  * Jam: 07:30 - 08:30 WIB
  */
 export function checkApelTimeStatus(): WibTimeStatus {
-  const d = new Date();
-  const day = d.getDay(); // 0 = Minggu, 1 = Senin, ..., 5 = Jumat, 6 = Sabtu
-  const hours = d.getHours();
-  const minutes = d.getMinutes();
-  const totalMin = hours * 60 + minutes;
+  // Gunakan waktu saat ini
+  const now = new Date();
 
-  const startMin = 7 * 60 + 30; // 07:30 WIB = 450 min
-  const endMin = 8 * 60 + 30;   // 08:30 WIB = 510 min
+  // Dapatkan jam dan menit di WIB
+  // Asumsi lingkungan server mungkin UTC, maka kita perlu mengonversi secara eksplisit ke WIB
+  const utcHours = now.getUTCHours();
+  const utcMinutes = now.getUTCMinutes();
+  
+  // Konversi UTC ke WIB (UTC+7)
+  let wibHours = utcHours + 7;
+  let wibMinutes = utcMinutes;
+  
+  if (wibHours >= 24) {
+    wibHours -= 24;
+  }
+  
+  const totalMin = wibHours * 60 + wibMinutes;
+  const day = (now.getUTCDay() + (wibHours >= 24 ? 1 : 0)) % 7;
 
-  const hoursStr = String(hours).padStart(2, '0');
-  const minStr = String(minutes).padStart(2, '0');
+  // Jadwal Resmi: 07:30 - 08:30 WIB
+  const startMin = 7 * 60 + 30; // 450 min
+  const endMin = 8 * 60 + 30;   // 510 min
+
+  const hoursStr = String(wibHours).padStart(2, '0');
+  const minStr = String(wibMinutes).padStart(2, '0');
   const formattedTime = `${hoursStr}:${minStr} WIB`;
 
-  const isWorkDay = day >= 1 && day <= 5;
+  const isWorkDay = day >= 1 && day <= 5; // Senin - Jumat
+  const isWithinWindow = totalMin >= startMin && totalMin <= endMin;
+  const isLate = totalMin > endMin;
 
   if (!isWorkDay) {
     const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    const currentDayName = dayNames[day];
     return {
       formattedTime,
       isWorkDay: false,
       isWithinWindow: false,
       isTooEarly: false,
       isLate: false,
-      statusLabel: `Libur Akhir Pekan (${currentDayName}) • Apel Pagi Hanya Senin s/d Jumat`,
+      statusLabel: `Libur Akhir Pekan (${dayNames[day]}) • Apel Pagi Hanya Senin s/d Jumat`,
     };
   }
 
+  // Jika sebelum jam 07:30
   if (totalMin < startMin) {
     return {
       formattedTime,
@@ -84,6 +100,7 @@ export function checkApelTimeStatus(): WibTimeStatus {
     };
   }
 
+  // Jika setelah jam 08:30
   if (totalMin > endMin) {
     return {
       formattedTime,
@@ -106,81 +123,72 @@ export function checkApelTimeStatus(): WibTimeStatus {
 }
 
 /**
- * Load attendance list from localStorage fallback
- */
-export function getStoredAttendanceLocal(): AbsenApelItem[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_ATTENDANCE);
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch (e) {
-    console.warn('Gagal membaca absen dari localStorage:', e);
-  }
-  return [];
-}
-
-/**
- * Save attendance list to localStorage safely
- */
-export function setStoredAttendanceLocal(items: AbsenApelItem[]): void {
-  try {
-    // Keep heavy photos light in local storage
-    const trimmed = items.map((item) => {
-      if (item.fotoSelfieUrl && item.fotoSelfieUrl.length > 80000) {
-        return {
-          ...item,
-          fotoSelfieUrl: item.fotoSelfieUrl.substring(0, 100) + '...',
-        };
-      }
-      return item;
-    });
-    safeSetLocalStorage(STORAGE_KEY_ATTENDANCE, JSON.stringify(trimmed));
-  } catch (e) {
-    console.warn('Gagal menyimpan absen ke localStorage:', e);
-  }
-}
-
-/**
- * Load all attendance records from Firestore and local cache
+ * Load all attendance records strictly online from Server Buffer and Firestore
  */
 export async function loadAllAttendance(): Promise<AbsenApelItem[]> {
-  try {
-    const firestoreData = await fetchAttendanceFromFirestore();
-    if (firestoreData && firestoreData.length > 0) {
-      setStoredAttendanceLocal(firestoreData);
-      // Sync to server buffer in background
-      fetch('/api/attendance/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: firestoreData }),
-      }).catch(() => {});
-      return firestoreData;
-    }
-  } catch (e) {
-    console.warn('Fallback from Firestore for attendance:', e);
-  }
+  const map = new Map<string, AbsenApelItem>();
 
-  // Backup Tier 1: Internal Server Buffer API
+  // 1. Fetch online from Express Server Buffer (/api/attendance)
   try {
-    const res = await fetch('/api/attendance');
+    const res = await fetch(`/api/attendance?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    });
     if (res.ok) {
       const json = await res.json();
       const serverItems = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
-      if (serverItems && serverItems.length > 0) {
-        setStoredAttendanceLocal(serverItems);
-        return serverItems;
+      if (Array.isArray(serverItems) && serverItems.length > 0) {
+        serverItems.forEach((a: AbsenApelItem) => {
+          if (a && a.id) map.set(a.id, a);
+        });
       }
     }
   } catch (e) {
-    console.warn('Fallback from server /api/attendance:', e);
+    // Silent catch
   }
 
-  return getStoredAttendanceLocal();
+  // 2. Fetch online from Firebase Firestore
+  try {
+    const firestoreData = await fetchAttendanceFromFirestore();
+    if (Array.isArray(firestoreData) && firestoreData.length > 0) {
+      firestoreData.forEach((a) => {
+        if (a && a.id) map.set(a.id, a);
+      });
+    }
+  } catch (e) {
+    // Already handled in fetchAttendanceFromFirestore
+  }
+
+  const list = Array.from(map.values());
+  list.sort(
+    (a, b) =>
+      new Date(b.waktuLengkap || b.createdAt).getTime() -
+      new Date(a.waktuLengkap || a.createdAt).getTime()
+  );
+  return list;
 }
 
 /**
- * Submit or update attendance record
+ * Delete attendance record online from Server Buffer
+ */
+export async function deleteAbsenApel(id: string): Promise<boolean> {
+  if (!id) return false;
+  try {
+    const res = await fetch(`/api/attendance/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('Error deleting attendance on server:', err);
+    return false;
+  }
+}
+
+/**
+ * Submit or update attendance record strictly online
  */
 export async function submitAbsenApel(
   account: UserAccount,
@@ -223,28 +231,14 @@ export async function submitAbsenApel(
     updatedAt: waktuLengkap,
   };
 
-  // 1. Update local storage
-  const currentLocal = getStoredAttendanceLocal();
-  const index = currentLocal.findIndex((a) => a.id === docId);
-  if (index >= 0) {
-    currentLocal[index] = item;
-  } else {
-    currentLocal.unshift(item);
-  }
-  setStoredAttendanceLocal(currentLocal);
-
-  // 2. Concurrently sync to Firebase Firestore and Server Buffer
-  saveAttendanceToFirestore(item).catch((err) => {
-    console.warn('Gagal menyinkronkan absen ke Firestore:', err);
-  });
+  // Concurrently sync online to Firebase Firestore and Server Buffer
+  saveAttendanceToFirestore(item).catch(() => {});
 
   fetch('/api/attendance', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(item),
-  }).catch((err) => {
-    console.warn('Gagal menyinkronkan absen ke server buffer:', err);
-  });
+  }).catch(() => {});
 
   return item;
 }

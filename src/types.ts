@@ -183,6 +183,7 @@ export interface CustomEvent {
   location: string;
   description?: string;
   required: boolean;
+  targetKeplingIds?: string[]; // Array of account IDs
   createdBy: string;
   createdAt: string;
 }

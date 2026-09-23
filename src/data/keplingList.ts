@@ -474,12 +474,135 @@ export const getEffectiveAccount = (account: UserAccount): UserAccount => {
   };
 };
 
+// ==========================================
+// DYNAMIC ACCOUNTS MANAGEMENT (SUPERADMIN CRUD)
+// ==========================================
+
+export const STORAGE_KEY_DYNAMIC_ACCOUNTS = 'kepling_dynamic_accounts_v1';
+export const STORAGE_KEY_DELETED_ACCOUNTS = 'kepling_deleted_static_accounts_v1';
+
+let memoryDynamicAccounts: UserAccount[] = [];
+let memoryDeletedAccountIds: Set<string> = new Set<string>();
+
+export const getDynamicAccounts = (): UserAccount[] => {
+  return memoryDynamicAccounts;
+};
+
+export const getDeletedAccountIds = (): Set<string> => {
+  return memoryDeletedAccountIds;
+};
+
+export const saveDynamicAccounts = (accounts: UserAccount[]): void => {
+  memoryDynamicAccounts = accounts;
+};
+
+export const saveDeletedAccountIds = (ids: Set<string>): void => {
+  memoryDeletedAccountIds = ids;
+};
+
+export const syncAccountsWithServer = async (): Promise<{ dynamicAccounts: UserAccount[]; deletedAccountIds: string[] }> => {
+  try {
+    const res = await fetch(`/api/accounts?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (Array.isArray(json?.dynamicAccounts)) {
+        memoryDynamicAccounts = json.dynamicAccounts;
+      }
+      if (Array.isArray(json?.deletedAccountIds)) {
+        memoryDeletedAccountIds = new Set(json.deletedAccountIds);
+      }
+    }
+  } catch (err) {
+    console.warn('[Online Accounts] Error syncing accounts from server:', err);
+  }
+  return {
+    dynamicAccounts: memoryDynamicAccounts,
+    deletedAccountIds: Array.from(memoryDeletedAccountIds),
+  };
+};
+
+export const addDynamicAccount = (account: UserAccount): void => {
+  const current = [...memoryDynamicAccounts];
+  const existingIndex = current.findIndex((a) => a.id.toLowerCase() === account.id.toLowerCase());
+  if (existingIndex >= 0) {
+    current[existingIndex] = account;
+  } else {
+    current.push(account);
+  }
+  memoryDynamicAccounts = current;
+
+  // If re-adding previously deleted account, remove from deleted set
+  if (memoryDeletedAccountIds.has(account.id)) {
+    memoryDeletedAccountIds.delete(account.id);
+  }
+
+  // Push online to server
+  fetch('/api/accounts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account }),
+  }).catch((err) => {
+    console.warn('Error saving account to server:', err);
+  });
+};
+
+export const deleteAccountById = (id: string): void => {
+  const cleanId = id.toLowerCase();
+  // 1. If it's dynamic, remove from memory
+  memoryDynamicAccounts = memoryDynamicAccounts.filter((a) => a.id.toLowerCase() !== cleanId);
+
+  // 2. Mark as deleted
+  memoryDeletedAccountIds.add(id);
+
+  // Push online to server
+  fetch(`/api/accounts/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  }).catch((err) => {
+    console.warn('Error deleting account on server:', err);
+  });
+};
+
+export const restoreAccountById = (id: string): void => {
+  const cleanId = id.toLowerCase();
+  memoryDeletedAccountIds.delete(id);
+  for (const delId of Array.from(memoryDeletedAccountIds)) {
+    if (delId.toLowerCase() === cleanId) {
+      memoryDeletedAccountIds.delete(delId);
+    }
+  }
+
+  // Push online to server
+  fetch('/api/accounts/restore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  }).catch((err) => {
+    console.warn('Error restoring account on server:', err);
+  });
+};
+
 export const getEffectiveKeplingAccounts = (): UserAccount[] => {
-  return KEPLING_ACCOUNTS.map((k) => getEffectiveAccount(k));
+  const dynamic = getDynamicAccounts().filter((a) => a.role === 'kepling');
+  const deletedIds = getDeletedAccountIds();
+  const combined = [...KEPLING_ACCOUNTS, ...dynamic];
+  return combined
+    .filter((a) => !deletedIds.has(a.id))
+    .map((k) => getEffectiveAccount(k));
 };
 
 export const getAllEffectiveAccounts = (): UserAccount[] => {
-  return ALL_ACCOUNTS.map((a) => getEffectiveAccount(a));
+  const dynamic = getDynamicAccounts();
+  const deletedIds = getDeletedAccountIds();
+  const combined = [...ALL_ACCOUNTS, ...dynamic];
+  return combined
+    .filter((a) => !deletedIds.has(a.id))
+    .map((a) => getEffectiveAccount(a));
 };
 
 export const saveCustomProfile = async (
@@ -639,7 +762,12 @@ export const FIXED_ACCOUNTS_LIST: FixedAccountOption[] = [
 ];
 
 export const getAccountById = (id: string): UserAccount => {
-  const found = ALL_ACCOUNTS.find((a) => a.id === id);
+  const dynamic = getDynamicAccounts();
+  const deletedIds = getDeletedAccountIds();
+  if (deletedIds.has(id)) {
+    return SUPER_ADMIN_ACCOUNT;
+  }
+  const found = [...ALL_ACCOUNTS, ...dynamic].find((a) => a.id === id);
   return getEffectiveAccount(found || SUPER_ADMIN_ACCOUNT);
 };
 
@@ -815,6 +943,23 @@ export const findAccountByUsername = (input: string): UserAccount | undefined =>
     );
   });
   if (matchedByName) return matchedByName;
+
+  // 11. Match custom dynamic accounts
+  const dynamic = getDynamicAccounts();
+  const deletedIds = getDeletedAccountIds();
+  const matchedDynamic = dynamic
+    .filter((a) => !deletedIds.has(a.id))
+    .find((a) => {
+      const normId = normalizeUsername(a.id);
+      const normNama = normalizeUsername(a.nama);
+      const firstNama = normNama.split('_')[0];
+      return (
+        normId === norm ||
+        normNama === norm ||
+        (firstNama.length >= 3 && norm === firstNama)
+      );
+    });
+  if (matchedDynamic) return matchedDynamic;
 
   return undefined;
 };

@@ -43,7 +43,18 @@ import {
   RuasJalanLingkungan,
   LingkunganPolygon,
 } from '../types';
-import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import { 
+  KEPLING_ACCOUNTS, 
+  ALL_ACCOUNTS,
+  getDynamicAccounts, 
+  addDynamicAccount, 
+  deleteAccountById, 
+  restoreAccountById,
+  getDeletedAccountIds, 
+  saveDeletedAccountIds,
+  getAllEffectiveAccounts,
+  syncAccountsWithServer 
+} from '../data/keplingList';
 import {
   formatTanggalIndonesia,
   getTodayLocalIso,
@@ -104,8 +115,22 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
 }) => {
   const todayIso = getTodayLocalIso();
 
-  // Tab mode for Monitoring Dashboard: Laporan Harian vs Realisasi PBB vs Hasil Pemetaan Spasial
-  const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PBB_REALISASI' | 'PEMETAAN'>('LAPORAN');
+  // Tab mode for Monitoring Dashboard: Laporan Harian vs Realisasi PBB vs Hasil Pemetaan Spasial vs Akun
+  const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PBB_REALISASI' | 'PEMETAAN' | 'ACCOUNTS'>('LAPORAN');
+
+  // Account management states
+  const [accountsList, setAccountsList] = useState<UserAccount[]>(() => getAllEffectiveAccounts());
+  const [newUsername, setNewUsername] = useState('');
+  const [newNama, setNewNama] = useState('');
+  const [newRole, setNewRole] = useState<'kepling' | 'kasi' | 'admin' | 'superadmin'>('kepling');
+  const [newJabatan, setNewJabatan] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newNomorLingkungan, setNewNomorLingkungan] = useState<number | ''>('');
+  const [newTelepon, setNewTelepon] = useState('');
+  const [accountError, setAccountError] = useState('');
+  const [accountSuccess, setAccountSuccess] = useState('');
+  const [accountSearch, setAccountSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'ALL' | 'kepling' | 'kasi' | 'admin' | 'superadmin'>('ALL');
 
   // Real-time SPPT & Realisasi PBB State
   const [pbbYear, setPbbYear] = useState<number>(() => {
@@ -698,14 +723,14 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
       </div>
 
       {/* Main Monitoring Tab Switcher (Laporan Harian vs Hasil Pemetaan Spasial) */}
-      <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 shadow-2xs">
+      <div className="flex items-center gap-2 p-1.5 bg-slate-800 rounded-2xl border border-slate-700 shadow-2xs">
         <button
           type="button"
           onClick={() => setActiveMainTab('LAPORAN')}
           className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
             activeMainTab === 'LAPORAN'
               ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-300 hover:text-white hover:bg-slate-700'
           }`}
         >
           <FileText className="w-4 h-4 text-emerald-600" />
@@ -721,7 +746,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
           className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
             activeMainTab === 'PBB_REALISASI'
               ? 'bg-amber-400 text-slate-950 shadow-sm border border-amber-300'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-300 hover:text-white hover:bg-slate-700'
           }`}
         >
           <Coins className="w-4 h-4 text-amber-600" />
@@ -741,7 +766,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
           className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
             activeMainTab === 'PEMETAAN'
               ? 'bg-emerald-700 text-white shadow-sm border border-emerald-600'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-300 hover:text-white hover:bg-slate-700'
           }`}
         >
           <MapIcon className="w-4 h-4 text-emerald-300" />
@@ -752,6 +777,26 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
               : 'bg-emerald-100 text-emerald-800'
           }`}>
             {kelurahanPemetaan.totalRumahAll} Rumah • {kelurahanPemetaan.totalJiwaAll} Jiwa
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('ACCOUNTS')}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
+            activeMainTab === 'ACCOUNTS'
+              ? 'bg-indigo-600 text-white shadow-sm border border-indigo-500'
+              : 'text-slate-300 hover:text-white hover:bg-slate-700'
+          }`}
+        >
+          <Users className="w-4 h-4 text-indigo-300" />
+          <span>Kelola Akun & Username</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold hidden sm:inline-block ${
+            activeMainTab === 'ACCOUNTS'
+              ? 'bg-white/20 text-white'
+              : 'bg-indigo-100 text-indigo-800'
+          }`}>
+            {accountsList.length} Akun
           </span>
         </button>
       </div>
@@ -1877,6 +1922,422 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {activeMainTab === 'ACCOUNTS' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-violet-950 rounded-2xl p-5 sm:p-6 text-white border border-indigo-800/50 shadow-xl relative overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 flex items-center justify-center font-bold shadow-inner shrink-0">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest bg-indigo-500 text-slate-950 px-2 py-0.5 rounded shadow-xs">
+                      Manajemen Akun Pengguna
+                    </span>
+                    <span className="text-[10px] font-bold bg-white/10 text-indigo-200 px-2 py-0.5 rounded border border-white/15">
+                      Kelola Hak Akses & Kredensial
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white mt-1">
+                    Kelola Akun Login & Kredensial Username
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Tambah akun kustom baru, kelola password, atau nonaktifkan akses bagi Kepala Lingkungan dan Kasi Kelurahan Mangga.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Feedback Messages */}
+          {accountError && (
+            <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl flex items-center gap-2 text-xs">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{accountError}</span>
+            </div>
+          )}
+          {accountSuccess && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl flex items-center gap-2 text-xs">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{accountSuccess}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* COLUMN 1: Form Tambah Akun */}
+            <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                <PlusCircle className="w-5 h-5 text-indigo-600" />
+                <h4 className="font-bold text-slate-800 text-sm">Tambah Akun Login Baru</h4>
+              </div>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                setAccountError('');
+                setAccountSuccess('');
+
+                const usernameClean = newUsername.trim().toLowerCase().replace(/[\s\-_.]+/g, '_');
+                if (!usernameClean) {
+                  setAccountError('Username tidak boleh kosong!');
+                  return;
+                }
+                if (usernameClean.length < 3) {
+                  setAccountError('Username minimal 3 karakter!');
+                  return;
+                }
+                if (!newNama.trim()) {
+                  setAccountError('Nama Lengkap tidak boleh kosong!');
+                  return;
+                }
+                if (!newPassword.trim()) {
+                  setAccountError('Kata sandi tidak boleh kosong!');
+                  return;
+                }
+
+                // Check duplicate ID
+                const allEff = getAllEffectiveAccounts();
+                const exists = allEff.some((a) => a.id.toLowerCase() === usernameClean);
+                if (exists) {
+                  setAccountError(`Username "${usernameClean}" sudah digunakan! Coba yang lain.`);
+                  return;
+                }
+
+                const romanMap: Record<number, string> = {
+                  1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V', 6: 'VI', 7: 'VII', 8: 'VIII', 9: 'IX', 10: 'X',
+                  11: 'XI', 12: 'XII', 13: 'XIII', 14: 'XIV', 15: 'XV', 16: 'XVI', 17: 'XVII', 18: 'XVIII', 19: 'XIX', 20: 'XX',
+                  21: 'XXI', 22: 'XXII', 23: 'XXIII', 24: 'XXIV'
+                };
+                const getRoman = (num: number) => romanMap[num] || String(num);
+
+                const newAccount: UserAccount = {
+                  id: usernameClean,
+                  role: newRole,
+                  nama: newNama.trim(),
+                  jabatan: newJabatan.trim() || (newRole === 'kepling' ? `Kepala Lingkungan ${newNomorLingkungan || ''}` : `Staf Kasi`),
+                  kelurahan: 'Kelurahan Mangga',
+                  kecamatan: 'Kecamatan Medan Tuntungan',
+                  password: newPassword.trim(),
+                  nomorLingkungan: newRole === 'kepling' && newNomorLingkungan ? Number(newNomorLingkungan) : undefined,
+                  lingkungan: newRole === 'kepling' && newNomorLingkungan ? `Lingkungan ${getRoman(Number(newNomorLingkungan))}` : undefined,
+                  telepon: newTelepon.trim() || undefined,
+                };
+
+                addDynamicAccount(newAccount);
+                setAccountsList(getAllEffectiveAccounts());
+
+                // Clear Form
+                setNewUsername('');
+                setNewNama('');
+                setNewRole('kepling');
+                setNewJabatan('');
+                setNewPassword('');
+                setNewNomorLingkungan('');
+                setNewTelepon('');
+                setAccountSuccess(`Akun login "${usernameClean}" berhasil ditambahkan!`);
+              }} className="space-y-3.5 text-xs text-slate-700">
+                {/* Peran / Role */}
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Peran / Hak Akses</label>
+                  <select
+                    value={newRole}
+                    onChange={(e) => {
+                      const r = e.target.value as any;
+                      setNewRole(r);
+                      if (r !== 'kepling') {
+                        setNewNomorLingkungan('');
+                        setNewJabatan(r === 'kasi' ? 'Staf Kasi' : r === 'superadmin' ? 'Superadmin' : 'Staf Admin');
+                      } else {
+                        setNewJabatan('');
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 font-medium"
+                  >
+                    <option value="kepling">Kepala Lingkungan (Kepling)</option>
+                    <option value="kasi">Kasi Kelurahan (PBB / Perlinsos / Trantibum)</option>
+                    <option value="admin">Staf Admin Kelurahan</option>
+                    <option value="superadmin">Super Admin / Lurah</option>
+                  </select>
+                </div>
+
+                {/* Username / ID */}
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Username Login (Gunakan Huruf Kecil & Tanpa Spasi)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: kepling_25 atau roni_purba"
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value.toLowerCase().trim())}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 font-medium"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-0.5">Username akan digunakan untuk masuk ke dalam aplikasi.</p>
+                </div>
+
+                {/* Nama Lengkap */}
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Nama Lengkap Pemegang Akun</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Roni Purba, S.H."
+                    value={newNama}
+                    onChange={(e) => setNewNama(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 font-medium"
+                  />
+                </div>
+
+                {/* Nomor Lingkungan (Hanya jika Kepling) */}
+                {newRole === 'kepling' && (
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Nomor Lingkungan (Angka)</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={100}
+                      placeholder="Contoh: 25"
+                      value={newNomorLingkungan}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewNomorLingkungan(val === '' ? '' : Number(val));
+                        if (val) {
+                          setNewJabatan(`Kepala Lingkungan ${val}`);
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 font-medium"
+                    />
+                  </div>
+                )}
+
+                {/* Jabatan Resmi */}
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Jabatan Resmi (Otomatis / Kustom)</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Kepala Lingkungan XXV atau Staff Pembangunan"
+                    value={newJabatan}
+                    onChange={(e) => setNewJabatan(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 font-medium"
+                  />
+                </div>
+
+                {/* Kata Sandi */}
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Kata Sandi / Password Akses</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: mangga25 atau roni123"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 font-medium"
+                  />
+                </div>
+
+                {/* Nomor Telepon / WA */}
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Nomor WA / Telepon (Opsional)</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 081234567890"
+                    value={newTelepon}
+                    onChange={(e) => setNewTelepon(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 font-medium"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-md transition-colors cursor-pointer mt-2 flex items-center justify-center gap-1.5"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Daftarkan Akun Pengguna</span>
+                </button>
+              </form>
+            </div>
+
+            {/* COLUMN 2: Daftar Akun Login */}
+            <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-indigo-600" />
+                  <h4 className="font-bold text-slate-800 text-sm">Daftar Akun Login Aktif</h4>
+                </div>
+                {/* Search */}
+                <div className="relative w-full sm:w-64">
+                  <input
+                    type="text"
+                    placeholder="Cari username atau nama..."
+                    value={accountSearch}
+                    onChange={(e) => setAccountSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap gap-1.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setRoleFilter('ALL')}
+                  className={`px-3 py-1 rounded-full font-bold cursor-pointer transition-colors ${
+                    roleFilter === 'ALL' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Semua ({accountsList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRoleFilter('superadmin')}
+                  className={`px-3 py-1 rounded-full font-bold cursor-pointer transition-colors ${
+                    roleFilter === 'superadmin' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Super Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRoleFilter('kasi')}
+                  className={`px-3 py-1 rounded-full font-bold cursor-pointer transition-colors ${
+                    roleFilter === 'kasi' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Kasi
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRoleFilter('kepling')}
+                  className={`px-3 py-1 rounded-full font-bold cursor-pointer transition-colors ${
+                    roleFilter === 'kepling' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Kepling
+                </button>
+              </div>
+
+              {/* Accounts Cards List */}
+              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                {accountsList
+                  .filter((a) => {
+                    const matchesSearch = 
+                      a.id.toLowerCase().includes(accountSearch.toLowerCase()) ||
+                      a.nama.toLowerCase().includes(accountSearch.toLowerCase()) ||
+                      (a.jabatan && a.jabatan.toLowerCase().includes(accountSearch.toLowerCase()));
+                    const matchesRole = roleFilter === 'ALL' || a.role === roleFilter;
+                    return matchesSearch && matchesRole;
+                  })
+                  .map((acc) => {
+                    // Check if it is a dynamic (custom) account
+                    const isCustom = getDynamicAccounts().some((d) => d.id.toLowerCase() === acc.id.toLowerCase());
+
+                    return (
+                      <div key={acc.id} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-150 hover:border-indigo-150 rounded-xl transition-all text-xs">
+                        <div className="flex items-start gap-2.5">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold ${
+                            acc.role === 'superadmin' ? 'bg-rose-100 text-rose-800' :
+                            acc.role === 'kasi' ? 'bg-amber-100 text-amber-800' :
+                            acc.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                            'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {acc.role === 'superadmin' ? 'SA' : acc.role === 'kasi' ? 'KS' : 'KP'}
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-bold text-slate-800">{acc.nama}</span>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                                isCustom ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' : 'bg-slate-200 text-slate-700'
+                              }`}>
+                                {isCustom ? 'KUSTOM' : 'BAWAAN'}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-medium">{acc.jabatan}</p>
+                            <div className="flex items-center gap-2.5 mt-1 text-[11px] font-mono text-slate-600 bg-white border border-slate-100 px-2 py-0.5 rounded-md w-fit">
+                              <span>User: <strong className="text-indigo-600 select-all">{acc.id}</strong></span>
+                              <span>•</span>
+                              <span>Pass: <strong className="text-slate-800 select-all">{acc.password || 'Mati / Diubah'}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Delete Button (Can delete custom, and soft-delete built-in) */}
+                        {acc.id !== 'super_admin' && acc.id !== 'fery_arapenta' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Apakah Anda yakin ingin menonaktifkan / menghapus akun "${acc.id}"?`)) {
+                                deleteAccountById(acc.id);
+                                setAccountsList(getAllEffectiveAccounts());
+                                setAccountSuccess(`Akun "${acc.id}" berhasil dinonaktifkan / dihapus.`);
+                              }
+                            }}
+                            className="w-7 h-7 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center hover:bg-rose-600 hover:text-white transition-colors cursor-pointer shrink-0"
+                            title="Hapus / Nonaktifkan Akun"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                {accountsList.filter((a) => {
+                  const matchesSearch = 
+                    a.id.toLowerCase().includes(accountSearch.toLowerCase()) ||
+                    a.nama.toLowerCase().includes(accountSearch.toLowerCase()) ||
+                    (a.jabatan && a.jabatan.toLowerCase().includes(accountSearch.toLowerCase()));
+                  const matchesRole = roleFilter === 'ALL' || a.role === roleFilter;
+                  return matchesSearch && matchesRole;
+                }).length === 0 && (
+                  <div className="text-center py-10 text-slate-400 text-xs">
+                    Tidak ada akun login yang sesuai dengan kriteria pencarian.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 3: Akun Bawaan yang Dinonaktifkan (Untuk Pemulihan) */}
+          {ALL_ACCOUNTS.filter(a => getDeletedAccountIds().has(a.id)).length > 0 && (
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                <div>
+                  <h4 className="font-bold text-slate-800 text-xs sm:text-sm">Akun Bawaan Sistem yang Sedang Dinonaktifkan</h4>
+                  <p className="text-[11px] text-slate-400">Akun-akun bawaan berikut disembunyikan dari daftar login. Anda dapat mengaktifkannya kembali kapan saja.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {ALL_ACCOUNTS
+                  .filter(a => getDeletedAccountIds().has(a.id))
+                  .map((acc) => (
+                    <div key={acc.id} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-bold text-slate-800">{acc.nama}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">User: {acc.id}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          restoreAccountById(acc.id);
+                          setAccountsList(getAllEffectiveAccounts());
+                          setAccountSuccess(`Akun bawaan "${acc.nama}" berhasil diaktifkan kembali!`);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-600 border border-emerald-200 text-emerald-700 hover:text-white transition-all text-[11px] font-bold cursor-pointer"
+                      >
+                        Pulihkan
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

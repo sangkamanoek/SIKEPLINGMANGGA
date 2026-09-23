@@ -11,14 +11,13 @@ import {
   initializeFirestore,
   Firestore,
   getFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
+  memoryLocalCache,
   setLogLevel,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Flexible config: use environment variables if provided in Vercel, fallback to bundled config
-const activeConfig = {
+const rawConfig = {
   apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string) || (firebaseConfig as any).apiKey,
   authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string) || (firebaseConfig as any).authDomain,
   projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string) || (firebaseConfig as any).projectId,
@@ -27,6 +26,22 @@ const activeConfig = {
   appId: (import.meta.env.VITE_FIREBASE_APP_ID as string) || (firebaseConfig as any).appId,
   measurementId: (import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string) || (firebaseConfig as any).measurementId,
   firestoreDatabaseId: (import.meta.env.VITE_FIREBASE_DATABASE_ID as string) || (firebaseConfig as any).firestoreDatabaseId,
+};
+
+// Check if Firebase is legitimately configured
+export const isFirebaseConfigured = !!(rawConfig.projectId && rawConfig.apiKey);
+
+// If not configured, use syntactically valid dummy values to prevent startup crashes
+// while forcing 100% stable local-only fallback mode.
+const activeConfig = isFirebaseConfigured ? rawConfig : {
+  apiKey: "AIzaSyDummyKeyForOfflineMode1234567890",
+  authDomain: "offline-mode.firebaseapp.com",
+  projectId: "offline-mode-dummy-project",
+  storageBucket: "offline-mode.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:dummyappid123456",
+  measurementId: "G-DUMMY123",
+  firestoreDatabaseId: undefined,
 };
 
 const app = !getApps().length ? initializeApp(activeConfig) : getApp();
@@ -40,12 +55,14 @@ try {
 let firestoreInstance: Firestore;
 
 try {
-  // Initialize Firestore with forced long polling for ultra-stable connection on cellular networks.
-  // We omit complex IndexedDB tab persistence to prevent silent offline write-queuing and browser hangs on mobile Safari/WebViews.
+  // Initialize Firestore with forced long polling for ultra-stable connection.
+  // Explicitly use memoryLocalCache to disable all on-disk persistence, 
+  // ensuring the app is always 100% online.
   firestoreInstance = initializeFirestore(
     app,
     {
       experimentalForceLongPolling: true,
+      localCache: memoryLocalCache(),
     },
     activeConfig.firestoreDatabaseId || undefined
   );
@@ -89,7 +106,9 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path,
   };
-  console.error('Firestore Error:', JSON.stringify(errInfo));
+  const jsonError = JSON.stringify(errInfo);
+  console.error('Firestore Error:', jsonError);
+  throw new Error(jsonError);
 }
 
 export const SCOPES = [

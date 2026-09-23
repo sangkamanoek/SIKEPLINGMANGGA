@@ -53,7 +53,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
   const [targetPerlinsos, setTargetPerlinsos] = useState<number>(300);
   const [targetPbb, setTargetPbb] = useState<number>(100);
   const [targetIkd, setTargetIkd] = useState<number>(50);
-  const [targetBpjs, setTargetBpjs] = useState<number>(25);
+  const [targetBpjs, setTargetBpjs] = useState<number>(10);
 
   const [useOverridePerlinsos, setUseOverridePerlinsos] = useState<boolean>(false);
   const [overridePerlinsos, setOverridePerlinsos] = useState<string>('');
@@ -97,7 +97,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
       setTargetPerlinsos(config.targetPerlinsos ?? 300);
       setTargetPbb(config.targetPbb ?? 100);
       setTargetIkd(config.targetIkd ?? 50);
-      setTargetBpjs(config.targetBpjs ?? 25);
+      setTargetBpjs(config.targetBpjs ?? 10);
 
       if (config.overridePerlinsos !== null && config.overridePerlinsos !== undefined) {
         setUseOverridePerlinsos(true);

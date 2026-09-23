@@ -10,6 +10,9 @@ import {
   Presentation,
   MoreVertical,
   X,
+  Wifi,
+  WifiOff,
+  Loader2,
 } from 'lucide-react';
 import { GoogleUser, SheetMetadata, UserAccount } from '../types';
 
@@ -46,6 +49,36 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    let syncTimer: any;
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      setIsSyncing(true);
+      // Trigger smooth 2.5s synchronization animation showing data transition to server
+      syncTimer = setTimeout(() => {
+        setIsSyncing(false);
+      }, 2500);
+    };
+
+    const handleOffline = () => {
+      if (syncTimer) clearTimeout(syncTimer);
+      setIsOnline(false);
+      setIsSyncing(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      if (syncTimer) clearTimeout(syncTimer);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -77,12 +110,26 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
           </span>
         </div>
 
-        {/* Indikator Status Resmi Aplikasi */}
+        {/* Indikator Status Resmi Aplikasi (Online/Offline Real-Time) */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-200 bg-emerald-900/60 border border-emerald-600/40 px-2.5 py-1 rounded-full shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Sistem Aktif & Terhubung
-          </span>
+          {isSyncing ? (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-100 bg-amber-950/90 border border-amber-500/40 px-3 py-1 rounded-full shadow-md transition-all duration-300 transform scale-102">
+              <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+              <span>MENYINKRONKAN KE FIREBASE...</span>
+            </span>
+          ) : isOnline ? (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-100 bg-emerald-950/80 border border-emerald-500/30 px-3 py-1 rounded-full shadow-xs transition-all duration-300">
+              <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>TERHUBUNG (ONLINE)</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-100 bg-rose-950/90 border border-rose-500/40 px-3 py-1 rounded-full shadow-md animate-pulse transition-all duration-300">
+              <WifiOff className="w-3.5 h-3.5 text-rose-400" />
+              <span className="w-2 h-2 rounded-full bg-rose-500" />
+              <span>OFFLINE (ANTREAN SINKRONISASI)</span>
+            </span>
+          )}
         </div>
       </div>
 

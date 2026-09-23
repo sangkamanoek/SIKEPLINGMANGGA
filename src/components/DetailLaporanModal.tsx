@@ -180,9 +180,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   }, [item?.tanggal]);
 
   // Real-time listener for door-to-door visits (Kunjungan Warga)
-  const [kunjunganList, setKunjunganList] = useState<KunjunganWargaData[]>(() =>
-    safeGetLocalStorage<KunjunganWargaData[]>('sikepling_kunjungan_harian_list_v1', [])
-  );
+  const [kunjunganList, setKunjunganList] = useState<KunjunganWargaData[]>([]);
 
   useEffect(() => {
     if (!db) return;
@@ -196,7 +194,6 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             list.push({ ...(d.data() as KunjunganWargaData), id: d.id });
           });
           setKunjunganList(list);
-          safeSetLocalStorage('sikepling_kunjungan_harian_list_v1', JSON.stringify(list));
         },
         (err) => {
           console.warn('Firestore snapshot error on kunjungan_warga in DetailModal:', err);
@@ -260,6 +257,14 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       return keplingMatch;
     });
   }, [kunjunganList, item, displayTanggal]);
+
+  // Total capaian kunjungan harian door-to-door
+  const jumlahKunjunganHarian = React.useMemo(() => {
+    if (relevantKunjungan && relevantKunjungan.length > 0) {
+      return relevantKunjungan.length;
+    }
+    return Number(item?.kinerja?.perlinsosKk) || 0;
+  }, [relevantKunjungan, item?.kinerja?.perlinsosKk]);
 
   // Combined photos array for lightbox and printing
   const effectivePhotos = React.useMemo(() => {
@@ -1008,7 +1013,10 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   </div>
 
                   {/* Identitas Petugas */}
-                  <div className="mb-2 text-[8.5pt] font-sans bg-white p-2 rounded-lg border border-slate-300">
+                  <div
+                    className="mb-3 text-[8.5pt] font-sans p-2.5 rounded-lg border border-slate-300 max-w-[94%] mx-auto shadow-xs"
+                    style={{ backgroundColor: '#eaeff2' }}
+                  >
                     <table className="w-full text-left">
                       <tbody>
                         <tr>
@@ -1112,24 +1120,34 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         </tr>
                         <tr>
                           <td className="text-center font-bold border border-black py-1">3</td>
+                          <td className="font-bold border border-black px-1.5 py-1">Hasil Kunjungan Harian (Door-to-Door)</td>
+                          <td className="text-center font-bold border border-black py-1">{jumlahKunjunganHarian} Rumah / KK</td>
+                          <td className="border border-black px-1.5 py-1">
+                            {jumlahKunjunganHarian > 0
+                              ? `Sambang warga dan silaturahmi lapangan terlaksana (${jumlahKunjunganHarian} Rumah / KK)`
+                              : 'Kunjungan dan silaturahmi warga door-to-door'}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-center font-bold border border-black py-1">4</td>
                           <td className="font-bold border border-black px-1.5 py-1">Identitas Kependudukan Digital (IKD)</td>
                           <td className="text-center font-bold border border-black py-1">{item.kinerja?.ikdOrang || 0} Orang</td>
                           <td className="border border-black px-1.5 py-1">{item.kinerja?.ikdKeterangan || 'Aktivasi aplikasi IKD Dukcapil'}</td>
                         </tr>
                         <tr>
-                          <td className="text-center font-bold border border-black py-1">4</td>
+                          <td className="text-center font-bold border border-black py-1">5</td>
                           <td className="font-bold border border-black px-1.5 py-1">BPJS Ketenagakerjaan (Pekerja Rentan)</td>
                           <td className="text-center font-bold border border-black py-1">{item.kinerja?.bpjsKetenagakerjaanOrang || 0} Orang</td>
                           <td className="border border-black px-1.5 py-1">{item.kinerja?.bpjsKetenagakerjaanKeterangan || 'Sosialisasi pekerja rentan'}</td>
                         </tr>
                         <tr>
-                          <td className="text-center font-bold border border-black py-1">5</td>
+                          <td className="text-center font-bold border border-black py-1">6</td>
                           <td className="font-bold border border-black px-1.5 py-1">Kegiatan Lapangan Lainnya</td>
                           <td className="text-center font-bold border border-black py-1">Terlaksana</td>
                           <td className="border border-black px-1.5 py-1">{item.kinerja?.kegiatanLainnya || '-'}</td>
                         </tr>
                         <tr>
-                          <td className="text-center font-bold border border-black py-1">6</td>
+                          <td className="text-center font-bold border border-black py-1">7</td>
                           <td className="font-bold border border-black px-1.5 py-1">Pemantauan Kondisi Infrastruktur Wilayah</td>
                           <td className="text-center font-bold border border-black py-1">
                             {item.kinerja?.infrastrukturSubjek ? 'Terpantau' : 'Nihil'}
@@ -1152,7 +1170,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         </tr>
                         {item.kinerja?.poskamlingStatus && (
                           <tr>
-                            <td className="text-center font-bold border border-black py-1">7</td>
+                            <td className="text-center font-bold border border-black py-1">8</td>
                             <td className="font-bold border border-black px-1.5 py-1">Pos Ronda / SISKAMLING (Tugas Tambahan)</td>
                             <td className="text-center font-bold border border-black py-1">{item.kinerja.poskamlingStatus}</td>
                             <td className="border border-black px-1.5 py-1">
@@ -2385,18 +2403,24 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
             {/* DATA IDENTITAS PETUGAS */}
             <div
-              className="mb-2 text-[8.5pt] font-sans bg-white p-2 rounded-lg border border-slate-300"
+              className="mb-2 text-[8.5pt] font-sans rounded-lg border border-slate-300 mx-auto"
               style={{
-                border: '1px solid #cbd5e1',
+                border: '1.5px solid #cbd5e1',
                 borderRadius: '6px',
-                padding: '6px 12px',
-                marginBottom: '8px',
+                padding: '6px 14px',
+                marginBottom: '10px',
+                marginLeft: 'auto',
+                marginRight: 'auto',
+                width: '94%',
+                boxSizing: 'border-box',
                 fontFamily: 'sans-serif',
                 fontSize: '8.5pt',
-                backgroundColor: '#ffffff',
+                backgroundColor: '#eaeff2',
+                display: 'flex',
+                justifyContent: 'center',
               }}
             >
-              <table className="w-full text-left" style={{ width: '100%', textAlign: 'left' }}>
+              <table className="text-left" style={{ textAlign: 'left', margin: '0 auto' }}>
                 <tbody>
                   <tr>
                     <td className="w-32 font-bold py-0.5 text-slate-800" style={{ width: '125px', fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Nama Petugas</td>
@@ -2507,6 +2531,18 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   </tr>
                   <tr>
                     <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>3</td>
+                    <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Hasil Kunjungan Harian (Door-to-Door)</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
+                      {jumlahKunjunganHarian} Rumah / KK
+                    </td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>
+                      {jumlahKunjunganHarian > 0
+                        ? `Sambang warga dan silaturahmi lapangan terlaksana (${jumlahKunjunganHarian} Rumah / KK)`
+                        : 'Kunjungan dan silaturahmi warga door-to-door'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>4</td>
                     <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Identitas Kependudukan Digital (IKD)</td>
                     <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
                       {item.kinerja?.ikdOrang || 0} Orang
@@ -2514,7 +2550,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.ikdKeterangan || 'Aktivasi aplikasi IKD Dukcapil'}</td>
                   </tr>
                   <tr>
-                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>4</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>5</td>
                     <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>BPJS Ketenagakerjaan (Pekerja Rentan)</td>
                     <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
                       {item.kinerja?.bpjsKetenagakerjaanOrang || 0} Orang
@@ -2522,13 +2558,13 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.bpjsKetenagakerjaanKeterangan || 'Sosialisasi pekerja rentan'}</td>
                   </tr>
                   <tr>
-                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>5</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>6</td>
                     <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Kegiatan Lapangan Lainnya</td>
                     <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>Terlaksana</td>
                     <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.kegiatanLainnya || '-'}</td>
                   </tr>
                   <tr>
-                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>6</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>7</td>
                     <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Pemantauan Kondisi Infrastruktur Wilayah</td>
                     <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
                       {item.kinerja?.infrastrukturSubjek ? 'Terpantau' : 'Nihil'}
@@ -2551,7 +2587,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   </tr>
                   {item.kinerja?.poskamlingStatus && (
                     <tr>
-                      <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>7</td>
+                      <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>8</td>
                       <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Pos Ronda / SISKAMLING (Tugas Tambahan)</td>
                       <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
                         {item.kinerja.poskamlingStatus}
@@ -2567,90 +2603,6 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               </table>
             </div>
 
-            {/* HASIL REKAPITULASI KUNJUNGAN / SAMBANG WARGA (DOOR-TO-DOOR) UNTUK PDF / CETAK */}
-            {relevantKunjungan.length > 0 ? (
-              <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '8px' }}>
-                <div
-                  className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900"
-                  style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '4px', color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                  <span>B. HASIL KUNJUNGAN / SAMBANG WARGA DOOR-TO-DOOR ({relevantKunjungan.length} RUMAH / KK):</span>
-                  <span style={{ fontSize: '7pt', color: '#047857', fontWeight: 'bold' }}>Data Terverifikasi Lapangan</span>
-                </div>
-                <table
-                  className="print-table w-full text-left text-[7.5pt] font-sans border-[1.5px] border-black"
-                  style={{ width: '100%', textAlign: 'left', fontSize: '7.5pt', fontFamily: 'sans-serif', borderCollapse: 'collapse', border: '1.5px solid #000000', marginBottom: '4px' }}
-                >
-                  <thead>
-                    <tr style={{ backgroundColor: '#ffffff', color: '#000000', fontWeight: 'bold' }}>
-                      <th style={{ border: '1px solid #000000', width: '28px', textAlign: 'center', padding: '3px 2px' }}>NO</th>
-                      <th style={{ border: '1px solid #000000', width: '140px', padding: '3px 6px' }}>NAMA WARGA / KK</th>
-                      <th style={{ border: '1px solid #000000', padding: '3px 6px' }}>ALAMAT LENGKAP</th>
-                      <th style={{ border: '1px solid #000000', width: '110px', textAlign: 'center', padding: '3px 4px' }}>STATUS KUNJUNGAN</th>
-                      <th style={{ border: '1px solid #000000', width: '70px', textAlign: 'center', padding: '3px 4px' }}>DOKUMENTASI</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {relevantKunjungan.map((kunj, kIdx) => (
-                      <tr key={kunj.id || kIdx}>
-                        <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '2px' }}>{kIdx + 1}</td>
-                        <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '2px 6px', textTransform: 'uppercase' }}>
-                          {kunj.namaWarga}
-                        </td>
-                        <td style={{ border: '1px solid #000000', padding: '2px 6px' }}>
-                          {kunj.alamat}
-                        </td>
-                        <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '2px 4px' }}>
-                          <span style={{
-                            color:
-                              kunj.keterangan === 'Sudah'
-                                ? '#065f46'
-                                : kunj.keterangan === 'Menolak'
-                                ? '#9f1239'
-                                : kunj.keterangan === 'Tidak Ditempat'
-                                ? '#b45309'
-                                : '#334155',
-                          }}>
-                            {kunj.keterangan === 'Sudah'
-                              ? '✓ SUDAH'
-                              : kunj.keterangan === 'Menolak'
-                              ? '✕ MENOLAK'
-                              : kunj.keterangan === 'Tidak Ditempat'
-                              ? '⚠ TDK DI TEMPAT'
-                              : (kunj.keterangan || '-').toUpperCase()}
-                          </span>
-                        </td>
-                        <td style={{ border: '1px solid #000000', textAlign: 'center', padding: '2px' }}>
-                          {kunj.fotoDokumentasi ? (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <img
-                                src={kunj.fotoDokumentasi}
-                                alt={kunj.namaWarga}
-                                crossOrigin="anonymous"
-                                style={{ width: '26px', height: '26px', objectFit: 'cover', borderRadius: '2px', border: '1px solid #94a3b8' }}
-                              />
-                            </div>
-                          ) : (
-                            <span style={{ color: '#94a3b8', fontSize: '6.5pt' }}>-</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : item?.kinerja?.perlinsosKk && Number(item.kinerja.perlinsosKk) > 0 ? (
-              <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '6px', border: '1px solid #000000', padding: '4px 8px', fontSize: '7.5pt', backgroundColor: '#ffffff', fontFamily: 'sans-serif' }}>
-                <strong>B. CATATAN HASIL KUNJUNGAN:</strong> Realisasi kunjungan door-to-door sebanyak <strong>{item.kinerja.perlinsosKk} KK</strong> ({item.kinerja?.perlinsosKeterangan || 'Pendataan / Verifikasi Lapangan'}).
-                {item.kinerja?.perlinsosMenolakKk && String(item.kinerja.perlinsosMenolakKk) !== '0' ? (
-                  <span style={{ color: '#9f1239', marginLeft: '4px' }}>| Warga Menolak: {item.kinerja.perlinsosMenolakKk} KK</span>
-                ) : ''}
-                {item.kinerja?.perlinsosTidakDiTempatKk && String(item.kinerja.perlinsosTidakDiTempatKk) !== '0' ? (
-                  <span style={{ color: '#b45309', marginLeft: '4px' }}>| Tidak di Tempat: {item.kinerja.perlinsosTidakDiTempatKk} KK</span>
-                ) : ''}
-              </div>
-            ) : null}
-
             {/* DOKUMENTASI FOTO KEGIATAN - SELALU DITAMPILKAN DI HALAMAN 1 */}
             {effectivePhotos && effectivePhotos.length > 0 && (
               <div className="mb-2 avoid-break" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '8px' }}>
@@ -2658,7 +2610,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900"
                   style={{ fontSize: '8.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', textTransform: 'uppercase', marginBottom: '5px', color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
-                  <span>{relevantKunjungan.length > 0 || (item?.kinerja?.perlinsosKk && Number(item.kinerja.perlinsosKk) > 0) ? 'C.' : 'B.'} DOKUMENTASI LAPANGAN TERLAMPIR ({effectivePhotos.length} FOTO):</span>
+                  <span>B. DOKUMENTASI LAPANGAN TERLAMPIR ({effectivePhotos.length} FOTO):</span>
                   <span style={{ fontSize: '7pt', color: '#64748b', fontWeight: 'normal', textTransform: 'none' }}>Format Album Resmi Kedinasan</span>
                 </div>
                 <div

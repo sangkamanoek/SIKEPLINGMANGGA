@@ -342,7 +342,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         300;
       const targetPbb = targetConfig?.targetPbb ?? 100;
       const targetIkd = targetConfig?.targetIkd ?? 50;
-      const targetBpjs = targetConfig?.targetBpjs ?? 25;
+      const targetBpjs = targetConfig?.targetBpjs ?? 10;
 
       // Hitung Capaian Efektif (Realisasi dari Laporan atau Override Super Admin)
       const effective = calculateEffectiveKinerja(reported, targetConfig);
@@ -804,7 +804,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </p>
                   </div>
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                    <span>Target: {activeTargetConfig?.targetBpjs || 25} Org</span>
+                    <span>Target: {activeTargetConfig?.targetBpjs || 10} Org</span>
                     <span className="text-amber-700 font-bold">Perlindungan Kerja</span>
                   </div>
                 </div>

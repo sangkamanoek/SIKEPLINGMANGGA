@@ -44,9 +44,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const isAdmin = isKelurahanAdmin(currentUser.role);
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
-  const [records, setRecords] = useState<KunjunganWargaData[]>(() =>
-    safeGetLocalStorage<KunjunganWargaData[]>(STORAGE_CACHE_KEY, [])
-  );
+  const [records, setRecords] = useState<KunjunganWargaData[]>([]);
   const [dateFilterMode, setDateFilterMode] = useState<'SINGLE' | 'RANGE' | 'ALL'>('SINGLE');
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [startDate, setStartDate] = useState<string>(() => {
@@ -95,8 +93,32 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // Real-time listener dari Firestore collection 'kunjungan_warga'
+  // Online Fetch from Server Buffer & Real-time listener dari Firestore
   useEffect(() => {
+    // 1. Fetch from Server API buffer
+    fetch(`/api/kunjungan?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        if (Array.isArray(json?.data) && json.data.length > 0) {
+          setRecords((prev) => {
+            const map = new Map<string, KunjunganWargaData>();
+            json.data.forEach((k: KunjunganWargaData) => map.set(k.id, k));
+            prev.forEach((k) => {
+              if (!map.has(k.id)) map.set(k.id, k);
+            });
+            return Array.from(map.values());
+          });
+        }
+      })
+      .catch((err) => console.warn('Notice loading kunjungan from server:', err));
+
+    // 2. Real-time listener from Firestore
     if (!db) return;
 
     try {
@@ -113,7 +135,6 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
           });
           const list = Array.from(map.values());
           setRecords(list);
-          safeSetLocalStorage(STORAGE_CACHE_KEY, JSON.stringify(list));
         },
         (err) => {
           console.warn('Firestore snapshot error on kunjungan_warga:', err);
@@ -128,14 +149,17 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const handleDelete = async (id: string, namaWarga: string) => {
     if (!window.confirm(`Hapus catatan kunjungan ke ${namaWarga}?`)) return;
     try {
+      // 1. Delete on Server Buffer
+      fetch(`/api/kunjungan/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch((err) => {
+        console.warn('Notice deleting kunjungan from server:', err);
+      });
+
+      // 2. Delete on Firestore
       if (db) {
         await deleteDoc(doc(db, 'kunjungan_warga', id));
       }
-      setRecords((prev) => {
-        const updated = prev.filter((r) => r.id !== id);
-        safeSetLocalStorage(STORAGE_CACHE_KEY, JSON.stringify(updated));
-        return updated;
-      });
+
+      setRecords((prev) => prev.filter((r) => r.id !== id));
       showToast(`Catatan kunjungan ke ${namaWarga} berhasil dihapus.`);
     } catch (e) {
       alert('Gagal menghapus: ' + e);

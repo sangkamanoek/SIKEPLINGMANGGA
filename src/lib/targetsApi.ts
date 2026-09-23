@@ -25,7 +25,7 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
       resultMap = firestoreMap;
     }
   } catch (err) {
-    console.warn('Notice reading targets from Firebase Firestore, checking server buffer:', err);
+    // Already handled in fetchTargetsFromFirestore
   }
 
   // 2. Prioritas kedua: Server API buffer
@@ -42,7 +42,7 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
         }
       }
     } catch (err) {
-      console.warn('Gagal fetch /api/targets-capaian, menggunakan cache lokal:', err);
+      // Silent catch
     }
   }
 
@@ -57,7 +57,7 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
         }
       }
     } catch (err) {
-      console.error('Error parsing local targets:', err);
+      // Silent catch
     }
   }
 
@@ -98,7 +98,7 @@ export async function saveKeplingTargetCapaian(
   try {
     await saveTargetToFirestore(item);
   } catch (err) {
-    console.warn('Notice saving target to Firebase Firestore:', err);
+    // Already handled
   }
 
   // 3. Sync ke server buffer
@@ -116,14 +116,14 @@ export async function saveKeplingTargetCapaian(
       }
     }
   } catch (err) {
-    console.warn('Gagal sync target ke server, tetap tersimpan di Firestore dan lokal:', err);
+    // Already handled
   }
 
   return currentMap;
 }
 
 /**
- * Simpan batch seluruh target ke Firebase Firestore dan server
+ * Simpan batch seluruh target ke Firebase Firestore and server
  */
 export async function saveAllTargetsCapaian(
   allTargets: TargetsCapaianMap
@@ -134,7 +134,7 @@ export async function saveAllTargetsCapaian(
   try {
     await saveAllTargetsToFirestore(allTargets);
   } catch (err) {
-    console.warn('Notice saving all targets to Firebase Firestore:', err);
+    // Already handled
   }
 
   // 2. Sync ke server buffer
@@ -152,14 +152,14 @@ export async function saveAllTargetsCapaian(
       }
     }
   } catch (err) {
-    console.warn('Gagal sync batch target ke server, tersimpan di Firestore dan lokal:', err);
+    // Silent catch
   }
 
   return allTargets;
 }
 
 /**
- * Reset target ke nilai resmi Pemko Medan / Kelurahan Mangga di Firebase Firestore dan server
+ * Reset target ke nilai resmi Pemko Medan / Kelurahan Mangga di Firebase Firestore and server
  */
 export async function resetTargetsCapaianToDefaults(): Promise<TargetsCapaianMap> {
   const defaults = getDefaultTargetsCapaianMap();
@@ -169,7 +169,7 @@ export async function resetTargetsCapaianToDefaults(): Promise<TargetsCapaianMap
   try {
     await resetTargetsInFirestore();
   } catch (err) {
-    console.warn('Notice resetting targets in Firebase Firestore:', err);
+    // Already handled
   }
 
   // 2. Reset di server buffer
@@ -185,7 +185,7 @@ export async function resetTargetsCapaianToDefaults(): Promise<TargetsCapaianMap
       }
     }
   } catch (err) {
-    console.warn('Gagal reset target ke server:', err);
+    // Silent catch
   }
 
   return defaults;

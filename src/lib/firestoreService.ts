@@ -10,7 +10,7 @@ import {
   limit,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, handleFirestoreError, OperationType } from './firebase';
 import { LaporanHarianItem, KeplingTargetCapaian, TargetsCapaianMap, TaskReminder, NotificationLog, AbsenApelItem, CustomEvent, EventAttendance } from '../types';
 import { getDefaultTargetsCapaianMap } from '../data/targetsData';
 
@@ -46,7 +46,7 @@ export async function fetchDeletedReportIdsFromFirestore(): Promise<Set<string>>
       if (data.id) deletedReportIdsMemory.add(data.id);
     });
   } catch (err) {
-    console.warn('Notice reading deleted_reports tombstones:', err);
+    handleFirestoreError(err, OperationType.GET, DELETED_REPORTS_COLLECTION);
   }
   return deletedReportIdsMemory;
 }
@@ -91,7 +91,7 @@ export async function fetchReportsFromFirestore(): Promise<LaporanHarianItem[]> 
 
     return reports;
   } catch (error: any) {
-    console.warn('Firebase Firestore fetch notice (switching to server buffer):', error?.message || error);
+    handleFirestoreError(error, OperationType.LIST, REPORTS_COLLECTION);
     return [];
   }
 }
@@ -121,8 +121,6 @@ export async function saveReportToFirestore(item: LaporanHarianItem): Promise<bo
 
     return true;
   } catch (error) {
-    console.error('Gagal menyimpan laporan ke Firebase Firestore:', error);
-
     // Fallback: If payload size is too large due to heavy base64 images, attempt to save without corrupted strings
     try {
       // Keep valid photos, and if document is still too large, reduce number of photos cleanly rather than breaking base64 string
@@ -134,7 +132,7 @@ export async function saveReportToFirestore(item: LaporanHarianItem): Promise<bo
       await setDoc(docRef, safeItem, { merge: true });
       return true;
     } catch (fallbackError) {
-      console.error('Fallback save to Firestore failed:', fallbackError);
+      handleFirestoreError(error, OperationType.WRITE, REPORTS_COLLECTION);
       return false;
     }
   }
@@ -158,7 +156,7 @@ export async function deleteReportFromFirestore(id: string): Promise<boolean> {
         deletedBy: 'admin',
       });
     } catch (delErr) {
-      console.warn('Notice writing tombstone to deleted_reports:', delErr);
+      handleFirestoreError(delErr, OperationType.WRITE, DELETED_REPORTS_COLLECTION);
     }
 
     // 3. Delete directly from reports collection by primary ID
@@ -167,7 +165,7 @@ export async function deleteReportFromFirestore(id: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.warn('Gagal menghapus laporan dari Firebase Firestore:', error);
+    handleFirestoreError(error, OperationType.DELETE, REPORTS_COLLECTION);
     return false;
   }
 }
@@ -198,7 +196,7 @@ export async function batchSyncReportsToFirestore(items: LaporanHarianItem[]): P
 
     return synced;
   } catch (error) {
-    console.warn('Gagal batch sync laporan ke Firebase Firestore:', error);
+    handleFirestoreError(error, OperationType.WRITE, REPORTS_COLLECTION);
     return 0;
   }
 }
@@ -221,7 +219,7 @@ export async function resetAllReportsInFirestore(): Promise<boolean> {
     await batch.commit();
     return true;
   } catch (error) {
-    console.warn('Gagal mereset laporan di Firebase Firestore:', error);
+    handleFirestoreError(error, OperationType.DELETE, REPORTS_COLLECTION);
     return false;
   }
 }
@@ -270,7 +268,7 @@ export function subscribeReportsFromFirestore(
       onData(reports, isFromCache);
     },
     (err) => {
-      console.warn('Firestore onSnapshot error reports (switching to server fallback):', err);
+      handleFirestoreError(err, OperationType.LIST, REPORTS_COLLECTION);
       if (onError) onError(err);
     }
   );
@@ -308,7 +306,7 @@ export async function fetchTargetsFromFirestore(): Promise<TargetsCapaianMap> {
     await saveAllTargetsToFirestore(defaults);
     return defaults;
   } catch (error) {
-    console.warn('Gagal membaca targets_capaian dari Firebase Firestore:', error);
+    handleFirestoreError(error, OperationType.LIST, TARGETS_COLLECTION);
     return getDefaultTargetsCapaianMap();
   }
 }
@@ -328,7 +326,7 @@ export async function saveTargetToFirestore(
     await setDoc(docRef, payload, { merge: true });
     return true;
   } catch (error) {
-    console.warn('Gagal menyimpan target ke Firebase Firestore:', error);
+    handleFirestoreError(error, OperationType.WRITE, TARGETS_COLLECTION);
     return false;
   }
 }
@@ -350,7 +348,7 @@ export async function saveAllTargetsToFirestore(allTargets: TargetsCapaianMap): 
     await batch.commit();
     return true;
   } catch (error) {
-    console.warn('Gagal menyimpan semua target ke Firebase Firestore:', error);
+    handleFirestoreError(error, OperationType.WRITE, TARGETS_COLLECTION);
     return false;
   }
 }
@@ -388,7 +386,7 @@ export function subscribeTargetsFromFirestore(
       }
     },
     (err) => {
-      console.warn('Firestore onSnapshot error targets:', err);
+      handleFirestoreError(err, OperationType.LIST, TARGETS_COLLECTION);
       if (onError) onError(err);
     }
   );
@@ -418,7 +416,7 @@ export async function fetchPasswordsFromFirestore(): Promise<Record<string, stri
 
     return passwords;
   } catch (error) {
-    console.warn('Gagal membaca passwords dari Firebase Firestore:', error);
+    handleFirestoreError(error, OperationType.LIST, PASSWORDS_COLLECTION);
     return {};
   }
 }
@@ -440,7 +438,7 @@ export async function savePasswordToFirestore(accountId: string, newPassword: st
     );
     return true;
   } catch (error) {
-    console.warn('Gagal menyimpan password ke Firebase Firestore:', error);
+    handleFirestoreError(error, OperationType.WRITE, PASSWORDS_COLLECTION);
     return false;
   }
 }
@@ -454,7 +452,7 @@ export async function resetPasswordInFirestore(accountId: string): Promise<boole
     await deleteDoc(docRef);
     return true;
   } catch (error) {
-    console.warn('Gagal mereset password di Firebase Firestore:', error);
+    handleFirestoreError(error, OperationType.DELETE, PASSWORDS_COLLECTION);
     return false;
   }
 }
@@ -479,7 +477,7 @@ export function subscribePasswordsFromFirestore(
       onData(passwords);
     },
     (err) => {
-      console.warn('Firestore onSnapshot passwords notice:', err);
+      handleFirestoreError(err, OperationType.LIST, PASSWORDS_COLLECTION);
     }
   );
 }
@@ -542,7 +540,7 @@ export async function fetchProfilesFromFirestore(): Promise<Record<string, { nam
     });
     return profiles;
   } catch (err) {
-    console.warn('Gagal membaca profiles dari Firebase Firestore:', err);
+    handleFirestoreError(err, OperationType.LIST, PROFILES_COLLECTION);
     return {};
   }
 }
@@ -564,7 +562,7 @@ export async function saveProfileToFirestore(
     );
     return true;
   } catch (error) {
-    console.warn('Gagal menyimpan profile ke Firebase Firestore:', error);
+    handleFirestoreError(error, OperationType.WRITE, PROFILES_COLLECTION);
     return false;
   }
 }
@@ -589,7 +587,7 @@ export function subscribeProfilesFromFirestore(
       onData(profiles);
     },
     (err) => {
-      console.warn('Firestore onSnapshot profiles notice:', err);
+      handleFirestoreError(err, OperationType.LIST, PROFILES_COLLECTION);
     }
   );
 }
@@ -615,7 +613,7 @@ export async function fetchAttendanceFromFirestore(): Promise<AbsenApelItem[]> {
     list.sort((a, b) => new Date(b.waktuLengkap || b.createdAt).getTime() - new Date(a.waktuLengkap || a.createdAt).getTime());
     return list;
   } catch (err: any) {
-    console.warn('Firebase Firestore attendance fetch notice (using server fallback):', err?.message || err);
+    handleFirestoreError(err, OperationType.LIST, ATTENDANCE_COLLECTION);
     return [];
   }
 }
@@ -626,7 +624,7 @@ export async function saveAttendanceToFirestore(item: AbsenApelItem): Promise<bo
     await setDoc(docRef, item, { merge: true });
     return true;
   } catch (err: any) {
-    console.warn('Firebase Firestore save attendance notice:', err?.message || err);
+    handleFirestoreError(err, OperationType.WRITE, ATTENDANCE_COLLECTION);
     return false;
   }
 }
@@ -650,7 +648,7 @@ export function subscribeAttendanceFromFirestore(
       onData(list, isFromCache);
     },
     (err) => {
-      console.warn('Firestore onSnapshot attendance notice (using server fallback):', err?.message || err);
+      handleFirestoreError(err, OperationType.LIST, ATTENDANCE_COLLECTION);
     }
   );
 }
@@ -677,7 +675,7 @@ export async function fetchCustomEventsFromFirestore(): Promise<CustomEvent[]> {
     events.sort((a, b) => b.date.localeCompare(a.date));
     return events;
   } catch (err: any) {
-    console.warn('Firebase Firestore custom events fetch notice:', err?.message || err);
+    handleFirestoreError(err, OperationType.LIST, CUSTOM_EVENTS_COLLECTION);
     return [];
   }
 }
@@ -688,7 +686,7 @@ export async function saveCustomEventToFirestore(event: CustomEvent): Promise<bo
     await setDoc(docRef, event, { merge: true });
     return true;
   } catch (err: any) {
-    console.warn('Firebase Firestore save custom event notice:', err?.message || err);
+    handleFirestoreError(err, OperationType.WRITE, CUSTOM_EVENTS_COLLECTION);
     return false;
   }
 }
@@ -699,7 +697,7 @@ export async function deleteCustomEventFromFirestore(id: string): Promise<boolea
     await deleteDoc(docRef);
     return true;
   } catch (err: any) {
-    console.warn('Firebase Firestore delete custom event notice:', err?.message || err);
+    handleFirestoreError(err, OperationType.DELETE, CUSTOM_EVENTS_COLLECTION);
     return false;
   }
 }
@@ -722,7 +720,7 @@ export function subscribeCustomEventsFromFirestore(
       onData(events);
     },
     (err) => {
-      console.warn('Firestore onSnapshot custom events notice:', err?.message || err);
+      handleFirestoreError(err, OperationType.LIST, CUSTOM_EVENTS_COLLECTION);
     }
   );
 }
@@ -740,7 +738,7 @@ export async function fetchEventAttendanceFromFirestore(): Promise<EventAttendan
     });
     return attendance;
   } catch (err: any) {
-    console.warn('Firebase Firestore event attendance fetch notice:', err?.message || err);
+    handleFirestoreError(err, OperationType.LIST, EVENT_ATTENDANCE_COLLECTION);
     return [];
   }
 }
@@ -751,7 +749,7 @@ export async function saveEventAttendanceToFirestore(item: EventAttendance): Pro
     await setDoc(docRef, item, { merge: true });
     return true;
   } catch (err: any) {
-    console.warn('Firebase Firestore save event attendance notice:', err?.message || err);
+    handleFirestoreError(err, OperationType.WRITE, EVENT_ATTENDANCE_COLLECTION);
     return false;
   }
 }
@@ -773,7 +771,7 @@ export function subscribeEventAttendanceFromFirestore(
       onData(attendance);
     },
     (err) => {
-      console.warn('Firestore onSnapshot event attendance notice:', err?.message || err);
+      handleFirestoreError(err, OperationType.LIST, EVENT_ATTENDANCE_COLLECTION);
     }
   );
 }
@@ -785,8 +783,8 @@ export function subscribeEventAttendanceFromFirestore(
  */
 export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean; message: string }> {
   try {
-    // 1. Delete all reports from 'reports' and legacy collection 'SIKEPLINGMANGGA'
-    const reportColNames = [REPORTS_COLLECTION, 'SIKEPLINGMANGGA', 'kunjungan_warga'];
+    // 1. Delete all reports from 'reports'
+    const reportColNames = [REPORTS_COLLECTION];
     for (const colName of reportColNames) {
       try {
         const c = collection(db, colName);
@@ -797,7 +795,7 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
           await batch.commit();
         }
       } catch (e) {
-        console.warn(`Wipe ${colName} error:`, e);
+        handleFirestoreError(e, OperationType.DELETE, colName);
       }
     }
 
@@ -811,7 +809,7 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
         await batch.commit();
       }
     } catch (e) {
-      console.warn('Wipe deleted_reports error:', e);
+      handleFirestoreError(e, OperationType.DELETE, DELETED_REPORTS_COLLECTION);
     }
 
     // 3. Delete all attendance from 'attendance' & 'event_attendance'
@@ -824,7 +822,7 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
         await batch.commit();
       }
     } catch (e) {
-      console.warn('Wipe attendance error:', e);
+      handleFirestoreError(e, OperationType.DELETE, ATTENDANCE_COLLECTION);
     }
 
     // 4. Delete all custom events from 'custom_events'
@@ -837,7 +835,7 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
         await batch.commit();
       }
     } catch (e) {
-      console.warn('Wipe custom_events error:', e);
+      handleFirestoreError(e, OperationType.DELETE, CUSTOM_EVENTS_COLLECTION);
     }
 
     // 5. Reset all targets_capaian in Firestore to 21 September 2026 baseline
@@ -854,10 +852,10 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
       }
       await targetBatch.commit();
     } catch (e) {
-      console.warn('Wipe targets_capaian error:', e);
+      handleFirestoreError(e, OperationType.WRITE, TARGETS_COLLECTION);
     }
 
-    // 6. Delete all PBB SPPT records from Firestore completely (pbb_sppt, pbb_sppt_2026, pbb_sppt_2025, pbb_sppt_2027)
+    // 6. Delete all PBB SPPT records from Firestore completely
     const pbbCols = ['pbb_sppt', 'pbb_sppt_2026', 'pbb_sppt_2025', 'pbb_sppt_2027'];
     for (const colName of pbbCols) {
       try {
@@ -869,7 +867,7 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
           await batch.commit();
         }
       } catch (e) {
-        console.warn(`Wipe PBB ${colName} error:`, e);
+        handleFirestoreError(e, OperationType.DELETE, colName);
       }
     }
 

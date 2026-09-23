@@ -8,8 +8,9 @@ import {
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, handleFirestoreError, OperationType } from './firebase';
 import { SpptPbbItem, INITIAL_PBB_SUMMARY, SAMPLE_SPPT_ITEMS } from '../data/pbbSampleData';
+import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 
 export interface LingkunganPbbSummary {
   lingkungan: number;
@@ -48,31 +49,17 @@ export const getPbbStorageKey = (year: number): string => {
  * Load SPPT items from localStorage or fallback to defaults
  */
 export function getLocalSpptForYear(year: number): SpptPbbItem[] {
-  try {
-    const key = getPbbStorageKey(year);
-    const raw = localStorage.getItem(key);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.warn('Error reading local SPPT:', err);
-  }
-  return [];
+  const key = getPbbStorageKey(year);
+  const defaultItems = year === 2026 ? SAMPLE_SPPT_ITEMS : [];
+  return safeGetLocalStorage<SpptPbbItem[]>(key, defaultItems);
 }
 
 /**
  * Save SPPT items to localStorage
  */
 export function saveLocalSpptForYear(items: SpptPbbItem[], year: number): void {
-  try {
-    const key = getPbbStorageKey(year);
-    localStorage.setItem(key, JSON.stringify(items));
-  } catch (err) {
-    console.warn('Error saving local SPPT:', err);
-  }
+  const key = getPbbStorageKey(year);
+  safeSetLocalStorage(key, JSON.stringify(items));
 }
 
 /**
@@ -336,17 +323,16 @@ export async function deletePbbFromApi(id: string, year: number = DEFAULT_PBB_YE
 // ----------------------------------------------------
 
 /**
- * Fetch SPPT data with multi-tier fallback: Local Cache -> Server API Buffer -> Cloud Firestore
+ * Fetch SPPT data strictly online: Server API Buffer + Cloud Firestore
  */
 export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR): Promise<SpptPbbItem[]> {
-  let currentList = getLocalSpptForYear(year);
+  let currentList: SpptPbbItem[] = [];
 
   // 1. Fetch from Express Server Buffer (/api/pbb)
   try {
     const apiItems = await fetchPbbFromApi(year);
     if (apiItems.length > 0) {
       currentList = smartMergeSpptItems(currentList, apiItems);
-      saveLocalSpptForYear(currentList, year);
     }
   } catch (err) {
     console.warn(`Notice reading PBB server buffer for ${year}:`, err);
@@ -368,15 +354,12 @@ export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR)
 
     if (firestoreItems.length > 0) {
       currentList = smartMergeSpptItems(currentList, firestoreItems);
-      saveLocalSpptForYear(currentList, year);
-      // Sync to Server API buffer as well so all devices have it
-      batchSavePbbToApi(currentList, year).catch(() => {});
       return currentList;
     }
 
     return currentList;
   } catch (err) {
-    console.warn(`Firestore PBB fetch notice for ${year}:`, err);
+    handleFirestoreError(err, OperationType.LIST, `${PBB_COLLECTION_PREFIX}${year}`);
     return currentList;
   }
 }
@@ -385,25 +368,20 @@ export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR)
  * Save single SPPT item to Firebase Firestore AND Server Buffer AND broadcast
  */
 export async function savePbbSpptToFirestore(item: SpptPbbItem, year: number = DEFAULT_PBB_YEAR): Promise<boolean> {
-  // 1. Immediately update Local Cache
-  const currentList = getLocalSpptForYear(year);
-  const updatedList = smartMergeSpptItems(currentList, [item]);
-  saveLocalSpptForYear(updatedList, year);
-
-  // 2. Broadcast to other open tabs on same device (e.g. Super Admin vs Kasi Pem)
+  // 1. Broadcast to other open tabs on same device (e.g. Super Admin vs Kasi Pem)
   broadcastPbbChange(item, year);
 
-  // 3. Save to Express Server Buffer (/api/pbb) for zero-latency multi-user sync
+  // 2. Save to Express Server Buffer (/api/pbb) for zero-latency multi-user sync
   savePbbToApi(item, year).catch(() => {});
 
-  // 4. Save to Cloud Firestore
+  // 3. Save to Cloud Firestore
   try {
     const colName = `${PBB_COLLECTION_PREFIX}${year}`;
     const docRef = doc(db, colName, item.id);
     await setDoc(docRef, item, { merge: true });
     return true;
   } catch (err) {
-    console.warn(`Firestore saving notice for SPPT ${item.id}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, `${PBB_COLLECTION_PREFIX}${year}`);
     return false;
   }
 }
@@ -436,7 +414,7 @@ export async function batchSavePbbSpptToFirestore(items: SpptPbbItem[], year: nu
     }
     return savedCount;
   } catch (err) {
-    console.warn('Error batch saving SPPT to Firestore:', err);
+    handleFirestoreError(err, OperationType.WRITE, `${PBB_COLLECTION_PREFIX}${year}`);
     return 0;
   }
 }
@@ -445,21 +423,17 @@ export async function batchSavePbbSpptToFirestore(items: SpptPbbItem[], year: nu
  * Delete SPPT item from Firebase Firestore & Server Buffer
  */
 export async function deletePbbSpptFromFirestore(id: string, year: number = DEFAULT_PBB_YEAR): Promise<boolean> {
-  // 1. Remove from local cache
-  const currentList = getLocalSpptForYear(year).filter((i) => i.id !== id);
-  saveLocalSpptForYear(currentList, year);
-
-  // 2. Remove from Server Buffer
+  // 1. Remove from Server Buffer
   deletePbbFromApi(id, year).catch(() => {});
 
-  // 3. Remove from Firestore
+  // 2. Remove from Firestore
   try {
     const colName = `${PBB_COLLECTION_PREFIX}${year}`;
     const docRef = doc(db, colName, id);
     await deleteDoc(docRef);
     return true;
   } catch (err) {
-    console.warn(`Error deleting SPPT ${id} from Firestore:`, err);
+    handleFirestoreError(err, OperationType.DELETE, `${PBB_COLLECTION_PREFIX}${year}`);
     return false;
   }
 }
@@ -474,7 +448,15 @@ export function subscribePbbSpptFromFirestore(
   const colName = `${PBB_COLLECTION_PREFIX}${year}`;
   const colRef = collection(db, colName);
 
-  let activeList = getLocalSpptForYear(year);
+  let activeList: SpptPbbItem[] = [];
+
+  // Initial fetch from Server API buffer
+  fetchPbbFromApi(year).then((apiItems) => {
+    if (apiItems.length > 0) {
+      activeList = smartMergeSpptItems(activeList, apiItems);
+      onData(activeList);
+    }
+  }).catch(() => {});
 
   // 1. Firestore Real-time listener
   const firestoreUnsub = onSnapshot(
@@ -492,18 +474,16 @@ export function subscribePbbSpptFromFirestore(
 
       // If the server is genuinely empty (database wiped / fresh start) and we are not loading from offline cache
       if (snapshot.empty && !isFromCache) {
-        console.log(`[PBB Sync] Firestore collection is empty on the server. Clearing local cache for ${year}.`);
+        console.log(`[PBB Sync] Firestore collection is empty on the server for ${year}.`);
         activeList = [];
-        saveLocalSpptForYear([], year);
         onData([]);
       } else if (firestoreItems.length > 0) {
         activeList = smartMergeSpptItems(activeList, firestoreItems);
-        saveLocalSpptForYear(activeList, year);
         onData(activeList);
       }
     },
     (err) => {
-      console.warn(`Firestore PBB onSnapshot notice for ${year}:`, err);
+      handleFirestoreError(err, OperationType.LIST, colName);
     }
   );
 
@@ -511,7 +491,6 @@ export function subscribePbbSpptFromFirestore(
   const handleBroadcast = (msg: any) => {
     if (msg?.data?.year === year && msg?.data?.item) {
       activeList = smartMergeSpptItems(activeList, [msg.data.item]);
-      saveLocalSpptForYear(activeList, year);
       onData(activeList);
     }
   };
@@ -519,34 +498,17 @@ export function subscribePbbSpptFromFirestore(
     pbbBroadcastChannel.addEventListener('message', handleBroadcast);
   }
 
-  // 3. Window Storage event listener (syncs across browser tabs on same domain)
-  const handleStorage = (e: StorageEvent) => {
-    if (e.key === getPbbStorageKey(year) && e.newValue) {
-      try {
-        const parsed = JSON.parse(e.newValue);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          activeList = smartMergeSpptItems(activeList, parsed);
-          onData(activeList);
-        }
-      } catch {
-        // ignore
-      }
-    }
-  };
-  window.addEventListener('storage', handleStorage);
-
-  // 4. Custom DOM event in same tab / window
+  // 3. Custom DOM event in same tab / window
   const handleCustomEvent = (e: any) => {
     const detail = e.detail;
     if (detail?.year === year && detail?.item) {
       activeList = smartMergeSpptItems(activeList, [detail.item]);
-      saveLocalSpptForYear(activeList, year);
       onData(activeList);
     }
   };
   window.addEventListener('pbb-item-synced', handleCustomEvent);
 
-  // 5. Periodic polling from Server API buffer every 8 seconds as safety net
+  // 4. Periodic polling from Server API buffer every 8 seconds as safety net
   const pollInterval = setInterval(async () => {
     try {
       const apiItems = await fetchPbbFromApi(year);
@@ -556,7 +518,6 @@ export function subscribePbbSpptFromFirestore(
         const newStatusStr = merged.map((x) => `${x.id}:${x.status}`).join('|');
         if (prevStatusStr !== newStatusStr || merged.length !== activeList.length) {
           activeList = merged;
-          saveLocalSpptForYear(activeList, year);
           onData(activeList);
         }
       }
@@ -567,12 +528,11 @@ export function subscribePbbSpptFromFirestore(
 
   return () => {
     firestoreUnsub();
+    clearInterval(pollInterval);
     if (pbbBroadcastChannel) {
       pbbBroadcastChannel.removeEventListener('message', handleBroadcast);
     }
-    window.removeEventListener('storage', handleStorage);
     window.removeEventListener('pbb-item-synced', handleCustomEvent);
-    clearInterval(pollInterval);
   };
 }
 
@@ -606,7 +566,7 @@ export async function wipeAllPbbSpptEverywhere(years: number[] = [2025, 2026, 20
           await batch.commit();
         }
       } catch (err) {
-        console.warn(`Error cleaning collection ${colName}:`, err);
+        handleFirestoreError(err, OperationType.DELETE, colName);
       }
     }
 

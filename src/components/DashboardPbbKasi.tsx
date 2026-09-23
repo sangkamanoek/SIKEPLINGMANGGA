@@ -157,23 +157,14 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
         return sum + (isNaN(val) ? 0 : val);
       }, 0);
 
-      // Target configuration from targetsMap
-      const targetConfig = targetsMap[kepling.id];
-      const targetPbb = targetConfig?.targetPbb ?? 100; // default 100 WP
+      // Retrieve actual PBB counts from the SPPT PBB database (Realisasi PBB tab)
+      const lkNum = kepling.nomorLingkungan;
+      const summary = pbbOverview.lingkunganSummaries.find((s) => s.lingkungan === lkNum);
 
-      // Use calculateEffectiveKinerja to get the exact matching cumulative stats
-      const reported = {
-        pbb: reportedPbbWp,
-        perlinsos: 0,
-        ikd: 0,
-        bpjs: 0,
-      };
-
-      const effective = calculateEffectiveKinerja(reported, targetConfig, index);
-      const totalPbb = effective.pbb;
-      const isOverridden = effective.isPbbOverridden || effective.isOverridden;
-
+      const totalPbb = summary ? summary.wpLunas : 0;
+      const targetPbb = summary ? summary.totalWp : 100;
       const pbbPercentage = targetPbb > 0 ? Math.round((totalPbb / targetPbb) * 100) : 0;
+      const isOverridden = false; // Directly powered by the real PBB realization database
 
       // Find latest PBB note
       const latestPbbReport = [...keplingReports]
@@ -199,7 +190,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
         isOverridden,
       };
     });
-  }, [filteredReports, targetsMap]);
+  }, [filteredReports, targetsMap, pbbOverview]);
 
   // 2b. Aggregate IKD stats per Kepling
   const keplingIkdStats = useMemo(() => {

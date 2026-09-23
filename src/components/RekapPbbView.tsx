@@ -37,6 +37,16 @@ import { parsePbbCsv } from '../utils/pbbParser';
 import { UserAccount } from '../types';
 import { PbbTrendCharts } from './PbbTrendCharts';
 import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Cell,
+} from 'recharts';
+import {
   AVAILABLE_PBB_YEARS,
   DEFAULT_PBB_YEAR,
   getLocalSpptForYear,
@@ -841,6 +851,89 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             </div>
           </div>
 
+          {/* Visual Chart: Ringkasan Realisasi PBB Per Lingkungan */}
+          <div className="bg-slate-50/80 rounded-xl border border-slate-200 p-4 print:hidden">
+            <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <BarChart3 className="w-4 h-4 text-emerald-600" />
+              <span>Grafik Realisasi Capaian PBB per Lingkungan ({selectedYear})</span>
+            </h4>
+            
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={summaryByLingkungan}
+                  margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis
+                    dataKey="lingkungan"
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(val) => `Ling ${val}`}
+                    tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    domain={[0, 100]}
+                    tickFormatter={(val) => `${val}%`}
+                    tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }}
+                  />
+                  <RechartsTooltip
+                    cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-md text-xs">
+                            <p className="font-extrabold text-slate-800 mb-1">Lingkungan {data.lingkungan}</p>
+                            <p className="text-slate-600">Capaian: <span className="font-extrabold text-emerald-700">{data.persentaseRealisasi.toFixed(1)}%</span></p>
+                            <p className="text-slate-600">WP Lunas: <span className="font-bold text-slate-800">{data.wpLunas} dari {data.totalWp} WP</span></p>
+                            <p className="text-slate-600">Realisasi: <span className="font-bold text-slate-800">Rp {data.realisasiNominal.toLocaleString('id-ID')}</span></p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar
+                    dataKey="persentaseRealisasi"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={30}
+                  >
+                    {summaryByLingkungan.map((entry, index) => {
+                      const pct = entry.persentaseRealisasi;
+                      let fill = '#ef4444'; // Red for low (< 40%)
+                      if (pct >= 80) fill = '#059669'; // Dark Emerald for high (>= 80%)
+                      else if (pct >= 60) fill = '#10b981'; // Emerald for good (>= 60%)
+                      else if (pct >= 40) fill = '#f59e0b'; // Amber for moderate (>= 40%)
+                      return <Cell key={`cell-${index}`} fill={fill} />;
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-2 text-[10px] text-slate-500 font-bold">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#059669]" />
+                <span>Sangat Baik (≥ 80%)</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />
+                <span>Baik (60% - 79%)</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]" />
+                <span>Cukup (40% - 59%)</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" />
+                <span>Kurang (&lt; 40%)</span>
+              </span>
+            </div>
+          </div>
+
           {/* Table Capaian Per Lingkungan */}
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-left text-xs sm:text-sm">
@@ -1105,6 +1198,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   <th className="py-3 px-3">Alamat Objek Pajak</th>
                   <th className="py-3 px-3 text-center">Buku</th>
                   <th className="py-3 px-3 text-right">PBB Terutang (Rp)</th>
+                  <th className="py-3 px-3 text-right">Realisasi Bayar (Rp)</th>
+                  <th className="py-3 px-3 text-center">% Bayar</th>
                   <th className="py-3 px-3 text-center">Lingk.</th>
                   <th className="py-3 px-3 text-center">Status</th>
                   <th className="py-3 px-3 text-center print:hidden">Aksi &amp; Kontrol</th>
@@ -1113,7 +1208,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               <tbody className="divide-y divide-slate-200 text-slate-800">
                 {filteredSpptList.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-slate-500 font-medium">
+                    <td colSpan={11} className="py-8 text-center text-slate-500 font-medium">
                       Tidak ada data SPPT PBB yang cocok dengan pencarian / filter Anda.
                     </td>
                   </tr>
@@ -1126,6 +1221,14 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                       <td className="py-2.5 px-3 text-slate-600 text-xs">{item.alamatOp}</td>
                       <td className="py-2.5 px-3 text-center font-semibold text-slate-500">{item.buku}</td>
                       <td className="py-2.5 px-3 text-right font-black text-slate-800">{formatRupiah(item.pbbTerutang)}</td>
+                      <td className="py-2.5 px-3 text-right font-black text-emerald-700">
+                        {item.status === 'Sudah Bayar' ? formatRupiah(item.pbbTerutang) : 'Rp 0'}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-black">
+                        <span className={item.status === 'Sudah Bayar' ? 'text-emerald-700' : 'text-rose-600'}>
+                          {item.status === 'Sudah Bayar' ? '100%' : '0%'}
+                        </span>
+                      </td>
                       <td className="py-2.5 px-3 text-center font-bold">Lingk {item.lingkungan}</td>
                       <td className="py-2.5 px-3 text-center">
                         <span
@@ -1198,14 +1301,33 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       {/* SUB-TAB 3: IMPORT / PASTE SPREADSHEET */}
       {activeSubTab === 'import_csv' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-6 space-y-4">
-          <div className="space-y-1">
-            <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-              <Upload className="w-5 h-5 text-emerald-600" />
-              <span>Import atau Paste Data SPPT PBB dari Google Sheets / Excel</span>
-            </h2>
-            <p className="text-xs text-slate-600">
-              Copy seluruh baris dari Google Sheets Anda (Kolom A s.d. H: NO, NOP, BUKU, Nama WP, Alamat OP, PBB, Status, LING) dan paste ke dalam kotak di bawah ini untuk memperbarui rekapitulasi realisasi.
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-4">
+            <div className="space-y-1 flex-1">
+              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Upload className="w-5 h-5 text-emerald-600" />
+                <span>Import atau Paste Data SPPT PBB dari Google Sheets / Excel</span>
+              </h2>
+              <p className="text-xs text-slate-600">
+                Copy seluruh baris dari Google Sheets Anda (Kolom A s.d. H: NO, NOP, BUKU, Nama WP, Alamat OP, PBB, Status, LING) dan paste ke dalam kotak di bawah ini untuk memperbarui rekapitulasi realisasi.
+              </p>
+            </div>
+            
+            {/* Target Year Selector for Import */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50/80 text-xs font-bold text-emerald-900 self-start shadow-2xs">
+              <Calendar className="w-4 h-4 text-emerald-700" />
+              <span>Target Tahun Pajak:</span>
+              <select
+                value={selectedYear}
+                onChange={(e) => handleYearChange(parseInt(e.target.value, 10))}
+                className="bg-white border border-emerald-300 text-emerald-950 font-black rounded px-2.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer text-xs transition-all"
+              >
+                {AVAILABLE_PBB_YEARS.map((yr) => (
+                  <option key={yr} value={yr}>
+                    {yr} {yr === 2026 ? '(Default)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="space-y-2">
