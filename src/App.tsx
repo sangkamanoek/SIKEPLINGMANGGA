@@ -55,10 +55,14 @@ import { EditProfileModal } from './components/EditProfileModal';
 import { AbsenApelModal } from './components/AbsenApelModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { AbsenApelItem } from './types';
+import { AbsenApelItem, CustomEvent, EventAttendance } from './types';
 import { loadAllAttendance } from './lib/attendanceApi';
-import { subscribeAttendanceFromFirestore, wipeAllFirestoreCapaianData, subscribeCustomEventsFromFirestore } from './lib/firestoreService';
-import { CustomEvent } from './types';
+import {
+  subscribeAttendanceFromFirestore,
+  wipeAllFirestoreCapaianData,
+  subscribeCustomEventsFromFirestore,
+  subscribeEventAttendanceFromFirestore,
+} from './lib/firestoreService';
 import { wipeAllPbbSpptEverywhere } from './lib/pbbService';
 import { consolidateDailyReport } from './lib/reportConsolidator';
 import {
@@ -138,6 +142,14 @@ export default function App() {
   const [isAbsenApelModalOpen, setIsAbsenApelModalOpen] = useState(false);
   const [customEvents, setCustomEvents] = useState<CustomEvent[]>([]);
   const [attendanceList, setAttendanceList] = useState<AbsenApelItem[]>([]);
+  const [eventAttendanceList, setEventAttendanceList] = useState<EventAttendance[]>([]);
+  const [kunjunganList, setKunjunganList] = useState<any[]>(() => {
+    try {
+      const stored = localStorage.getItem('sikepling_kunjungan_harian_list_v1');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return [];
+  });
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
 
@@ -395,6 +407,30 @@ export default function App() {
       setCustomEvents(data);
     });
 
+    // Subscribe to real-time event attendance
+    const unsubscribeEventAttendance = subscribeEventAttendanceFromFirestore((items) => {
+      if (Array.isArray(items)) {
+        setEventAttendanceList(items);
+      }
+    });
+
+    // Single lightweight fetch for kunjungan (strips base64 photos to save Vercel bandwidth)
+    fetch(`/api/kunjungan?light=true&_t=${Date.now()}`, { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((json) => {
+        if (Array.isArray(json?.data) && json.data.length > 0) {
+          setKunjunganList((prev) => {
+            const map = new Map<string, any>();
+            json.data.forEach((k: any) => map.set(k.id, k));
+            prev.forEach((k: any) => {
+              if (!map.has(k.id)) map.set(k.id, k);
+            });
+            return Array.from(map.values());
+          });
+        }
+      })
+      .catch(() => {});
+
     const pollNotifications = setInterval(() => {
       if (typeof window === 'undefined' || !('Notification' in window)) return;
       if (window.Notification.permission !== 'granted') return;
@@ -440,6 +476,7 @@ export default function App() {
       unsubscribeFirestoreReports();
       unsubscribeAttendance();
       unsubscribeEvents();
+      unsubscribeEventAttendance();
       clearInterval(pollNotifications);
       unsubscribe();
     };
@@ -777,9 +814,10 @@ export default function App() {
       )}
 
       {/* Navigation Tabs Bar */}
-      <div className="bg-white border-b border-slate-200 shadow-2xs sticky top-0 z-30 print:hidden">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between overflow-x-auto">
-          <div className="flex gap-1">
+      {/* Modern, Aesthetic Navigation Tabs Bar (Floating Glass Capsule Switcher) */}
+      <div className="bg-slate-50/80 backdrop-blur-md border-b border-slate-200/70 sticky top-0 z-30 py-2.5 px-2 print:hidden">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 overflow-x-auto no-scrollbar scroll-smooth">
+          <div className="flex items-center gap-2 pr-2">
             {activeAccount.role === 'kepling' ? (
               <>
                 {/* Kepling Tab - Hub */}
@@ -787,13 +825,13 @@ export default function App() {
                   id="tab-hub-kepling"
                   type="button"
                   onClick={() => setActiveTab('hub')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     activeTab === 'hub'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                   }`}
                 >
-                  <Compass className="w-4 h-4 text-emerald-700" />
+                  <Compass className={`w-4 h-4 ${activeTab === 'hub' ? 'text-white' : 'text-emerald-600'}`} />
                   <span>Pusat Menu</span>
                 </button>
 
@@ -802,11 +840,11 @@ export default function App() {
                   id="tab-absen-apel-kepling"
                   type="button"
                   onClick={() => setIsAbsenApelModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-black border-b-2 border-transparent text-amber-700 hover:text-amber-900 hover:bg-amber-50 cursor-pointer whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer whitespace-nowrap transition-all shadow-3xs"
                 >
-                  <UserCheck className="w-4 h-4 text-amber-600" />
+                  <UserCheck className="w-4 h-4 text-amber-600 animate-pulse" />
                   <span>Absen Apel Pagi</span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-400 text-slate-950 shadow-2xs">
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-200 text-slate-950">
                     PRESENSI
                   </span>
                 </button>
@@ -816,13 +854,13 @@ export default function App() {
                   id="tab-kegiatan-khusus"
                   type="button"
                   onClick={() => setActiveTab('kegiatan_khusus')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     activeTab === 'kegiatan_khusus'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                   }`}
                 >
-                  <UserCheck className="w-4 h-4 text-emerald-700" />
+                  <UserCheck className={`w-4 h-4 ${activeTab === 'kegiatan_khusus' ? 'text-white' : 'text-emerald-600'}`} />
                   <span>Absen Kegiatan Khusus</span>
                 </button>
 
@@ -831,15 +869,15 @@ export default function App() {
                   id="tab-kunjungan-warga-kepling"
                   type="button"
                   onClick={() => setActiveTab('kunjungan')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     activeTab === 'kunjungan'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                   }`}
                 >
-                  <Users className="w-4 h-4 text-emerald-700" />
+                  <Users className={`w-4 h-4 ${activeTab === 'kunjungan' ? 'text-white' : 'text-emerald-600'}`} />
                   <span>Kunjungan Harian</span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'kunjungan' ? 'bg-emerald-700 text-emerald-100' : 'bg-emerald-100 text-emerald-800'}`}>
                     WARGA
                   </span>
                 </button>
@@ -849,13 +887,13 @@ export default function App() {
                   id="tab-input-laporan"
                   type="button"
                   onClick={() => setActiveTab('form')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     activeTab === 'form'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                   }`}
                 >
-                  <FileText className="w-4 h-4 text-emerald-700" />
+                  <FileText className={`w-4 h-4 ${activeTab === 'form' ? 'text-white' : 'text-emerald-600'}`} />
                   <span>Formulir Laporan</span>
                 </button>
 
@@ -864,15 +902,15 @@ export default function App() {
                   id="tab-pemetaan-kepling"
                   type="button"
                   onClick={() => setActiveTab('pemetaan')}
-                  className={`inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     activeTab === 'pemetaan'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                   }`}
                 >
-                  <Compass className="w-4 h-4 text-emerald-700" />
+                  <Compass className={`w-4 h-4 ${activeTab === 'pemetaan' ? 'text-white' : 'text-emerald-600'}`} />
                   <span>Peta &amp; WRS</span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-300 text-slate-950">
+                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'pemetaan' ? 'bg-emerald-700 text-emerald-100' : 'bg-amber-300 text-slate-950'}`}>
                     GIS
                   </span>
                 </button>
@@ -882,15 +920,15 @@ export default function App() {
                   id="tab-capaian-kepling"
                   type="button"
                   onClick={() => setActiveTab('capaian')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     activeTab === 'capaian'
-                      ? 'border-emerald-600 text-emerald-900 bg-emerald-50/70 font-black'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                   }`}
                 >
-                  <Award className="w-4 h-4 text-amber-500" />
+                  <Award className={`w-4 h-4 ${activeTab === 'capaian' ? 'text-white' : 'text-amber-500'}`} />
                   <span>Dashboard Capaian</span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-100 text-amber-800">
+                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'capaian' ? 'bg-emerald-700 text-emerald-100' : 'bg-amber-100 text-amber-800'}`}>
                     SAYA
                   </span>
                 </button>
@@ -900,15 +938,15 @@ export default function App() {
                   id="tab-pbb-kepling"
                   type="button"
                   onClick={() => setActiveTab('rekap_pbb')}
-                  className={`inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     activeTab === 'rekap_pbb'
-                      ? 'border-emerald-600 text-emerald-900 bg-emerald-50/70 font-black'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                   }`}
                 >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                  <FileSpreadsheet className={`w-4 h-4 ${activeTab === 'rekap_pbb' ? 'text-white' : 'text-emerald-700'}`} />
                   <span>PBB Lingkungan {activeAccount.nomorLingkungan || ''}</span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'rekap_pbb' ? 'bg-emerald-700 text-emerald-100' : 'bg-emerald-100 text-emerald-800'}`}>
                     2026
                   </span>
                 </button>
@@ -921,13 +959,13 @@ export default function App() {
                     setRiwayatFilterPetugas(activeAccount.nama);
                     setActiveTab('riwayat');
                   }}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     activeTab === 'riwayat'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                   }`}
                 >
-                  <History className="w-4 h-4 text-emerald-700" />
+                  <History className={`w-4 h-4 ${activeTab === 'riwayat' ? 'text-white' : 'text-emerald-700'}`} />
                   <span>Riwayat Laporan Saya</span>
                 </button>
               </>
@@ -938,34 +976,33 @@ export default function App() {
                   id="tab-hub-admin"
                   type="button"
                   onClick={() => setActiveTab('hub')}
-                  className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     activeTab === 'hub'
-                      ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
-                      : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                   }`}
                 >
-                  <Compass className="w-4 h-4 text-emerald-700" />
+                  <Compass className={`w-4 h-4 ${activeTab === 'hub' ? 'text-white' : 'text-emerald-700'}`} />
                   <span>Pusat Menu</span>
                 </button>
 
                 {/* Kasi Sektoral Dashboard Tab */}
                 {(activeAccount.role === 'kasi_pemerintahan' ||
                   activeAccount.role === 'kasi_pembangunan' ||
-                  activeAccount.role === 'kasi_trantibum' ||
-                  activeAccount.role === 'super_admin') && (
+                  activeAccount.role === 'kasi_trantibum') && (
                   <button
                     id="tab-dashboard-kasi"
                     type="button"
                     onClick={() => setActiveTab('dashboard_kasi')}
-                    className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                       activeTab === 'dashboard_kasi'
-                        ? 'border-teal-600 text-teal-950 bg-teal-50 font-black'
-                        : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                        ? 'bg-teal-600 text-white shadow-md shadow-teal-600/10 scale-[1.02] font-black'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                     }`}
                   >
-                    <Award className="w-4 h-4 text-teal-600" />
+                    <Award className={`w-4 h-4 ${activeTab === 'dashboard_kasi' ? 'text-white' : 'text-teal-600'}`} />
                     <span>Dashboard Sektoral</span>
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-teal-100 text-teal-800">
+                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'dashboard_kasi' ? 'bg-teal-700 text-teal-100' : 'bg-teal-100 text-teal-800'}`}>
                       {activeAccount.role === 'kasi_pemerintahan'
                         ? 'PBB'
                         : activeAccount.role === 'kasi_pembangunan'
@@ -981,15 +1018,15 @@ export default function App() {
                     id="tab-rekap-pbb-kasi"
                     type="button"
                     onClick={() => setActiveTab('rekap_pbb')}
-                    className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                       activeTab === 'rekap_pbb'
-                        ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
-                        : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                     }`}
                   >
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                    <FileSpreadsheet className={`w-4 h-4 ${activeTab === 'rekap_pbb' ? 'text-white' : 'text-emerald-700'}`} />
                     <span>Realisasi PBB</span>
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'rekap_pbb' ? 'bg-emerald-700 text-emerald-100' : 'bg-emerald-100 text-emerald-800'}`}>
                       2026
                     </span>
                   </button>
@@ -997,34 +1034,20 @@ export default function App() {
 
                 {activeAccount.role === 'super_admin' && (
                   <>
-                    {/* Super Admin Tab 0: Absen Apel Pagi 24 Kepling */}
-                    <button
-                      id="tab-absen-apel-admin"
-                      type="button"
-                      onClick={() => setIsAbsenApelModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-black border-b-2 border-transparent text-amber-900 hover:bg-amber-100/70 cursor-pointer whitespace-nowrap"
-                    >
-                      <UserCheck className="w-4 h-4 text-amber-600" />
-                      <span>Absen Apel Pagi</span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-400 text-slate-950 shadow-2xs">
-                        REKAP 24
-                      </span>
-                    </button>
-
                     {/* Super Admin Tab 1: Monitoring 24 Kepling */}
                     <button
                       id="tab-monitoring-super-admin"
                       type="button"
                       onClick={() => setActiveTab('monitoring')}
-                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                         activeTab === 'monitoring'
-                          ? 'border-amber-500 text-amber-900 bg-amber-50/80 font-black'
-                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                          ? 'bg-amber-600 text-white shadow-md shadow-amber-600/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                       }`}
                     >
-                      <ShieldCheck className="w-4 h-4 text-amber-600" />
+                      <ShieldCheck className={`w-4 h-4 ${activeTab === 'monitoring' ? 'text-white' : 'text-amber-600'}`} />
                       <span>Monitoring 24 Kepling</span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-200 text-amber-950">
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'monitoring' ? 'bg-amber-700 text-amber-100' : 'bg-amber-200 text-amber-950'}`}>
                         STATUS
                       </span>
                     </button>
@@ -1034,15 +1057,15 @@ export default function App() {
                       id="tab-capaian-super-admin"
                       type="button"
                       onClick={() => setActiveTab('capaian_admin')}
-                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                         activeTab === 'capaian_admin'
-                          ? 'border-amber-500 text-amber-900 bg-amber-50/80 font-black'
-                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                          ? 'bg-amber-600 text-white shadow-md shadow-amber-600/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                       }`}
                     >
-                      <Trophy className="w-4 h-4 text-amber-600" />
+                      <Trophy className={`w-4 h-4 ${activeTab === 'capaian_admin' ? 'text-white' : 'text-amber-600'}`} />
                       <span>Dashboard Capaian</span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'capaian_admin' ? 'bg-emerald-700 text-emerald-100' : 'bg-emerald-100 text-emerald-800'}`}>
                         24 KEPLING
                       </span>
                     </button>
@@ -1055,16 +1078,16 @@ export default function App() {
                         setRiwayatFilterPetugas(undefined);
                         setActiveTab('riwayat');
                       }}
-                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                         activeTab === 'riwayat'
-                          ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
-                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                       }`}
                     >
-                      <History className="w-4 h-4 text-emerald-700" />
+                      <History className={`w-4 h-4 ${activeTab === 'riwayat' ? 'text-white' : 'text-emerald-700'}`} />
                       <span>Semua Riwayat</span>
                       {reports.length > 0 && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-200 text-slate-800 font-bold">
+                        <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'riwayat' ? 'bg-emerald-700 text-emerald-100' : 'bg-slate-200 text-slate-800'}`}>
                           {reports.length}
                         </span>
                       )}
@@ -1075,15 +1098,15 @@ export default function App() {
                       id="tab-kunjungan-warga-admin"
                       type="button"
                       onClick={() => setActiveTab('kunjungan')}
-                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                         activeTab === 'kunjungan'
-                          ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
-                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                       }`}
                     >
-                      <Users className="w-4 h-4 text-emerald-700" />
+                      <Users className={`w-4 h-4 ${activeTab === 'kunjungan' ? 'text-white' : 'text-emerald-700'}`} />
                       <span>Kunjungan Harian</span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'kunjungan' ? 'bg-emerald-700 text-emerald-100' : 'bg-emerald-100 text-emerald-800'}`}>
                         24 LINGKUNGAN
                       </span>
                     </button>
@@ -1093,15 +1116,15 @@ export default function App() {
                       id="tab-pemetaan-admin"
                       type="button"
                       onClick={() => setActiveTab('pemetaan')}
-                      className={`inline-flex items-center gap-1.5 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                         activeTab === 'pemetaan'
-                          ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50 font-black'
-                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                       }`}
                     >
-                      <Compass className="w-4 h-4 text-emerald-700" />
+                      <Compass className={`w-4 h-4 ${activeTab === 'pemetaan' ? 'text-white' : 'text-emerald-700'}`} />
                       <span>WebGIS &amp; WRS</span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-400 text-slate-950 shadow-2xs">
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'pemetaan' ? 'bg-emerald-700 text-emerald-100' : 'bg-amber-400 text-slate-950 shadow-3xs'}`}>
                         PETA 24
                       </span>
                     </button>
@@ -1111,13 +1134,13 @@ export default function App() {
                       id="tab-input-laporan"
                       type="button"
                       onClick={() => setActiveTab('form')}
-                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                         activeTab === 'form'
-                          ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
-                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                       }`}
                     >
-                      <FileText className="w-4 h-4 text-emerald-700" />
+                      <FileText className={`w-4 h-4 ${activeTab === 'form' ? 'text-white' : 'text-emerald-700'}`} />
                       <span>Input Laporan</span>
                     </button>
 
@@ -1126,29 +1149,14 @@ export default function App() {
                       id="tab-kegiatan-khusus"
                       type="button"
                       onClick={() => setActiveTab('kegiatan_khusus')}
-                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                         activeTab === 'kegiatan_khusus'
-                          ? 'border-amber-500 text-amber-900 bg-amber-50/80 font-black'
-                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                          ? 'bg-amber-600 text-white shadow-md shadow-amber-600/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                       }`}
                     >
-                      <UserCheck className="w-4 h-4 text-amber-600" />
+                      <UserCheck className={`w-4 h-4 ${activeTab === 'kegiatan_khusus' ? 'text-white' : 'text-amber-600'}`} />
                       <span>Kegiatan Khusus</span>
-                    </button>
-
-                    {/* Super Admin Tab 7: Realisasi PBB */}
-                    <button
-                      id="tab-rekap-pbb-admin"
-                      type="button"
-                      onClick={() => setActiveTab('rekap_pbb')}
-                      className={`inline-flex items-center gap-2 py-3 px-3.5 sm:px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                        activeTab === 'rekap_pbb'
-                          ? 'border-amber-500 text-amber-900 bg-amber-50/80 font-black'
-                          : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                      }`}
-                    >
-                      <FileSpreadsheet className="w-4 h-4 text-amber-600" />
-                      <span>Realisasi PBB</span>
                     </button>
                   </>
                 )}
@@ -1162,11 +1170,11 @@ export default function App() {
               href={sheetMeta.spreadsheetUrl}
               target="_blank"
               rel="noreferrer"
-              className="hidden md:inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline shrink-0 pl-3"
+              className="hidden md:inline-flex items-center gap-1.5 text-xs font-black text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl border border-emerald-200 shrink-0 transition-all shadow-3xs"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
               <span>Google Sheets</span>
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className="w-3 h-3 text-emerald-600" />
             </a>
           )}
         </div>
@@ -1313,6 +1321,10 @@ export default function App() {
             onNavigateToForm={() => setActiveTab('form')}
             onNavigateToPemetaan={handleNavigateToPemetaan}
             onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
+            attendanceList={attendanceList}
+            eventAttendanceList={eventAttendanceList}
+            customEvents={customEvents}
+            kunjunganList={kunjunganList}
           />
         )}
 
@@ -1333,6 +1345,10 @@ export default function App() {
             onNavigateToForm={() => setActiveTab('form')}
             onNavigateToPemetaan={handleNavigateToPemetaan}
             onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
+            attendanceList={attendanceList}
+            eventAttendanceList={eventAttendanceList}
+            customEvents={customEvents}
+            kunjunganList={kunjunganList}
           />
         )}
 

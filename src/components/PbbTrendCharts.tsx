@@ -750,6 +750,119 @@ export const PbbTrendCharts: React.FC<PbbTrendChartsProps> = ({
         </div>
       )}
 
+      {/* 24 Lingkungan WP Comparative Chart */}
+      {selectedLingkungan === 'all' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-teal-600" />
+                <span>Grafik Perbandingan Jumlah Wajib Pajak (Target WP vs WP Lunas) per Lingkungan</span>
+              </h4>
+              <p className="text-xs text-slate-500 font-medium">
+                Membandingkan total target Wajib Pajak (SPPT) terdaftar dengan jumlah Wajib Pajak yang sudah melunasi pembayaran PBB di 24 lingkungan
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-teal-600 inline-block" /> WP Lunas
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-slate-300 inline-block" /> Total Target WP
+              </span>
+            </div>
+          </div>
+
+          <div className="w-full h-80 pt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={comparisonData}
+                margin={{ top: 20, right: 10, left: -20, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fill: '#475569', fontSize: 10, fontWeight: 700 }}
+                  axisLine={{ stroke: '#cbd5e1' }}
+                  tickLine={false}
+                  interval={0}
+                  angle={-45}
+                  textAnchor="end"
+                  height={50}
+                />
+                <YAxis
+                  tick={{ fill: '#475569', fontSize: 11, fontWeight: 500 }}
+                  axisLine={{ stroke: '#cbd5e1' }}
+                  tickLine={false}
+                  tickFormatter={(val) => `${val}`}
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl border border-slate-700 text-xs space-y-1 min-w-[210px]">
+                          <div className="font-black text-amber-300 border-b border-slate-700 pb-1">
+                            Lingkungan {data.lingkungan}
+                          </div>
+                          <div className="flex justify-between items-center text-slate-200">
+                            <span>Total Target WP:</span>
+                            <span className="font-bold">{data.totalWp.toLocaleString('id-ID')} WP</span>
+                          </div>
+                          <div className="flex justify-between items-center text-teal-400">
+                            <span>WP Lunas (Sudah Bayar):</span>
+                            <span className="font-black">{data.wpLunas.toLocaleString('id-ID')} WP</span>
+                          </div>
+                          <div className="flex justify-between items-center text-rose-300">
+                            <span>Sisa WP Belum Lunas:</span>
+                            <span className="font-bold">{(data.totalWp - data.wpLunas).toLocaleString('id-ID')} WP</span>
+                          </div>
+                          <div className="pt-1.5 mt-1 border-t border-slate-800 text-[11px] text-amber-300 flex justify-between">
+                            <span>Rasio Pelunasan WP:</span>
+                            <span className="font-extrabold">{data.persentaseWp.toFixed(2)}%</span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{ paddingTop: 12, fontSize: 11, fontWeight: 600 }}
+                  formatter={(value) => (value === 'wpLunas' ? 'Wajib Pajak Lunas (Sudah Bayar)' : 'Total Target Wajib Pajak (SPPT)')}
+                />
+                <Bar
+                  dataKey="wpLunas"
+                  name="wpLunas"
+                  fill="#0d9488"
+                  radius={[4, 4, 0, 0]}
+                >
+                  {comparisonData.map((entry, index) => (
+                    <Cell
+                      key={`comp-wp-${index}`}
+                      fill={
+                        entry.persentaseWp >= 80
+                          ? '#0d9488'
+                          : entry.persentaseWp >= 50
+                          ? '#14b8a6'
+                          : '#0284c7'
+                      }
+                    />
+                  ))}
+                </Bar>
+                <Bar
+                  dataKey="totalWp"
+                  name="totalWp"
+                  fill="#cbd5e1"
+                  radius={[4, 4, 0, 0]}
+                  opacity={0.6}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       {/* Evaluasi & Analisis Strategis Card */}
       <div className="bg-gradient-to-r from-emerald-900 to-teal-950 text-white rounded-2xl p-5 sm:p-6 shadow-md space-y-3">
         <div className="flex items-center gap-2 text-amber-300 font-black text-sm uppercase tracking-wide">

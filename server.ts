@@ -463,8 +463,22 @@ app.post('/api/accounts/restore', (req, res) => {
 // KUNJUNGAN WARGA (DOOR-TO-DOOR) CRUD ENDPOINTS
 // =========================================================================
 
-// GET all kunjungan records
-app.get('/api/kunjungan', (_req, res) => {
+// GET all kunjungan records (supports light=true to prevent Vercel data overage)
+app.get('/api/kunjungan', (req, res) => {
+  if (req.query.light === 'true') {
+    const lightKunjungan = kunjunganCache.map((k) => {
+      const { fotoRumah, ...rest } = k;
+      return {
+        ...rest,
+        hasFoto: Boolean(fotoRumah),
+      };
+    });
+    return res.json({
+      success: true,
+      count: lightKunjungan.length,
+      data: lightKunjungan,
+    });
+  }
   return res.json({
     success: true,
     count: kunjunganCache.length,
@@ -691,10 +705,32 @@ app.post('/api/wipe-all-data', (_req, res) => {
   }
 });
 
-// GET all reports
-app.get('/api/reports', (_req, res) => {
+// GET all reports (supports light=true to prevent Vercel 4.5MB payload limit & bandwidth overage)
+app.get('/api/reports', (req, res) => {
   const deletedSet = new Set(deletedReportsCache);
   const activeReports = reportsCache.filter((r) => r && r.id && !deletedSet.has(r.id));
+
+  if (req.query.light === 'true') {
+    const lightReports = activeReports.map((r) => {
+      const { dokumentasiFoto, ...rest } = r;
+      return {
+        ...rest,
+        jumlahDokumentasi: r.jumlahDokumentasi || dokumentasiFoto?.length || 0,
+        // Keep photo metadata without heavy base64 strings
+        dokumentasiFoto: Array.isArray(dokumentasiFoto)
+          ? dokumentasiFoto.map((f: any) => ({
+              id: f.id,
+              name: f.name,
+              timestamp: f.timestamp,
+              kategori: f.kategori,
+              url: f.url && f.url.length > 500 ? '' : f.url,
+            }))
+          : [],
+      };
+    });
+    return res.json({ success: true, count: lightReports.length, data: lightReports });
+  }
+
   res.json({ success: true, count: activeReports.length, data: activeReports });
 });
 

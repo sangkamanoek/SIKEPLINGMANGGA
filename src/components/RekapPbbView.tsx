@@ -31,6 +31,8 @@ import {
   ArrowRight,
   CreditCard,
   User,
+  Users,
+  Target,
   MapPin,
   Calendar
 } from 'lucide-react';
@@ -106,7 +108,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [selectedNopClassification, setSelectedNopClassification] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [sortBy, setSortBy] = useState<'lingkungan' | 'persentase' | 'target'>('persentase');
+  const [sortBy, setSortBy] = useState<'lingkungan' | 'persentase' | 'target' | 'wp_lunas_pct' | 'wp_lunas_qty'>('persentase');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeSubTab, setActiveTab] = useState<'rekap_lingkungan' | 'grafik_tren' | 'detail_sppt' | 'import_csv'>(() => {
     if (activeAccount?.role === 'kepling') {
@@ -529,6 +531,12 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       } else if (sortBy === 'target') {
         valA = a.targetNominal;
         valB = b.targetNominal;
+      } else if (sortBy === 'wp_lunas_pct') {
+        valA = a.persentaseWpLunas;
+        valB = b.persentaseWpLunas;
+      } else if (sortBy === 'wp_lunas_qty') {
+        valA = a.wpLunas;
+        valB = b.wpLunas;
       } else {
         valA = a.lingkungan;
         valB = b.lingkungan;
@@ -1242,6 +1250,91 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         </div>
       </div>
 
+      {/* Dedikasi Perbandingan Wajib Pajak Panel */}
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
+          <div>
+            <h4 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <Users className="w-4.5 h-4.5 text-emerald-600" />
+              <span>Perbandingan Target WP vs WP yang Sudah Membayar</span>
+            </h4>
+            <p className="text-[11px] text-slate-500 font-medium">
+              Analisis tingkat partisipasi & pelunasan Wajib Pajak (SPPT) aktif {selectedLingkungan === 'all' ? 'se-Kelurahan Mangga' : `di Lingkungan ${selectedLingkungan}`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-100/70 text-emerald-800 self-start sm:self-center">
+            <span>Rasio Pelunasan WP: {kelurahanTotals.persentaseWpLunas.toFixed(2)}%</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Target Wajib Pajak Stat */}
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200 flex items-center gap-3.5 shadow-2xs">
+            <div className="p-3 bg-slate-100 text-slate-600 rounded-lg">
+              <Target className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide">Total Target Wajib Pajak</p>
+              <p className="text-base sm:text-lg font-black text-slate-800 mt-0.5">{kelurahanTotals.totalWp.toLocaleString('id-ID')} <span className="text-xs text-slate-500 font-bold">SPPT (WP)</span></p>
+              <p className="text-[10px] text-slate-500 font-medium mt-0.5">Seluruh SPPT terdaftar tahun {selectedYear}</p>
+            </div>
+          </div>
+
+          {/* WP Sudah Membayar Stat */}
+          <div className="bg-white p-3.5 rounded-xl border border-emerald-200/80 flex items-center gap-3.5 shadow-2xs">
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wide">WP Sudah Membayar (Lunas)</p>
+              <p className="text-base sm:text-lg font-black text-slate-800 mt-0.5">{kelurahanTotals.wpLunas.toLocaleString('id-ID')} <span className="text-xs text-slate-500 font-bold">SPPT (WP)</span></p>
+              <p className="text-[10px] text-emerald-500 font-medium mt-0.5">Rasio pelunasan: <span className="font-bold text-emerald-600">{kelurahanTotals.persentaseWpLunas.toFixed(1)}%</span></p>
+            </div>
+          </div>
+
+          {/* Sisa WP Belum Membayar Stat */}
+          <div className="bg-white p-3.5 rounded-xl border border-amber-200/80 flex items-center gap-3.5 shadow-2xs">
+            <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-amber-600 uppercase tracking-wide">Sisa WP Belum Membayar</p>
+              <p className="text-base sm:text-lg font-black text-slate-800 mt-0.5">{kelurahanTotals.wpBelumLunas.toLocaleString('id-ID')} <span className="text-xs text-slate-500 font-bold">SPPT (WP)</span></p>
+              <p className="text-[10px] text-amber-500 font-medium mt-0.5">Sisa wajib pajak bertunggak: <span className="font-bold text-amber-600">{(100 - kelurahanTotals.persentaseWpLunas).toFixed(1)}%</span></p>
+            </div>
+          </div>
+        </div>
+
+        {/* Visual Progress Bar comparing Target WP vs Paid WP */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-xs font-black">
+            <span className="text-emerald-800 flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              <span>Sudah Membayar ({kelurahanTotals.wpLunas.toLocaleString('id-ID')} WP)</span>
+            </span>
+            <span className="text-slate-500 flex items-center gap-1">
+              <span>Belum Membayar ({kelurahanTotals.wpBelumLunas.toLocaleString('id-ID')} WP)</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+            </span>
+          </div>
+          
+          <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden border border-slate-300 flex">
+            <div 
+              className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-l-full flex items-center justify-center text-[9px] font-black text-white" 
+              style={{ width: `${kelurahanTotals.persentaseWpLunas}%` }}
+            >
+              {kelurahanTotals.persentaseWpLunas >= 15 ? `${kelurahanTotals.persentaseWpLunas.toFixed(1)}% Lunas` : ''}
+            </div>
+            <div 
+              className="bg-slate-300 h-full rounded-r-full flex items-center justify-center text-[9px] font-black text-slate-700" 
+              style={{ width: `${100 - kelurahanTotals.persentaseWpLunas}%` }}
+            >
+              {(100 - kelurahanTotals.persentaseWpLunas) >= 15 ? `${(100 - kelurahanTotals.persentaseWpLunas).toFixed(1)}% Belum` : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Sub Tab Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 pt-2 pb-2 rounded-xl shadow-2xs print:hidden overflow-x-auto">
         <div className="flex gap-2">
@@ -1387,8 +1480,10 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
-                <option value="persentase">Urutkan: Capaian tertinggi (%)</option>
+                <option value="persentase">Urutkan: Capaian nominal tertinggi (%)</option>
                 <option value="target">Urutkan: Target terbesar (Rp)</option>
+                <option value="wp_lunas_pct">Urutkan: Rasio WP Lunas tertinggi (%)</option>
+                <option value="wp_lunas_qty">Urutkan: Jumlah WP Lunas terbanyak</option>
                 <option value="lingkungan">Urutkan: Nomor Lingkungan</option>
               </select>
 
