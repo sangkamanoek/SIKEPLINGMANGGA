@@ -198,6 +198,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   };
 
   const [rawCsvInput, setRawCsvInput] = useState<string>('');
+  const [importMode, setImportMode] = useState<'master' | 'sync_status'>('master');
   const [parseSuccessMsg, setParseSuccessMsg] = useState<string | null>(null);
 
   // Modal State for Add/Edit WP
@@ -499,6 +500,81 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const handleParseCsvData = () => {
     if (!rawCsvInput.trim()) return;
 
+    if (importMode === 'sync_status') {
+      try {
+        const lines = rawCsvInput.split('\n');
+        let matchedCount = 0;
+        let notFoundCount = 0;
+        const parsedNops = new Set<string>();
+
+        lines.forEach(line => {
+          // Split by tabs or commas
+          const cells = line.split(/[\t,]/);
+          for (let cell of cells) {
+            cell = cell.trim();
+            // Remove non-digits
+            const digitsOnly = cell.replace(/[^0-9]/g, '');
+            // Check if it's a NOP (typically has length of 17 or 18 digits)
+            // e.g. 12.75.010.009.001-0004.0 (18 digits) or 12.75.010.009.001-0004 (17 digits)
+            if (digitsOnly.length >= 15 && digitsOnly.length <= 19) {
+              parsedNops.add(digitsOnly);
+              break; // Only one NOP per row
+            }
+          }
+        });
+
+        if (parsedNops.size === 0) {
+          alert('Sistem tidak menemukan format NOP yang valid di baris data Anda. Pastikan ada kolom NOP (Nomor Objek Pajak) yang tercantum di setiap baris.');
+          return;
+        }
+
+        setSpptList((prev) => {
+          const updated = prev.map(item => {
+            const cleanNop = item.nop.replace(/[^0-9]/g, '');
+            if (parsedNops.has(cleanNop)) {
+              matchedCount++;
+              return {
+                ...item,
+                status: 'Sudah Bayar' as const
+              };
+            }
+            return item;
+          });
+
+          const allExistingNops = new Set(prev.map(x => x.nop.replace(/[^0-9]/g, '')));
+          parsedNops.forEach(n => {
+            if (!allExistingNops.has(n)) {
+              notFoundCount++;
+            }
+          });
+
+          if (matchedCount > 0) {
+            const updatedMatches = updated.filter(item => {
+              const cleanNop = item.nop.replace(/[^0-9]/g, '');
+              return parsedNops.has(cleanNop);
+            });
+            batchSavePbbSpptToFirestore(updatedMatches, selectedYear)
+              .then(() => {
+                notify(`Sinkronisasi real-time berhasil disimpan ke server!`, 'success');
+              })
+              .catch(() => {
+                notify(`Gagal mengirim pembaruan sinkronisasi ke server`, 'error');
+              });
+          }
+
+          notify(`Sinkronisasi Selesai! Berhasil mencocokkan ${matchedCount} data NOP sebagai 'Sudah Bayar'. (${notFoundCount} NOP tidak terdaftar di database master).`, 'success');
+          return updated;
+        });
+
+        setRawCsvInput('');
+        setActiveTab('detail_sppt');
+      } catch (e) {
+        alert('Terjadi kesalahan saat memproses sinkronisasi data.');
+      }
+      return;
+    }
+
+    // Legacy mode:
     try {
       const { summary, spptItems } = parsePbbCsv(rawCsvInput);
 
@@ -1305,10 +1381,10 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             <div className="space-y-1 flex-1">
               <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <Upload className="w-5 h-5 text-emerald-600" />
-                <span>Import atau Paste Data SPPT PBB dari Google Sheets / Excel</span>
+                <span>Import atau Sinkronisasi Data SPPT PBB dari Excel / Sheets</span>
               </h2>
               <p className="text-xs text-slate-600">
-                Copy seluruh baris dari Google Sheets Anda (Kolom A s.d. H: NO, NOP, BUKU, Nama WP, Alamat OP, PBB, Status, LING) dan paste ke dalam kotak di bawah ini untuk memperbarui rekapitulasi realisasi.
+                Gunakan fasilitas ini untuk menambahkan data master baru atau memperbarui status pembayaran PBB secara massal dari file Excel Anda.
               </p>
             </div>
             
@@ -1330,21 +1406,86 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             </div>
           </div>
 
+          {/* Mode Selector */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => {
+                setImportMode('master');
+                setRawCsvInput('');
+              }}
+              className={`px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 justify-center cursor-pointer ${
+                importMode === 'master'
+                  ? 'bg-emerald-700 text-white shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <div className="text-left">
+                <p className="font-black">1. Import Master SPPT Baru</p>
+                <p className="text-[10px] opacity-80 font-normal">Membutuhkan 8 Kolom Lengkap (termasuk Lingkungan)</p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setImportMode('sync_status');
+                setRawCsvInput('');
+              }}
+              className={`px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 justify-center cursor-pointer ${
+                importMode === 'sync_status'
+                  ? 'bg-emerald-700 text-white shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <RefreshCw className="w-4 h-4" />
+              <div className="text-left">
+                <p className="font-black">2. Sinkronisasi Status Bayar (Cocokkan NOP)</p>
+                <p className="text-[10px] opacity-80 font-normal">Hanya butuh kolom NOP. Mengabaikan kolom Lingkungan!</p>
+              </div>
+            </button>
+          </div>
+
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-700 block">Paste Data CSV / Tab Separated Values (Kolom A-H):</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-slate-800 block">
+                {importMode === 'master' 
+                  ? 'Paste Data CSV/Spreadsheet (Format Lengkap Kolom A-H):' 
+                  : 'Paste Data Excel / Daftar WP Sudah Bayar (Cukup ada kolom NOP):'}
+              </label>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                {importMode === 'master' ? 'Format: NO | NOP | BUKU | NAMA | ALAMAT | PBB | STATUS | LING' : 'Format Bebas: NOP akan dideteksi otomatis'}
+              </span>
+            </div>
+
             <textarea
               rows={8}
               value={rawCsvInput}
               onChange={(e) => setRawCsvInput(e.target.value)}
-              placeholder={`Contoh:\n1,12.75.010.009.001-0001.0,"IV, V",MULIA MELIALA,JL LETJEN DJAMIN GINTING 88, Rp 2.835.604 ,Belum Bayar,1\n2,12.75.010.009.001-0002.0,"IV, V",PANTAS MELIALA,JL LETJEN DJAMIN GINTING 86, Rp 3.209.724 ,Belum Bayar,1`}
-              className="w-full p-3.5 rounded-xl border border-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50"
+              placeholder={importMode === 'master' 
+                ? `Contoh (Format 8 Kolom):\n1,12.75.010.009.001-0001.0,"IV, V",MULIA MELIALA,JL LETJEN DJAMIN GINTING 88, Rp 2.835.604 ,Belum Bayar,1\n2,12.75.010.009.001-0002.0,"IV, V",PANTAS MELIALA,JL LETJEN DJAMIN GINTING 86, Rp 3.209.724 ,Belum Bayar,1`
+                : `Tempel/Paste kolom dari Excel WP Sudah Bayar Anda (sistem otomatis mencari NOP):\n12.75.010.009.001-0004\tGINTING\tSudah Bayar\n12.75.010.009.001-0016\tOPONG GINTING\tSudah Bayar\n12.75.010.009.002-0002\tMOMIN SITEPU\tSudah Bayar`}
+              className="w-full p-3.5 rounded-xl border border-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 leading-relaxed"
             />
+          </div>
+
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-xs">
+            <p className="font-black text-amber-900 flex items-center gap-1.5">
+              <Info className="w-4 h-4 text-amber-700 shrink-0" />
+              <span>{importMode === 'master' ? 'Cara Import Master SPPT:' : 'Cara Sinkronisasi Tanpa Lingkungan (NOP Matching):'}</span>
+            </p>
+            <p className="text-amber-800 text-[11px] leading-relaxed">
+              {importMode === 'master' 
+                ? 'Gunakan opsi ini saat pertama kali mengimpor master database SPPT PBB tahunan Kelurahan Mangga yang memiliki kolom lingkungan lengkap.'
+                : 'Blok dan salin (Copy) tabel Excel Anda yang berisi NOP pembayar pajak, lalu tempel (Paste) di atas. Sistem secara otomatis membaca Nomor NOP di setiap baris, mencari data aslinya di sistem yang sudah terpetakan di lingkungannya masing-masing, dan langsung memperbarui statusnya menjadi "Sudah Bayar" (Lunas) sekaligus menyimpannya ke Firebase.'}
+            </p>
           </div>
 
           <div className="flex items-center justify-between gap-3 pt-2">
             <div className="flex items-center gap-2 text-xs text-slate-500">
-              <Info className="w-4 h-4 text-slate-400" />
-              <span>Sistem secara otomatis membersihkan format "Rp", spasi, dan koma.</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Sistem otomatis mengabaikan baris judul (header) dan karakter rupiah.</span>
             </div>
 
             <button
@@ -1352,8 +1493,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               disabled={!rawCsvInput.trim()}
               className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-2 shadow-2xs"
             >
-              <RefreshCw className="w-4 h-4" />
-              <span>Proses Data SPPT</span>
+              <RefreshCw className="w-4 h-4 animate-spin-hover" />
+              <span>{importMode === 'master' ? 'Proses Impor Master SPPT' : 'Sinkronkan Status Bayar (NOP Match)'}</span>
             </button>
           </div>
         </div>
