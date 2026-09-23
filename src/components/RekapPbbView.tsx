@@ -154,13 +154,52 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const handleManualSync = async () => {
     setIsSyncing(true);
     try {
-      await batchSavePbbSpptToFirestore(spptList, selectedYear);
-      const items = await fetchPbbSpptFromFirestore(selectedYear);
-      if (Array.isArray(items)) {
-        setSpptList(items);
-      }
-      notify(`Data PBB Tahun ${selectedYear} berhasil disinkronkan ke seluruh sistem!`, 'success');
-    } catch {
+      // 1. Ambil data ter-update secara online dari Firestore/Server terlebih dahulu
+      const onlineItems = await fetchPbbSpptFromFirestore(selectedYear);
+      const onlineArray = Array.isArray(onlineItems) ? onlineItems : [];
+
+      // 2. Gabungkan secara aman (Conflict Resolution: Status "Sudah Bayar" selalu menang!)
+      const map = new Map<string, SpptPbbItem>();
+      
+      // Masukkan data online terlebih dahulu (kebenaran server)
+      onlineArray.forEach(item => {
+        if (item && item.id) map.set(item.id, item);
+      });
+
+      // Gabungkan dengan data lokal, pastikan status "Sudah Bayar" dari mana pun dipertahankan
+      spptList.forEach(item => {
+        if (!item || !item.id) return;
+        const existing = map.get(item.id);
+        if (existing) {
+          const finalStatus = (existing.status === 'Sudah Bayar' || item.status === 'Sudah Bayar')
+            ? 'Sudah Bayar'
+            : 'Belum Bayar';
+          map.set(item.id, {
+            ...existing,
+            ...item,
+            status: finalStatus
+          });
+        } else {
+          map.set(item.id, item);
+        }
+      });
+
+      const mergedList = Array.from(map.values());
+      
+      // Urutkan list berdasarkan lingkungan dan nomor
+      mergedList.sort((a, b) => {
+        if (a.lingkungan !== b.lingkungan) return a.lingkungan - b.lingkungan;
+        return a.no - b.no;
+      });
+
+      // 3. Simpan hasil penggabungan aman ke server & Firestore
+      await batchSavePbbSpptToFirestore(mergedList, selectedYear);
+      
+      // 4. Perbarui state lokal
+      setSpptList(mergedList);
+      notify(`Sinkronisasi Dua Arah Berhasil! Data PBB Tahun ${selectedYear} telah diperbarui secara aman.`, 'success');
+    } catch (err) {
+      console.error('Error during manual sync:', err);
       notify('Gagal sinkronisasi data PBB', 'error');
     } finally {
       setIsSyncing(false);

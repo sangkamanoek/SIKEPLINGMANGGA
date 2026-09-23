@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Anti-Cache Headers: Ensure 100% online operation and zero client-side caching
 app.use((req, res, next) => {
