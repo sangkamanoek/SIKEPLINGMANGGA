@@ -31,6 +31,7 @@ import {
 import * as XLSX from 'xlsx';
 import { LaporanHarianItem, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import { isReportMatchingKepling } from '../lib/formatter';
 
 interface DashboardTrantibumKasiProps {
   reports: LaporanHarianItem[];
@@ -92,11 +93,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
   // 2. Aggregate All 7 Trantibum Dimensions per Kepling
   const keplingTrantibData = useMemo(() => {
     return KEPLING_ACCOUNTS.map((kepling) => {
-      const keplingReports = filteredReports.filter(
-        (r) =>
-          r.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase() ||
-          r.lingkungan?.trim().toLowerCase() === kepling.lingkungan.trim().toLowerCase()
-      );
+      const keplingReports = filteredReports.filter((r) => isReportMatchingKepling(r, kepling));
 
       // Helper text merger
       const allText = keplingReports

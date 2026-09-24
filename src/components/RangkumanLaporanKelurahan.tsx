@@ -39,6 +39,8 @@ import {
   getTodayLocalIso,
   isReportMatchingDate,
   getReportIsoDate,
+  isReportMatchingKepling,
+  extractNomorLingkungan,
   NAMA_BULAN,
 } from '../lib/formatter';
 import {
@@ -218,11 +220,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
 
       KEPLING_ACCOUNTS.forEach((kepling) => {
         let att = dayAttendances.find((a) => isAttendanceMatchingKepling(a, kepling));
-        const rep = dayReports.find(
-          (r) =>
-            r.keplingId === kepling.id ||
-            r.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase()
-        );
+        const rep = dayReports.find((r) => isReportMatchingKepling(r, kepling));
         if (!att && rep?.absenApel?.status) {
           att = { status: rep.absenApel.status as any } as any;
         }
@@ -266,8 +264,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
         const dayRep = reports.find(
           (r) =>
             isReportMatchingDate(r, day.dateStr) &&
-            (r.keplingId === kepling.id ||
-              r.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase())
+            isReportMatchingKepling(r, kepling)
         );
 
         if (!att && dayRep?.absenApel?.status) {
@@ -310,26 +307,30 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       const keplingWeekReports = reports.filter(
         (r) =>
           allWeekDates.some((d) => isReportMatchingDate(r, d)) &&
-          (r.keplingId === kepling.id ||
-            r.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase())
+          isReportMatchingKepling(r, kepling)
       );
       const totalLaporan = keplingWeekReports.length;
       const persenLaporan = Math.min(100, Math.round((totalLaporan / 5) * 100));
 
       // Kunjungan warga kepling ini dalam sepekan
-      const keplingWeekKunjungan = (kunjunganList || []).filter(
-        (k) =>
-          k &&
-          allWeekDates.some(
-            (d) =>
-              isAttendanceMatchingDate(k, d) ||
-              k.tanggal === d ||
-              (k.createdAt && k.createdAt.startsWith(d))
-          ) &&
-          (k.keplingId === kepling.id ||
-            k.lingkunganNomor === nomor ||
-            k.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase())
-      );
+      const keplingWeekKunjungan = (kunjunganList || []).filter((k) => {
+        if (!k) return false;
+        const inDate = allWeekDates.some(
+          (d) =>
+            isAttendanceMatchingDate(k, d) ||
+            k.tanggal === d ||
+            (k.createdAt && k.createdAt.startsWith(d))
+        );
+        if (!inDate) return false;
+        if (k.keplingId && kepling.id && k.keplingId.toLowerCase() === kepling.id.toLowerCase()) return true;
+        if (k.lingkunganNomor && nomor > 0 && Number(k.lingkunganNomor) === nomor) return true;
+        if (k.lingkungan) {
+          const lNum = extractNomorLingkungan(k.lingkungan);
+          if (lNum !== null && nomor > 0 && lNum === nomor) return true;
+        }
+        if (k.namaKepling && kepling.nama && k.namaKepling.trim().toLowerCase() === kepling.nama.trim().toLowerCase()) return true;
+        return false;
+      });
 
       // Akumulasi indikator sektoral sepekan
       let pbbWp = 0;
@@ -471,13 +472,8 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     return KEPLING_ACCOUNTS.map((kepling) => {
       const nomor = kepling.nomorLingkungan || 0;
 
-      // Cari Laporan Kinerja Terlebih Dahulu
-      const laporan = reportsOnDate.find(
-        (r) =>
-          r.keplingId === kepling.id ||
-          (r.jabatan && r.jabatan.toLowerCase().includes(`lingkungan ${kepling.lingkungan.replace('Lingkungan ', '').toLowerCase()}`)) ||
-          (r.namaKepling && r.namaKepling.trim().toLowerCase() === kepling.nama.trim().toLowerCase())
-      );
+      // Cari Laporan Kinerja Terlebih Dahulu dengan pencocokan presisi
+      const laporan = reportsOnDate.find((r) => isReportMatchingKepling(r, kepling));
 
       // Cari Presensi Apel di attendanceList dengan pencocokan fuzzy (ID, nomor, lingkungan, nama)
       let absen = attendanceOnDate.find((a) => isAttendanceMatchingKepling(a, kepling));
@@ -505,13 +501,18 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       }
 
       // Cari Kunjungan Warga
-      const kunjungan = kunjunganOnDate.filter(
-        (k) =>
-          k.keplingId === kepling.id ||
-          k.lingkunganNomor === nomor ||
-          (k.lingkungan && k.lingkungan.toLowerCase() === kepling.lingkungan.toLowerCase()) ||
-          (k.namaKepling && k.namaKepling.trim().toLowerCase() === kepling.nama.trim().toLowerCase())
-      );
+      const kunjungan = kunjunganOnDate.filter((k) => {
+        if (!k) return false;
+        if (k.keplingId && kepling.id && k.keplingId.toLowerCase() === kepling.id.toLowerCase()) return true;
+        if (k.lingkunganNomor && nomor > 0 && Number(k.lingkunganNomor) === nomor) return true;
+        if (k.lingkungan) {
+          const lNum = extractNomorLingkungan(k.lingkungan);
+          if (lNum !== null && nomor > 0 && lNum === nomor) return true;
+          if (k.lingkungan.trim().toLowerCase() === kepling.lingkungan.trim().toLowerCase()) return true;
+        }
+        if (k.namaKepling && kepling.nama && k.namaKepling.trim().toLowerCase() === kepling.nama.trim().toLowerCase()) return true;
+        return false;
+      });
 
       const statusLower = (absen?.status || '').toLowerCase().trim();
       const isApelHadir = Boolean(absen && (statusLower === 'hadir' || statusLower.includes('hadir')));

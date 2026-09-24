@@ -6,6 +6,7 @@ import {
   subscribeAttendanceFromFirestore,
 } from './firestoreService';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import { extractNomorLingkungan } from './formatter';
 
 const STORAGE_KEY_ATTENDANCE = 'kepling_absen_apel_list';
 
@@ -326,10 +327,15 @@ export function isAttendanceMatchingKepling(
 ): boolean {
   if (!item || !kepling) return false;
 
-  const nomor = kepling.nomorLingkungan || 0;
+  const nomor =
+    kepling.nomorLingkungan ||
+    extractNomorLingkungan(kepling.lingkungan) ||
+    extractNomorLingkungan(kepling.jabatan) ||
+    extractNomorLingkungan(kepling.id) ||
+    0;
 
   // 1. Direct account ID check (case-insensitive, handles with/without underscore)
-  if (item.accountId) {
+  if (item.accountId && kepling.id) {
     const itemAccId = String(item.accountId).trim().toLowerCase();
     const kepAccId = String(kepling.id).trim().toLowerCase();
     if (itemAccId === kepAccId) return true;
@@ -337,7 +343,8 @@ export function isAttendanceMatchingKepling(
 
     // Check numerical ID match e.g. "kepling_1" vs "kepling1" vs "1"
     const rawNum = itemAccId.replace(/[^0-9]/g, '');
-    if (rawNum && nomor > 0 && parseInt(rawNum, 10) === nomor) {
+    const kepNum = kepAccId.replace(/[^0-9]/g, '');
+    if (rawNum && kepNum && parseInt(rawNum, 10) === parseInt(kepNum, 10)) {
       return true;
     }
   }
@@ -349,40 +356,23 @@ export function isAttendanceMatchingKepling(
     }
   }
 
-  // 3. Lingkungan Name matching (handles "Lingkungan I", "Lingkungan 1", "Lk I", etc.)
+  // 3. Lingkungan Name matching via exact extractNomorLingkungan
   if (item.lingkungan) {
-    const itemLk = String(item.lingkungan).toLowerCase().trim();
-    const kepLk = String(kepling.lingkungan).toLowerCase().trim();
-    if (itemLk === kepLk) return true;
-
-    if (nomor > 0) {
-      const ROMAN_NUMERALS = [
-        'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x',
-        'xi', 'xii', 'xiii', 'xiv', 'xv', 'xvi', 'xvii', 'xviii', 'xix', 'xx',
-        'xxi', 'xxii', 'xxiii', 'xxiv'
-      ];
-      const roman = ROMAN_NUMERALS[nomor - 1];
-      if (
-        itemLk.includes(`lingkungan ${nomor}`) ||
-        itemLk.includes(`lingkungan ${roman}`) ||
-        itemLk.includes(`lk ${nomor}`) ||
-        itemLk.includes(`lk ${roman}`) ||
-        itemLk.includes(`lk. ${nomor}`) ||
-        itemLk.includes(`lk. ${roman}`)
-      ) {
-        return true;
-      }
+    const itemNum = extractNomorLingkungan(item.lingkungan);
+    if (itemNum !== null && nomor > 0) {
+      if (itemNum === nomor) return true;
     }
+
+    const itemLk = String(item.lingkungan).toLowerCase().trim();
+    const kepLk = String(kepling.lingkungan || '').toLowerCase().trim();
+    if (itemLk && kepLk && itemLk === kepLk) return true;
   }
 
   // 4. Nama Kepling matching
   if (item.namaKepling && kepling.nama) {
-    const cleanItem = String(item.namaKepling).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const cleanKep = String(kepling.nama).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanItem = String(item.namaKepling).toLowerCase().trim();
+    const cleanKep = String(kepling.nama).toLowerCase().trim();
     if (cleanItem === cleanKep) return true;
-    if (cleanItem.length >= 5 && (cleanKep.includes(cleanItem) || cleanItem.includes(cleanKep))) {
-      return true;
-    }
   }
 
   return false;

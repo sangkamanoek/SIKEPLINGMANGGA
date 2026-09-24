@@ -22,6 +22,7 @@ import {
 import * as XLSX from 'xlsx';
 import { LaporanHarianItem, TargetsCapaianMap, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import { isReportMatchingKepling } from '../lib/formatter';
 import {
   calculateEffectiveKinerja,
   DEFAULT_PERLINSOS_TARGETS,
@@ -84,11 +85,7 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
   // 2. Aggregate Perlinsos stats per Kepling
   const keplingPerlinsosStats = useMemo(() => {
     return KEPLING_ACCOUNTS.map((kepling, index) => {
-      const keplingReports = filteredReports.filter(
-        (r) =>
-          r.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase() ||
-          r.lingkungan?.trim().toLowerCase() === kepling.lingkungan.trim().toLowerCase()
-      );
+      const keplingReports = filteredReports.filter((r) => isReportMatchingKepling(r, kepling));
 
       // Reported Perlinsos KK
       const reportedKk = keplingReports.reduce((sum, r) => {

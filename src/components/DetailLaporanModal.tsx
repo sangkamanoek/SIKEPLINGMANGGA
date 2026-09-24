@@ -29,8 +29,14 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, AbsenApelItem } from '../types';
-import { formatTanggalIndonesia, generateReportPdfFileName, formatReportToText } from '../lib/formatter';
-import { loadAllAttendance } from '../lib/attendanceApi';
+import {
+  formatTanggalIndonesia,
+  generateReportPdfFileName,
+  formatReportToText,
+  isReportMatchingKepling,
+  extractNomorLingkungan,
+} from '../lib/formatter';
+import { loadAllAttendance, isAttendanceMatchingKepling, isAttendanceMatchingDate } from '../lib/attendanceApi';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
@@ -126,28 +132,27 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       }
     }
 
-    const kepling = KEPLING_ACCOUNTS.find(
-      (k) =>
-        (item.keplingId && k.id === item.keplingId) ||
-        k.nama.toLowerCase() === (item.namaKepling || '').toLowerCase() ||
-        k.jabatan.toLowerCase() === (item.jabatan || '').toLowerCase() ||
-        k.lingkungan.toLowerCase() === (item.jabatan || '').toLowerCase()
-    );
+    const kepling = KEPLING_ACCOUNTS.find((k) => isReportMatchingKepling(item, k));
     const targetKeplingId = item.keplingId || kepling?.id;
 
     const findMatch = (list: AbsenApelItem[]) => {
       return list.find((a) => {
-        const matchKepling =
-          (targetKeplingId && a.accountId === targetKeplingId) ||
-          (kepling && a.accountId === kepling.id) ||
-          a.namaKepling.toLowerCase() === (item.namaKepling || '').toLowerCase() ||
-          a.lingkungan.toLowerCase() === (item.jabatan || '').toLowerCase();
-
         const matchDate =
           (dateKey && a.tanggal === dateKey) ||
-          (item.createdAt && a.tanggal === item.createdAt.substring(0, 10));
+          (item.createdAt && a.tanggal === item.createdAt.substring(0, 10)) ||
+          (dateKey && isAttendanceMatchingDate(a, dateKey));
 
-        return matchKepling && matchDate;
+        if (!matchDate) return false;
+
+        if (kepling) {
+          return isAttendanceMatchingKepling(a, kepling);
+        }
+
+        const matchKepling =
+          (targetKeplingId && a.accountId === targetKeplingId) ||
+          a.namaKepling?.trim().toLowerCase() === (item.namaKepling || '').trim().toLowerCase();
+
+        return matchKepling;
       });
     };
 
@@ -222,9 +227,10 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       } catch {}
     }
 
-    const lkMatch = (item.jabatan || '').match(/Lingkungan\s+([IVXLCDM\d]+)/i) ||
-                    (item.namaKepling || '').match(/Lingkungan\s+([IVXLCDM\d]+)/i);
-    const itemLingkunganStr = lkMatch ? `Lingkungan ${lkMatch[1]}`.toLowerCase() : '';
+    const targetNomor =
+      extractNomorLingkungan(item.jabatan) ||
+      extractNomorLingkungan((item as any).lingkungan) ||
+      extractNomorLingkungan(item.keplingId);
     const itemNamaKeplingLower = (item.namaKepling || '').trim().toLowerCase();
 
     return kunjunganList.filter((k) => {
@@ -245,16 +251,15 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
       if (!dateMatch) return false;
 
-      const kKeplingId = (k.keplingId || '').trim();
+      const kKeplingId = (k.keplingId || '').trim().toLowerCase();
       const kNamaKepling = (k.namaKepling || '').trim().toLowerCase();
-      const kLingkungan = (k.lingkungan || '').trim().toLowerCase();
+      const kNomor = k.lingkunganNomor ? Number(k.lingkunganNomor) : extractNomorLingkungan(k.lingkungan);
 
-      const keplingMatch =
-        (item.keplingId && kKeplingId && item.keplingId === kKeplingId) ||
-        (itemNamaKeplingLower && kNamaKepling && (itemNamaKeplingLower.includes(kNamaKepling) || kNamaKepling.includes(itemNamaKeplingLower))) ||
-        (itemLingkunganStr && kLingkungan && itemLingkunganStr === kLingkungan);
+      if (item.keplingId && kKeplingId && item.keplingId.toLowerCase() === kKeplingId) return true;
+      if (targetNomor && kNomor && targetNomor === kNomor) return true;
+      if (itemNamaKeplingLower && kNamaKepling && itemNamaKeplingLower === kNamaKepling) return true;
 
-      return keplingMatch;
+      return false;
     });
   }, [kunjunganList, item, displayTanggal]);
 

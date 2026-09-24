@@ -309,31 +309,52 @@ const ROMAN_NUMERALS: [string, number][] = [
 
 /**
  * Ekstraksi nomor lingkungan (1 - 24) secara presisi tanpa salah mengenali angka romawi.
- * Mencegah bug di mana "Lingkungan XX" salah terbaca sebagai "Lingkungan X".
+ * Mencegah bug di mana "Lingkungan IV" atau "Lingkungan XX" salah terbaca sebagai "Lingkungan I" atau "Lingkungan X".
  */
 export function extractNomorLingkungan(text?: string | null): number | null {
   if (!text) return null;
   const upper = String(text).toUpperCase().trim();
 
-  // 1. Cek pola angka eksplisit: "Lingkungan 20", "LK 10", "Kepling 5"
-  const numMatch = upper.match(/\b(?:LINGKUNGAN|KEPLING|LK)\s*(\d{1,2})\b/i);
+  // 1. Cek pola angka Arab eksplisit: "Lingkungan 20", "LK 10", "Kepling 5", "LK. 1", "Lingkungan - 4"
+  const numMatch = upper.match(/\b(?:LINGKUNGAN|KEPLING|LK|KEPALA\s+LINGKUNGAN)[^\w\d]*0*([1-9]|1[0-9]|2[0-4])\b/i);
   if (numMatch) {
     const n = parseInt(numMatch[1], 10);
     if (n >= 1 && n <= 24) return n;
   }
 
-  // 2. Cek angka Romawi yang didahului kata Lingkungan/Kepling: "Lingkungan XX", "Kepala Lingkungan X"
+  // 2. Cek angka Romawi yang didahului kata Lingkungan/Kepling/LK/Kepala Lingkungan
   for (const [roman, num] of ROMAN_NUMERALS) {
-    const regex = new RegExp(`\\b(?:LINGKUNGAN|KEPLING|LK)\\s+${roman}\\b`, 'i');
+    const regex = new RegExp(`\\b(?:LINGKUNGAN|KEPLING|LK|KEPALA\\s+LINGKUNGAN)[^\\w\\d]+${roman}\\b`, 'i');
     if (regex.test(upper)) {
       return num;
     }
   }
 
-  // 3. Cek angka Romawi berdiri sendiri dengan word boundary
+  // 3. Cek format ID seperti "kepling_1", "kepling1", "kepling_01", "lingkungan_4"
+  const idNumMatch = upper.match(/^(?:KEPLING|LINGKUNGAN|LK)[_.\-\s]*0*([1-9]|1[0-9]|2[0-4])$/i);
+  if (idNumMatch) {
+    const n = parseInt(idNumMatch[1], 10);
+    if (n >= 1 && n <= 24) return n;
+  }
+
+  // 4. Cek format ID dengan Romawi seperti "kepling_iv", "lingkungan_i"
   for (const [roman, num] of ROMAN_NUMERALS) {
-    const regex = new RegExp(`\\b${roman}\\b`, 'i');
-    if (regex.test(upper)) {
+    const idRomanRegex = new RegExp(`^(?:KEPLING|LINGKUNGAN|LK)[_\\-\\s.]*${roman}$`, 'i');
+    if (idRomanRegex.test(upper)) {
+      return num;
+    }
+  }
+
+  // 5. Cek jika seluruh string murni angka 1-24 ("1" .. "24", "01" .. "09")
+  const pureNumMatch = upper.match(/^0*([1-9]|1[0-9]|2[0-4])$/);
+  if (pureNumMatch) {
+    const n = parseInt(pureNumMatch[1], 10);
+    if (n >= 1 && n <= 24) return n;
+  }
+
+  // 6. Cek jika seluruh string murni Romawi I - XXIV ("I", "IV", "XXIV")
+  for (const [roman, num] of ROMAN_NUMERALS) {
+    if (upper === roman) {
       return num;
     }
   }
@@ -344,13 +365,19 @@ export function extractNomorLingkungan(text?: string | null): number | null {
 /**
  * Validasi apakah sebuah laporan benar-benar milik akun Kepling tertentu.
  * Menggunakan pencocokan keplingId, nama lengkap, dan nomor lingkungan eksak.
- * Menghindari penggunaan substring .includes('Lingkungan X') yang dapat salah mencocokkan 'Lingkungan XX'.
+ * Menghindari penggunaan substring .includes('Lingkungan X') yang dapat salah mencocokkan 'Lingkungan XX' / 'Lingkungan IV'.
  */
 export function isReportMatchingKepling(
   report: LaporanHarianItem,
   kepling: { id: string; nama: string; nomorLingkungan?: number; jabatan?: string; lingkungan?: string }
 ): boolean {
   if (!report || !kepling) return false;
+
+  const targetNomor =
+    kepling.nomorLingkungan ||
+    extractNomorLingkungan(kepling.lingkungan) ||
+    extractNomorLingkungan(kepling.jabatan) ||
+    extractNomorLingkungan(kepling.id);
 
   // 1. Jika laporan memiliki keplingId, cek kecocokan ID terlebih dahulu
   if (report.keplingId && kepling.id) {
@@ -359,24 +386,30 @@ export function isReportMatchingKepling(
     if (rId === kId) {
       return true;
     }
+    const rNum = report.keplingId.replace(/[^0-9]/g, '');
+    const kNum = kepling.id.replace(/[^0-9]/g, '');
+    if (rNum && kNum && parseInt(rNum, 10) === parseInt(kNum, 10)) {
+      return true;
+    }
   }
 
-  // 2. Pencocokan nama lengkap (case-insensitive & trimmed)
+  // 2. Pencocokan nomor lingkungan eksak (1 s/d 24)
+  const reportLingkunganNum =
+    extractNomorLingkungan(report.jabatan) ||
+    extractNomorLingkungan((report as any).lingkungan) ||
+    extractNomorLingkungan(report.keplingId);
+
+  if (reportLingkunganNum !== null && targetNomor) {
+    return reportLingkunganNum === targetNomor;
+  }
+
+  // 3. Pencocokan nama lengkap (case-insensitive & trimmed)
   if (report.namaKepling && kepling.nama) {
     const rName = report.namaKepling.trim().toLowerCase();
     const kName = kepling.nama.trim().toLowerCase();
     if (rName === kName) {
       return true;
     }
-  }
-
-  // 3. Pencocokan nomor lingkungan eksak (1 s/d 24)
-  const reportLingkunganNum =
-    extractNomorLingkungan(report.jabatan) ||
-    extractNomorLingkungan((report as any).lingkungan);
-
-  if (reportLingkunganNum !== null && kepling.nomorLingkungan) {
-    return reportLingkunganNum === kepling.nomorLingkungan;
   }
 
   // 4. Pencocokan string jabatan/lingkungan secara utuh (equality, BUKAN includes)

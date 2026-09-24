@@ -25,6 +25,7 @@ import {
 import * as XLSX from 'xlsx';
 import { LaporanHarianItem, TargetsCapaianMap, UserAccount, AbsenApelItem } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import { isReportMatchingKepling } from '../lib/formatter';
 import { RekapAbsensiSuperAdmin } from './RekapAbsensiSuperAdmin';
 import { calculateEffectiveKinerja } from '../data/targetsData';
 import {
@@ -145,11 +146,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   // 2. Aggregate PBB stats per Kepling
   const keplingPbbStats = useMemo(() => {
     return KEPLING_ACCOUNTS.map((kepling, index) => {
-      const keplingReports = filteredReports.filter(
-        (r) =>
-          r.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase() ||
-          r.lingkungan?.trim().toLowerCase() === kepling.lingkungan.trim().toLowerCase()
-      );
+      const keplingReports = filteredReports.filter((r) => isReportMatchingKepling(r, kepling));
 
       // Total WP from reports in this period
       const reportedPbbWp = keplingReports.reduce((sum, r) => {
@@ -195,11 +192,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   // 2b. Aggregate IKD stats per Kepling
   const keplingIkdStats = useMemo(() => {
     return KEPLING_ACCOUNTS.map((kepling, index) => {
-      const keplingReports = filteredReports.filter(
-        (r) =>
-          r.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase() ||
-          r.lingkungan?.trim().toLowerCase() === kepling.lingkungan.trim().toLowerCase()
-      );
+      const keplingReports = filteredReports.filter((r) => isReportMatchingKepling(r, kepling));
 
       // Total IKD from reports in this period
       const reportedIkdOrang = keplingReports.reduce((sum, r) => {
