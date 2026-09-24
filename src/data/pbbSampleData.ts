@@ -10,6 +10,7 @@ export interface SpptPbbItem {
   status: 'Sudah Bayar' | 'Belum Bayar';
   lingkungan: number;
   keterangan?: string;
+  updatedAt?: string;
 }
 
 export interface RekapLingkunganPbb {

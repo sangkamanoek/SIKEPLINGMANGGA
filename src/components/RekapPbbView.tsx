@@ -414,12 +414,17 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         lingkungan: formLingkungan,
         status: formStatus,
         keterangan: formKeterangan.trim(),
+        updatedAt: new Date().toISOString(),
       };
       setSpptList((prev) =>
         prev.map((item) => (item.id === editingWpItem.id ? updatedItem : item))
       );
       savePbbSpptToFirestore(updatedItem, selectedYear).catch(() => {});
-      notify(`Data WP "${formNamaWp.trim().toUpperCase()}" berhasil diperbarui dan tersimpan ke Firebase!`, 'success');
+      let msg = `Data WP "${formNamaWp.trim().toUpperCase()}" berhasil diperbarui ke "${formStatus}" dan tersimpan!`;
+      if (selectedStatusFilter === 'belum' && formStatus === 'Sudah Bayar') {
+        msg += ' (Catatan: Data berpindah dari filter "Khusus Belum Bayar". Ubah filter ke "Semua" atau "Khusus Sudah Bayar" untuk melihatnya).';
+      }
+      notify(msg, 'success');
     } else {
       // Create New Item
       const formattedNop = formatNop(formNop.trim());
@@ -435,6 +440,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         lingkungan: formLingkungan,
         status: formStatus,
         keterangan: formKeterangan.trim(),
+        updatedAt: new Date().toISOString(),
       };
 
       setSpptList((prev) => [newWp, ...prev]);
@@ -460,10 +466,18 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       prev.map((item) => {
         if (item.id === id) {
           const newStatus = item.status === 'Sudah Bayar' ? 'Belum Bayar' : 'Sudah Bayar';
-          const updatedItem = { ...item, status: newStatus as 'Sudah Bayar' | 'Belum Bayar' };
+          const updatedItem = {
+            ...item,
+            status: newStatus as 'Sudah Bayar' | 'Belum Bayar',
+            updatedAt: new Date().toISOString(),
+          };
           savePbbSpptToFirestore(updatedItem, selectedYear).catch(() => {});
+          let msg = `Status NOP ${item.nop} (${item.namaWp}) diubah menjadi "${newStatus}"`;
+          if (selectedStatusFilter === 'belum' && newStatus === 'Sudah Bayar') {
+            msg += ' (Catatan: Data berpindah dari filter "Khusus Belum Bayar". Ubah filter ke "Semua" atau "Khusus Sudah Bayar" untuk melihatnya).';
+          }
           notify(
-            `Status NOP ${item.nop} (${item.namaWp}) diubah menjadi "${newStatus}"`,
+            msg,
             newStatus === 'Sudah Bayar' ? 'success' : 'info'
           );
           return updatedItem;

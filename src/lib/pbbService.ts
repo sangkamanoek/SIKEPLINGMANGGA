@@ -209,9 +209,31 @@ export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbIte
 
     if (map.has(targetId)) {
       const existing = map.get(targetId)!;
+      const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+      const updateTime = update.updatedAt ? new Date(update.updatedAt).getTime() : 0;
+
+      let finalStatus: 'Sudah Bayar' | 'Belum Bayar';
+      let finalJumlahBayar: number | undefined;
+
+      if (existingTime > updateTime) {
+        // Local existing is newer than incoming update
+        finalStatus = existing.status;
+        finalJumlahBayar = existing.jumlahBayar;
+      } else if (updateTime > existingTime) {
+        // Incoming update is newer than local existing
+        finalStatus = update.status;
+        finalJumlahBayar = update.jumlahBayar;
+      } else {
+        // Timestamps equal or not present: "Sudah Bayar" is preserved (payment confirmation wins)
+        finalStatus = (existing.status === 'Sudah Bayar' || update.status === 'Sudah Bayar') ? 'Sudah Bayar' : 'Belum Bayar';
+        finalJumlahBayar = existing.status === 'Sudah Bayar' ? existing.jumlahBayar : update.jumlahBayar;
+      }
+
       map.set(targetId, {
         ...existing,
         ...update,
+        status: finalStatus,
+        jumlahBayar: finalJumlahBayar,
         id: targetId,
       });
     } else {
