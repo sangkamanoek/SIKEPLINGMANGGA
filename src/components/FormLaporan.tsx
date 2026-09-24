@@ -42,6 +42,7 @@ interface FormLaporanProps {
   preselectedKepling?: UserAccount | null;
   attendanceList?: AbsenApelItem[];
   onOpenAbsenApel?: () => void;
+  onBackToRangkuman?: () => void;
 }
 
 const STORAGE_KEY_PROFILE = 'kepling_profile_data';
@@ -70,6 +71,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   preselectedKepling,
   attendanceList = [],
   onOpenAbsenApel,
+  onBackToRangkuman,
 }) => {
   const today = new Date();
 
@@ -677,6 +679,29 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {onBackToRangkuman && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-3xs">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onBackToRangkuman}
+              className="px-4 py-2 rounded-xl text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-2 transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <span>← Kembali ke Rangkuman Kelurahan (24 Kepling)</span>
+            </button>
+            <div className="text-xs text-emerald-900 font-bold hidden md:block">
+              Mode Asistensi Input Laporan Kepala Lingkungan
+            </div>
+          </div>
+          <div className="text-xs font-semibold text-emerald-800 bg-white px-3 py-1.5 rounded-xl border border-emerald-200">
+            Formulir Aktif:{' '}
+            <strong>
+              {preselectedKepling ? `${preselectedKepling.lingkungan} (${preselectedKepling.nama})` : activeAccount?.nama || 'Petugas'}
+            </strong>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Form Controls (7 cols) */}
         <div className="lg:col-span-7 space-y-6">

@@ -17,6 +17,31 @@ import { getDefaultTargetsCapaianMap } from '../data/targetsData';
 // Local in-memory cache of deleted report IDs to prevent re-emergence
 const deletedReportIdsMemory = new Set<string>();
 
+/**
+ * Recursively cleans an object/array for Firestore writes by removing any fields with `undefined` values.
+ * Firestore strictly forbids `undefined` anywhere in document payloads.
+ */
+export function cleanFirestoreData<T extends Record<string, any>>(data: T): Record<string, any> {
+  if (!data || typeof data !== 'object') return data;
+  const cleaned: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) {
+      continue; // Skip undefined completely
+    } else if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+      cleaned[key] = cleanFirestoreData(value);
+    } else if (Array.isArray(value)) {
+      cleaned[key] = value
+        .filter((v) => v !== undefined)
+        .map((v) => (v !== null && typeof v === 'object' && !(v instanceof Date) ? cleanFirestoreData(v) : v));
+    } else {
+      cleaned[key] = value;
+    }
+  }
+
+  return cleaned;
+}
+
 export const shouldFilterReport = (report: any): boolean => {
   if (!report) return true;
   if (report.id && deletedReportIdsMemory.has(report.id)) {
@@ -117,7 +142,7 @@ export async function saveReportToFirestore(item: LaporanHarianItem): Promise<bo
     item.updatedAt = new Date().toISOString();
 
     const docRef = doc(db, REPORTS_COLLECTION, item.id);
-    await setDoc(docRef, item, { merge: true });
+    await setDoc(docRef, cleanFirestoreData(item), { merge: true });
 
     return true;
   } catch (error) {
@@ -129,7 +154,7 @@ export async function saveReportToFirestore(item: LaporanHarianItem): Promise<bo
         dokumentasiFoto: item.dokumentasiFoto?.slice(0, 4),
       };
       const docRef = doc(db, REPORTS_COLLECTION, item.id);
-      await setDoc(docRef, safeItem, { merge: true });
+      await setDoc(docRef, cleanFirestoreData(safeItem), { merge: true });
       return true;
     } catch (fallbackError) {
       handleFirestoreError(error, OperationType.WRITE, REPORTS_COLLECTION);
@@ -187,7 +212,7 @@ export async function batchSyncReportsToFirestore(items: LaporanHarianItem[]): P
         if (!item || !item.namaKepling || shouldFilterReport(item) || (item.id && deletedReportIdsMemory.has(item.id))) continue;
         const id = item.id || ('lap_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6));
         const docRef = doc(db, REPORTS_COLLECTION, id);
-        batch.set(docRef, { ...item, id }, { merge: true });
+        batch.set(docRef, cleanFirestoreData({ ...item, id }), { merge: true });
         synced++;
       }
 
@@ -342,7 +367,7 @@ export async function saveAllTargetsToFirestore(allTargets: TargetsCapaianMap): 
     for (const k of keys) {
       const item = allTargets[k];
       const docRef = doc(db, TARGETS_COLLECTION, k);
-      batch.set(docRef, { ...item, updatedAt: new Date().toISOString() }, { merge: true });
+      batch.set(docRef, cleanFirestoreData({ ...item, updatedAt: new Date().toISOString() }), { merge: true });
     }
 
     await batch.commit();

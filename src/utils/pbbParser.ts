@@ -8,7 +8,9 @@ export interface SpptPbbItem {
   pbbTerutang: number;
   status: 'Sudah Bayar' | 'Belum Bayar';
   lingkungan: number;
-  keterangan?: string;
+  jumlahBayar?: number | null;
+  keterangan?: string | null;
+  updatedAt?: string;
 }
 
 export interface SummaryLingkungan {

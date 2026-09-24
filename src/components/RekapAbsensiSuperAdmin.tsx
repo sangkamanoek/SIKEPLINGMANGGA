@@ -28,6 +28,7 @@ import {
   computeAttendanceSummary24,
   computeWeeklyAttendance24,
   computeMonthlyAttendance24,
+  getTodayAbsenForKepling,
   KeplingWeeklyRow,
   KeplingMonthlyRow,
 } from '../lib/attendanceApi';
@@ -83,11 +84,9 @@ export const RekapAbsensiSuperAdmin: React.FC<RekapAbsensiSuperAdminProps> = ({
   const weeklyData = computeWeeklyAttendance24(attendanceList, weekRefDate);
   const monthlyData = computeMonthlyAttendance24(attendanceList, selectedYear, selectedMonth);
 
-  // Daily records list for 24 Kepling
+  // Daily records list for 24 Kepling with smart fuzzy matching
   const dailyKeplingList = KEPLING_ACCOUNTS.map((acc) => {
-    const record = attendanceList.find(
-      (a) => a.accountId === acc.id && a.tanggal === selectedDate
-    );
+    const record = getTodayAbsenForKepling(attendanceList, acc.id, selectedDate);
     const absentStat = calculateAbsentDays(attendanceList, acc.id, selectedDate);
     return { account: acc, record, absentStat };
   });

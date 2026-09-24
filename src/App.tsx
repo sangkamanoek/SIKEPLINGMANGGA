@@ -32,6 +32,7 @@ import { uploadMakalahToGoogleDrive } from './lib/driveService';
 import { SUPER_ADMIN_ACCOUNT, getAccountById, syncPasswordsWithServer, syncProfilesWithServer, syncAccountsWithServer } from './data/keplingList';
 import { HeaderBanner } from './components/HeaderBanner';
 import { FormLaporan } from './components/FormLaporan';
+import { RangkumanLaporanKelurahan } from './components/RangkumanLaporanKelurahan';
 import { RiwayatLaporan } from './components/RiwayatLaporan';
 import { DetailLaporanModal } from './components/DetailLaporanModal';
 import { AccountSelectorModal } from './components/AccountSelectorModal';
@@ -55,14 +56,17 @@ import { EditProfileModal } from './components/EditProfileModal';
 import { AbsenApelModal } from './components/AbsenApelModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { AbsenApelItem, CustomEvent, EventAttendance } from './types';
-import { loadAllAttendance } from './lib/attendanceApi';
+import { AbsenApelItem, CustomEvent, EventAttendance, StatusAbsenApel } from './types';
+import { loadAllAttendance, getTodayAbsenForKepling } from './lib/attendanceApi';
 import {
   subscribeAttendanceFromFirestore,
+  saveAttendanceToFirestore,
   wipeAllFirestoreCapaianData,
   subscribeCustomEventsFromFirestore,
   subscribeEventAttendanceFromFirestore,
 } from './lib/firestoreService';
+import { KEPLING_ACCOUNTS } from './data/keplingList';
+import { getReportIsoDate, getTodayLocalIso } from './lib/formatter';
 import { wipeAllPbbSpptEverywhere } from './lib/pbbService';
 import { consolidateDailyReport } from './lib/reportConsolidator';
 import {
@@ -158,6 +162,9 @@ export default function App() {
     'hub' | 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb'
   >('hub');
 
+  // Sub-mode untuk tab 'form' bagi Super Admin: 'rangkuman' (default) atau 'formulir' (asistensi)
+  const [superAdminFormSubMode, setSuperAdminFormSubMode] = useState<'rangkuman' | 'formulir'>('rangkuman');
+
   // Targeted lingkungan for Pemetaan WebGIS deep-linking
   const [pemetaanTargetLingkungan, setPemetaanTargetLingkungan] = useState<string | undefined>(undefined);
 
@@ -196,19 +203,28 @@ export default function App() {
     setTimeout(() => setToastMsg(null), 4000);
   };
 
-  // Centralized report fetcher: reads from server with local cache fallback
+  // Centralized report & attendance fetcher: reads from server and Firestore in parallel
   const refreshAllReports = useCallback(async (showNotification = false) => {
     setIsRefreshingReports(true);
     try {
-      const serverReports = await fetchAllReports();
+      const [serverReports, freshAttendance] = await Promise.all([
+        fetchAllReports().catch(() => null),
+        loadAllAttendance().catch(() => null),
+      ]);
       if (serverReports) {
         setReports(serverReports);
-        if (showNotification) {
-          showToast(`Data berhasil diperbarui (${serverReports.length} laporan tersedia)`, 'success');
-        }
+      }
+      if (freshAttendance && freshAttendance.length > 0) {
+        setAttendanceList(freshAttendance);
+      }
+      if (showNotification) {
+        showToast(
+          `Data berhasil diperbarui (${serverReports?.length || 0} laporan, ${freshAttendance?.length || 0} presensi apel)`,
+          'success'
+        );
       }
     } catch (e) {
-      console.warn('Could not refresh reports from server:', e);
+      console.warn('Could not refresh data from server:', e);
     } finally {
       setIsRefreshingReports(false);
     }
@@ -543,6 +559,48 @@ export default function App() {
 
       // 3. Save to Firebase Firestore and Server buffer in parallel
       await saveReportToServer(reportToSave);
+
+      // 3b. Sync presensi apel from report to central attendance if not already recorded
+      if (reportToSave.absenApel && reportToSave.absenApel.status) {
+        try {
+          const isoDate = getReportIsoDate(reportToSave) || getTodayLocalIso();
+          const accId = reportToSave.keplingId || activeAccount.id;
+          const targetKepling = KEPLING_ACCOUNTS.find(
+            (k) => k.id === accId || k.nama.toLowerCase() === reportToSave.namaKepling.toLowerCase()
+          );
+
+          if (targetKepling) {
+            const hasExisting = getTodayAbsenForKepling(attendanceList, targetKepling.id, isoDate);
+            if (!hasExisting) {
+              const newAbsen: AbsenApelItem = {
+                id: `absen_${targetKepling.id}_${isoDate}`,
+                accountId: targetKepling.id,
+                namaKepling: targetKepling.nama,
+                lingkungan: targetKepling.lingkungan,
+                nomorLingkungan: targetKepling.nomorLingkungan,
+                tanggal: isoDate,
+                jam: reportToSave.absenApel.jam || '07:35 WIB',
+                waktuLengkap: reportToSave.absenApel.waktuLengkap || new Date().toISOString(),
+                status: (reportToSave.absenApel.status as StatusAbsenApel) || 'Hadir',
+                fotoSelfieUrl: reportToSave.absenApel.fotoSelfieUrl || '',
+                lokasiGps: reportToSave.absenApel.lokasiGps || 'Halaman Kantor Kelurahan Mangga (GPS Verified)',
+                catatan: reportToSave.absenApel.catatan || '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              };
+              saveAttendanceToFirestore(newAbsen).catch(() => {});
+              fetch('/api/attendance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newAbsen),
+              }).catch(() => {});
+              setAttendanceList((prev) => [newAbsen, ...prev.filter((a) => a.id !== newAbsen.id)]);
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Auto sync attendance notice:', syncErr);
+        }
+      }
 
       // 4. If Google account is connected, sync to Google Sheets in background/parallel
       const activeToken = token || (await getAccessToken());
@@ -1129,11 +1187,14 @@ export default function App() {
                       </span>
                     </button>
 
-                    {/* Super Admin Tab 5: Input Formulir (Bantuan/Asistensi) */}
+                    {/* Super Admin Tab 5: Input Formulir / Rangkuman Laporan */}
                     <button
                       id="tab-input-laporan"
                       type="button"
-                      onClick={() => setActiveTab('form')}
+                      onClick={() => {
+                        setSuperAdminFormSubMode('rangkuman');
+                        setActiveTab('form');
+                      }}
                       className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                         activeTab === 'form'
                           ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
@@ -1142,6 +1203,9 @@ export default function App() {
                     >
                       <FileText className={`w-4 h-4 ${activeTab === 'form' ? 'text-white' : 'text-emerald-700'}`} />
                       <span>Input Laporan</span>
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'form' ? 'bg-emerald-700 text-emerald-100' : 'bg-emerald-100 text-emerald-800'}`}>
+                        RANGKUMAN
+                      </span>
                     </button>
 
                     {/* Super Admin Tab 6: Kegiatan Khusus */}
@@ -1292,16 +1356,104 @@ export default function App() {
         )}
 
         {activeTab === 'form' && (
-          <FormLaporan
-            onSaveReport={handleSaveReport}
-            isSaving={isSaving}
-            hasGoogleAuth={Boolean(token)}
-            onConnectGoogle={handleConnectGoogle}
-            activeAccount={activeAccount}
-            preselectedKepling={preselectedKepling}
-            attendanceList={attendanceList}
-            onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
-          />
+          activeAccount.role === 'super_admin' ? (
+            <div className="space-y-4">
+              {/* Sub-Header Mode Switcher Khusus Super Admin */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200 shadow-xs">
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                  <button
+                    id="btn-submode-rangkuman"
+                    type="button"
+                    onClick={() => setSuperAdminFormSubMode('rangkuman')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      superAdminFormSubMode === 'rangkuman'
+                        ? 'bg-emerald-700 text-white shadow-xs font-black'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    📊 Rangkuman Seluruh Laporan (24 Kepling)
+                  </button>
+                  <button
+                    id="btn-submode-formulir"
+                    type="button"
+                    onClick={() => setSuperAdminFormSubMode('formulir')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      superAdminFormSubMode === 'formulir'
+                        ? 'bg-emerald-700 text-white shadow-xs font-black'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    📝 Formulir Input Asistensi Manual
+                  </button>
+                </div>
+
+                <div className="text-xs text-slate-500 font-semibold px-2">
+                  {superAdminFormSubMode === 'rangkuman' ? (
+                    <span className="text-emerald-700 font-bold">
+                      ✓ Menampilkan rekapitulasi apel, kinerja, dan kunjungan warga (NIHIL jika belum melapor)
+                    </span>
+                  ) : (
+                    <span>
+                      Target Asistensi:{' '}
+                      <strong className="text-slate-800">
+                        {preselectedKepling ? `${preselectedKepling.lingkungan} (${preselectedKepling.nama})` : 'Pilih di Formulir'}
+                      </strong>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {superAdminFormSubMode === 'rangkuman' ? (
+                <ErrorBoundary fallbackTitle="Gagal Memuat Rangkuman Kelurahan">
+                  <RangkumanLaporanKelurahan
+                    reports={reports}
+                    attendanceList={attendanceList}
+                    kunjunganList={kunjunganList}
+                    currentUser={activeAccount}
+                    onOpenReportDetail={(report) => {
+                      setSelectedReport(report);
+                      setIsModalOpen(true);
+                    }}
+                    onDraftForKepling={(kepling) => {
+                      setPreselectedKepling(kepling);
+                      setSuperAdminFormSubMode('formulir');
+                      showToast(`Formulir disiapkan untuk ${kepling.lingkungan} (${kepling.nama})`, 'info');
+                    }}
+                    onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
+                    onRefreshData={() => refreshAllReports(true)}
+                    isRefreshing={isRefreshingReports}
+                  />
+                </ErrorBoundary>
+              ) : (
+                <ErrorBoundary fallbackTitle="Gagal Memuat Formulir Laporan">
+                  <FormLaporan
+                    onSaveReport={handleSaveReport}
+                    isSaving={isSaving}
+                    hasGoogleAuth={Boolean(token)}
+                    onConnectGoogle={handleConnectGoogle}
+                    activeAccount={activeAccount}
+                    preselectedKepling={preselectedKepling}
+                    attendanceList={attendanceList}
+                    onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
+                    onBackToRangkuman={() => setSuperAdminFormSubMode('rangkuman')}
+                  />
+                </ErrorBoundary>
+              )}
+            </div>
+          ) : (
+            <ErrorBoundary fallbackTitle="Gagal Memuat Formulir Laporan">
+              <FormLaporan
+                onSaveReport={handleSaveReport}
+                isSaving={isSaving}
+                hasGoogleAuth={Boolean(token)}
+                onConnectGoogle={handleConnectGoogle}
+                activeAccount={activeAccount}
+                preselectedKepling={preselectedKepling}
+                attendanceList={attendanceList}
+                onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
+              />
+            </ErrorBoundary>
+          )
         )}
 
         {/* Dashboard Capaian Kepling Pribadi */}
@@ -1362,6 +1514,7 @@ export default function App() {
               }}
               onDraftForKepling={(kepling) => {
                 setPreselectedKepling(kepling);
+                setSuperAdminFormSubMode('formulir');
                 setActiveTab('form');
                 showToast(`Formulir disiapkan untuk ${kepling.lingkungan} (${kepling.nama})`, 'info');
               }}

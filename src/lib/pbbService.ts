@@ -11,6 +11,7 @@ import {
 import { db, handleFirestoreError, OperationType } from './firebase';
 import { SpptPbbItem, INITIAL_PBB_SUMMARY, SAMPLE_SPPT_ITEMS } from '../data/pbbSampleData';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
+import { cleanFirestoreData } from './firestoreService';
 
 export interface LingkunganPbbSummary {
   lingkungan: number;
@@ -51,15 +52,31 @@ export const getPbbStorageKey = (year: number): string => {
 export function getLocalSpptForYear(year: number): SpptPbbItem[] {
   const key = getPbbStorageKey(year);
   const defaultItems = year === 2026 ? SAMPLE_SPPT_ITEMS : [];
-  return safeGetLocalStorage<SpptPbbItem[]>(key, defaultItems);
+  const res = safeGetLocalStorage<SpptPbbItem[]>(key, []);
+  if (Array.isArray(res) && res.length > 0) return res;
+
+  // Check fallback storage keys (e.g. legacy master data key)
+  const legacyMaster = safeGetLocalStorage<SpptPbbItem[]>(`sikepling_pbb_master_data_${year}`, []);
+  if (Array.isArray(legacyMaster) && legacyMaster.length > 0) {
+    // Migrate to standard key
+    safeSetLocalStorage(key, JSON.stringify(legacyMaster));
+    return legacyMaster;
+  }
+
+  return defaultItems;
 }
 
 /**
- * Save SPPT items to localStorage
+ * Save SPPT items to localStorage and notify all components
  */
 export function saveLocalSpptForYear(items: SpptPbbItem[], year: number): void {
   const key = getPbbStorageKey(year);
   safeSetLocalStorage(key, JSON.stringify(items));
+  // Keep backup master data key in sync
+  safeSetLocalStorage(`sikepling_pbb_master_data_${year}`, JSON.stringify(items));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('pbb-data-updated', { detail: { year, count: items.length } }));
+  }
 }
 
 /**
@@ -218,27 +235,38 @@ export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbIte
       if (existingTime > updateTime) {
         // Local existing is newer than incoming update
         finalStatus = existing.status;
-        finalJumlahBayar = existing.jumlahBayar;
+        finalJumlahBayar = existing.jumlahBayar !== undefined ? existing.jumlahBayar : (existing.status === 'Sudah Bayar' ? existing.pbbTerutang : null);
       } else if (updateTime > existingTime) {
         // Incoming update is newer than local existing
         finalStatus = update.status;
-        finalJumlahBayar = update.jumlahBayar;
+        finalJumlahBayar = update.jumlahBayar !== undefined ? update.jumlahBayar : (update.status === 'Sudah Bayar' ? update.pbbTerutang : null);
       } else {
         // Timestamps equal or not present: "Sudah Bayar" is preserved (payment confirmation wins)
         finalStatus = (existing.status === 'Sudah Bayar' || update.status === 'Sudah Bayar') ? 'Sudah Bayar' : 'Belum Bayar';
-        finalJumlahBayar = existing.status === 'Sudah Bayar' ? existing.jumlahBayar : update.jumlahBayar;
+        const paidCandidate = existing.status === 'Sudah Bayar' 
+          ? (existing.jumlahBayar ?? existing.pbbTerutang) 
+          : (update.status === 'Sudah Bayar' ? (update.jumlahBayar ?? update.pbbTerutang) : null);
+        finalJumlahBayar = finalStatus === 'Sudah Bayar' ? paidCandidate : null;
       }
 
       map.set(targetId, {
         ...existing,
         ...update,
         status: finalStatus,
-        jumlahBayar: finalJumlahBayar,
+        jumlahBayar: finalJumlahBayar ?? null,
+        keterangan: update.keterangan || existing.keterangan || '',
         id: targetId,
       });
     } else {
       // New record added by user
-      map.set(update.id, { ...update });
+      const newItemPaid = update.jumlahBayar !== undefined 
+        ? update.jumlahBayar 
+        : (update.status === 'Sudah Bayar' ? update.pbbTerutang : null);
+      map.set(update.id, { 
+        ...update,
+        jumlahBayar: newItemPaid ?? null,
+        keterangan: update.keterangan || '',
+      });
       if (cleanNop) {
         nopMap.set(cleanNop, update.id);
       }
@@ -271,6 +299,7 @@ export function broadcastPbbChange(item: SpptPbbItem, year: number) {
     }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('pbb-item-synced', { detail: { item, year } }));
+      window.dispatchEvent(new CustomEvent('pbb-data-updated', { detail: { year } }));
     }
   } catch {
     // ignore
@@ -390,20 +419,59 @@ export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR)
 }
 
 /**
+ * Sanitizes and normalizes an SPPT item for safe writing to Firestore.
+ * Strictly guarantees `jumlahBayar` is either a valid number or null (NEVER undefined),
+ * and removes any undefined fields to prevent Firestore serialization errors.
+ */
+export function cleanPbbItemForFirestore(item: SpptPbbItem): Record<string, any> {
+  const isLunas = item.status === 'Sudah Bayar';
+  const terutang = typeof item.pbbTerutang === 'number'
+    ? item.pbbTerutang
+    : (Number(String(item.pbbTerutang || 0).replace(/[^0-9]/g, '')) || 0);
+
+  let jBayar: number | null = null;
+  if (item.jumlahBayar !== undefined && item.jumlahBayar !== null) {
+    const num = Number(item.jumlahBayar);
+    jBayar = isNaN(num) ? null : num;
+  } else if (isLunas) {
+    jBayar = terutang;
+  }
+
+  const rawDoc: Record<string, any> = {
+    id: String(item.id),
+    no: Number(item.no) || 1,
+    nop: item.nop ? String(item.nop).trim() : '',
+    buku: item.buku ? String(item.buku) : 'I, II, III',
+    namaWp: item.namaWp ? String(item.namaWp).trim() : '',
+    alamatOp: item.alamatOp ? String(item.alamatOp).trim() : '',
+    pbbTerutang: terutang,
+    status: isLunas ? 'Sudah Bayar' : 'Belum Bayar',
+    lingkungan: Number(item.lingkungan) || 1,
+    jumlahBayar: jBayar, // Guaranteed to be number or null, NEVER undefined!
+    keterangan: item.keterangan ? String(item.keterangan).trim() : '',
+    updatedAt: item.updatedAt || new Date().toISOString(),
+  };
+
+  return cleanFirestoreData(rawDoc);
+}
+
+/**
  * Save single SPPT item to Firebase Firestore AND Server Buffer AND broadcast
  */
 export async function savePbbSpptToFirestore(item: SpptPbbItem, year: number = DEFAULT_PBB_YEAR): Promise<boolean> {
+  const safePayload = cleanPbbItemForFirestore(item) as unknown as SpptPbbItem;
+
   // 1. Broadcast to other open tabs on same device (e.g. Super Admin vs Kasi Pem)
-  broadcastPbbChange(item, year);
+  broadcastPbbChange(safePayload, year);
 
   // 2. Save to Express Server Buffer (/api/pbb) for zero-latency multi-user sync
-  savePbbToApi(item, year).catch(() => {});
+  savePbbToApi(safePayload, year).catch(() => {});
 
   // 3. Save to Cloud Firestore
   try {
     const colName = `${PBB_COLLECTION_PREFIX}${year}`;
-    const docRef = doc(db, colName, item.id);
-    await setDoc(docRef, item, { merge: true });
+    const docRef = doc(db, colName, String(safePayload.id));
+    await setDoc(docRef, safePayload, { merge: true });
     return true;
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `${PBB_COLLECTION_PREFIX}${year}`);
@@ -415,23 +483,28 @@ export async function savePbbSpptToFirestore(item: SpptPbbItem, year: number = D
  * Batch save SPPT items to Firebase Firestore & Server Buffer
  */
 export async function batchSavePbbSpptToFirestore(items: SpptPbbItem[], year: number = DEFAULT_PBB_YEAR): Promise<number> {
+  if (!Array.isArray(items) || items.length === 0) return 0;
+
+  // 0. Pre-clean all items to guarantee clean fields (no undefined)
+  const sanitizedItems = items.map((item) => cleanPbbItemForFirestore(item) as unknown as SpptPbbItem);
+
   // 1. Save to Server Buffer
-  batchSavePbbToApi(items, year).catch(() => {});
+  batchSavePbbToApi(sanitizedItems, year).catch(() => {});
 
   // 2. Save to Firestore in chunks of 400
   try {
-    if (!Array.isArray(items) || items.length === 0) return 0;
     const colName = `${PBB_COLLECTION_PREFIX}${year}`;
     let savedCount = 0;
 
-    for (let i = 0; i < items.length; i += 400) {
-      const chunk = items.slice(i, i + 400);
+    for (let i = 0; i < sanitizedItems.length; i += 400) {
+      const chunk = sanitizedItems.slice(i, i + 400);
       const batch = writeBatch(db);
 
       for (const item of chunk) {
         if (!item || !item.id) continue;
-        const docRef = doc(db, colName, item.id);
-        batch.set(docRef, item, { merge: true });
+        const docRef = doc(db, colName, String(item.id));
+        const safeDoc = cleanPbbItemForFirestore(item);
+        batch.set(docRef, safeDoc, { merge: true });
         savedCount++;
       }
 

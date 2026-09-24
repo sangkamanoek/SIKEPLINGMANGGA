@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText,
   Award,
@@ -23,6 +23,15 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { UserAccount, LaporanHarianItem, AbsenApelItem } from '../types';
+import { SpptPbbItem } from '../data/pbbSampleData';
+import {
+  DEFAULT_PBB_YEAR,
+  AVAILABLE_PBB_YEARS,
+  getLocalSpptForYear,
+  fetchPbbSpptFromFirestore,
+  subscribePbbSpptFromFirestore,
+  computePbbOverview,
+} from '../lib/pbbService';
 
 interface SmartHubDashboardProps {
   activeAccount: UserAccount;
@@ -58,39 +67,156 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
     localStorage.setItem('sikepling_dashboard_style', style);
   };
 
-  // Live PBB database summary computed from LocalStorage (same as master SPPT)
-  const pbbSummary = React.useMemo(() => {
+  // Active PBB year (synced with user's selected year)
+  const [pbbYear, setPbbYear] = useState<number>(() => {
     try {
-      const year = 2026;
-      const cached = localStorage.getItem(`sikepling_pbb_master_data_${year}`);
-      if (cached) {
-        const list = JSON.parse(cached) as any[];
-        const totalCount = list.length;
-        const lunasList = list.filter(item => item.status === 'Sudah Bayar');
-        const lunasCount = lunasList.length;
-        const totalTarget = list.reduce((acc, item) => acc + (item.pbbTerutang || 0), 0);
-        const totalRealisasi = lunasList.reduce((acc, item) => acc + (item.pbbTerutang || 0), 0);
-        const percent = totalTarget > 0 ? (totalRealisasi / totalTarget) * 100 : 0;
+      const saved = localStorage.getItem('sikepling_pbb_selected_year');
+      if (saved) {
+        const num = parseInt(saved, 10);
+        if (AVAILABLE_PBB_YEARS.includes(num)) return num;
+      }
+    } catch {}
+    return DEFAULT_PBB_YEAR;
+  });
+
+  // Reactive live SPPT list state
+  const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => {
+    const list = getLocalSpptForYear(pbbYear);
+    if (list.length > 0) return list;
+    try {
+      const legacy = localStorage.getItem(`sikepling_pbb_master_data_${pbbYear}`);
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  // Subscribe to real-time PBB updates (Firestore, API buffer, LocalStorage, BroadcastChannel)
+  useEffect(() => {
+    // 1. Initial reload from local storage
+    const currentLocal = getLocalSpptForYear(pbbYear);
+    if (currentLocal.length > 0) {
+      setSpptList(currentLocal);
+    }
+
+    // 2. Fetch latest online
+    fetchPbbSpptFromFirestore(pbbYear).then((items) => {
+      if (Array.isArray(items) && items.length > 0) {
+        setSpptList(items);
+      }
+    }).catch(() => {});
+
+    // 3. Real-time subscription
+    const unsub = subscribePbbSpptFromFirestore(pbbYear, (items) => {
+      if (Array.isArray(items) && items.length > 0) {
+        setSpptList(items);
+      }
+    });
+
+    // 4. Local storage & cross-tab sync listeners
+    const handleSync = () => {
+      const updated = getLocalSpptForYear(pbbYear);
+      setSpptList(updated);
+    };
+
+    window.addEventListener('pbb-data-updated', handleSync);
+    window.addEventListener('pbb-item-synced', handleSync);
+    const handleWiped = () => setSpptList([]);
+    window.addEventListener('pbb-wiped-all', handleWiped);
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key && (e.key.includes('sikepling_sppt_pbb') || e.key.includes('sikepling_pbb_master_data'))) {
+        handleSync();
+      }
+      if (e.key === 'sikepling_pbb_selected_year' && e.newValue) {
+        const num = parseInt(e.newValue, 10);
+        if (AVAILABLE_PBB_YEARS.includes(num)) setPbbYear(num);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      unsub();
+      window.removeEventListener('pbb-data-updated', handleSync);
+      window.removeEventListener('pbb-item-synced', handleSync);
+      window.removeEventListener('pbb-wiped-all', handleWiped);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [pbbYear]);
+
+  // Live PBB database summary computed directly from synced SPPT data (same as RekapPbbView)
+  const pbbSummary = useMemo(() => {
+    // For Kepling role, focus on their assigned Lingkungan; for Super Admin / Kasi, whole kelurahan
+    const filteredList = isKepling && activeAccount.nomorLingkungan
+      ? spptList.filter(item => Number(item.lingkungan) === activeAccount.nomorLingkungan)
+      : spptList;
+
+    if (filteredList.length > 0) {
+      const totalCount = filteredList.length;
+      const lunasList = filteredList.filter(item => item.status === 'Sudah Bayar');
+      const lunasCount = lunasList.length;
+      const totalTarget = filteredList.reduce((acc, item) => acc + (Number(item.pbbTerutang) || 0), 0);
+      const totalRealisasi = lunasList.reduce((acc, item) => {
+        const paid = item.jumlahBayar !== undefined && item.jumlahBayar !== null
+          ? Number(item.jumlahBayar)
+          : (Number(item.pbbTerutang) || 0);
+        return acc + paid;
+      }, 0);
+      const percent = totalTarget > 0 
+        ? (totalRealisasi / totalTarget) * 100 
+        : (totalCount > 0 ? (lunasCount / totalCount) * 100 : 0);
+      const percentWp = totalCount > 0 ? (lunasCount / totalCount) * 100 : 0;
+
+      return {
+        totalCount,
+        lunasCount,
+        totalTarget,
+        totalRealisasi,
+        percent: percent > 0 ? percent : percentWp,
+        percentWp,
+      };
+    }
+
+    // Check computePbbOverview baseline if available
+    const overview = computePbbOverview(spptList, pbbYear);
+    if (overview.totalWp > 0) {
+      const lkTarget = isKepling && activeAccount.nomorLingkungan
+        ? overview.lingkunganSummaries.find(lk => lk.lingkungan === activeAccount.nomorLingkungan)
+        : null;
+
+      if (lkTarget && lkTarget.totalWp > 0) {
         return {
-          totalCount,
-          lunasCount,
-          totalTarget,
-          totalRealisasi,
-          percent,
+          totalCount: lkTarget.totalWp,
+          lunasCount: lkTarget.wpLunas,
+          totalTarget: lkTarget.targetNominal,
+          totalRealisasi: lkTarget.realisasiNominal,
+          percent: lkTarget.persentaseRealisasi || lkTarget.persentaseWpLunas,
+          percentWp: lkTarget.persentaseWpLunas,
         };
       }
-    } catch (e) {
-      console.error(e);
+
+      return {
+        totalCount: overview.totalWp,
+        lunasCount: overview.totalWpLunas,
+        totalTarget: overview.totalTargetNominal,
+        totalRealisasi: overview.totalRealisasiNominal,
+        percent: overview.persentaseRealisasiNominal || overview.persentaseWpLunas,
+        percentWp: overview.persentaseWpLunas,
+      };
     }
-    // Fallbacks
+
+    // Default clean state when database is empty (0 WP)
     return {
-      totalCount: 3120,
-      lunasCount: 1945,
-      totalTarget: 412500000,
-      totalRealisasi: 288750000,
-      percent: 70.0,
+      totalCount: 0,
+      lunasCount: 0,
+      totalTarget: 0,
+      totalRealisasi: 0,
+      percent: 0,
+      percentWp: 0,
     };
-  }, []);
+  }, [spptList, isKepling, activeAccount.nomorLingkungan, pbbYear]);
 
   // Stats / Compliance Helpers
   const todayStr = new Date().toISOString().split('T')[0];
@@ -173,14 +299,14 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
     },
     {
       id: 'pbb_lingkungan',
-      title: isKepling ? `Data PBB Lingkungan ${activeAccount.nomorLingkungan || ''}` : 'Rekapitulasi Realisasi PBB 2026',
+      title: isKepling ? `Data PBB Lingkungan ${activeAccount.nomorLingkungan || ''}` : `Rekapitulasi Realisasi PBB ${pbbYear}`,
       desc: isKepling
         ? `Pantau target nominal PBB, daftar SPPT Wajib Pajak Lingkungan ${activeAccount.nomorLingkungan || ''}, dan tandai WP lunas.`
-        : 'Rekapitulasi target dan realisasi penerimaan PBB-P2 Tahun 2026 di 24 Lingkungan Kelurahan Mangga.',
+        : `Rekapitulasi target dan realisasi penerimaan PBB-P2 Tahun ${pbbYear} di 24 Lingkungan Kelurahan Mangga.`,
       category: 'capaian',
       icon: FileSpreadsheet,
       iconBg: 'bg-emerald-50 text-emerald-700',
-      badge: isKepling ? 'PBB LINGKUNGAN' : 'PBB 2026',
+      badge: isKepling ? 'PBB LINGKUNGAN' : `PBB ${pbbYear}`,
       badgeColor: 'bg-emerald-100 text-emerald-800',
       action: () => onNavigate('rekap_pbb')
     },
@@ -345,9 +471,14 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
               className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
             >
               <div className="space-y-1.5">
-                <span className="text-[9px] uppercase font-black tracking-widest text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                  📊 Realisasi PBB-P2
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] uppercase font-black tracking-widest text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                    📊 Realisasi PBB-P2 {isKepling && activeAccount.nomorLingkungan ? `(Lingk. ${activeAccount.nomorLingkungan})` : `(${pbbYear})`}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-bold">
+                    {spptList.length > 0 ? 'Live Database' : 'Siap Input'}
+                  </span>
+                </div>
                 <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
                   Capaian Penerimaan PBB
                 </h3>
@@ -364,9 +495,9 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
                       style={{ width: `${Math.min(100, pbbSummary.percent)}%` }}
                     />
                   </div>
-                  <div className="flex justify-between text-[10px] text-slate-500 font-semibold pt-1 leading-none">
-                    <span>Lunas: {pbbSummary.lunasCount} WP</span>
-                    <span>Target: {pbbSummary.totalCount} WP</span>
+                  <div className="flex justify-between text-[10px] text-slate-600 font-bold pt-1 leading-none">
+                    <span className="text-emerald-700">Lunas: {pbbSummary.lunasCount.toLocaleString('id-ID')} WP</span>
+                    <span className="text-slate-500">Target: {pbbSummary.totalCount.toLocaleString('id-ID')} WP</span>
                   </div>
                 </div>
               </div>

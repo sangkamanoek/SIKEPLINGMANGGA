@@ -244,7 +244,152 @@ export async function submitAbsenApel(
 }
 
 /**
- * Get today's attendance record for a specific Kepling account
+ * Check whether an attendance item matches a target ISO date string (YYYY-MM-DD).
+ * Handles YYYY-MM-DD, DD-MM-YYYY, DD/MM/YYYY, Indonesian text dates, and ISO timestamps in UTC / WIB.
+ */
+export function isAttendanceMatchingDate(
+  item: AbsenApelItem | any,
+  targetDateIso: string
+): boolean {
+  if (!item || !targetDateIso) return false;
+
+  // 1. Direct match on item.tanggal
+  if (item.tanggal) {
+    const t = String(item.tanggal).trim();
+    if (t === targetDateIso) return true;
+
+    // Normalize DD-MM-YYYY or DD/MM/YYYY
+    const ddmmyyyy = t.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (ddmmyyyy) {
+      const d = ddmmyyyy[1].padStart(2, '0');
+      const m = ddmmyyyy[2].padStart(2, '0');
+      const y = ddmmyyyy[3];
+      if (`${y}-${m}-${d}` === targetDateIso) return true;
+    }
+
+    // Indonesian month name match e.g. "24 September 2026", "24 SEPT 2026"
+    const monthMatch = t.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+    if (monthMatch) {
+      const d = monthMatch[1].padStart(2, '0');
+      const monthStr = monthMatch[2].toUpperCase();
+      const y = monthMatch[3];
+      const monthNames = [
+        'JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI',
+        'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER'
+      ];
+      const mIdx = monthNames.findIndex(b => b.startsWith(monthStr) || monthStr.startsWith(b.slice(0, 3)));
+      if (mIdx >= 0) {
+        const m = String(mIdx + 1).padStart(2, '0');
+        if (`${y}-${m}-${d}` === targetDateIso) return true;
+      }
+    }
+  }
+
+  // 2. Check waktuLengkap (ISO string) with local/WIB conversion
+  if (item.waktuLengkap && typeof item.waktuLengkap === 'string') {
+    if (item.waktuLengkap.startsWith(targetDateIso)) return true;
+    try {
+      const dt = new Date(item.waktuLengkap);
+      if (!isNaN(dt.getTime())) {
+        const utc = dt.getTime() + dt.getTimezoneOffset() * 60000;
+        const wib = new Date(utc + 7 * 3600000);
+        const wibIso = `${wib.getFullYear()}-${String(wib.getMonth() + 1).padStart(2, '0')}-${String(wib.getDate()).padStart(2, '0')}`;
+        if (wibIso === targetDateIso) return true;
+      }
+    } catch {}
+  }
+
+  // 3. Check createdAt
+  if (item.createdAt && typeof item.createdAt === 'string') {
+    if (item.createdAt.startsWith(targetDateIso)) return true;
+    try {
+      const dt = new Date(item.createdAt);
+      if (!isNaN(dt.getTime())) {
+        const utc = dt.getTime() + dt.getTimezoneOffset() * 60000;
+        const wib = new Date(utc + 7 * 3600000);
+        const wibIso = `${wib.getFullYear()}-${String(wib.getMonth() + 1).padStart(2, '0')}-${String(wib.getDate()).padStart(2, '0')}`;
+        if (wibIso === targetDateIso) return true;
+      }
+    } catch {}
+  }
+
+  return false;
+}
+
+/**
+ * Smart matching of an attendance record to a Kepling account.
+ * Checks accountId, extracted number, nomorLingkungan, lingkungan name, and namaKepling.
+ */
+export function isAttendanceMatchingKepling(
+  item: AbsenApelItem | any,
+  kepling: UserAccount
+): boolean {
+  if (!item || !kepling) return false;
+
+  const nomor = kepling.nomorLingkungan || 0;
+
+  // 1. Direct account ID check (case-insensitive, handles with/without underscore)
+  if (item.accountId) {
+    const itemAccId = String(item.accountId).trim().toLowerCase();
+    const kepAccId = String(kepling.id).trim().toLowerCase();
+    if (itemAccId === kepAccId) return true;
+    if (itemAccId.replace(/_/g, '') === kepAccId.replace(/_/g, '')) return true;
+
+    // Check numerical ID match e.g. "kepling_1" vs "kepling1" vs "1"
+    const rawNum = itemAccId.replace(/[^0-9]/g, '');
+    if (rawNum && nomor > 0 && parseInt(rawNum, 10) === nomor) {
+      return true;
+    }
+  }
+
+  // 2. Nomor Lingkungan (handles number, numeric string)
+  if (item.nomorLingkungan !== undefined && item.nomorLingkungan !== null && nomor > 0) {
+    if (Number(item.nomorLingkungan) === nomor) {
+      return true;
+    }
+  }
+
+  // 3. Lingkungan Name matching (handles "Lingkungan I", "Lingkungan 1", "Lk I", etc.)
+  if (item.lingkungan) {
+    const itemLk = String(item.lingkungan).toLowerCase().trim();
+    const kepLk = String(kepling.lingkungan).toLowerCase().trim();
+    if (itemLk === kepLk) return true;
+
+    if (nomor > 0) {
+      const ROMAN_NUMERALS = [
+        'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x',
+        'xi', 'xii', 'xiii', 'xiv', 'xv', 'xvi', 'xvii', 'xviii', 'xix', 'xx',
+        'xxi', 'xxii', 'xxiii', 'xxiv'
+      ];
+      const roman = ROMAN_NUMERALS[nomor - 1];
+      if (
+        itemLk.includes(`lingkungan ${nomor}`) ||
+        itemLk.includes(`lingkungan ${roman}`) ||
+        itemLk.includes(`lk ${nomor}`) ||
+        itemLk.includes(`lk ${roman}`) ||
+        itemLk.includes(`lk. ${nomor}`) ||
+        itemLk.includes(`lk. ${roman}`)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  // 4. Nama Kepling matching
+  if (item.namaKepling && kepling.nama) {
+    const cleanItem = item.namaKepling.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanKep = kepling.nama.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanItem === cleanKep) return true;
+    if (cleanItem.length >= 5 && (cleanKep.includes(cleanItem) || cleanItem.includes(cleanKep))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Get today's attendance record for a specific Kepling account with smart fuzzy matching
  */
 export function getTodayAbsenForKepling(
   attendanceList: AbsenApelItem[],
@@ -252,9 +397,20 @@ export function getTodayAbsenForKepling(
   tanggal?: string
 ): AbsenApelItem | undefined {
   const dateStr = tanggal || getTodayDateString();
-  return attendanceList.find(
-    (a) => a.accountId === accountId && a.tanggal === dateStr
+  const kepling = KEPLING_ACCOUNTS.find(
+    (k) => k.id === accountId || k.id.replace(/_/g, '') === accountId.replace(/_/g, '')
   );
+
+  return attendanceList.find((a) => {
+    if (!isAttendanceMatchingDate(a, dateStr)) return false;
+    if (kepling) {
+      return isAttendanceMatchingKepling(a, kepling);
+    }
+    return (
+      a.accountId === accountId ||
+      a.accountId?.replace(/_/g, '') === accountId.replace(/_/g, '')
+    );
+  });
 }
 
 /**
@@ -275,22 +431,25 @@ export function computeAttendanceSummary24(
   tanggal?: string
 ): AttendanceSummary24 {
   const dateStr = tanggal || getTodayDateString();
-  const todayRecords = attendanceList.filter((a) => a.tanggal === dateStr && a.accountId !== 'super_admin');
 
   let hadir = 0;
   let izin = 0;
   let sakit = 0;
   let dinasLuar = 0;
 
-  todayRecords.forEach((rec) => {
-    if (rec.status === 'Hadir') hadir++;
-    else if (rec.status === 'Izin') izin++;
-    else if (rec.status === 'Sakit') sakit++;
-    else if (rec.status === 'Dinas Luar') dinasLuar++;
+  KEPLING_ACCOUNTS.forEach((kepling) => {
+    const rec = getTodayAbsenForKepling(attendanceList, kepling.id, dateStr);
+    if (rec) {
+      const st = (rec.status || '').toLowerCase();
+      if (st === 'hadir' || st.includes('hadir')) hadir++;
+      else if (st === 'izin' || st.includes('izin')) izin++;
+      else if (st === 'sakit' || st.includes('sakit')) sakit++;
+      else if (st === 'dinas luar' || st.includes('dinas')) dinasLuar++;
+    }
   });
 
   const totalKepling = KEPLING_ACCOUNTS.length; // 24
-  const totalSudahAbsen = todayRecords.length;
+  const totalSudahAbsen = hadir + izin + sakit + dinasLuar;
   const totalBelumAbsen = Math.max(0, totalKepling - totalSudahAbsen);
   const percentageHadir = Math.round((hadir / totalKepling) * 100);
 
@@ -347,7 +506,7 @@ export function calculateAbsentDays(
     const dateStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
 
     if (isWorkDay) {
-      const rec = attendanceList.find((a) => a.accountId === accountId && a.tanggal === dateStr);
+      const rec = getTodayAbsenForKepling(attendanceList, accountId, dateStr);
       const isToday = dateStr === todayStr;
 
       // Check if there's a required event today

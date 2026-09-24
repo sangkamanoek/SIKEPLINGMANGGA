@@ -62,6 +62,7 @@ import {
   deletePbbSpptFromFirestore,
   subscribePbbSpptFromFirestore,
   fetchPbbSpptFromFirestore,
+  smartMergeSpptItems,
   wipeAllPbbSpptEverywhere,
   formatNop,
   stripNonDigits,
@@ -218,41 +219,10 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       const onlineItems = await fetchPbbSpptFromFirestore(selectedYear);
       const onlineArray = Array.isArray(onlineItems) ? onlineItems : [];
 
-      // 2. Gabungkan secara aman (Conflict Resolution: Status "Sudah Bayar" selalu menang!)
-      const map = new Map<string, SpptPbbItem>();
-      
-      // Masukkan data online terlebih dahulu (kebenaran server)
-      onlineArray.forEach(item => {
-        if (item && item.id) map.set(item.id, item);
-      });
+      // 2. Gabungkan secara cerdas (Conflict Resolution: Status "Sudah Bayar" dan data terbaru dipertahankan)
+      const mergedList = smartMergeSpptItems(onlineArray, spptList);
 
-      // Gabungkan dengan data lokal, pastikan status "Sudah Bayar" dari mana pun dipertahankan
-      spptList.forEach(item => {
-        if (!item || !item.id) return;
-        const existing = map.get(item.id);
-        if (existing) {
-          const finalStatus = (existing.status === 'Sudah Bayar' || item.status === 'Sudah Bayar')
-            ? 'Sudah Bayar'
-            : 'Belum Bayar';
-          map.set(item.id, {
-            ...existing,
-            ...item,
-            status: finalStatus
-          });
-        } else {
-          map.set(item.id, item);
-        }
-      });
-
-      const mergedList = Array.from(map.values());
-      
-      // Urutkan list berdasarkan lingkungan dan nomor
-      mergedList.sort((a, b) => {
-        if (a.lingkungan !== b.lingkungan) return a.lingkungan - b.lingkungan;
-        return a.no - b.no;
-      });
-
-      // 3. Simpan hasil penggabungan aman ke server & Firestore
+      // 3. Simpan hasil penggabungan aman ke server & Firestore (sudah disanitasi otomatis)
       await batchSavePbbSpptToFirestore(mergedList, selectedYear);
       
       // 4. Perbarui state lokal
@@ -430,7 +400,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         alamatOp: formAlamatOp.trim().toUpperCase() || 'KELURAHAN MANGGA',
         buku: formBuku,
         pbbTerutang: nominalPbb,
-        jumlahBayar: formStatus === 'Sudah Bayar' ? nominalBayar : undefined,
+        jumlahBayar: formStatus === 'Sudah Bayar' ? nominalBayar : null,
         lingkungan: formLingkungan,
         status: formStatus,
         keterangan: formKeterangan.trim(),
@@ -456,7 +426,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         alamatOp: formAlamatOp.trim().toUpperCase() || 'KELURAHAN MANGGA',
         buku: formBuku,
         pbbTerutang: nominalPbb,
-        jumlahBayar: formStatus === 'Sudah Bayar' ? nominalBayar : undefined,
+        jumlahBayar: formStatus === 'Sudah Bayar' ? nominalBayar : null,
         lingkungan: formLingkungan,
         status: formStatus,
         keterangan: formKeterangan.trim(),
@@ -618,14 +588,27 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     let wp = 0;
     let lunas = 0;
 
-    summaryByLingkungan.forEach((item) => {
-      target += item.targetNominal;
-      realisasi += item.realisasiNominal;
-      wp += item.totalWp;
-      lunas += item.wpLunas;
-    });
+    if (selectedLingkungan === 'all') {
+      wp = spptList.length;
+      const lunasItems = spptList.filter(item => item.status === 'Sudah Bayar');
+      lunas = lunasItems.length;
+      target = spptList.reduce((acc, item) => acc + (Number(item.pbbTerutang) || 0), 0);
+      realisasi = lunasItems.reduce((acc, item) => {
+        const actualPaid = item.jumlahBayar !== undefined && item.jumlahBayar !== null 
+          ? Number(item.jumlahBayar) 
+          : (Number(item.pbbTerutang) || 0);
+        return acc + actualPaid;
+      }, 0);
+    } else {
+      summaryByLingkungan.forEach((item) => {
+        target += item.targetNominal;
+        realisasi += item.realisasiNominal;
+        wp += item.totalWp;
+        lunas += item.wpLunas;
+      });
+    }
 
-    const persentase = target > 0 ? (realisasi / target) * 100 : 0;
+    const persentase = target > 0 ? (realisasi / target) * 100 : (wp > 0 ? (lunas / wp) * 100 : 0);
     const persentaseWp = wp > 0 ? (lunas / wp) * 100 : 0;
 
     return {
@@ -638,7 +621,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       persentaseRealisasi: persentase,
       persentaseWpLunas: persentaseWp,
     };
-  }, [summaryByLingkungan]);
+  }, [summaryByLingkungan, spptList, selectedLingkungan]);
 
   // Monthly Progress Calculation for Header Card
   const monthlyProgress = useMemo(() => {
@@ -1080,7 +1063,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             namaWp: parsed.namaWp,
             alamatOp: parsed.alamatOp,
             pbbTerutang: parsed.pbbTerutang,
-            jumlahBayar: parsed.jumlahBayar,
+            jumlahBayar: parsed.jumlahBayar ?? (parsed.status === 'Sudah Bayar' ? parsed.pbbTerutang : null),
             lingkungan: parsed.lingkungan,
           };
           itemsToUpload.push(updatedSpptList[existingIdx]);
@@ -1094,7 +1077,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             namaWp: parsed.namaWp,
             alamatOp: parsed.alamatOp,
             pbbTerutang: parsed.pbbTerutang,
-            jumlahBayar: parsed.jumlahBayar,
+            jumlahBayar: parsed.jumlahBayar ?? (parsed.status === 'Sudah Bayar' ? parsed.pbbTerutang : null),
             status: parsed.status,
             lingkungan: parsed.lingkungan,
           };
