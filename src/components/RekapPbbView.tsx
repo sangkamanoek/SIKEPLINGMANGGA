@@ -319,6 +319,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [formAlamatOp, setFormAlamatOp] = useState<string>('');
   const [formBuku, setFormBuku] = useState<'I, II, III' | 'IV, V'>('IV, V');
   const [formPbbTerutang, setFormPbbTerutang] = useState<string>('');
+  const [formJumlahBayar, setFormJumlahBayar] = useState<string>('');
   const [formLingkungan, setFormLingkungan] = useState<number>(() => {
     if (activeAccount?.role === 'kepling' && activeAccount?.nomorLingkungan) {
       return activeAccount.nomorLingkungan;
@@ -353,6 +354,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     setFormAlamatOp('');
     setFormBuku('IV, V');
     setFormPbbTerutang('');
+    setFormJumlahBayar('');
     setFormLingkungan(targetLingNum);
     setFormStatus('Belum Bayar');
     setFormKeterangan('');
@@ -368,6 +370,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     setFormAlamatOp(item.alamatOp);
     setFormBuku(item.buku || 'IV, V');
     setFormPbbTerutang(String(item.pbbTerutang));
+    setFormJumlahBayar(item.jumlahBayar !== undefined && item.jumlahBayar !== null ? String(item.jumlahBayar) : String(item.pbbTerutang));
     setFormLingkungan(item.lingkungan);
     setFormStatus(item.status);
     setFormKeterangan(item.keterangan || '');
@@ -394,6 +397,9 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       return;
     }
 
+    const cleanBayarStr = formJumlahBayar.replace(/[^0-9]/g, '');
+    const nominalBayar = cleanBayarStr ? parseInt(cleanBayarStr, 10) : nominalPbb;
+
     if (editingWpItem) {
       // Update Existing Item
       const formattedNop = formatNop(formNop.trim());
@@ -404,6 +410,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         alamatOp: formAlamatOp.trim().toUpperCase() || 'KELURAHAN MANGGA',
         buku: formBuku,
         pbbTerutang: nominalPbb,
+        jumlahBayar: formStatus === 'Sudah Bayar' ? nominalBayar : undefined,
         lingkungan: formLingkungan,
         status: formStatus,
         keterangan: formKeterangan.trim(),
@@ -424,6 +431,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         alamatOp: formAlamatOp.trim().toUpperCase() || 'KELURAHAN MANGGA',
         buku: formBuku,
         pbbTerutang: nominalPbb,
+        jumlahBayar: formStatus === 'Sudah Bayar' ? nominalBayar : undefined,
         lingkungan: formLingkungan,
         status: formStatus,
         keterangan: formKeterangan.trim(),
@@ -488,7 +496,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         dataMap[ling].targetNominal += nominal;
         if (item.status === 'Sudah Bayar') {
           dataMap[ling].wpLunas += 1;
-          dataMap[ling].realisasiNominal += nominal;
+          const actualPaid = item.jumlahBayar !== undefined && item.jumlahBayar !== null ? Number(item.jumlahBayar) : nominal;
+          dataMap[ling].realisasiNominal += actualPaid;
         }
       }
     });
@@ -620,12 +629,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
     lunasItems.forEach(item => {
       const mIdx = getPaymentMonth(item);
+      const paidAmount = item.jumlahBayar !== undefined && item.jumlahBayar !== null ? Number(item.jumlahBayar) : item.pbbTerutang;
       if (mIdx <= 6) {
-        totalSebelumAgustus += item.pbbTerutang;
+        totalSebelumAgustus += paidAmount;
       } else if (mIdx === 7) {
-        totalAgustus += item.pbbTerutang;
+        totalAgustus += paidAmount;
       } else if (mIdx === 8) {
-        totalSeptember += item.pbbTerutang;
+        totalSeptember += paidAmount;
       }
     });
 
@@ -857,6 +867,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           let targetLingkungan = 1;
           let isNew = true;
           let mappingSource: 'Master SPPT' | 'WebGIS Rumah' | 'Manual' = 'Manual';
+          let masterPbbTerutang = 0;
 
           // 1. Try to map from Master SPPT Database
           if (masterNopMap.has(cleanNop)) {
@@ -866,7 +877,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             mappingSource = 'Master SPPT';
             if (!detectedNama) detectedNama = masterItem.namaWp;
             if (!detectedAlamat) detectedAlamat = masterItem.alamatOp;
-            if (detectedPbb === 0) detectedPbb = masterItem.pbbTerutang;
+            masterPbbTerutang = masterItem.pbbTerutang;
           }
           // 2. Try to map from WebGIS Citizen database
           else if (webgisNopMap.has(cleanNop)) {
@@ -885,12 +896,17 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             if (!detectedNama) detectedNama = 'NOP BARU (BELUM DIEDIT)';
           }
 
+          const finalPbbTerutang = masterPbbTerutang > 0 ? masterPbbTerutang : (detectedPbb > 0 ? detectedPbb : 100000);
+          // If the parsed file contains an amount and status is 'Sudah Bayar', and it is different from the master's PBB Terutang, treat it as the actual paid amount (with deductions if lower)
+          const finalJumlahBayar = (detectedStatus === 'Sudah Bayar' && detectedPbb > 0 && detectedPbb !== masterPbbTerutang) ? detectedPbb : undefined;
+
           tempItems.push({
             id: `import_map_${nextIdCount++}`,
             nop: detectedNop,
             namaWp: detectedNama || 'WAJIB PAJAK BARU',
             alamatOp: detectedAlamat || 'KELURAHAN MANGGA',
-            pbbTerutang: detectedPbb || 100000,
+            pbbTerutang: finalPbbTerutang,
+            jumlahBayar: finalJumlahBayar,
             status: detectedStatus,
             lingkungan: targetLingkungan,
             isNew,
@@ -954,6 +970,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             namaWp: parsed.namaWp,
             alamatOp: parsed.alamatOp,
             pbbTerutang: parsed.pbbTerutang,
+            jumlahBayar: parsed.jumlahBayar,
             lingkungan: parsed.lingkungan,
           };
           itemsToUpload.push(updatedSpptList[existingIdx]);
@@ -967,6 +984,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             namaWp: parsed.namaWp,
             alamatOp: parsed.alamatOp,
             pbbTerutang: parsed.pbbTerutang,
+            jumlahBayar: parsed.jumlahBayar,
             status: parsed.status,
             lingkungan: parsed.lingkungan,
           };
@@ -1950,12 +1968,27 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                       <td className="py-2.5 px-3 text-center font-semibold text-slate-500">{item.buku}</td>
                       <td className="py-2.5 px-3 text-right font-black text-slate-800">{formatRupiah(item.pbbTerutang)}</td>
                       <td className="py-2.5 px-3 text-right font-black text-emerald-700">
-                        {item.status === 'Sudah Bayar' ? formatRupiah(item.pbbTerutang) : 'Rp 0'}
+                        {(() => {
+                          if (item.status !== 'Sudah Bayar') return 'Rp 0';
+                          const paid = item.jumlahBayar !== undefined && item.jumlahBayar !== null ? item.jumlahBayar : item.pbbTerutang;
+                          return formatRupiah(paid);
+                        })()}
                       </td>
                       <td className="py-2.5 px-3 text-center font-black">
-                        <span className={item.status === 'Sudah Bayar' ? 'text-emerald-700' : 'text-rose-600'}>
-                          {item.status === 'Sudah Bayar' ? '100%' : '0%'}
-                        </span>
+                        {(() => {
+                          if (item.status !== 'Sudah Bayar') return <span className="text-rose-600">0%</span>;
+                          const paid = item.jumlahBayar !== undefined && item.jumlahBayar !== null ? item.jumlahBayar : item.pbbTerutang;
+                          const pct = (paid / item.pbbTerutang) * 100;
+                          if (pct < 100) {
+                            return (
+                              <div className="flex flex-col items-center leading-none gap-0.5">
+                                <span className="text-amber-600 font-extrabold">{pct.toFixed(0)}%</span>
+                                <span className="text-[8px] font-black px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded border border-amber-200 uppercase tracking-tight scale-90">Potong</span>
+                              </div>
+                            );
+                          }
+                          return <span className="text-emerald-700">100%</span>;
+                        })()}
                       </td>
                       <td className="py-2.5 px-3 text-center font-bold">
                         {item.lingkungan === 0 ? (
@@ -2531,7 +2564,12 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
                     <button
                       type="button"
-                      onClick={() => setFormStatus('Sudah Bayar')}
+                      onClick={() => {
+                        setFormStatus('Sudah Bayar');
+                        if (!formJumlahBayar) {
+                          setFormJumlahBayar(formPbbTerutang);
+                        }
+                      }}
                       className={`py-2 px-3 rounded-xl border text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-2 ${
                         formStatus === 'Sudah Bayar'
                           ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-2xs font-black'
@@ -2543,6 +2581,44 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                     </button>
                   </div>
                 </div>
+
+                {/* Nominal Realisasi Pembayaran (jika mendapat pemotongan) */}
+                {formStatus === 'Sudah Bayar' && (
+                  <div className="space-y-1 sm:col-span-2 p-3.5 bg-emerald-50/40 border border-emerald-200/60 rounded-xl animate-fade-in">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Nominal Realisasi yang Dibayar (Rp)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formJumlahBayar}
+                      onChange={(e) => setFormJumlahBayar(e.target.value)}
+                      placeholder="Masukkan nominal jika berbeda dengan PBB Terutang..."
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    />
+                    <div className="flex justify-between text-[10px] font-semibold text-slate-500 pt-1">
+                      <span>
+                        Ketetapan: {formPbbTerutang ? formatRupiah(parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10)) : '-'}
+                      </span>
+                      {(() => {
+                        const originalVal = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
+                        const paidVal = parseInt(formJumlahBayar.replace(/[^0-9]/g, ''), 10) || originalVal;
+                        if (paidVal < originalVal) {
+                          return (
+                            <span className="text-amber-600 font-black">
+                              ⚠️ Terpotong: -{formatRupiah(originalVal - paidVal)}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="text-emerald-700">
+                            Bayar Penuh (100%)
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}

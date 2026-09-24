@@ -83,7 +83,10 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
     const spptLingkungan = spptList.filter((s) => Number(s.lingkungan) === n);
     const spptLunas = spptLingkungan.filter((s) => s.status === 'Sudah Bayar');
 
-    const spptNominalLunas = spptLunas.reduce((acc, curr) => acc + (Number(curr.pbbTerutang) || 0), 0);
+    const spptNominalLunas = spptLunas.reduce((acc, curr) => {
+      const actualPaid = curr.jumlahBayar !== undefined && curr.jumlahBayar !== null ? Number(curr.jumlahBayar) : (Number(curr.pbbTerutang) || 0);
+      return acc + actualPaid;
+    }, 0);
     const spptNominalTotal = spptLingkungan.reduce((acc, curr) => acc + (Number(curr.pbbTerutang) || 0), 0);
 
     // If actual SPPTs exist in database, use actual counts and sums; otherwise use target baseline
