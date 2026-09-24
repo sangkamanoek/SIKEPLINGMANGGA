@@ -44,7 +44,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
 
   // 1. Fetch online directly from Server API buffer (/api/reports)
   try {
-    const res = await fetch(`/api/reports?_t=${Date.now()}`, {
+    const res = await fetch(`/api/reports?light=true&_t=${Date.now()}`, {
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
