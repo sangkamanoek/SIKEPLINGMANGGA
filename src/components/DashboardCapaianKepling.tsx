@@ -451,8 +451,8 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         if (kj.keplingId && kj.keplingId === k.id) return true;
         if (kj.lingkunganId && kj.lingkunganId === k.id) return true;
         if (kj.lingkunganNomor && Number(kj.lingkunganNomor) === k.nomorLingkungan) return true;
-        if (kj.createdByName && kj.createdByName.toLowerCase() === k.nama.toLowerCase()) return true;
-        if (kj.lingkunganNama && kj.lingkunganNama.toLowerCase() === k.lingkungan.toLowerCase()) return true;
+        if (kj.createdByName && k.nama && String(kj.createdByName).toLowerCase() === String(k.nama).toLowerCase()) return true;
+        if (kj.lingkunganNama && k.lingkungan && String(kj.lingkunganNama).toLowerCase() === String(k.lingkungan).toLowerCase()) return true;
         return false;
       });
       const targetKunjunganHarian = 20; // Target referensi 20 kunjungan KK

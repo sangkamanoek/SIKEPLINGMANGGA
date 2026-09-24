@@ -915,7 +915,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                   <span>
                     {isSubmitting
                       ? 'Menyimpan Presensi...'
-                      : `SIMPAN PRESENSI APEL PAGI (${status.toUpperCase()})`}
+                      : `SIMPAN PRESENSI APEL PAGI (${String(status || 'HADIR').toUpperCase()})`}
                   </span>
                 </button>
               </div>

@@ -182,7 +182,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                 ? 'DASHBOARD LAPORAN & CAPAIAN TARGET PERLINDUNGAN SOSIAL (PERLINSOS)'
                 : activeAccount.role === 'kasi_trantibum'
                 ? 'DASHBOARD KETENTRAMAN, KETERTIBAN UMUM, POSKAMLING & KEDISIPLINAN'
-                : `PELAPORAN HARIAN ${activeAccount.lingkungan.toUpperCase() || 'KEPALA LINGKUNGAN'} • KELURAHAN MANGGA`}
+                : `PELAPORAN HARIAN ${String(activeAccount.lingkungan || 'KEPALA LINGKUNGAN').toUpperCase()} • KELURAHAN MANGGA`}
             </p>
           </div>
         </div>

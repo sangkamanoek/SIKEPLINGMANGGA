@@ -118,7 +118,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           dateKey = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
         } else {
           const day = parts[0].padStart(2, '0');
-          const mStr = parts[1].toUpperCase();
+          const mStr = String(parts[1] || '').toUpperCase();
           const month = monthMap[mStr] || '01';
           const year = parts[2];
           dateKey = `${year}-${month}-${day}`;
@@ -1008,7 +1008,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                       LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN
                     </h1>
                     <div className="text-[8.5pt] font-serif mt-1 text-slate-900">
-                      <span className="font-bold">Hari:</span> {(item.hari || '').toUpperCase()} &nbsp;&nbsp;|&nbsp;&nbsp; <span className="font-bold">Tanggal:</span> {displayTanggal.toUpperCase()}
+                      <span className="font-bold">Hari:</span> {String(item.hari || '').toUpperCase()} &nbsp;&nbsp;|&nbsp;&nbsp; <span className="font-bold">Tanggal:</span> {String(displayTanggal || '').toUpperCase()}
                     </div>
                   </div>
 
@@ -1058,7 +1058,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                 {absenApelData?.status === 'Tidak Mengikuti Apel'
                                   ? '✕ TIDAK MENGIKUTI APEL'
                                   : absenApelData?.status
-                                  ? `✓ ${absenApelData.status.toUpperCase()}`
+                                  ? `✓ ${String(absenApelData.status).toUpperCase()}`
                                   : '✓ HADIR'}
                               </span>
                               <span className="text-slate-800 font-medium text-[8pt]">
@@ -1227,7 +1227,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                     ? '✕ MENOLAK'
                                     : kunj.keterangan === 'Tidak Ditempat'
                                     ? '⚠ TDK DI TEMPAT'
-                                    : (kunj.keterangan || '-').toUpperCase()}
+                                    : String(kunj.keterangan || '-').toUpperCase()}
                                 </span>
                               </td>
                               <td className="border border-black text-center py-1 px-1">
@@ -1334,9 +1334,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   <div className="mt-4 pt-1 text-[8.5pt] font-sans">
                     <div className="flex justify-end pr-4">
                       <div className="text-center flex flex-col items-center min-w-[200px]">
-                        <div>Medan, {displayTanggal.toUpperCase()}</div>
+                        <div>Medan, {String(displayTanggal || '').toUpperCase()}</div>
                         <div className="mt-0.5">Yang Melaporkan,</div>
-                        <div className="font-bold uppercase whitespace-nowrap">{(item.jabatan || '').toUpperCase()}</div>
+                        <div className="font-bold uppercase whitespace-nowrap">{String(item.jabatan || '').toUpperCase()}</div>
                         <div className="h-10" />
                         <div className="font-bold underline uppercase whitespace-nowrap">( {item.namaKepling || ''} )</div>
                         <div className="text-[7.5pt] text-slate-700 mt-0.5">Kepala Lingkungan</div>
@@ -1363,7 +1363,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         KEPALA LINGKUNGAN KELURAHAN MANGGA KECAMATAN MEDAN TUNTUNGAN
                       </div>
                       <div className="text-[8pt] text-slate-600 mt-1">
-                        <strong>Hari:</strong> {(item.hari || '').toUpperCase()} &nbsp;|&nbsp; <strong>Tanggal:</strong> {displayTanggal.toUpperCase()} &nbsp;|&nbsp; <strong>Petugas:</strong> {item.namaKepling || ''} ({(item.jabatan || '').toUpperCase()})
+                        <strong>Hari:</strong> {String(item.hari || '').toUpperCase()} &nbsp;|&nbsp; <strong>Tanggal:</strong> {String(displayTanggal || '').toUpperCase()} &nbsp;|&nbsp; <strong>Petugas:</strong> {item.namaKepling || ''} ({String(item.jabatan || '').toUpperCase()})
                       </div>
                     </div>
 
@@ -1374,7 +1374,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                           <div className="text-[8.5pt] font-bold font-sans text-slate-900 uppercase border-b border-slate-300 pb-1 flex items-center justify-between">
                             <span>• {group.title} ({group.photos.length} Foto)</span>
                             <span className={`text-[7pt] px-2 py-0.5 rounded font-bold ${group.badgeBg} ${group.textClr}`}>
-                              {group.key.toUpperCase()}
+                              {String(group.key || '').toUpperCase()}
                             </span>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
@@ -1408,9 +1408,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     <div className="mt-3 pt-2 text-[8.5pt] font-sans">
                       <div className="flex justify-end pr-4">
                         <div className="text-center flex flex-col items-center min-w-[200px]">
-                          <div>Medan, {displayTanggal.toUpperCase()}</div>
+                          <div>Medan, {String(displayTanggal || '').toUpperCase()}</div>
                           <div className="mt-0.5">Kepala Lingkungan Pelapor,</div>
-                          <div className="font-bold uppercase whitespace-nowrap">{(item.jabatan || '').toUpperCase()}</div>
+                          <div className="font-bold uppercase whitespace-nowrap">{String(item.jabatan || '').toUpperCase()}</div>
                           <div className="h-10" />
                           <div className="font-bold underline uppercase whitespace-nowrap">( {item.namaKepling || ''} )</div>
                         </div>
@@ -2397,7 +2397,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 className="text-[8.5pt] font-serif mt-1"
                 style={{ fontSize: '8.5pt', fontFamily: "'Times New Roman', Times, serif", marginTop: '3px' }}
               >
-                <span style={{ fontWeight: 'bold' }}>Hari:</span> {(item?.hari || '').toUpperCase()} &nbsp;&nbsp;|&nbsp;&nbsp; <span style={{ fontWeight: 'bold' }}>Tanggal:</span> {displayTanggal.toUpperCase()}
+                <span style={{ fontWeight: 'bold' }}>Hari:</span> {String(item?.hari || '').toUpperCase()} &nbsp;&nbsp;|&nbsp;&nbsp; <span style={{ fontWeight: 'bold' }}>Tanggal:</span> {String(displayTanggal || '').toUpperCase()}
               </div>
             </div>
 
@@ -2460,7 +2460,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         {absenApelData?.status === 'Tidak Mengikuti Apel'
                           ? '[✕ TIDAK MENGIKUTI APEL]'
                           : absenApelData?.status
-                          ? `[✓ ${absenApelData.status.toUpperCase()}]`
+                          ? `[✓ ${String(absenApelData.status).toUpperCase()}]`
                           : '[✓ HADIR]'}
                       </span>{' '}
                       <span style={{ color: '#334155' }}>
@@ -2774,10 +2774,10 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     minWidth: '220px',
                   }}
                 >
-                  <div>Medan, {displayTanggal.toUpperCase()}</div>
+                  <div>Medan, {String(displayTanggal || '').toUpperCase()}</div>
                   <div className="mt-0.5">Yang Melaporkan,</div>
                   <div className="font-bold uppercase whitespace-nowrap" style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>
-                    {(item?.jabatan || '').toUpperCase()}
+                    {String(item?.jabatan || '').toUpperCase()}
                   </div>
                   <div style={{ height: '38px' }} />
                   <div className="font-bold underline uppercase whitespace-nowrap" style={{ fontWeight: 'bold', textDecoration: 'underline', textTransform: 'uppercase' }}>
@@ -2851,7 +2851,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   KEPALA LINGKUNGAN KELURAHAN MANGGA KECAMATAN MEDAN TUNTUNGAN
                 </div>
                 <div style={{ fontSize: '8pt', fontFamily: 'sans-serif', color: '#475569', marginTop: '4px' }}>
-                  <strong>Hari:</strong> {(item.hari || '').toUpperCase()} &nbsp;|&nbsp; <strong>Tanggal:</strong> {displayTanggal.toUpperCase()} &nbsp;|&nbsp; <strong>Petugas:</strong> {item.namaKepling || ''} ({(item.jabatan || '').toUpperCase()})
+                  <strong>Hari:</strong> {String(item.hari || '').toUpperCase()} &nbsp;|&nbsp; <strong>Tanggal:</strong> {String(displayTanggal || '').toUpperCase()} &nbsp;|&nbsp; <strong>Petugas:</strong> {item.namaKepling || ''} ({String(item.jabatan || '').toUpperCase()})
                 </div>
               </div>
 
@@ -2949,9 +2949,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               >
                 <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '16px' }}>
                   <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '220px' }}>
-                    <div>Medan, {displayTanggal.toUpperCase()}</div>
+                    <div>Medan, {String(displayTanggal || '').toUpperCase()}</div>
                     <div style={{ marginTop: '2px' }}>Kepala Lingkungan Pelapor,</div>
-                    <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{(item?.jabatan || '').toUpperCase()}</div>
+                    <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{String(item?.jabatan || '').toUpperCase()}</div>
                     <div style={{ height: '36px' }} />
                     <div style={{ fontWeight: 'bold', textDecoration: 'underline', textTransform: 'uppercase' }}>
                       ( {item?.namaKepling || ''} )

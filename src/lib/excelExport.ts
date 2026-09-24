@@ -210,7 +210,7 @@ export async function exportAbsensiToExcel(
         idx + 1,
         k.lingkungan,
         k.nama,
-        status.toUpperCase(),
+        String(status || '').toUpperCase(),
         jam,
         lokasi,
         status === 'Tidak Mengikuti Apel' ? `${absentStat.consecutiveDays} Hari` : '-',

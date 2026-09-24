@@ -566,7 +566,9 @@ export default function App() {
           const isoDate = getReportIsoDate(reportToSave) || getTodayLocalIso();
           const accId = reportToSave.keplingId || activeAccount.id;
           const targetKepling = KEPLING_ACCOUNTS.find(
-            (k) => k.id === accId || k.nama.toLowerCase() === reportToSave.namaKepling.toLowerCase()
+            (k) =>
+              k.id === accId ||
+              (k.nama && reportToSave.namaKepling && k.nama.toLowerCase() === String(reportToSave.namaKepling).toLowerCase())
           );
 
           if (targetKepling) {

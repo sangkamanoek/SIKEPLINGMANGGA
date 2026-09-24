@@ -130,7 +130,7 @@ export default function ViewImagesPage({ reportId }: { reportId: string }) {
                       <p className="font-semibold text-gray-800 break-words text-sm">{foto.name || `Foto ${index + 1}`}</p>
                       {foto.kategori && (
                         <span className="inline-block mt-1 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
-                          {foto.kategori.toUpperCase()}
+                          {String(foto.kategori).toUpperCase()}
                         </span>
                       )}
                     </div>

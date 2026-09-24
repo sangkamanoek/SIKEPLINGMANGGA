@@ -70,7 +70,7 @@ export function getReportIsoDate(r: LaporanHarianItem | any): string {
     const monthNameMatch = t.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
     if (monthNameMatch) {
       const day = monthNameMatch[1].padStart(2, '0');
-      const monthStr = monthNameMatch[2].toUpperCase();
+      const monthStr = String(monthNameMatch[2] || '').toUpperCase();
       const year = monthNameMatch[3];
 
       let monthIdx = NAMA_BULAN.findIndex(
@@ -157,14 +157,14 @@ export function generateLaporanWhatsAppText(item: LaporanHarianItem): string {
   const lines: string[] = [];
 
   lines.push('*🟩 LAPORAN KEGIATAN HARIAN*');
-  lines.push(`*${(item.jabatan || 'KEPALA LINGKUNGAN').toUpperCase()}*`);
-  lines.push(`*${(item.kelurahan || 'KELURAHAN MANGGA').toUpperCase()}*`);
-  lines.push(`*${(item.kecamatan || 'KECAMATAN MEDAN TUNTUNGAN').toUpperCase()}*`);
+  lines.push(`*${String(item.jabatan || 'KEPALA LINGKUNGAN').toUpperCase()}*`);
+  lines.push(`*${String(item.kelurahan || 'KELURAHAN MANGGA').toUpperCase()}*`);
+  lines.push(`*${String(item.kecamatan || 'KECAMATAN MEDAN TUNTUNGAN').toUpperCase()}*`);
   lines.push('');
-  lines.push(`📅 *Hari*        : ${item.hari.toUpperCase()}`);
-  lines.push(`📆 *Tanggal*    : ${item.tanggal.toUpperCase()}`);
-  lines.push(`👤 *Nama*       : ${item.namaKepling}`);
-  lines.push(`🏷️ *Jabatan*    : ${item.jabatan}`);
+  lines.push(`📅 *Hari*        : ${String(item.hari || '').toUpperCase()}`);
+  lines.push(`📆 *Tanggal*    : ${String(item.tanggal || '').toUpperCase()}`);
+  lines.push(`👤 *Nama*       : ${item.namaKepling || ''}`);
+  lines.push(`🏷️ *Jabatan*    : ${item.jabatan || ''}`);
   lines.push('');
   lines.push('📋 *KINERJA HARIAN:*');
 
@@ -249,14 +249,14 @@ export function formatReportToText(input: any): string {
   const kelurahan = input.kelurahan || 'Kelurahan Mangga';
   const kecamatan = input.kecamatan || 'Medan Tuntungan';
   const apelText = input.absenApelJam
-    ? `${(input.absenApelStatus || 'HADIR').toUpperCase()} (${input.absenApelJam})`
+    ? `${String(input.absenApelStatus || 'HADIR').toUpperCase()} (${input.absenApelJam})`
     : 'HADIR (07.35 WIB)';
 
   const lines: string[] = [
     `*🟩 LAPORAN KEGIATAN HARIAN*`,
-    `*${jabatan.toUpperCase()}*`,
-    `*${kelurahan.toUpperCase()}*`,
-    `*${kecamatan.toUpperCase()}*`,
+    `*${String(jabatan || 'KEPALA LINGKUNGAN').toUpperCase()}*`,
+    `*${String(kelurahan || 'KELURAHAN MANGGA').toUpperCase()}*`,
+    `*${String(kecamatan || 'KECAMATAN MEDAN TUNTUNGAN').toUpperCase()}*`,
     `----------------------------------------`,
     `Hari     : ${hari}`,
     `Tanggal  : ${tanggal}`,
@@ -313,7 +313,7 @@ const ROMAN_NUMERALS: [string, number][] = [
  */
 export function extractNomorLingkungan(text?: string | null): number | null {
   if (!text) return null;
-  const upper = text.toUpperCase().trim();
+  const upper = String(text).toUpperCase().trim();
 
   // 1. Cek pola angka eksplisit: "Lingkungan 20", "LK 10", "Kepling 5"
   const numMatch = upper.match(/\b(?:LINGKUNGAN|KEPLING|LK)\s*(\d{1,2})\b/i);

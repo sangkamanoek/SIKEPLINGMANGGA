@@ -134,11 +134,12 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
     );
   }
 
+  const searchLower = String(search || '').toLowerCase();
   const filteredKepling = KEPLING_ACCOUNTS.filter(
     (k) =>
-      k.lingkungan.toLowerCase().includes(search.toLowerCase()) ||
-      k.nama.toLowerCase().includes(search.toLowerCase()) ||
-      k.jabatan.toLowerCase().includes(search.toLowerCase())
+      String(k.lingkungan || '').toLowerCase().includes(searchLower) ||
+      String(k.nama || '').toLowerCase().includes(searchLower) ||
+      String(k.jabatan || '').toLowerCase().includes(searchLower)
   );
 
   const handleStartLogin = (account: UserAccount) => {

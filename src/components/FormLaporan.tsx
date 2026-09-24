@@ -511,29 +511,29 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   const pbbPhotos = fotoList.filter(
     (f) =>
       f.kategori === 'pbb' ||
-      f.name.toUpperCase().includes('[PBB]') ||
-      f.name.toLowerCase().includes('pbb')
+      String(f.name || '').toUpperCase().includes('[PBB]') ||
+      String(f.name || '').toLowerCase().includes('pbb')
   );
   const pbbPhotosCount = pbbPhotos.length;
 
   const perlinsosPhotos = fotoList.filter(
     (f) =>
       f.kategori === 'perlinsos' ||
-      f.name.toUpperCase().includes('[PERLINSOS]') ||
-      f.name.toLowerCase().includes('perlinsos')
+      String(f.name || '').toUpperCase().includes('[PERLINSOS]') ||
+      String(f.name || '').toLowerCase().includes('perlinsos')
   );
   const perlinsosPhotosCount = perlinsosPhotos.length;
 
   const uncategorizedPhotos = fotoList.filter(
     (f) =>
       f.kategori === 'umum' ||
-      (!f.kategori && !f.name.includes('[PBB]') && !f.name.includes('[PERLINSOS]'))
+      (!f.kategori && !String(f.name || '').includes('[PBB]') && !String(f.name || '').includes('[PERLINSOS]'))
   );
 
   const lainnyaPhotos = fotoList.filter(
     (f) =>
       f.kategori === 'lainnya' ||
-      f.name.toUpperCase().includes('[KEGIATAN LAINNYA]') ||
+      String(f.name || '').toUpperCase().includes('[KEGIATAN LAINNYA]') ||
       f.kategori === 'kebersihan'
   );
   const lainnyaPhotosCount = lainnyaPhotos.length;
@@ -794,7 +794,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                           {isAbsent || todayApel?.status === 'Tidak Mengikuti Apel'
                             ? '✕ TIDAK MENGIKUTI APEL'
                             : todayApel?.status
-                            ? `✓ ${todayApel.status.toUpperCase()}`
+                            ? `✓ ${String(todayApel.status).toUpperCase()}`
                             : '✓ HADIR'}
                         </span>
                         <span className="text-[11px] text-slate-600 font-medium">
@@ -2104,9 +2104,9 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
             <div className="p-4 bg-slate-950 text-emerald-400 font-mono text-[11.5px] leading-relaxed max-h-96 overflow-y-auto space-y-2 border-b border-slate-800 select-text">
               <p className="text-white font-bold">
                 🟩 LAPORAN KEGIATAN HARIAN<br />
-                {jabatan.toUpperCase() || 'KEPALA LINGKUNGAN'}<br />
-                {kelurahan.toUpperCase() || 'KELURAHAN MANGGA'}<br />
-                {kecamatan.toUpperCase() || 'KECAMATAN MEDAN TUNTUNGAN'}
+                {String(jabatan || 'KEPALA LINGKUNGAN').toUpperCase()}<br />
+                {String(kelurahan || 'KELURAHAN MANGGA').toUpperCase()}<br />
+                {String(kecamatan || 'KECAMATAN MEDAN TUNTUNGAN').toUpperCase()}
               </p>
 
               <div className="text-slate-300 space-y-0.5 pt-1 border-t border-slate-800">

@@ -267,7 +267,8 @@ export function parseCoordinatesFromInput(input: string): { lat: number; lng: nu
   if (dmsMatch) {
     const parseDms = (deg: string, min: string, sec: string, dir: string) => {
       let dd = parseFloat(deg) + parseFloat(min) / 60 + parseFloat(sec) / 3600;
-      if (dir.toUpperCase() === 'S' || dir.toUpperCase() === 'W') dd = -dd;
+      const dUpper = String(dir || '').toUpperCase();
+      if (dUpper === 'S' || dUpper === 'W') dd = -dd;
       return dd;
     };
     const lat = parseDms(dmsMatch[1], dmsMatch[2], dmsMatch[3], dmsMatch[4]);

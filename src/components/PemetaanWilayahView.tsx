@@ -648,12 +648,12 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
       // Tooltip label
       const tooltipContent = isHeatmapMode
-        ? `<div class="font-sans font-black text-xs text-slate-950">${poly.lingkunganNama.toUpperCase()}</div>
+        ? `<div class="font-sans font-black text-xs text-slate-950">${String(poly.lingkunganNama || '').toUpperCase()}</div>
            <div class="text-[10px] text-red-700 font-black bg-red-50 border border-red-200 px-2 py-0.5 rounded shadow-2xs mt-1 flex items-center gap-1">
              🔥 <span>${count} Kejadian Laporan</span>
            </div>`
-        : `<div class="font-sans font-black text-xs text-slate-900">${poly.lingkunganNama.toUpperCase()}</div>
-           <div class="text-[10px] text-slate-600 font-semibold">${poly.keplingNama}</div>`;
+        : `<div class="font-sans font-black text-xs text-slate-900">${String(poly.lingkunganNama || '').toUpperCase()}</div>
+           <div class="text-[10px] text-slate-600 font-semibold">${poly.keplingNama || ''}</div>`;
 
       polygonShape.bindTooltip(
         tooltipContent,

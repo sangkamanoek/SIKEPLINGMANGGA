@@ -129,7 +129,7 @@ export const RekapAbsensiSuperAdmin: React.FC<RekapAbsensiSuperAdminProps> = ({
       if (shareMode && res.method === 'share' && res.success) {
         showToast('Berhasil membuka menu share ke WhatsApp / HP!');
       } else {
-        showToast(`File Excel Rekapitulasi ${activeSubTab.toUpperCase()} berhasil diunduh.`);
+        showToast(`File Excel Rekapitulasi ${String(activeSubTab || '').toUpperCase()} berhasil diunduh.`);
       }
     } catch (e) {
       console.error(e);

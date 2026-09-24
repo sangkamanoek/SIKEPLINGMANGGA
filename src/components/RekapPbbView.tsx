@@ -396,8 +396,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       const updatedItem: SpptPbbItem = {
         ...editingWpItem,
         nop: formattedNop,
-        namaWp: formNamaWp.trim().toUpperCase(),
-        alamatOp: formAlamatOp.trim().toUpperCase() || 'KELURAHAN MANGGA',
+        namaWp: String(formNamaWp || '').trim().toUpperCase(),
+        alamatOp: String(formAlamatOp || '').trim().toUpperCase() || 'KELURAHAN MANGGA',
         buku: formBuku,
         pbbTerutang: nominalPbb,
         jumlahBayar: formStatus === 'Sudah Bayar' ? nominalBayar : null,
@@ -410,7 +410,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         prev.map((item) => (item.id === editingWpItem.id ? updatedItem : item))
       );
       savePbbSpptToFirestore(updatedItem, selectedYear).catch(() => {});
-      let msg = `Data WP "${formNamaWp.trim().toUpperCase()}" berhasil diperbarui ke "${formStatus}" dan tersimpan!`;
+      let msg = `Data WP "${String(formNamaWp || '').trim().toUpperCase()}" berhasil diperbarui ke "${formStatus}" dan tersimpan!`;
       if (selectedStatusFilter === 'belum' && formStatus === 'Sudah Bayar') {
         msg += ' (Catatan: Data berpindah dari filter "Khusus Belum Bayar". Ubah filter ke "Semua" atau "Khusus Sudah Bayar" untuk melihatnya).';
       }
@@ -422,8 +422,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         id: `wp_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         no: spptList.length + 1,
         nop: formattedNop,
-        namaWp: formNamaWp.trim().toUpperCase(),
-        alamatOp: formAlamatOp.trim().toUpperCase() || 'KELURAHAN MANGGA',
+        namaWp: String(formNamaWp || '').trim().toUpperCase(),
+        alamatOp: String(formAlamatOp || '').trim().toUpperCase() || 'KELURAHAN MANGGA',
         buku: formBuku,
         pbbTerutang: nominalPbb,
         jumlahBayar: formStatus === 'Sudah Bayar' ? nominalBayar : null,
@@ -870,27 +870,27 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
           if (col1Digits.length >= 15 && col1Digits.length <= 19) {
             detectedNop = cells[1];
-            if (cells[3]) detectedNama = cells[3].toUpperCase();
-            if (cells[4]) detectedAlamat = cells[4].toUpperCase();
+            if (cells[3]) detectedNama = String(cells[3]).toUpperCase();
+            if (cells[4]) detectedAlamat = String(cells[4]).toUpperCase();
             if (cells[5]) {
               const val = parseInt(cells[5].replace(/[^0-9]/g, ''), 10);
               if (!isNaN(val) && val > 0) detectedPbb = val;
             }
             if (cells[6]) {
-              const st = cells[6].toLowerCase();
+              const st = String(cells[6]).toLowerCase();
               if (st.includes('belum')) detectedStatus = 'Belum Bayar';
               else detectedStatus = 'Sudah Bayar';
             }
           } else if (col0Digits.length >= 15 && col0Digits.length <= 19) {
             detectedNop = cells[0];
-            if (cells[1]) detectedNama = cells[1].toUpperCase();
-            if (cells[2]) detectedAlamat = cells[2].toUpperCase();
+            if (cells[1]) detectedNama = String(cells[1]).toUpperCase();
+            if (cells[2]) detectedAlamat = String(cells[2]).toUpperCase();
             if (cells[3]) {
               const val = parseInt(cells[3].replace(/[^0-9]/g, ''), 10);
               if (!isNaN(val) && val > 0) detectedPbb = val;
             }
             if (cells[4]) {
-              const st = cells[4].toLowerCase();
+              const st = String(cells[4]).toLowerCase();
               if (st.includes('belum')) detectedStatus = 'Belum Bayar';
               else detectedStatus = 'Sudah Bayar';
             }
@@ -927,7 +927,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
             if (!detectedNama || !detectedAlamat) {
               const textCells = cells.filter((c) => {
-                const trimmed = c.trim();
+                const trimmed = String(c || '').trim();
                 if (!trimmed) return false;
                 if (trimmed.replace(/[^0-9]/g, '').length >= 15) return false;
                 if (trimmed.toLowerCase().includes('rp')) return false;
@@ -937,10 +937,10 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               });
 
               if (!detectedNama && textCells.length > 0) {
-                detectedNama = textCells[0].trim().toUpperCase();
+                detectedNama = String(textCells[0]).trim().toUpperCase();
               }
               if (!detectedAlamat && textCells.length > 1) {
-                detectedAlamat = textCells[1].trim().toUpperCase();
+                detectedAlamat = String(textCells[1]).trim().toUpperCase();
               }
             }
           }

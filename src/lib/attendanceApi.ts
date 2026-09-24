@@ -271,7 +271,7 @@ export function isAttendanceMatchingDate(
     const monthMatch = t.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
     if (monthMatch) {
       const d = monthMatch[1].padStart(2, '0');
-      const monthStr = monthMatch[2].toUpperCase();
+      const monthStr = String(monthMatch[2] || '').toUpperCase();
       const y = monthMatch[3];
       const monthNames = [
         'JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI',
@@ -377,8 +377,8 @@ export function isAttendanceMatchingKepling(
 
   // 4. Nama Kepling matching
   if (item.namaKepling && kepling.nama) {
-    const cleanItem = item.namaKepling.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const cleanKep = kepling.nama.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanItem = String(item.namaKepling).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanKep = String(kepling.nama).toLowerCase().replace(/[^a-z0-9]/g, '');
     if (cleanItem === cleanKep) return true;
     if (cleanItem.length >= 5 && (cleanKep.includes(cleanItem) || cleanItem.includes(cleanKep))) {
       return true;

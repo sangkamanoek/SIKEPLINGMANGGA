@@ -686,7 +686,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     lines.push('');
 
     consolidatedKeplingData.forEach((it) => {
-      lines.push(`*📍 ${it.kepling.lingkungan.toUpperCase()} - ${it.kepling.nama}*`);
+      lines.push(`*📍 ${String(it.kepling.lingkungan || '').toUpperCase()} - ${it.kepling.nama || ''}*`);
 
       // Status Apel
       if (it.isApelHadir) {
@@ -1392,8 +1392,8 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
                     <div className="text-right shrink-0">
                       <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-800 bg-rose-100 px-2 py-0.5 rounded-lg border border-rose-200">
                         <AlertTriangle className="w-3 h-3 text-rose-600" />
-                        {item.absen?.status && item.absen.status !== 'Hadir'
-                          ? item.absen.status.toUpperCase()
+                        {item.absen?.status && String(item.absen.status).toLowerCase() !== 'hadir'
+                          ? String(item.absen.status).toUpperCase()
                           : 'NIHIL'}
                       </span>
                       {item.absen?.catatan && (
