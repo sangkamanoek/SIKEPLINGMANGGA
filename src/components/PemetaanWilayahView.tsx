@@ -197,6 +197,42 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
   const [isKmlTextModalOpen, setIsKmlTextModalOpen] = useState(false);
   const [kmlRawInputText, setKmlRawInputText] = useState('');
   const [editingHouse, setEditingHouse] = useState<TitikRumahBangunan | null>(null);
+  const getEmptyHouseFormData = (lingkunganId?: string) => ({
+    lingkunganId: lingkunganId || (isKepling ? currentUser.id : 'kepling_1'),
+    namaJalan: '',
+    nomorRumah: '',
+    namaKepalaKeluarga: '',
+    nikKk: '',
+    isKkMangga: true,
+    asalKk: 'Kelurahan Mangga',
+    lat: '' as number | string,
+    lng: '' as number | string,
+    jumlahJiwa: '' as number | string,
+    jumlahLakiLaki: '' as number | string,
+    jumlahPerempuan: '' as number | string,
+    jumlahLansia: '' as number | string,
+    jumlahAnak: '' as number | string,
+    pekerjaanKk: '',
+    penerimaBansos: false,
+    jenisBansos: [] as string[],
+    desilBansos: '',
+    kategoriRentan: false,
+    statusWrs: 'AKTIF' as StatusWrs,
+    tarifRetribusi: 15000,
+    nopPbb: '',
+    statusPbb: 'LUNAS' as StatusPbb,
+    nominalPbb: '' as number | string,
+    tahunPbb: '' as number | string,
+    catatan: '',
+    memilikiUsaha: false,
+    jenisUsaha: 'Toko Kelontong / Sembako',
+    namaUsaha: '',
+    luasTanahM2: '' as number | string,
+    luasBangunanM2: '' as number | string,
+    kategoriBangunan: 'RUMAH_TINGGAL' as const,
+    jenisFasilitas: '',
+  });
+
   const [houseForm, setHouseForm] = useState<{
     lingkunganId: string;
     namaJalan: string;
@@ -205,67 +241,33 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     nikKk: string;
     isKkMangga: boolean;
     asalKk: string;
-    lat: number;
-    lng: number;
-    jumlahJiwa: number;
-    jumlahLakiLaki: number;
-    jumlahPerempuan: number;
-    jumlahLansia: number;
-    jumlahAnak: number;
+    lat: number | string;
+    lng: number | string;
+    jumlahJiwa: number | string;
+    jumlahLakiLaki: number | string;
+    jumlahPerempuan: number | string;
+    jumlahLansia: number | string;
+    jumlahAnak: number | string;
     pekerjaanKk: string;
     penerimaBansos: boolean;
     jenisBansos: string[];
     desilBansos: string;
     kategoriRentan: boolean;
     statusWrs: StatusWrs;
-    tarifRetribusi: number;
+    tarifRetribusi: number | string;
     nopPbb: string;
     statusPbb: StatusPbb;
-    nominalPbb: number;
-    tahunPbb: number;
+    nominalPbb: number | string;
+    tahunPbb: number | string;
     catatan: string;
     memilikiUsaha: boolean;
     jenisUsaha: string;
     namaUsaha: string;
-    luasTanahM2: number;
-    luasBangunanM2: number;
+    luasTanahM2: number | string;
+    luasBangunanM2: number | string;
     kategoriBangunan: 'RUMAH_TINGGAL' | 'RUMAH_USAHA' | 'RUMAH_IBADAH' | 'SEKOLAH' | 'KANTOR_FASUM';
     jenisFasilitas: string;
-  }>({
-    lingkunganId: isKepling ? currentUser.id : 'kepling_1',
-    namaJalan: '',
-    nomorRumah: '',
-    namaKepalaKeluarga: '',
-    nikKk: '',
-    isKkMangga: true,
-    asalKk: 'Kelurahan Mangga',
-    lat: KELURAHAN_MANGGA_CENTER[0],
-    lng: KELURAHAN_MANGGA_CENTER[1],
-    jumlahJiwa: 4,
-    jumlahLakiLaki: 2,
-    jumlahPerempuan: 2,
-    jumlahLansia: 0,
-    jumlahAnak: 1,
-    pekerjaanKk: 'Wiraswasta',
-    penerimaBansos: false,
-    jenisBansos: [],
-    desilBansos: '',
-    kategoriRentan: false,
-    statusWrs: 'AKTIF',
-    tarifRetribusi: 15000,
-    nopPbb: '',
-    statusPbb: 'LUNAS',
-    nominalPbb: 150000,
-    tahunPbb: 2026,
-    catatan: '',
-    memilikiUsaha: false,
-    jenisUsaha: 'Toko Kelontong / Sembako',
-    namaUsaha: '',
-    luasTanahM2: 100,
-    luasBangunanM2: 70,
-    kategoriBangunan: 'RUMAH_TINGGAL',
-    jenisFasilitas: '',
-  });
+  }>(() => getEmptyHouseFormData(isKepling ? currentUser.id : 'kepling_1'));
 
   const formatNopPbb = (val: string): string => {
     const digits = val.replace(/\D/g, '').slice(0, 18);
@@ -1447,10 +1449,9 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
               type="button"
               onClick={() => {
                 setEditingHouse(null);
-                setHouseForm((prev) => ({
-                  ...prev,
-                  lingkunganId: isKepling ? currentUser.id : 'kepling_1',
-                }));
+                setHouseForm(getEmptyHouseFormData(isKepling ? currentUser.id : 'kepling_1'));
+                setGoogleMapsUrlInput('');
+                setDetectedStreetOverlay(null);
                 setIsHouseModalOpen(true);
               }}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md cursor-pointer transition-transform hover:scale-[1.02]"
@@ -2092,14 +2093,14 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                       tarifRetribusi: selectedHouse.tarifRetribusi || 15000,
                       nopPbb: selectedHouse.nopPbb || '',
                       statusPbb: selectedHouse.statusPbb || 'LUNAS',
-                      nominalPbb: selectedHouse.nominalPbb || 150000,
-                      tahunPbb: selectedHouse.tahunPbb || 2026,
+                      nominalPbb: selectedHouse.nominalPbb !== undefined ? selectedHouse.nominalPbb : '',
+                      tahunPbb: selectedHouse.tahunPbb !== undefined ? selectedHouse.tahunPbb : '',
                       catatan: selectedHouse.catatan || '',
                       memilikiUsaha: selectedHouse.memilikiUsaha || false,
                       jenisUsaha: selectedHouse.jenisUsaha || 'Toko Kelontong / Sembako',
                       namaUsaha: selectedHouse.namaUsaha || '',
-                      luasTanahM2: selectedHouse.luasTanahM2 || 100,
-                      luasBangunanM2: selectedHouse.luasBangunanM2 || 70,
+                      luasTanahM2: selectedHouse.luasTanahM2 !== undefined ? selectedHouse.luasTanahM2 : '',
+                      luasBangunanM2: selectedHouse.luasBangunanM2 !== undefined ? selectedHouse.luasBangunanM2 : '',
                       isKkMangga: selectedHouse.isKkMangga !== false,
                       asalKk: selectedHouse.asalKk || (selectedHouse.isKkMangga !== false ? 'Kelurahan Mangga' : 'Luar Kelurahan Mangga'),
                       kategoriBangunan: selectedHouse.kategoriBangunan || 'RUMAH_TINGGAL',
@@ -2795,10 +2796,10 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                       type="number"
                       min="0"
                       step="1000"
-                      placeholder="150000"
+                      placeholder="misal: 150000"
                       value={houseForm.nominalPbb}
                       onChange={(e) =>
-                        setHouseForm((prev) => ({ ...prev, nominalPbb: +e.target.value }))
+                        setHouseForm((prev) => ({ ...prev, nominalPbb: e.target.value === '' ? '' : +e.target.value }))
                       }
                       className="w-full p-2 rounded-xl border border-slate-300 font-bold text-xs"
                     />
@@ -2810,9 +2811,10 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                       type="number"
                       min="2020"
                       max="2030"
+                      placeholder="misal: 2026"
                       value={houseForm.tahunPbb}
                       onChange={(e) =>
-                        setHouseForm((prev) => ({ ...prev, tahunPbb: +e.target.value }))
+                        setHouseForm((prev) => ({ ...prev, tahunPbb: e.target.value === '' ? '' : +e.target.value }))
                       }
                       className="w-full p-2 rounded-xl border border-slate-300 font-bold text-xs"
                     />
@@ -2904,7 +2906,8 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                     type="number"
                     min="0"
                     readOnly
-                    value={(Number(houseForm.jumlahLakiLaki) || 0) + (Number(houseForm.jumlahPerempuan) || 0)}
+                    placeholder="0"
+                    value={((Number(houseForm.jumlahLakiLaki) || 0) + (Number(houseForm.jumlahPerempuan) || 0)) || ''}
                     className="w-full p-2 rounded-xl border border-emerald-400 bg-emerald-50/80 font-black text-emerald-950 cursor-not-allowed text-center"
                     title="Dihitung otomatis: Laki-laki + Perempuan"
                   />
@@ -2914,13 +2917,14 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   <input
                     type="number"
                     min="0"
+                    placeholder="misal: 2"
                     value={houseForm.jumlahLakiLaki}
                     onChange={(e) => {
-                      const val = Math.max(0, +e.target.value);
+                      const val = e.target.value === '' ? '' : Math.max(0, +e.target.value);
                       setHouseForm((prev) => ({
                         ...prev,
                         jumlahLakiLaki: val,
-                        jumlahJiwa: val + (Number(prev.jumlahPerempuan) || 0),
+                        jumlahJiwa: (val === '' ? 0 : val) + (Number(prev.jumlahPerempuan) || 0),
                       }));
                     }}
                     className="w-full p-2 rounded-xl border border-slate-300 font-bold text-center"
@@ -2931,13 +2935,14 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   <input
                     type="number"
                     min="0"
+                    placeholder="misal: 2"
                     value={houseForm.jumlahPerempuan}
                     onChange={(e) => {
-                      const val = Math.max(0, +e.target.value);
+                      const val = e.target.value === '' ? '' : Math.max(0, +e.target.value);
                       setHouseForm((prev) => ({
                         ...prev,
                         jumlahPerempuan: val,
-                        jumlahJiwa: (Number(prev.jumlahLakiLaki) || 0) + val,
+                        jumlahJiwa: (Number(prev.jumlahLakiLaki) || 0) + (val === '' ? 0 : val),
                       }));
                     }}
                     className="w-full p-2 rounded-xl border border-slate-300 font-bold text-center"
@@ -2948,9 +2953,10 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   <input
                     type="number"
                     min="0"
+                    placeholder="misal: 0"
                     value={houseForm.jumlahLansia}
                     onChange={(e) =>
-                      setHouseForm((prev) => ({ ...prev, jumlahLansia: +e.target.value }))
+                      setHouseForm((prev) => ({ ...prev, jumlahLansia: e.target.value === '' ? '' : +e.target.value }))
                     }
                     className="w-full p-2 rounded-xl border border-slate-300 text-center"
                   />
@@ -2964,7 +2970,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="misal: Karyawan Swasta / Pedagang / ASN"
+                  placeholder="misal: Wiraswasta / Karyawan Swasta / ASN"
                   value={houseForm.pekerjaanKk}
                   onChange={(e) =>
                     setHouseForm((prev) => ({ ...prev, pekerjaanKk: e.target.value }))
@@ -2981,9 +2987,9 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                     type="number"
                     min="1"
                     value={houseForm.luasTanahM2}
-                    onChange={(e) => setHouseForm((prev) => ({ ...prev, luasTanahM2: +e.target.value }))}
+                    onChange={(e) => setHouseForm((prev) => ({ ...prev, luasTanahM2: e.target.value === '' ? '' : +e.target.value }))}
                     className="w-full p-2 rounded-xl border border-slate-300 font-bold text-xs"
-                    placeholder="Contoh: 120"
+                    placeholder="Contoh: 100"
                   />
                 </div>
                 <div>
@@ -2992,9 +2998,9 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                     type="number"
                     min="1"
                     value={houseForm.luasBangunanM2}
-                    onChange={(e) => setHouseForm((prev) => ({ ...prev, luasBangunanM2: +e.target.value }))}
+                    onChange={(e) => setHouseForm((prev) => ({ ...prev, luasBangunanM2: e.target.value === '' ? '' : +e.target.value }))}
                     className="w-full p-2 rounded-xl border border-slate-300 font-bold text-xs"
-                    placeholder="Contoh: 90"
+                    placeholder="Contoh: 70"
                   />
                 </div>
               </div>
@@ -3092,12 +3098,11 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   <div>
                     <span className="text-slate-500">Lat:</span>
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
+                      placeholder="misal: 3.523456"
                       value={houseForm.lat}
                       onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setHouseForm((prev) => ({ ...prev, lat: val }));
+                        setHouseForm((prev) => ({ ...prev, lat: e.target.value }));
                       }}
                       className="w-full p-1.5 rounded-lg border border-slate-300 font-mono"
                     />
@@ -3105,12 +3110,11 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   <div>
                     <span className="text-slate-500">Lng:</span>
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
+                      placeholder="misal: 98.634567"
                       value={houseForm.lng}
                       onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setHouseForm((prev) => ({ ...prev, lng: val }));
+                        setHouseForm((prev) => ({ ...prev, lng: e.target.value }));
                       }}
                       className="w-full p-1.5 rounded-lg border border-slate-300 font-mono"
                     />

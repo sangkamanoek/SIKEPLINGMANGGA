@@ -34,7 +34,9 @@ import {
   Users,
   Target,
   MapPin,
-  Calendar
+  Calendar,
+  Eye,
+  Lock
 } from 'lucide-react';
 import { INITIAL_PBB_SUMMARY, SAMPLE_SPPT_ITEMS, SpptPbbItem } from '../data/pbbSampleData';
 import { parsePbbCsv } from '../utils/pbbParser';
@@ -74,12 +76,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const isKepling = activeAccount?.role === 'kepling' && typeof activeAccount?.nomorLingkungan === 'number';
   const keplingLingkunganNum = isKepling ? activeAccount.nomorLingkungan : undefined;
 
-  // Check authorization for Edit & Add WP (Super Admin, Kasi Pemerintahan, and Kepling)
+  // Check authorization for Edit & Add WP & Status change (Only Super Admin and Kasi Pemerintahan; Kepling is read-only)
   const canManageWp =
-    !activeAccount ||
-    activeAccount.role === 'super_admin' ||
-    activeAccount.role === 'kasi_pemerintahan' ||
-    activeAccount.role === 'kepling';
+    activeAccount?.role === 'super_admin' ||
+    activeAccount?.role === 'kasi_pemerintahan' ||
+    (!activeAccount && process.env.NODE_ENV !== 'production');
 
   // Year State (Default to 2026)
   const [selectedYear, setSelectedYear] = useState<number>(() => {
@@ -116,6 +117,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     }
     return 'rekap_lingkungan';
   });
+
+  // Ensure read-only users cannot access import_csv tab
+  useEffect(() => {
+    if (!canManageWp && activeSubTab === 'import_csv') {
+      setActiveTab('detail_sppt');
+    }
+  }, [canManageWp, activeSubTab]);
 
   // Custom SPPT item list state with LocalStorage persistence & Firebase sync
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => {
@@ -342,6 +350,10 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
   // Open Modal for Adding New WP
   const handleOpenAddModal = () => {
+    if (!canManageWp) {
+      notify('Akses Dibatasi: Hanya Superadmin dan Kasi Pemerintahan yang berwenang menambah data PBB.', 'error');
+      return;
+    }
     setEditingWpItem(null);
     const targetLingNum = isKepling && activeAccount?.nomorLingkungan
       ? activeAccount.nomorLingkungan
@@ -364,6 +376,10 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
   // Open Modal for Editing Existing WP
   const handleOpenEditModal = (item: SpptPbbItem) => {
+    if (!canManageWp) {
+      notify('Akses Dibatasi: Hanya Superadmin dan Kasi Pemerintahan yang berwenang mengedit data PBB.', 'error');
+      return;
+    }
     setEditingWpItem(item);
     setFormNop(item.nop);
     setFormNamaWp(item.namaWp);
@@ -381,6 +397,10 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   // Save (Add or Edit) WP Item
   const handleSaveWpItem = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageWp) {
+      notify('Akses Dibatasi: Hanya Superadmin dan Kasi Pemerintahan yang berwenang menyimpan perubahan data PBB.', 'error');
+      return;
+    }
     if (!formNop.trim()) {
       setFormError('Nomor Objek Pajak (NOP) wajib diisi.');
       return;
@@ -453,6 +473,10 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
   // Delete WP Item
   const handleDeleteWpItem = (item: SpptPbbItem) => {
+    if (!canManageWp) {
+      notify('Akses Dibatasi: Hanya Superadmin dan Kasi Pemerintahan yang berwenang menghapus data PBB.', 'error');
+      return;
+    }
     if (window.confirm(`Apakah Anda yakin ingin menghapus Wajib Pajak "${item.namaWp}" (NOP: ${item.nop})?`)) {
       setSpptList((prev) => prev.filter((i) => i.id !== item.id));
       deletePbbSpptFromFirestore(item.id, selectedYear).catch(() => {});
@@ -460,8 +484,12 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     }
   };
 
-  // Toggle Status directly
+  // Toggle Status directly (Only Superadmin and Kasi Pemerintahan)
   const handleToggleStatusWp = (id: string) => {
+    if (!canManageWp) {
+      notify('Akses Dibatasi: Hanya Superadmin dan Kasi Pemerintahan yang berwenang mengubah status pembayaran PBB.', 'error');
+      return;
+    }
     setSpptList((prev) =>
       prev.map((item) => {
         if (item.id === id) {
@@ -822,65 +850,124 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           }
         });
 
-        lines.forEach((line) => {
-          const cells = line.split(/[\t,]/);
+        lines.forEach((rawLine) => {
+          const line = rawLine.trim();
+          if (!line) return;
+
+          // Skip non-data header lines
+          const lower = line.toLowerCase();
+          if (
+            lower.startsWith('kecamatan') ||
+            lower.startsWith('kelurahan') ||
+            lower.includes('daftar objek') ||
+            lower.includes('pbb (rp)') ||
+            (lower.includes('nop') && lower.includes('nama wp'))
+          ) {
+            return;
+          }
+
+          let delimiter = '\t';
+          if (!line.includes('\t')) {
+            if (line.includes(';')) delimiter = ';';
+            else delimiter = ',';
+          }
+
+          const cells = line.split(delimiter).map((c) => c.trim().replace(/^"|"$/g, ''));
           if (cells.length < 2) return;
 
           let detectedNop = '';
           let detectedNama = '';
           let detectedAlamat = '';
           let detectedPbb = 0;
-          let detectedStatus = 'Sudah Bayar';
+          let detectedStatus: 'Sudah Bayar' | 'Belum Bayar' = 'Sudah Bayar';
 
-          cells.forEach(cell => {
-            cell = cell.trim();
-            const digitsOnly = cell.replace(/[^0-9]/g, '');
+          // Check if column 1 contains NOP: [Nomor, NOP, Tahun, Nama WP, Alamat OP, PBB (Rp), Status]
+          const col1Digits = cells[1] ? cells[1].replace(/[^0-9]/g, '') : '';
+          const col0Digits = cells[0] ? cells[0].replace(/[^0-9]/g, '') : '';
 
-            // Identify NOP (typically 15 to 19 digits)
-            if (digitsOnly.length >= 15 && digitsOnly.length <= 19) {
-              detectedNop = cell;
+          if (col1Digits.length >= 15 && col1Digits.length <= 19) {
+            detectedNop = cells[1];
+            if (cells[3]) detectedNama = cells[3].toUpperCase();
+            if (cells[4]) detectedAlamat = cells[4].toUpperCase();
+            if (cells[5]) {
+              const val = parseInt(cells[5].replace(/[^0-9]/g, ''), 10);
+              if (!isNaN(val) && val > 0) detectedPbb = val;
             }
-            // Identify PBB amount
-            else if (cell.toLowerCase().includes('rp') || (/^\d{1,3}(\.\d{3})+$/.test(cell)) || (/^\d+$/.test(cell) && Number(cell) > 10000)) {
-              const val = parseInt(cell.replace(/[^0-9]/g, ''), 10);
-              if (!isNaN(val) && val > 0) {
-                detectedPbb = val;
+            if (cells[6]) {
+              const st = cells[6].toLowerCase();
+              if (st.includes('belum')) detectedStatus = 'Belum Bayar';
+              else detectedStatus = 'Sudah Bayar';
+            }
+          } else if (col0Digits.length >= 15 && col0Digits.length <= 19) {
+            detectedNop = cells[0];
+            if (cells[1]) detectedNama = cells[1].toUpperCase();
+            if (cells[2]) detectedAlamat = cells[2].toUpperCase();
+            if (cells[3]) {
+              const val = parseInt(cells[3].replace(/[^0-9]/g, ''), 10);
+              if (!isNaN(val) && val > 0) detectedPbb = val;
+            }
+            if (cells[4]) {
+              const st = cells[4].toLowerCase();
+              if (st.includes('belum')) detectedStatus = 'Belum Bayar';
+              else detectedStatus = 'Sudah Bayar';
+            }
+          } else {
+            // Flexible cell scanner fallback
+            cells.forEach((cell) => {
+              cell = cell.trim();
+              const digitsOnly = cell.replace(/[^0-9]/g, '');
+
+              // Identify NOP (typically 15 to 19 digits)
+              if (digitsOnly.length >= 15 && digitsOnly.length <= 19) {
+                detectedNop = cell;
+              }
+              // Identify PBB amount (handles 227,594 or 227.594 or Rp 227.594)
+              else if (
+                cell.toLowerCase().includes('rp') ||
+                /^\d{1,3}([.,]\d{3})+$/.test(cell) ||
+                (digitsOnly.length >= 4 && digitsOnly.length <= 11 && Number(digitsOnly) > 1000)
+              ) {
+                const val = parseInt(digitsOnly, 10);
+                if (!isNaN(val) && val > 0 && digitsOnly !== '2024' && digitsOnly !== '2025' && digitsOnly !== '2026' && digitsOnly !== '2027') {
+                  detectedPbb = val;
+                }
+              }
+              // Identify Status
+              else if (cell.toLowerCase().includes('bayar') || cell.toLowerCase().includes('lunas')) {
+                if (cell.toLowerCase().includes('belum')) {
+                  detectedStatus = 'Belum Bayar';
+                } else {
+                  detectedStatus = 'Sudah Bayar';
+                }
+              }
+            });
+
+            if (!detectedNama || !detectedAlamat) {
+              const textCells = cells.filter((c) => {
+                const trimmed = c.trim();
+                if (!trimmed) return false;
+                if (trimmed.replace(/[^0-9]/g, '').length >= 15) return false;
+                if (trimmed.toLowerCase().includes('rp')) return false;
+                if (trimmed.toLowerCase().includes('bayar') || trimmed.toLowerCase().includes('lunas')) return false;
+                if (/^\d+$/.test(trimmed.replace(/[^0-9]/g, '')) && trimmed.length < 10) return false;
+                return true;
+              });
+
+              if (!detectedNama && textCells.length > 0) {
+                detectedNama = textCells[0].trim().toUpperCase();
+              }
+              if (!detectedAlamat && textCells.length > 1) {
+                detectedAlamat = textCells[1].trim().toUpperCase();
               }
             }
-            // Identify Status
-            else if (cell.toLowerCase().includes('bayar') || cell.toLowerCase().includes('lunas')) {
-              if (cell.toLowerCase().includes('belum')) {
-                detectedStatus = 'Belum Bayar';
-              } else {
-                detectedStatus = 'Sudah Bayar';
-              }
-            }
-          });
+          }
 
           if (!detectedNop) return;
-
-          // Find longest text for Nama / Alamat
-          const textCells = cells.filter(c => {
-            const trimmed = c.trim();
-            if (!trimmed) return false;
-            if (trimmed.replace(/[^0-9]/g, '').length >= 15) return false;
-            if (trimmed.toLowerCase().includes('rp')) return false;
-            if (trimmed.toLowerCase().includes('bayar') || trimmed.toLowerCase().includes('lunas')) return false;
-            if (/^\d+$/.test(trimmed.replace(/[^0-9]/g, '')) && trimmed.length < 10) return false;
-            return true;
-          });
-
-          if (textCells.length > 0) {
-            detectedNama = textCells[0].trim().toUpperCase();
-          }
-          if (textCells.length > 1) {
-            detectedAlamat = textCells[1].trim().toUpperCase();
-          }
 
           const cleanNop = detectedNop.replace(/[^0-9]/g, '');
           let targetLingkungan = 1;
           let isNew = true;
-          let mappingSource: 'Master SPPT' | 'WebGIS Rumah' | 'Manual' = 'Manual';
+          let mappingSource: 'Master SPPT' | 'WebGIS Rumah' | 'Blok NOP' | 'Manual' = 'Manual';
           let masterPbbTerutang = 0;
 
           // 1. Try to map from Master SPPT Database
@@ -893,17 +980,26 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             if (!detectedAlamat) detectedAlamat = masterItem.alamatOp;
             masterPbbTerutang = masterItem.pbbTerutang;
           }
-          // 2. Try to map from WebGIS Citizen database
-          else if (webgisNopMap.has(cleanNop)) {
-            const houseItem = webgisNopMap.get(cleanNop)!;
-            targetLingkungan = Number(houseItem.lingkungan) || 1;
-            isNew = true;
-            mappingSource = 'WebGIS Rumah';
-            if (!detectedNama) detectedNama = houseItem.namaWarga || houseItem.namaPemilik;
-            if (!detectedAlamat) detectedAlamat = houseItem.alamat;
-          }
-          // 3. Brand New NOP (Unmatched)
+          // 2. Infer from NOP block (e.g. 12.75.010.009.001-0004 -> Lingkungan 1, .002- -> Lingk 2, etc.)
           else {
+            const blockMatch = detectedNop.match(/\.009\.(\d{3})-/i) || cleanNop.match(/009(\d{3})/);
+            if (blockMatch) {
+              const blockNum = parseInt(blockMatch[1], 10);
+              if (blockNum >= 1 && blockNum <= 24) {
+                targetLingkungan = blockNum;
+                mappingSource = 'Blok NOP';
+              }
+            }
+            if (targetLingkungan === 0 && webgisNopMap.has(cleanNop)) {
+              const houseItem = webgisNopMap.get(cleanNop)!;
+              targetLingkungan = Number(houseItem.lingkungan) || 1;
+              mappingSource = 'WebGIS Rumah';
+              if (!detectedNama) detectedNama = houseItem.namaWarga || houseItem.namaPemilik;
+              if (!detectedAlamat) detectedAlamat = houseItem.alamat;
+            }
+          }
+
+          if (targetLingkungan === 0) {
             targetLingkungan = 0; // Sentinel value indicating NOP Baru
             isNew = true;
             mappingSource = 'Manual';
@@ -911,8 +1007,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           }
 
           const finalPbbTerutang = masterPbbTerutang > 0 ? masterPbbTerutang : (detectedPbb > 0 ? detectedPbb : 100000);
-          // If the parsed file contains an amount and status is 'Sudah Bayar', and it is different from the master's PBB Terutang, treat it as the actual paid amount (with deductions if lower)
-          const finalJumlahBayar = (detectedStatus === 'Sudah Bayar' && detectedPbb > 0 && detectedPbb !== masterPbbTerutang) ? detectedPbb : undefined;
+          // If status is 'Sudah Bayar' and file contains an amount, record it as the actual paid amount (with deductions if lower)
+          const finalJumlahBayar = (detectedStatus === 'Sudah Bayar' && detectedPbb > 0) ? detectedPbb : undefined;
 
           tempItems.push({
             id: `import_map_${nextIdCount++}`,
@@ -1047,12 +1143,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               </div>
               {isKepling ? (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black">
-                  <span>👑 Kepala Lingkungan: {activeAccount?.nama}</span>
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>👑 Kepala Lingkungan: {activeAccount?.nama} (Mode Lihat Data)</span>
                 </div>
               ) : canManageWp ? (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-black">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Akses Pengelola: {activeAccount?.nama || 'Superadmin & Kasi'}</span>
+                  <span>Akses Pengelola PBB: {activeAccount?.nama || 'Superadmin & Kasi Pemerintahan'}</span>
                 </div>
               ) : null}
             </div>
@@ -1122,7 +1219,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all shadow-md cursor-pointer border border-emerald-400/50"
                 >
                   <UserPlus className="w-4 h-4" />
-                  <span>+ Tambah WP {isKepling ? `Lingk ${keplingLingkunganNum}` : 'Baru'}</span>
+                  <span>+ Tambah WP Baru</span>
                 </button>
               )}
 
@@ -1418,19 +1515,21 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             </span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('import_csv')}
-            className={`py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-              activeSubTab === 'import_csv'
-                ? 'border-emerald-600 text-emerald-800 font-black'
-                : 'border-transparent text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <Upload className="w-4 h-4" />
-              <span>Import / Paste Spreadsheet</span>
-            </span>
-          </button>
+          {canManageWp && (
+            <button
+              onClick={() => setActiveTab('import_csv')}
+              className={`py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                activeSubTab === 'import_csv'
+                  ? 'border-emerald-600 text-emerald-800 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                <span>Import / Paste Spreadsheet</span>
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Sync Status Badge */}
@@ -1896,7 +1995,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ Tambah WP {isKepling ? `Lingk ${keplingLingkunganNum}` : ''}</span>
+                  <span>+ Tambah WP Baru</span>
                 </button>
               )}
             </div>
@@ -1921,7 +2020,15 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                     Lingkungan {selectedLingkungan} memiliki total rekapitulasi <strong>{kelurahanTotals.totalWp} Objek Pajak</strong> dengan total target <strong>{formatRupiah(kelurahanTotals.targetNominal)}</strong>.
                     {filteredSpptList.length < kelurahanTotals.totalWp && (
                       <span className="block mt-1 text-slate-700">
-                        📌 <em>Catatan: Menampilkan rincian {filteredSpptList.length} Objek Pajak terdaftar. Anda dapat menambah atau memperbarui data menggunakan tombol <strong>+ Tambah WP</strong> atau menu <button onClick={() => setActiveTab('import_csv')} className="font-bold text-emerald-800 underline hover:text-emerald-950 cursor-pointer">Import / Paste Spreadsheet</button>.</em>
+                        {canManageWp ? (
+                          <>
+                            📌 <em>Catatan: Menampilkan rincian {filteredSpptList.length} Objek Pajak terdaftar. Anda dapat menambah atau memperbarui data menggunakan tombol <strong>+ Tambah WP</strong> atau menu <button onClick={() => setActiveTab('import_csv')} className="font-bold text-emerald-800 underline hover:text-emerald-950 cursor-pointer">Import / Paste Spreadsheet</button>.</em>
+                          </>
+                        ) : (
+                          <>
+                            📌 <em>Catatan: Menampilkan rincian {filteredSpptList.length} Objek Pajak di lingkungan Anda. Hak akses Anda adalah melihat data. Perubahan status pembayaran atau data WP dikelola oleh Kasi Pemerintahan dan Superadmin.</em>
+                          </>
+                        )}
                       </span>
                     )}
                   </span>
@@ -2034,43 +2141,51 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                       </td>
                       <td className="py-2.5 px-3 text-center print:hidden">
                         <div className="flex items-center justify-center gap-1.5">
-                          {/* Toggle status button */}
-                          <button
-                            onClick={() => handleToggleStatusWp(item.id)}
-                            className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
-                              item.status === 'Sudah Bayar'
-                                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300'
-                                : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs'
-                            }`}
-                            title={item.status === 'Sudah Bayar' ? 'Ubah status ke Belum Bayar' : 'Tandai Lunas / Sudah Bayar'}
-                          >
-                            {item.status === 'Sudah Bayar' ? 'Ubah Belum' : 'Tandai Lunas'}
-                          </button>
+                          {canManageWp ? (
+                            <>
+                              {/* Toggle status button (Hanya Superadmin & Kasi Pemerintahan) */}
+                              <button
+                                onClick={() => handleToggleStatusWp(item.id)}
+                                className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
+                                  item.status === 'Sudah Bayar'
+                                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300'
+                                    : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs'
+                                }`}
+                                title={item.status === 'Sudah Bayar' ? 'Ubah status ke Belum Bayar' : 'Tandai Lunas / Sudah Bayar'}
+                              >
+                                {item.status === 'Sudah Bayar' ? 'Ubah Belum' : 'Tandai Lunas'}
+                              </button>
 
-                          {/* Edit button (for Superadmin & Kasi Pemerintahan) */}
-                          {canManageWp && (
-                            <button
-                              onClick={() => handleOpenEditModal(item)}
-                              className={`p-1 rounded-lg cursor-pointer transition-colors ${
-                                item.lingkungan === 0
-                                  ? 'bg-rose-600 text-white hover:bg-rose-700 border border-rose-700 animate-pulse ring-2 ring-rose-400'
-                                  : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300'
-                              }`}
-                              title={item.lingkungan === 0 ? "⚠️ Klik untuk Petakan Lingkungan Secara Manual" : "Edit Data Wajib Pajak"}
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                              {/* Edit button */}
+                              <button
+                                onClick={() => handleOpenEditModal(item)}
+                                className={`p-1 rounded-lg cursor-pointer transition-colors ${
+                                  item.lingkungan === 0
+                                    ? 'bg-rose-600 text-white hover:bg-rose-700 border border-rose-700 animate-pulse ring-2 ring-rose-400'
+                                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300'
+                                }`}
+                                title={item.lingkungan === 0 ? "⚠️ Klik untuk Petakan Lingkungan Secara Manual" : "Edit Data Wajib Pajak"}
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
 
-                          {/* Delete button (for Superadmin & Kasi Pemerintahan) */}
-                          {canManageWp && (
-                            <button
-                              onClick={() => handleDeleteWpItem(item)}
-                              className="p-1 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 cursor-pointer transition-colors"
-                              title="Hapus Data Wajib Pajak"
+                              {/* Delete button */}
+                              <button
+                                onClick={() => handleDeleteWpItem(item)}
+                                className="p-1 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 cursor-pointer transition-colors"
+                                title="Hapus Data Wajib Pajak"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200"
+                              title="Kepling hanya berwenang memantau data PBB (Read-only)"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                              <Eye className="w-3 h-3 text-slate-400" />
+                              <span>Hanya Lihat</span>
+                            </span>
                           )}
                         </div>
                       </td>
