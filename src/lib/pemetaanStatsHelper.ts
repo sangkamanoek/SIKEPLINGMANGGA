@@ -144,48 +144,48 @@ export function computeLingkunganPemetaanStats(
     const jfLower = (h.jenisFasilitas || '').toLowerCase();
 
     if (
-      cat === 'RUMAH_IBADAH' ||
-      /masjid|mushola|gereja|vihara|pura|klenteng/i.test(nameLower) ||
-      /masjid|mushola|gereja|vihara|pura|klenteng/i.test(jfLower)
+      cat === 'FASILITAS_KESEHATAN' ||
+      /\b(puskesmas|pustu|posyandu|klinik|faskes|kesehatan|apotek|apotik|rsud|rumah sakit|poliklinik|bidan)\b/i.test(nameLower) ||
+      /\b(puskesmas|pustu|posyandu|klinik|faskes|kesehatan|apotek|apotik|rsud|rumah sakit|poliklinik|bidan)\b/i.test(jfLower)
     ) {
       totalFasilitasPublik++;
-      if (/masjid|mushola/i.test(nameLower) || /masjid|mushola/i.test(jfLower)) {
+      totalFaskes++;
+    } else if (
+      cat === 'SEKOLAH' ||
+      /\b(sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus|madrasah|pesantren|akademi|politeknik|bimbel)\b/i.test(nameLower) ||
+      /\b(sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus|madrasah|pesantren|akademi|politeknik|bimbel)\b/i.test(jfLower)
+    ) {
+      totalFasilitasPublik++;
+      totalSekolah++;
+    } else if (
+      cat === 'RUMAH_IBADAH' ||
+      /\b(masjid|mushola|musala|gereja|vihara|pura|klenteng)\b/i.test(nameLower) ||
+      /\b(masjid|mushola|musala|gereja|vihara|pura|klenteng)\b/i.test(jfLower)
+    ) {
+      totalFasilitasPublik++;
+      if (/masjid|mushola|musala/i.test(nameLower) || /masjid|mushola|musala/i.test(jfLower)) {
         totalMasjid++;
       } else {
         totalGereja++;
       }
     } else if (
-      cat === 'SEKOLAH' ||
-      /sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(nameLower) ||
-      /sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(jfLower)
-    ) {
-      totalFasilitasPublik++;
-      totalSekolah++;
-    } else if (
-      cat === 'FASILITAS_KESEHATAN' ||
-      /puskesmas|pustu|posyandu|klinik|faskes/i.test(nameLower) ||
-      /puskesmas|pustu|posyandu|klinik|faskes/i.test(jfLower)
-    ) {
-      totalFasilitasPublik++;
-      totalFaskes++;
-    } else if (
       cat === 'SPBU_STASIUN' ||
-      /spbu|pertashop/i.test(nameLower) ||
-      /spbu|pertashop/i.test(jfLower)
+      /\b(spbu|pertashop|pertamina)\b/i.test(nameLower) ||
+      /\b(spbu|pertashop|pertamina)\b/i.test(jfLower)
     ) {
       totalFasilitasPublik++;
       totalSpbu++;
     } else if (
       cat === 'KANTOR_FASUM' ||
-      /kantor|lurah|balai|poskamling/i.test(nameLower) ||
-      /kantor|lurah|balai|poskamling/i.test(jfLower)
+      /\b(kantor|lurah|balai|poskamling|pelayanan)\b/i.test(nameLower) ||
+      /\b(kantor|lurah|balai|poskamling|pelayanan)\b/i.test(jfLower)
     ) {
       totalFasilitasPublik++;
       totalKantorFasum++;
     } else if (
       cat === 'RUANG_PUBLIK_TAMAN' ||
-      /taman|lapangan/i.test(nameLower) ||
-      /taman|lapangan/i.test(jfLower)
+      /\b(taman|lapangan|ronda|futsal)\b/i.test(nameLower) ||
+      /\b(taman|lapangan|ronda|futsal)\b/i.test(jfLower)
     ) {
       totalFasilitasPublik++;
       totalRuangPublik++;
@@ -193,7 +193,7 @@ export function computeLingkunganPemetaanStats(
       cat === 'PASAR_SARANA_EKONOMI' ||
       cat === 'RUMAH_USAHA' ||
       h.memilikiUsaha ||
-      /pasar|bank|atm|toko|warung|minimarket|usah/i.test(nameLower)
+      /\b(pasar|bank|atm|toko|warung|minimarket|usaha)\b/i.test(nameLower)
     ) {
       totalPasarUsaha++;
       if (cat !== 'RUMAH_USAHA') totalFasilitasPublik++;

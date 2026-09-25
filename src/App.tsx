@@ -1274,6 +1274,10 @@ export default function App() {
               activeAccount={activeAccount}
               reports={reports}
               attendanceList={attendanceList}
+              isGoogleConnected={Boolean(user && token)}
+              googleUserEmail={user?.email}
+              spreadsheetTitle={sheetMeta?.title}
+              onForceSyncAll={refreshAllReports}
               onNavigate={(tab) => {
                 if (tab === 'riwayat') {
                   setRiwayatFilterPetugas(activeAccount.role === 'kepling' ? activeAccount.nama : undefined);

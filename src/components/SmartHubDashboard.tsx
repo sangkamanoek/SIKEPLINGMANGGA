@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { UserAccount, LaporanHarianItem, AbsenApelItem } from '../types';
 import { DeadlineNotifAlert } from './DeadlineNotifAlert';
+import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { SpptPbbItem } from '../data/pbbSampleData';
 import {
   DEFAULT_PBB_YEAR,
@@ -41,6 +42,10 @@ interface SmartHubDashboardProps {
   onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb') => void;
   onOpenAbsenApel: () => void;
   onOpenPPTModal: () => void;
+  isGoogleConnected?: boolean;
+  googleUserEmail?: string | null;
+  spreadsheetTitle?: string | null;
+  onForceSyncAll?: () => Promise<void> | void;
 }
 
 export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
@@ -49,7 +54,11 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
   attendanceList,
   onNavigate,
   onOpenAbsenApel,
-  onOpenPPTModal
+  onOpenPPTModal,
+  isGoogleConnected = false,
+  googleUserEmail,
+  spreadsheetTitle,
+  onForceSyncAll,
 }) => {
   const isKepling = activeAccount.role === 'kepling';
   const isAdmin = activeAccount.role === 'super_admin';
@@ -420,6 +429,14 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Panel Ringkasan Status Sinkronisasi Real-Time (Firebase, Google Sheets, IndexedDB) */}
+      <RealtimeSyncStatusPanel
+        isGoogleConnected={isGoogleConnected}
+        googleUserEmail={googleUserEmail}
+        spreadsheetTitle={spreadsheetTitle}
+        onForceSyncAll={onForceSyncAll}
+      />
 
       {/* Visual Alert & Deadline 23:30 Push Notif Component */}
       <DeadlineNotifAlert activeAccount={activeAccount} reports={reports} onNavigate={onNavigate} />

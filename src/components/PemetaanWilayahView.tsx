@@ -273,7 +273,17 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     namaUsaha: string;
     luasTanahM2: number | string;
     luasBangunanM2: number | string;
-    kategoriBangunan: 'RUMAH_TINGGAL' | 'RUMAH_USAHA' | 'RUMAH_IBADAH' | 'SEKOLAH' | 'KANTOR_FASUM';
+    kategoriBangunan: (
+      'RUMAH_TINGGAL' |
+      'RUMAH_USAHA' |
+      'RUMAH_IBADAH' |
+      'SEKOLAH' |
+      'FASILITAS_KESEHATAN' |
+      'SPBU_STASIUN' |
+      'KANTOR_FASUM' |
+      'RUANG_PUBLIK_TAMAN' |
+      'PASAR_SARANA_EKONOMI'
+    );
     jenisFasilitas: string;
   }>(() => getEmptyHouseFormData(isKepling ? currentUser.id : 'kepling_1'));
 
@@ -793,13 +803,13 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       const jfLower = (h.jenisFasilitas || '').toLowerCase();
 
       if (filterTheme === 'IBADAH') {
-        if (cat !== 'RUMAH_IBADAH' && !/masjid|mushola|gereja|vihara|pura|klenteng/i.test(nameLower) && !/masjid|mushola|gereja|vihara|pura|klenteng/i.test(jfLower)) return false;
-      }
-      if (filterTheme === 'SEKOLAH') {
-        if (cat !== 'SEKOLAH' && !/sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(nameLower) && !/sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(jfLower)) return false;
+        if (cat !== 'RUMAH_IBADAH' && !/\b(masjid|mushola|musala|gereja|vihara|pura|klenteng)\b/i.test(nameLower) && !/\b(masjid|mushola|musala|gereja|vihara|pura|klenteng)\b/i.test(jfLower)) return false;
       }
       if (filterTheme === 'FASKES') {
-        if (cat !== 'FASILITAS_KESEHATAN' && !/puskesmas|pustu|posyandu|klinik|faskes/i.test(nameLower) && !/puskesmas|pustu|posyandu|klinik|faskes/i.test(jfLower)) return false;
+        if (cat !== 'FASILITAS_KESEHATAN' && !/\b(puskesmas|pustu|posyandu|klinik|faskes|kesehatan|apotek|apotik|rsud|rumah sakit|poliklinik|bidan)\b/i.test(nameLower) && !/\b(puskesmas|pustu|posyandu|klinik|faskes|kesehatan|apotek|apotik|rsud|rumah sakit|poliklinik|bidan)\b/i.test(jfLower)) return false;
+      }
+      if (filterTheme === 'SEKOLAH') {
+        if (cat !== 'SEKOLAH' && !/\b(sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus|madrasah|pesantren|akademi|politeknik|bimbel)\b/i.test(nameLower) && !/\b(sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus|madrasah|pesantren|akademi|politeknik|bimbel)\b/i.test(jfLower)) return false;
       }
       if (filterTheme === 'SPBU') {
         if (cat !== 'SPBU_STASIUN' && !/spbu|pertashop/i.test(nameLower) && !/spbu|pertashop/i.test(jfLower)) return false;
@@ -1024,6 +1034,20 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       const jfLower = (h.jenisFasilitas || '').toLowerCase();
 
       if (
+        cat === 'FASILITAS_KESEHATAN' ||
+        /puskesmas|pustu|posyandu|klinik|faskes|kesehatan|apotek|rumah sakit|rsud|bidan/i.test(nameLower) ||
+        /puskesmas|pustu|posyandu|klinik|faskes|kesehatan|apotek|rumah sakit|rsud|bidan/i.test(jfLower)
+      ) {
+        totalFasilitasPublik++;
+        totalFaskes++;
+      } else if (
+        cat === 'SEKOLAH' ||
+        /\b(sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus|madrasah|pesantren|akademi|politeknik)\b/i.test(nameLower) ||
+        /\b(sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus|madrasah|pesantren|akademi|politeknik)\b/i.test(jfLower)
+      ) {
+        totalFasilitasPublik++;
+        totalSekolah++;
+      } else if (
         cat === 'RUMAH_IBADAH' ||
         /masjid|mushola|gereja|vihara|pura|klenteng/i.test(nameLower) ||
         /masjid|mushola|gereja|vihara|pura|klenteng/i.test(jfLower)
@@ -1035,37 +1059,23 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
           totalGereja++;
         }
       } else if (
-        cat === 'SEKOLAH' ||
-        /sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(nameLower) ||
-        /sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(jfLower)
-      ) {
-        totalFasilitasPublik++;
-        totalSekolah++;
-      } else if (
-        cat === 'FASILITAS_KESEHATAN' ||
-        /puskesmas|pustu|posyandu|klinik|faskes/i.test(nameLower) ||
-        /puskesmas|pustu|posyandu|klinik|faskes/i.test(jfLower)
-      ) {
-        totalFasilitasPublik++;
-        totalFaskes++;
-      } else if (
         cat === 'SPBU_STASIUN' ||
-        /spbu|pertashop/i.test(nameLower) ||
-        /spbu|pertashop/i.test(jfLower)
+        /spbu|pertashop|pertamina/i.test(nameLower) ||
+        /spbu|pertashop|pertamina/i.test(jfLower)
       ) {
         totalFasilitasPublik++;
         totalSpbu++;
       } else if (
         cat === 'KANTOR_FASUM' ||
-        /kantor|lurah|balai|poskamling/i.test(nameLower) ||
-        /kantor|lurah|balai|poskamling/i.test(jfLower)
+        /kantor|lurah|balai|pelayanan|poskamling/i.test(nameLower) ||
+        /kantor|lurah|balai|pelayanan|poskamling/i.test(jfLower)
       ) {
         totalFasilitasPublik++;
         totalKantorFasum++;
       } else if (
         cat === 'RUANG_PUBLIK_TAMAN' ||
-        /taman|lapangan/i.test(nameLower) ||
-        /taman|lapangan/i.test(jfLower)
+        /taman|lapangan|futsal|ronda/i.test(nameLower) ||
+        /taman|lapangan|futsal|ronda/i.test(jfLower)
       ) {
         totalFasilitasPublik++;
         totalRuangPublik++;
@@ -3027,7 +3037,22 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                     <button
                       key={cat.id}
                       type="button"
-                      onClick={() => setHouseForm((prev) => ({ ...prev, kategoriBangunan: cat.id as any }))}
+                      onClick={() => {
+                        let defaultJenis = '';
+                        if (cat.id === 'FASILITAS_KESEHATAN') defaultJenis = 'Puskesmas Pembantu (Pustu)';
+                        else if (cat.id === 'SPBU_STASIUN') defaultJenis = 'SPBU Pertamina Resmi';
+                        else if (cat.id === 'RUMAH_IBADAH') defaultJenis = 'Gereja';
+                        else if (cat.id === 'SEKOLAH') defaultJenis = 'SD Negeri / Swasta';
+                        else if (cat.id === 'KANTOR_FASUM') defaultJenis = 'Kantor Kelurahan';
+                        else if (cat.id === 'RUANG_PUBLIK_TAMAN') defaultJenis = 'Poskamling / Pos Ronda';
+                        else if (cat.id === 'PASAR_SARANA_EKONOMI') defaultJenis = 'Pasar Tradisional';
+
+                        setHouseForm((prev) => ({
+                          ...prev,
+                          kategoriBangunan: cat.id as any,
+                          jenisFasilitas: defaultJenis || prev.jenisFasilitas,
+                        }));
+                      }}
                       className={`p-2 rounded-xl text-left text-xs font-bold border transition-all cursor-pointer ${
                         houseForm.kategoriBangunan === cat.id
                           ? 'bg-teal-800 text-white border-teal-800 shadow-xs'
