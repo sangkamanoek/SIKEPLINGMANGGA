@@ -371,9 +371,14 @@ app.use('/api', (_req, res, next) => {
   next();
 });
 
-// API Endpoints
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// API Health & Root Endpoints for Vercel Agent and Cloud Run probes
+app.get(['/api', '/api/', '/api/index', '/api/index.ts', '/api/health'], (_req, res) => {
+  res.json({
+    status: 'ok',
+    success: true,
+    service: 'SI-KEPLING Kelurahan Mangga API',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // =========================================================================
@@ -1226,6 +1231,16 @@ app.get('/api/reverse-geocode', async (req, res) => {
       fullFormatted: 'Jalan Flamboyan, Medan Tuntungan',
     });
   }
+});
+
+// Fallback catch-all for any unhandled /api requests on Vercel/Cloud Run
+app.use('/api', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    success: true,
+    message: 'SI-KEPLING Kelurahan Mangga API Operational',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 async function startServer() {
