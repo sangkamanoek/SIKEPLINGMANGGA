@@ -745,10 +745,19 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     if (filterTheme === 'JALAN') return;
 
     const filtered = houses.filter((h) => {
-      if (filterLingkungan !== 'all' && h.lingkunganId !== filterLingkungan) return false;
-      if (filterTheme === 'WRS' && !h.statusWrs) return false;
-      if (filterTheme === 'BANSOS' && !h.penerimaBansos) return false;
-      if (filterTheme === 'PBB' && !h.statusPbb) return false;
+      const latNum = Number(h.lat);
+      const lngNum = Number(h.lng);
+      if (isNaN(latNum) || isNaN(lngNum) || latNum === 0 || lngNum === 0) return false;
+
+      // Allow public facilities like Kantor Lurah to show across filters
+      const isPublicFacility =
+        h.kategoriBangunan === 'KANTOR_FASUM' ||
+        (h.namaKepalaKeluarga && h.namaKepalaKeluarga.toLowerCase().includes('kantor lurah'));
+
+      if (filterLingkungan !== 'all' && h.lingkunganId !== filterLingkungan && !isPublicFacility) return false;
+      if (filterTheme === 'WRS' && !h.statusWrs && !isPublicFacility) return false;
+      if (filterTheme === 'BANSOS' && !h.penerimaBansos && !isPublicFacility) return false;
+      if (filterTheme === 'PBB' && !h.statusPbb && !isPublicFacility) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         return (
@@ -766,7 +775,13 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       let markerColor = '#10b981'; // Green default
       let iconSymbol = '🏠';
 
-      if (h.kategoriBangunan === 'RUMAH_IBADAH') {
+      if (
+        h.kategoriBangunan === 'KANTOR_FASUM' ||
+        (h.namaKepalaKeluarga && h.namaKepalaKeluarga.toLowerCase().includes('kantor lurah'))
+      ) {
+        markerColor = '#1e3a8a'; // Dark Navy Blue for Kantor Lurah & Fasilitas Umum
+        iconSymbol = '🏛️';
+      } else if (h.kategoriBangunan === 'RUMAH_IBADAH') {
         markerColor = '#0d9488'; // Teal / Cyan for House of Worship
         iconSymbol = h.jenisFasilitas?.toLowerCase().includes('masjid') || h.jenisFasilitas?.toLowerCase().includes('mushola') ? '🕌' : '⛪';
       } else if (h.kategoriBangunan === 'SEKOLAH') {
@@ -1193,8 +1208,8 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       nikKk: houseForm.nikKk,
       isKkMangga: houseForm.isKkMangga !== false,
       asalKk: houseForm.isKkMangga ? 'Kelurahan Mangga' : (houseForm.asalKk || 'Luar Kelurahan Mangga'),
-      lat: houseForm.lat,
-      lng: houseForm.lng,
+      lat: Number(houseForm.lat) || KELURAHAN_MANGGA_CENTER[0],
+      lng: Number(houseForm.lng) || KELURAHAN_MANGGA_CENTER[1],
       jumlahJiwa: (Number(houseForm.jumlahLakiLaki) || 0) + (Number(houseForm.jumlahPerempuan) || 0) || 1,
       jumlahLakiLaki: Number(houseForm.jumlahLakiLaki) || 0,
       jumlahPerempuan: Number(houseForm.jumlahPerempuan) || 0,

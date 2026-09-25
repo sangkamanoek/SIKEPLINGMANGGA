@@ -2,7 +2,7 @@ import { LingkunganPolygon, TitikRumahBangunan, RuasJalanLingkungan } from '../t
 import { KEPLING_ACCOUNTS } from './keplingList';
 import { parseAllKmlPolygons } from '../lib/webgisService';
 
-export const KELURAHAN_MANGGA_CENTER: [number, number] = [3.5230, 98.6340];
+export const KELURAHAN_MANGGA_CENTER: [number, number] = [3.514234, 98.633175];
 export const DEFAULT_MAP_ZOOM = 14;
 
 // Official Kelurahan Mangga Boundary in Medan Tuntungan (ArcGIS reference geometry)
@@ -75,6 +75,39 @@ export const DEFAULT_RUAS_JALAN: RuasJalanLingkungan[] = [];
  * Initial sample house points with WRS and Bansos statuses
  */
 export const DEFAULT_TITIK_RUMAH: TitikRumahBangunan[] = [
+  {
+    id: 'kantor_lurah_mangga',
+    lingkunganId: 'kepling_1',
+    lingkunganNomor: 1,
+    namaJalan: 'Jl. Tembakau Raya No. 35',
+    nomorRumah: 'No. 35',
+    namaKepalaKeluarga: 'Kantor Lurah Kelurahan Mangga',
+    nikKk: '1271000000000000',
+    isKkMangga: true,
+    asalKk: 'Kelurahan Mangga',
+    lat: 3.514234,
+    lng: 98.633175,
+    jumlahJiwa: 0,
+    jumlahLakiLaki: 0,
+    jumlahPerempuan: 0,
+    jumlahLansia: 0,
+    jumlahAnak: 0,
+    pekerjaanKk: 'Pemerintahan / Pelayanan Publik',
+    penerimaBansos: false,
+    statusWrs: 'AKTIF',
+    tarifRetribusi: 0,
+    statusPbb: 'BEBAS_PAJAK',
+    nominalPbb: 0,
+    tahunPbb: 2026,
+    luasTanahM2: 500,
+    luasBangunanM2: 300,
+    kategoriBangunan: 'KANTOR_FASUM',
+    jenisFasilitas: 'Kantor Kelurahan',
+    catatan: 'Kantor Lurah Kelurahan Mangga - Jl. Tembakau Raya No. 35, Medan Tuntungan',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdByName: 'Sistem Kelurahan Mangga',
+  },
   {
     id: 'rumah_juan_lingk1',
     lingkunganId: 'kepling_1',

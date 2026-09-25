@@ -115,17 +115,15 @@ export function getLocalHouses(): TitikRumahBangunan[] {
         return DEFAULT_TITIK_RUMAH;
       }
       if (Array.isArray(parsed)) {
-        const hasJuan = parsed.some(
-          (h) =>
-            h.id === 'rumah_juan_lingk1' ||
-            (h.namaKepalaKeluarga && h.namaKepalaKeluarga.toLowerCase() === 'juan')
-        );
-        if (!hasJuan && DEFAULT_TITIK_RUMAH.length > 0) {
-          const merged = [...DEFAULT_TITIK_RUMAH, ...parsed];
-          safeSetLocalStorage(STORAGE_KEY_HOUSES, JSON.stringify(merged));
-          return merged;
-        }
-        return parsed.length > 0 ? parsed : DEFAULT_TITIK_RUMAH;
+        DEFAULT_TITIK_RUMAH.forEach((def) => {
+          const idx = parsed.findIndex((h: any) => h.id === def.id);
+          if (idx < 0) {
+            parsed.unshift(def);
+          } else if (def.id === 'kantor_lurah_mangga') {
+            parsed[idx] = { ...parsed[idx], ...def };
+          }
+        });
+        return parsed;
       }
     }
   } catch (e) {
@@ -140,6 +138,11 @@ export function saveLocalHouses(_houses: TitikRumahBangunan[]): void {
 
 export async function fetchAllHouses(): Promise<TitikRumahBangunan[]> {
   const map = new Map<string, TitikRumahBangunan>();
+
+  // Ensure default landmarks like Kantor Lurah are present
+  DEFAULT_TITIK_RUMAH.forEach((def) => {
+    if (def && def.id) map.set(def.id, def);
+  });
 
   // 1. Fetch from Server API buffer
   try {
@@ -177,6 +180,14 @@ export async function fetchAllHouses(): Promise<TitikRumahBangunan[]> {
   }
 
   const list = Array.from(map.values());
+  const kantorDef = DEFAULT_TITIK_RUMAH.find((d) => d.id === 'kantor_lurah_mangga');
+  if (kantorDef) {
+    const idx = list.findIndex((h) => h.id === 'kantor_lurah_mangga');
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], lat: kantorDef.lat, lng: kantorDef.lng, namaJalan: kantorDef.namaJalan };
+    }
+  }
+
   if (list.length > 0) {
     list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return list;
