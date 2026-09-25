@@ -111,18 +111,22 @@ export function computeLingkunganPemetaanStats(
   let bansosKategoriRentan = 0;
 
   lingHouses.forEach((h) => {
+    const isResidential = !h.kategoriBangunan || h.kategoriBangunan === 'RUMAH_TINGGAL' || h.kategoriBangunan === 'RUMAH_USAHA';
     const l = Number(h.jumlahLakiLaki) || 0;
     const p = Number(h.jumlahPerempuan) || 0;
     totalLakiLaki += l;
     totalPerempuan += p;
-    totalJiwa += Number(h.jumlahJiwa) || l + p || 1;
+    totalJiwa += Number(h.jumlahJiwa) || l + p || (isResidential ? 1 : 0);
     totalAnak += Number(h.jumlahAnak) || 0;
     totalLansia += Number(h.jumlahLansia) || 0;
 
-    if (h.isKkMangga !== false) {
-      kkMangga++;
-    } else {
-      kkLuar++;
+    // Only count KK for residential houses
+    if (isResidential) {
+      if (h.isKkMangga !== false) {
+        kkMangga++;
+      } else {
+        kkLuar++;
+      }
     }
 
     if (h.statusWrs === 'AKTIF') {
@@ -151,7 +155,10 @@ export function computeLingkunganPemetaanStats(
     }
   });
 
-  const totalRumah = lingHouses.length;
+  const residentialHouses = lingHouses.filter(
+    (h) => !h.kategoriBangunan || h.kategoriBangunan === 'RUMAH_TINGGAL' || h.kategoriBangunan === 'RUMAH_USAHA'
+  );
+  const totalRumah = residentialHouses.length;
   const persenKkMangga = totalRumah > 0 ? Math.round((kkMangga / totalRumah) * 100) : 0;
   const persenWrsAktif = totalRumah > 0 ? Math.round((wrsAktif / totalRumah) * 100) : 0;
   const persenPbbLunas = totalRumah > 0 ? Math.round((pbbLunas / totalRumah) * 100) : 0;

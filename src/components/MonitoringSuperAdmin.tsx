@@ -1179,7 +1179,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                 <tr className="bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-slate-200">
                   <th className="py-3 px-4 text-center">Lingkungan</th>
                   <th className="py-3 px-4">Nama Kepling &amp; Jabatan</th>
-                  <th className="py-3 px-4">Kontak / Telepon</th>
                   <th className="py-3 px-4 text-center">Status Pelaporan Harian</th>
                   <th className="py-3 px-4 text-center">Waktu Kirim</th>
                   <th className="py-3 px-4">Ringkasan Kinerja Harian</th>
@@ -1231,24 +1230,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                             </button>
                           );
                         })()}
-                      </td>
-
-                      {/* Phone */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5 text-slate-700 font-mono text-[11px]">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{kepling.telepon || '0812-3456-7890'}</span>
-                        </div>
-                        {kepling.telepon && (
-                          <a
-                            href={`https://wa.me/${kepling.telepon.replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[10px] text-emerald-700 hover:underline font-bold mt-0.5 inline-block"
-                          >
-                            Hubungi WA ↗
-                          </a>
-                        )}
                       </td>
 
                       {/* STATUS BADGE WITH RED BADGE AFTER 23:30 */}

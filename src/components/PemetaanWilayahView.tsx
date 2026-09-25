@@ -886,13 +886,15 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
       const marker = L.marker([h.lat, h.lng], { icon: customIcon });
 
+      const isRes = !h.kategoriBangunan || h.kategoriBangunan === 'RUMAH_TINGGAL' || h.kategoriBangunan === 'RUMAH_USAHA';
+
       marker.bindTooltip(
         `
         <div style="font-family: sans-serif; font-size: 11px;">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
             <div style="font-weight: bold; color: #1e293b;">${h.namaKepalaKeluarga} (${h.nomorRumah})</div>
-            <span style="font-size: 9px; font-weight: bold; padding: 1px 5px; border-radius: 4px; ${h.isKkMangga !== false ? 'background: #dcfce7; color: #166534;' : 'background: #fef3c7; color: #92400e;'}">
-              ${h.isKkMangga !== false ? 'KK Mangga' : 'KK Luar'}
+            <span style="font-size: 9px; font-weight: bold; padding: 1px 5px; border-radius: 4px; ${isRes ? (h.isKkMangga !== false ? 'background: #dcfce7; color: #166534;' : 'background: #fef3c7; color: #92400e;') : 'background: #f3e8ff; color: #6b21a8;'}">
+              ${isRes ? (h.isKkMangga !== false ? 'KK Mangga' : 'KK Luar') : 'Fasilitas / Usaha'}
             </span>
           </div>
           <div style="color: #64748b;">${h.namaJalan}</div>
@@ -928,9 +930,12 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       (r) => filterLingkungan === 'all' || r.lingkunganId === filterLingkungan
     );
 
-    const totalKk = activeHouses.length;
-    const totalKkMangga = activeHouses.filter((h) => h.isKkMangga !== false).length;
-    const totalKkLuar = activeHouses.filter((h) => h.isKkMangga === false).length;
+    const activeResidential = activeHouses.filter(
+      (h) => !h.kategoriBangunan || h.kategoriBangunan === 'RUMAH_TINGGAL' || h.kategoriBangunan === 'RUMAH_USAHA'
+    );
+    const totalKk = activeResidential.length;
+    const totalKkMangga = activeResidential.filter((h) => h.isKkMangga !== false).length;
+    const totalKkLuar = activeResidential.filter((h) => h.isKkMangga === false).length;
     const totalJiwa = activeHouses.reduce((acc, h) => acc + (h.jumlahJiwa || (h.jumlahLakiLaki || 0) + (h.jumlahPerempuan || 0)), 0);
     const totalLaki = activeHouses.reduce((acc, h) => acc + (h.jumlahLakiLaki || 0), 0);
     const totalPerempuan = activeHouses.reduce((acc, h) => acc + (h.jumlahPerempuan || 0), 0);
@@ -1246,7 +1251,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
         nomorRumah: houseForm.nomorRumah || (isResidential ? 'No. -' : 'S/N'),
         namaKepalaKeluarga: displayName,
         nikKk: isResidential ? houseForm.nikKk : undefined,
-        isKkMangga: isResidential ? (houseForm.isKkMangga !== false) : true,
+        isKkMangga: isResidential ? (houseForm.isKkMangga !== false) : false,
         asalKk: isResidential ? (houseForm.isKkMangga ? 'Kelurahan Mangga' : (houseForm.asalKk || 'Luar Kelurahan Mangga')) : 'Fasilitas Publik / Tempat Usaha',
         lat: Number(houseForm.lat) || KELURAHAN_MANGGA_CENTER[0],
         lng: Number(houseForm.lng) || KELURAHAN_MANGGA_CENTER[1],
@@ -2014,24 +2019,41 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
               </div>
 
               <div className="space-y-2 text-xs border-t border-slate-100 pt-2">
-                <div className="flex justify-between items-center bg-blue-50/70 p-2 rounded-xl border border-blue-100">
-                  <span className="text-slate-600 font-medium">Status KK:</span>
-                  <span
-                    className={`font-black px-2 py-0.5 rounded text-[10px] ${
-                      selectedHouse.isKkMangga !== false
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}
-                  >
-                    {selectedHouse.isKkMangga !== false
-                      ? '🏠 KK Kelurahan Mangga'
-                      : `🌐 Bukan KK Mangga ${selectedHouse.asalKk && selectedHouse.asalKk !== 'Luar Kelurahan Mangga' ? `(${selectedHouse.asalKk})` : ''}`}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">NIK KK:</span>
-                  <span className="font-bold text-slate-800">{selectedHouse.nikKk || '-'}</span>
-                </div>
+                {(() => {
+                  const isRes = !selectedHouse.kategoriBangunan || selectedHouse.kategoriBangunan === 'RUMAH_TINGGAL' || selectedHouse.kategoriBangunan === 'RUMAH_USAHA';
+                  if (isRes) {
+                    return (
+                      <>
+                        <div className="flex justify-between items-center bg-blue-50/70 p-2 rounded-xl border border-blue-100">
+                          <span className="text-slate-600 font-medium">Status KK:</span>
+                          <span
+                            className={`font-black px-2 py-0.5 rounded text-[10px] ${
+                              selectedHouse.isKkMangga !== false
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {selectedHouse.isKkMangga !== false
+                              ? '🏠 KK Kelurahan Mangga'
+                              : `🌐 Bukan KK Mangga ${selectedHouse.asalKk && selectedHouse.asalKk !== 'Luar Kelurahan Mangga' ? `(${selectedHouse.asalKk})` : ''}`}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">NIK KK:</span>
+                          <span className="font-bold text-slate-800">{selectedHouse.nikKk || '-'}</span>
+                        </div>
+                      </>
+                    );
+                  }
+                  return (
+                    <div className="flex justify-between items-center bg-purple-50/80 p-2.5 rounded-xl border border-purple-200">
+                      <span className="text-purple-900 font-bold">Kategori Bangunan:</span>
+                      <span className="font-black px-2 py-0.5 rounded text-[10px] bg-purple-600 text-white">
+                        🏢 Fasilitas Umum / Usaha (Non-Rumah)
+                      </span>
+                    </div>
+                  );
+                })()}
                 <div className="flex justify-between">
                   <span className="text-slate-500">Total Jiwa:</span>
                   <span className="font-bold text-slate-800">
