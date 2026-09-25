@@ -28,6 +28,15 @@ export interface LingkunganPemetaanStats {
   totalNominalPbb: number;
   bansosKk: number;
   bansosKategoriRentan: number;
+  totalFasilitasPublik: number;
+  totalMasjid: number;
+  totalGereja: number;
+  totalSekolah: number;
+  totalFaskes: number;
+  totalSpbu: number;
+  totalKantorFasum: number;
+  totalRuangPublik: number;
+  totalPasarUsaha: number;
   totalRuasJalan: number;
   totalPanjangJalanMeter: number;
   jalanBaik: number;
@@ -109,6 +118,15 @@ export function computeLingkunganPemetaanStats(
   let totalNominalPbb = 0;
   let bansosKk = 0;
   let bansosKategoriRentan = 0;
+  let totalMasjid = 0;
+  let totalGereja = 0;
+  let totalSekolah = 0;
+  let totalFaskes = 0;
+  let totalSpbu = 0;
+  let totalKantorFasum = 0;
+  let totalRuangPublik = 0;
+  let totalPasarUsaha = 0;
+  let totalFasilitasPublik = 0;
 
   lingHouses.forEach((h) => {
     const isResidential = !h.kategoriBangunan || h.kategoriBangunan === 'RUMAH_TINGGAL' || h.kategoriBangunan === 'RUMAH_USAHA';
@@ -119,6 +137,67 @@ export function computeLingkunganPemetaanStats(
     totalJiwa += Number(h.jumlahJiwa) || l + p || (isResidential ? 1 : 0);
     totalAnak += Number(h.jumlahAnak) || 0;
     totalLansia += Number(h.jumlahLansia) || 0;
+
+    // Categorize public facilities & business
+    const cat = h.kategoriBangunan;
+    const nameLower = (h.namaKepalaKeluarga || '').toLowerCase();
+    const jfLower = (h.jenisFasilitas || '').toLowerCase();
+
+    if (
+      cat === 'RUMAH_IBADAH' ||
+      /masjid|mushola|gereja|vihara|pura|klenteng/i.test(nameLower) ||
+      /masjid|mushola|gereja|vihara|pura|klenteng/i.test(jfLower)
+    ) {
+      totalFasilitasPublik++;
+      if (/masjid|mushola/i.test(nameLower) || /masjid|mushola/i.test(jfLower)) {
+        totalMasjid++;
+      } else {
+        totalGereja++;
+      }
+    } else if (
+      cat === 'SEKOLAH' ||
+      /sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(nameLower) ||
+      /sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(jfLower)
+    ) {
+      totalFasilitasPublik++;
+      totalSekolah++;
+    } else if (
+      cat === 'FASILITAS_KESEHATAN' ||
+      /puskesmas|pustu|posyandu|klinik|faskes/i.test(nameLower) ||
+      /puskesmas|pustu|posyandu|klinik|faskes/i.test(jfLower)
+    ) {
+      totalFasilitasPublik++;
+      totalFaskes++;
+    } else if (
+      cat === 'SPBU_STASIUN' ||
+      /spbu|pertashop/i.test(nameLower) ||
+      /spbu|pertashop/i.test(jfLower)
+    ) {
+      totalFasilitasPublik++;
+      totalSpbu++;
+    } else if (
+      cat === 'KANTOR_FASUM' ||
+      /kantor|lurah|balai|poskamling/i.test(nameLower) ||
+      /kantor|lurah|balai|poskamling/i.test(jfLower)
+    ) {
+      totalFasilitasPublik++;
+      totalKantorFasum++;
+    } else if (
+      cat === 'RUANG_PUBLIK_TAMAN' ||
+      /taman|lapangan/i.test(nameLower) ||
+      /taman|lapangan/i.test(jfLower)
+    ) {
+      totalFasilitasPublik++;
+      totalRuangPublik++;
+    } else if (
+      cat === 'PASAR_SARANA_EKONOMI' ||
+      cat === 'RUMAH_USAHA' ||
+      h.memilikiUsaha ||
+      /pasar|bank|atm|toko|warung|minimarket|usah/i.test(nameLower)
+    ) {
+      totalPasarUsaha++;
+      if (cat !== 'RUMAH_USAHA') totalFasilitasPublik++;
+    }
 
     // Only count KK for residential houses
     if (isResidential) {
@@ -210,6 +289,15 @@ export function computeLingkunganPemetaanStats(
     totalNominalPbb,
     bansosKk,
     bansosKategoriRentan,
+    totalFasilitasPublik,
+    totalMasjid,
+    totalGereja,
+    totalSekolah,
+    totalFaskes,
+    totalSpbu,
+    totalKantorFasum,
+    totalRuangPublik,
+    totalPasarUsaha,
     totalRuasJalan: lingRoads.length,
     totalPanjangJalanMeter,
     jalanBaik,

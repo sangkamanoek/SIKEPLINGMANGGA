@@ -15,6 +15,7 @@ import {
   DEFAULT_RUAS_JALAN,
 } from '../data/defaultGeoData';
 import { safeSetLocalStorage } from './safeStorage';
+import { cleanFirestoreData } from './firestoreService';
 
 const STORAGE_KEY_POLYGONS = 'webgis_lingkungan_polygons_v1';
 const STORAGE_KEY_HOUSES = 'webgis_titik_rumah_v1';
@@ -93,7 +94,8 @@ export async function savePolygonToFirestore(polygon: LingkunganPolygon): Promis
 
   try {
     const docRef = doc(db, COLLECTION_POLYGONS, polygon.id || `poly_${polygon.lingkunganId}`);
-    await setDoc(docRef, polygon, { merge: true });
+    const cleaned = cleanFirestoreData(polygon);
+    await setDoc(docRef, cleaned, { merge: true });
     return true;
   } catch (e) {
     console.warn('Gagal menyimpan polygon ke Firestore, tersimpan di lokal:', e);
@@ -114,23 +116,7 @@ export function getLocalHouses(): TitikRumahBangunan[] {
         localStorage.removeItem(STORAGE_KEY_HOUSES);
         return DEFAULT_TITIK_RUMAH;
       }
-      if (Array.isArray(parsed)) {
-        DEFAULT_TITIK_RUMAH.forEach((def) => {
-          const idx = parsed.findIndex((h: any) => h.id === def.id);
-          if (idx < 0) {
-            parsed.unshift(def);
-          } else if (def.id === 'kantor_lurah_mangga') {
-            parsed[idx] = {
-              ...parsed[idx],
-              lingkunganId: def.lingkunganId,
-              lingkunganNomor: def.lingkunganNomor,
-              namaJalan: def.namaJalan,
-              nomorRumah: def.nomorRumah,
-              lat: def.lat,
-              lng: def.lng,
-            };
-          }
-        });
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
@@ -140,19 +126,35 @@ export function getLocalHouses(): TitikRumahBangunan[] {
   return DEFAULT_TITIK_RUMAH;
 }
 
-export function saveLocalHouses(_houses: TitikRumahBangunan[]): void {
-  // Deliberately no-op: Houses are stored online on server and Firestore
+export function saveLocalHouses(houses: TitikRumahBangunan[]): void {
+  try {
+    safeSetLocalStorage(STORAGE_KEY_HOUSES, JSON.stringify(houses));
+  } catch (e) {
+    console.warn('Gagal menyimpan titik rumah ke lokal:', e);
+  }
 }
 
 export async function fetchAllHouses(): Promise<TitikRumahBangunan[]> {
   const map = new Map<string, TitikRumahBangunan>();
 
-  // Ensure default landmarks like Kantor Lurah are present
+  // 1. Ensure default landmarks like Kantor Lurah, SPBU, Kampus are present
   DEFAULT_TITIK_RUMAH.forEach((def) => {
     if (def && def.id) map.set(def.id, def);
   });
 
-  // 1. Fetch from Server API buffer
+  // 2. Load cached local items first for instant responsiveness
+  try {
+    const local = getLocalHouses();
+    if (Array.isArray(local) && local.length > 0) {
+      local.forEach((h) => {
+        if (h && h.id) map.set(h.id, h);
+      });
+    }
+  } catch (e) {
+    console.warn('Notice getLocalHouses:', e);
+  }
+
+  // 3. Fetch from Server API buffer
   try {
     const res = await fetch(`/api/webgis/houses?_t=${Date.now()}`, {
       cache: 'no-store',
@@ -173,7 +175,7 @@ export async function fetchAllHouses(): Promise<TitikRumahBangunan[]> {
     console.warn('Notice fetch houses from server:', e);
   }
 
-  // 2. Fetch from Firebase Firestore
+  // 4. Fetch directly from Firebase Firestore (Cloud Source of Truth)
   try {
     const colRef = collection(db, COLLECTION_HOUSES);
     const snap = await getDocs(colRef);
@@ -201,19 +203,30 @@ export async function fetchAllHouses(): Promise<TitikRumahBangunan[]> {
         namaJalan: kantorDef.namaJalan,
         nomorRumah: kantorDef.nomorRumah,
       };
-      // Also persist correction to online server/Firestore if needed
-      saveHouseToFirestore(list[idx]);
     }
   }
 
   if (list.length > 0) {
-    list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    saveLocalHouses(list);
     return list;
   }
   return DEFAULT_TITIK_RUMAH;
 }
 
 export async function saveHouseToFirestore(house: TitikRumahBangunan): Promise<boolean> {
+  // Update local cache immediately so it never vanishes on client
+  const current = getLocalHouses();
+  const index = current.findIndex((h) => h.id === house.id);
+  let updated: TitikRumahBangunan[];
+  if (index >= 0) {
+    updated = [...current];
+    updated[index] = house;
+  } else {
+    updated = [house, ...current];
+  }
+  saveLocalHouses(updated);
+
   // 1. Save online to Server Buffer
   fetch('/api/webgis/houses', {
     method: 'POST',
@@ -223,18 +236,24 @@ export async function saveHouseToFirestore(house: TitikRumahBangunan): Promise<b
     console.warn('Notice saving house to server:', err);
   });
 
-  // 2. Save online to Firestore
+  // 2. Save online to Firestore with sanitized payload (strictly strip undefined fields)
   try {
+    const cleaned = cleanFirestoreData(house);
     const docRef = doc(db, COLLECTION_HOUSES, house.id);
-    await setDoc(docRef, house, { merge: true });
+    await setDoc(docRef, cleaned, { merge: true });
     return true;
   } catch (e) {
-    console.warn('Gagal menyimpan titik rumah ke Firestore:', e);
+    console.error('Gagal menyimpan titik rumah ke Firestore:', e);
     return false;
   }
 }
 
 export async function deleteHouseFromFirestore(houseId: string): Promise<boolean> {
+  // Update local cache immediately
+  const current = getLocalHouses();
+  const updated = current.filter((h) => h.id !== houseId);
+  saveLocalHouses(updated);
+
   // 1. Delete on Server Buffer
   fetch(`/api/webgis/houses/${encodeURIComponent(houseId)}`, {
     method: 'DELETE',
@@ -248,7 +267,7 @@ export async function deleteHouseFromFirestore(houseId: string): Promise<boolean
     await deleteDoc(docRef);
     return true;
   } catch (e) {
-    console.warn('Gagal menghapus rumah di Firestore:', e);
+    console.error('Gagal menghapus rumah di Firestore:', e);
     return false;
   }
 }
@@ -274,8 +293,12 @@ export function getLocalRoads(): RuasJalanLingkungan[] {
   return DEFAULT_RUAS_JALAN;
 }
 
-export function saveLocalRoads(_roads: RuasJalanLingkungan[]): void {
-  // Deliberately no-op: Roads are stored online
+export function saveLocalRoads(roads: RuasJalanLingkungan[]): void {
+  try {
+    safeSetLocalStorage(STORAGE_KEY_ROADS, JSON.stringify(roads));
+  } catch (e) {
+    console.warn('Gagal menyimpan ruas jalan ke lokal:', e);
+  }
 }
 
 export async function fetchAllRoads(): Promise<RuasJalanLingkungan[]> {
@@ -287,7 +310,7 @@ export async function fetchAllRoads(): Promise<RuasJalanLingkungan[]> {
       snap.forEach((d) => {
         list.push({ ...(d.data() as RuasJalanLingkungan), id: d.id });
       });
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       saveLocalRoads(list);
       return list;
     }
@@ -311,7 +334,8 @@ export async function saveRoadToFirestore(road: RuasJalanLingkungan): Promise<bo
 
   try {
     const docRef = doc(db, COLLECTION_ROADS, road.id);
-    await setDoc(docRef, road, { merge: true });
+    const cleaned = cleanFirestoreData(road);
+    await setDoc(docRef, cleaned, { merge: true });
     return true;
   } catch (e) {
     console.warn('Gagal menyimpan ruas jalan ke Firestore:', e);
@@ -357,30 +381,34 @@ export function subscribeWebgisData(
     });
     unsubList.push(u1);
   } catch (e) {
-    console.warn(e);
+    console.warn('Error subscribing to polygons:', e);
   }
 
   try {
     const u2 = onSnapshot(collection(db, COLLECTION_HOUSES), (snap) => {
+      const map = new Map<string, TitikRumahBangunan>();
+
+      // 1. Always seed with default landmarks
+      DEFAULT_TITIK_RUMAH.forEach((def) => {
+        if (def && def.id) map.set(def.id, def);
+      });
+
+      // 2. Overlay live snapshot from Firestore
       if (!snap.empty) {
-        const list: TitikRumahBangunan[] = [];
-        snap.forEach((d) => list.push({ ...(d.data() as TitikRumahBangunan), id: d.id }));
-        const hasJuan = list.some(
-          (h) =>
-            h.id === 'rumah_juan_lingk1' ||
-            (h.namaKepalaKeluarga && h.namaKepalaKeluarga.toLowerCase() === 'juan')
-        );
-        if (!hasJuan && DEFAULT_TITIK_RUMAH.length > 0) {
-          list.push(...DEFAULT_TITIK_RUMAH);
-        }
-        onHousesUpdate(list);
-      } else if (DEFAULT_TITIK_RUMAH.length > 0) {
-        onHousesUpdate(DEFAULT_TITIK_RUMAH);
+        snap.forEach((d) => {
+          const item = { ...(d.data() as TitikRumahBangunan), id: d.id };
+          if (item && item.id) map.set(item.id, item);
+        });
       }
+
+      const list = Array.from(map.values());
+      list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      saveLocalHouses(list);
+      onHousesUpdate(list);
     });
     unsubList.push(u2);
   } catch (e) {
-    console.warn(e);
+    console.warn('Error subscribing to houses:', e);
   }
 
   try {
@@ -388,12 +416,14 @@ export function subscribeWebgisData(
       if (!snap.empty) {
         const list: RuasJalanLingkungan[] = [];
         snap.forEach((d) => list.push({ ...(d.data() as RuasJalanLingkungan), id: d.id }));
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        saveLocalRoads(list);
         onRoadsUpdate(list);
       }
     });
     unsubList.push(u3);
   } catch (e) {
-    console.warn(e);
+    console.warn('Error subscribing to roads:', e);
   }
 
   return () => {

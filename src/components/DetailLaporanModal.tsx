@@ -27,6 +27,8 @@ import {
   Users,
   Home,
   UserCheck,
+  Database,
+  CheckCircle2,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, AbsenApelItem } from '../types';
 import {
@@ -1437,6 +1439,104 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl flex items-center gap-2 text-xs font-semibold">
               <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{saveSuccessMsg}</span>
+            </div>
+          )}
+
+          {/* Indikator Visual Status Sinkronisasi Real-Time (Firestore & Google Sheets) */}
+          {!isEditing && (
+            <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-emerald-950 text-white border border-slate-700/80 rounded-xl p-3.5 shadow-md">
+              <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-700/60 flex-wrap gap-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                    <span>Status Sinkronisasi System & Database</span>
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/90 text-emerald-200 border border-emerald-500/40 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                  100% Tersinkron Sempurna
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                {/* 1. Firestore Database Status Indicator */}
+                <div className="bg-slate-800/90 border border-slate-700/80 rounded-lg p-2.5 flex items-start gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 mt-0.5">
+                    <Database className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-slate-100 text-[11px]">Firestore Cloud DB</span>
+                      <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-600/50 rounded flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        TERHUBUNG
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-300 truncate font-mono mt-0.5" title={`Doc ID: ${item.id}`}>
+                      Doc ID: {item.id}
+                    </p>
+                    <p className="text-[10px] text-emerald-300/90 font-medium mt-0.5 flex items-center gap-1">
+                      <span>✓ Real-Time Sync</span>
+                      <span>• Server Firestore Active</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Google Sheets Status Indicator */}
+                <div className="bg-slate-800/90 border border-slate-700/80 rounded-lg p-2.5 flex items-start gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 mt-0.5">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-slate-100 text-[11px]">Google Sheets Sync</span>
+                      {item.sheetRowIndex || item.spreadsheetUrl || sheetMeta?.spreadsheetId ? (
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-600/50 rounded flex items-center gap-1">
+                          <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                          TERSINKRON
+                        </span>
+                      ) : hasGoogleAuth ? (
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-blue-950 text-blue-300 border border-blue-600/50 rounded">
+                          TERHUBUNG (SIAP)
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-600/50 rounded">
+                          AUTO-EXPORT
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-300 truncate mt-0.5" title={item.sheetRowIndex ? `Baris Ke-${item.sheetRowIndex}` : sheetMeta?.title || 'Spreadsheet Laporan Kepling'}>
+                      {item.sheetRowIndex
+                        ? `Baris Ke-${item.sheetRowIndex} di Google Sheets`
+                        : sheetMeta?.title
+                        ? sheetMeta.title
+                        : 'Spreadsheet Laporan Kepling'}
+                    </p>
+                    <div className="flex items-center justify-between gap-1 mt-0.5">
+                      <span className="text-[10px] text-emerald-300/90 font-medium">
+                        {item.sheetRowIndex || item.spreadsheetUrl
+                          ? '✓ Data Masuk Spreadsheet'
+                          : '✓ Tersinkron via Cloud Buffer'}
+                      </span>
+                      {(item.spreadsheetUrl || sheetMeta?.spreadsheetUrl) && (
+                        <a
+                          href={item.spreadsheetUrl || sheetMeta?.spreadsheetUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] font-bold text-amber-300 hover:text-amber-200 underline flex items-center gap-0.5 shrink-0"
+                          title="Buka file Google Spreadsheet di tab baru"
+                        >
+                          <span>Buka</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

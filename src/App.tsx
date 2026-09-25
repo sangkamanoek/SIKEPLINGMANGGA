@@ -469,6 +469,11 @@ export default function App() {
       });
     }, 60000); // Poll every minute
 
+    // Fast background sync interval every 10s to guarantee real-time data sync across Super Admin, Admin, and Kepling
+    const fastSyncInterval = setInterval(() => {
+      refreshAllReports(false);
+    }, 10000);
+
     const unsubscribe = initAuth(
       async (firebaseUser, accessToken) => {
         setUser({
@@ -495,6 +500,7 @@ export default function App() {
       unsubscribeEvents();
       unsubscribeEventAttendance();
       clearInterval(pollNotifications);
+      clearInterval(fastSyncInterval);
       unsubscribe();
     };
   }, [syncSpreadsheet, refreshAllReports]);

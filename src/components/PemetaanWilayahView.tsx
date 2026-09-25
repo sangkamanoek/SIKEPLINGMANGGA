@@ -129,7 +129,9 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       setFilterLingkungan(initialLingkunganFilter);
     }
   }, [initialLingkunganFilter]);
-  const [filterTheme, setFilterTheme] = useState<'ALL' | 'WRS' | 'PBB' | 'BANSOS' | 'JALAN' | 'HEATMAP'>('ALL');
+  const [filterTheme, setFilterTheme] = useState<
+    'ALL' | 'WRS' | 'PBB' | 'BANSOS' | 'JALAN' | 'HEATMAP' | 'FASUM' | 'IBADAH' | 'SEKOLAH' | 'FASKES' | 'SPBU' | 'USAHA'
+  >('ALL');
   const [reports, setReports] = useState<any[]>([]);
   const [loadingReports, setLoadingReports] = useState<boolean>(false);
 
@@ -188,6 +190,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
   // Saving & Syncing Loading Status
   const [isSavingHouse, setIsSavingHouse] = useState(false);
   const [isSavingRoad, setIsSavingRoad] = useState(false);
+  const [isSyncingWebgis, setIsSyncingWebgis] = useState(false);
   const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(null);
 
   // Draw Polygon Mode
@@ -750,12 +753,22 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     if (filterTheme === 'JALAN') return;
 
     const filtered = houses.filter((h) => {
-      const latNum = Number(h.lat);
-      const lngNum = Number(h.lng);
+      const latNum = Number(String(h.lat || '').replace(',', '.'));
+      const lngNum = Number(String(h.lng || '').replace(',', '.'));
       if (isNaN(latNum) || isNaN(lngNum) || latNum === 0 || lngNum === 0) return false;
 
+      // Robust Lingkungan Filter matching
+      const filterNum = extractNomorLingkungan(filterLingkungan);
+      const houseNum = h.lingkunganNomor || extractNomorLingkungan(h.lingkunganId);
+      const isLingMatch =
+        filterLingkungan === 'all' ||
+        h.lingkunganId === filterLingkungan ||
+        (filterNum !== null && houseNum === filterNum);
+
       // Allow public facilities like Kantor Lurah, Puskesmas, SPBU, Gereja, Sekolah, Taman to show across filters
+      const isSelected = selectedHouse && selectedHouse.id === h.id;
       const isChurchOrFasum =
+        isSelected ||
         h.kategoriBangunan === 'KANTOR_FASUM' ||
         h.kategoriBangunan === 'FASILITAS_KESEHATAN' ||
         h.kategoriBangunan === 'SPBU_STASIUN' ||
@@ -764,14 +777,39 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
         h.kategoriBangunan === 'RUANG_PUBLIK_TAMAN' ||
         h.kategoriBangunan === 'PASAR_SARANA_EKONOMI' ||
         h.kategoriBangunan === 'RUMAH_USAHA' ||
-        (h.namaKepalaKeluarga && /kantor|lurah|puskesmas|pustu|spbu|pertashop|posyandu|poskamling|gereja|masjid|mushola|vihara|pura|klenteng|sekolah|pasar|atm|bank|faskes/i.test(h.namaKepalaKeluarga)) ||
-        (h.jenisFasilitas && /kantor|lurah|puskesmas|pustu|spbu|pertashop|posyandu|poskamling|gereja|masjid|mushola|vihara|pura|klenteng|sekolah|pasar|atm|bank|faskes/i.test(h.jenisFasilitas)) ||
-        (h.catatan && /kantor|lurah|puskesmas|pustu|spbu|pertashop|posyandu|poskamling|gereja|masjid|mushola|vihara|pura|klenteng|sekolah|pasar|atm|bank|faskes/i.test(h.catatan));
+        (h.namaKepalaKeluarga && /kantor|lurah|puskesmas|pustu|spbu|pertashop|posyandu|poskamling|gereja|masjid|mushola|vihara|pura|klenteng|sekolah|universitas|kampus|perguruan|akademi|stikes|politeknik|yayasan|pasar|atm|bank|faskes/i.test(h.namaKepalaKeluarga)) ||
+        (h.jenisFasilitas && /kantor|lurah|puskesmas|pustu|spbu|pertashop|posyandu|poskamling|gereja|masjid|mushola|vihara|pura|klenteng|sekolah|universitas|kampus|perguruan|akademi|stikes|politeknik|yayasan|pasar|atm|bank|faskes/i.test(h.jenisFasilitas)) ||
+        (h.catatan && /kantor|lurah|puskesmas|pustu|spbu|pertashop|posyandu|poskamling|gereja|masjid|mushola|vihara|pura|klenteng|sekolah|universitas|kampus|perguruan|akademi|stikes|politeknik|yayasan|pasar|atm|bank|faskes/i.test(h.catatan));
 
-      if (filterLingkungan !== 'all' && h.lingkunganId !== filterLingkungan && !isChurchOrFasum) return false;
+      if (filterLingkungan !== 'all' && !isLingMatch && !isChurchOrFasum) return false;
+
+      // Theme-specific filters
       if (filterTheme === 'WRS' && !h.statusWrs && !isChurchOrFasum) return false;
       if (filterTheme === 'BANSOS' && !h.penerimaBansos && !isChurchOrFasum) return false;
       if (filterTheme === 'PBB' && !h.statusPbb && !isChurchOrFasum) return false;
+
+      const cat = h.kategoriBangunan;
+      const nameLower = (h.namaKepalaKeluarga || '').toLowerCase();
+      const jfLower = (h.jenisFasilitas || '').toLowerCase();
+
+      if (filterTheme === 'IBADAH') {
+        if (cat !== 'RUMAH_IBADAH' && !/masjid|mushola|gereja|vihara|pura|klenteng/i.test(nameLower) && !/masjid|mushola|gereja|vihara|pura|klenteng/i.test(jfLower)) return false;
+      }
+      if (filterTheme === 'SEKOLAH') {
+        if (cat !== 'SEKOLAH' && !/sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(nameLower) && !/sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(jfLower)) return false;
+      }
+      if (filterTheme === 'FASKES') {
+        if (cat !== 'FASILITAS_KESEHATAN' && !/puskesmas|pustu|posyandu|klinik|faskes/i.test(nameLower) && !/puskesmas|pustu|posyandu|klinik|faskes/i.test(jfLower)) return false;
+      }
+      if (filterTheme === 'SPBU') {
+        if (cat !== 'SPBU_STASIUN' && !/spbu|pertashop/i.test(nameLower) && !/spbu|pertashop/i.test(jfLower)) return false;
+      }
+      if (filterTheme === 'FASUM') {
+        if (cat !== 'KANTOR_FASUM' && cat !== 'RUANG_PUBLIK_TAMAN' && !/kantor|lurah|balai|poskamling|taman/i.test(nameLower) && !/kantor|lurah|balai|poskamling|taman/i.test(jfLower)) return false;
+      }
+      if (filterTheme === 'USAHA') {
+        if (cat !== 'PASAR_SARANA_EKONOMI' && cat !== 'RUMAH_USAHA' && !h.memilikiUsaha && !/pasar|bank|atm|toko|warung|minimarket|usah/i.test(nameLower)) return false;
+      }
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         return (
@@ -921,6 +959,17 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     });
   }, [houses, filterLingkungan, filterTheme, searchQuery]);
 
+  // Auto-fly map camera to selected house location
+  useEffect(() => {
+    if (selectedHouse && selectedHouse.lat && selectedHouse.lng && mapInstanceRef.current) {
+      const lat = Number(selectedHouse.lat);
+      const lng = Number(selectedHouse.lng);
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        mapInstanceRef.current.flyTo([lat, lng], 18, { animate: true, duration: 1 });
+      }
+    }
+  }, [selectedHouse]);
+
   // 9. Statistics Roll-up Calculations
   const stats = useMemo(() => {
     const activeHouses = houses.filter(
@@ -958,6 +1007,79 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
     const bansosKk = activeHouses.filter((h) => h.penerimaBansos).length;
 
+    // Public Facilities & Infrastructure Breakdown
+    let totalMasjid = 0;
+    let totalGereja = 0;
+    let totalSekolah = 0;
+    let totalFaskes = 0;
+    let totalSpbu = 0;
+    let totalKantorFasum = 0;
+    let totalRuangPublik = 0;
+    let totalPasarUsaha = 0;
+    let totalFasilitasPublik = 0;
+
+    activeHouses.forEach((h) => {
+      const cat = h.kategoriBangunan;
+      const nameLower = (h.namaKepalaKeluarga || '').toLowerCase();
+      const jfLower = (h.jenisFasilitas || '').toLowerCase();
+
+      if (
+        cat === 'RUMAH_IBADAH' ||
+        /masjid|mushola|gereja|vihara|pura|klenteng/i.test(nameLower) ||
+        /masjid|mushola|gereja|vihara|pura|klenteng/i.test(jfLower)
+      ) {
+        totalFasilitasPublik++;
+        if (/masjid|mushola/i.test(nameLower) || /masjid|mushola/i.test(jfLower)) {
+          totalMasjid++;
+        } else {
+          totalGereja++;
+        }
+      } else if (
+        cat === 'SEKOLAH' ||
+        /sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(nameLower) ||
+        /sekolah|sd|smp|sma|smk|tk|paud|universitas|kampus/i.test(jfLower)
+      ) {
+        totalFasilitasPublik++;
+        totalSekolah++;
+      } else if (
+        cat === 'FASILITAS_KESEHATAN' ||
+        /puskesmas|pustu|posyandu|klinik|faskes/i.test(nameLower) ||
+        /puskesmas|pustu|posyandu|klinik|faskes/i.test(jfLower)
+      ) {
+        totalFasilitasPublik++;
+        totalFaskes++;
+      } else if (
+        cat === 'SPBU_STASIUN' ||
+        /spbu|pertashop/i.test(nameLower) ||
+        /spbu|pertashop/i.test(jfLower)
+      ) {
+        totalFasilitasPublik++;
+        totalSpbu++;
+      } else if (
+        cat === 'KANTOR_FASUM' ||
+        /kantor|lurah|balai|poskamling/i.test(nameLower) ||
+        /kantor|lurah|balai|poskamling/i.test(jfLower)
+      ) {
+        totalFasilitasPublik++;
+        totalKantorFasum++;
+      } else if (
+        cat === 'RUANG_PUBLIK_TAMAN' ||
+        /taman|lapangan/i.test(nameLower) ||
+        /taman|lapangan/i.test(jfLower)
+      ) {
+        totalFasilitasPublik++;
+        totalRuangPublik++;
+      } else if (
+        cat === 'PASAR_SARANA_EKONOMI' ||
+        cat === 'RUMAH_USAHA' ||
+        h.memilikiUsaha ||
+        /pasar|bank|atm|toko|warung|minimarket|usah/i.test(nameLower)
+      ) {
+        totalPasarUsaha++;
+        if (cat !== 'RUMAH_USAHA') totalFasilitasPublik++;
+      }
+    });
+
     const totalPanjangJalan = activeRoads.reduce((acc, r) => acc + (r.panjangMeter || 0), 0);
     const jalanBaik = activeRoads.filter((r) => r.kondisiJalan === 'BAIK').length;
     const jalanRusak = activeRoads.filter(
@@ -983,6 +1105,15 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       pbbNominalTarget,
       pbbPersen,
       bansosKk,
+      totalFasilitasPublik,
+      totalMasjid,
+      totalGereja,
+      totalSekolah,
+      totalFaskes,
+      totalSpbu,
+      totalKantorFasum,
+      totalRuangPublik,
+      totalPasarUsaha,
       totalPanjangJalan,
       jalanBaik,
       jalanRusak,
@@ -1284,10 +1415,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
         createdByName: currentUser.nama,
       };
 
-      // 1. Save online to Firestore and Server
-      const isSavedOk = await saveHouseToFirestore(newHouse);
-
-      // 2. Immediately update local state so marker appears on map without delay!
+      // 1. Immediately update local state so marker appears on map instantly (0ms delay!)
       setHouses((prev) => {
         const idx = prev.findIndex((h) => h.id === newHouse.id);
         if (idx >= 0) {
@@ -1298,17 +1426,18 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
         return [newHouse, ...prev];
       });
 
-      // 3. Pan map to point & select item
       if (mapInstanceRef.current && newHouse.lat && newHouse.lng) {
         mapInstanceRef.current.setView([newHouse.lat, newHouse.lng], 18);
       }
       setSelectedHouse(newHouse);
-
       setIsHouseModalOpen(false);
       setEditingHouse(null);
 
+      // 2. Save online to Firestore and Server buffer concurrently in background
+      const isSavedOk = await saveHouseToFirestore(newHouse);
+
       if (isSavedOk) {
-        onShowToast?.(`✅ BERHASIL TERSIMPAN! ${newHouse.namaKepalaKeluarga} telah tersimpan di Firestore`, 'success');
+        onShowToast?.(`✅ BERHASIL TERSIMPAN! ${newHouse.namaKepalaKeluarga} telah tersimpan & tersinkronisasi`, 'success');
       } else {
         onShowToast?.(`⚠️ Data ${newHouse.namaKepalaKeluarga} tersimpan di memori. Akan disinkronkan online.`, 'info');
       }
@@ -1328,8 +1457,18 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       statusPbb: newStatus,
       updatedAt: new Date().toISOString(),
     };
-    await saveHouseToFirestore(updated);
+    // Optimistic UI update instantly!
+    setHouses((prev) => {
+      const idx = prev.findIndex((h) => h.id === updated.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = updated;
+        return copy;
+      }
+      return [updated, ...prev];
+    });
     setSelectedHouse(updated);
+    saveHouseToFirestore(updated).catch(() => {});
     onShowToast?.(
       `Status PBB ${house.namaKepalaKeluarga} diubah menjadi: ${newStatus === 'LUNAS' ? '🟢 LUNAS' : newStatus === 'BEBAS_PAJAK' ? '🔵 BEBAS PAJAK' : '🔴 BELUM LUNAS'}`,
       'success'
@@ -1361,8 +1500,11 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       createdByName: currentUser.nama,
     };
 
-    await saveRoadToFirestore(newRoad);
+    // Optimistic UI update
+    setRoads((prev) => [newRoad, ...prev.filter((r) => r.id !== newRoad.id)]);
     setIsRoadModalOpen(false);
+
+    saveRoadToFirestore(newRoad).catch(() => {});
     onShowToast?.(`Data ruas jalan ${newRoad.namaJalan} berhasil disimpan!`, 'success');
   };
 
@@ -1449,6 +1591,30 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       },
       (err) => alert('Gagal membaca GPS: ' + err.message)
     );
+  };
+
+  // Manual WebGIS Full Sync with Cloud Firestore & Server Buffer
+  const handleManualSyncWebgis = async () => {
+    setIsSyncingWebgis(true);
+    try {
+      const [pList, hList, rList] = await Promise.all([
+        fetchAllPolygons(),
+        fetchAllHouses(),
+        fetchAllRoads(),
+      ]);
+      setPolygons(pList);
+      setHouses(hList);
+      setRoads(rList);
+      onShowToast?.(
+        `✅ WebGIS Tersinkron Sempurna! (${hList.length} Titik Bangunan, ${pList.length} Batas Wilayah, ${rList.length} Jalan)`,
+        'success'
+      );
+    } catch (err: any) {
+      console.error('Error syncing WebGIS:', err);
+      onShowToast?.('Gagal menyinkronkan data WebGIS dari cloud.', 'error');
+    } finally {
+      setIsSyncingWebgis(false);
+    }
   };
 
   return (
@@ -1598,6 +1764,22 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
               <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
               <span>Ekspor Excel</span>
             </button>
+
+            {/* Sync WebGIS Real-time */}
+            <button
+              type="button"
+              onClick={handleManualSyncWebgis}
+              disabled={isSyncingWebgis}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black shadow-md cursor-pointer transition-all ${
+                isSyncingWebgis
+                  ? 'bg-blue-900 text-blue-200 border border-blue-600/60 cursor-wait'
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border border-blue-400/40 hover:scale-[1.02]'
+              }`}
+              title="Sinkronkan data WebGIS langsung dengan Cloud Firestore & server"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncingWebgis ? 'animate-spin text-blue-300' : 'text-white'}`} />
+              <span>{isSyncingWebgis ? 'Menyinkronkan...' : 'Sinkronkan WebGIS'}</span>
+            </button>
           </div>
         </div>
 
@@ -1699,6 +1881,134 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
           <span className="text-[9px] text-slate-500 font-medium">
             🟢 {stats.jalanBaik} Baik | 🔴 {stats.jalanRusak} Rusak
           </span>
+        </div>
+      </div>
+
+      {/* FASILITAS PUBLIK & SARANA UMUM SUMMARY BAR */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-3.5 border border-indigo-700/50 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-800/60 pb-2 mb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">🏛️</span>
+            <h4 className="text-xs font-black uppercase tracking-wider text-indigo-200">
+              Fasilitas Publik &amp; Sarana Umum ({stats.totalFasilitasPublik} Titik Terpetakan)
+            </h4>
+          </div>
+          <span className="text-[10px] text-indigo-300 font-medium">
+            Non-Rumah Tinggal (Klik kartu di bawah untuk memfilter di peta)
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+          {/* Masjid / Mushola */}
+          <button
+            type="button"
+            onClick={() => setFilterTheme(filterTheme === 'IBADAH' ? 'ALL' : 'IBADAH')}
+            className={`p-2 rounded-xl text-left transition-all border cursor-pointer ${
+              filterTheme === 'IBADAH'
+                ? 'bg-emerald-500/30 border-emerald-400 ring-2 ring-emerald-400'
+                : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between text-emerald-300 text-[10px] font-bold">
+              <span>🕌 Masjid / Mushola</span>
+            </div>
+            <p className="text-base font-black text-white mt-0.5">{stats.totalMasjid}</p>
+          </button>
+
+          {/* Gereja / Rumah Ibadah */}
+          <button
+            type="button"
+            onClick={() => setFilterTheme(filterTheme === 'IBADAH' ? 'ALL' : 'IBADAH')}
+            className={`p-2 rounded-xl text-left transition-all border cursor-pointer ${
+              filterTheme === 'IBADAH'
+                ? 'bg-teal-500/30 border-teal-400 ring-2 ring-teal-400'
+                : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between text-teal-300 text-[10px] font-bold">
+              <span>⛪ Gereja / Ibadah</span>
+            </div>
+            <p className="text-base font-black text-white mt-0.5">{stats.totalGereja}</p>
+          </button>
+
+          {/* Sekolah */}
+          <button
+            type="button"
+            onClick={() => setFilterTheme(filterTheme === 'SEKOLAH' ? 'ALL' : 'SEKOLAH')}
+            className={`p-2 rounded-xl text-left transition-all border cursor-pointer ${
+              filterTheme === 'SEKOLAH'
+                ? 'bg-blue-500/30 border-blue-400 ring-2 ring-blue-400'
+                : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between text-blue-300 text-[10px] font-bold">
+              <span>🏫 Sekolah / Kampus</span>
+            </div>
+            <p className="text-base font-black text-white mt-0.5">{stats.totalSekolah}</p>
+          </button>
+
+          {/* Faskes */}
+          <button
+            type="button"
+            onClick={() => setFilterTheme(filterTheme === 'FASKES' ? 'ALL' : 'FASKES')}
+            className={`p-2 rounded-xl text-left transition-all border cursor-pointer ${
+              filterTheme === 'FASKES'
+                ? 'bg-rose-500/30 border-rose-400 ring-2 ring-rose-400'
+                : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between text-rose-300 text-[10px] font-bold">
+              <span>🏥 Puskesmas / Faskes</span>
+            </div>
+            <p className="text-base font-black text-white mt-0.5">{stats.totalFaskes}</p>
+          </button>
+
+          {/* SPBU */}
+          <button
+            type="button"
+            onClick={() => setFilterTheme(filterTheme === 'SPBU' ? 'ALL' : 'SPBU')}
+            className={`p-2 rounded-xl text-left transition-all border cursor-pointer ${
+              filterTheme === 'SPBU'
+                ? 'bg-orange-500/30 border-orange-400 ring-2 ring-orange-400'
+                : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between text-orange-300 text-[10px] font-bold">
+              <span>⛽ SPBU / Pertashop</span>
+            </div>
+            <p className="text-base font-black text-white mt-0.5">{stats.totalSpbu}</p>
+          </button>
+
+          {/* Kantor / Fasum */}
+          <button
+            type="button"
+            onClick={() => setFilterTheme(filterTheme === 'FASUM' ? 'ALL' : 'FASUM')}
+            className={`p-2 rounded-xl text-left transition-all border cursor-pointer ${
+              filterTheme === 'FASUM'
+                ? 'bg-indigo-500/30 border-indigo-400 ring-2 ring-indigo-400'
+                : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between text-indigo-300 text-[10px] font-bold">
+              <span>🏢 Kantor / Gedung</span>
+            </div>
+            <p className="text-base font-black text-white mt-0.5">{stats.totalKantorFasum}</p>
+          </button>
+
+          {/* Tempat Usaha / UMKM */}
+          <button
+            type="button"
+            onClick={() => setFilterTheme(filterTheme === 'USAHA' ? 'ALL' : 'USAHA')}
+            className={`p-2 rounded-xl text-left transition-all border cursor-pointer ${
+              filterTheme === 'USAHA'
+                ? 'bg-amber-500/30 border-amber-400 ring-2 ring-amber-400'
+                : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between text-amber-300 text-[10px] font-bold">
+              <span>🏪 Usaha / UMKM</span>
+            </div>
+            <p className="text-base font-black text-white mt-0.5">{stats.totalPasarUsaha}</p>
+          </button>
         </div>
       </div>
 
@@ -2009,6 +2319,21 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                       ? selectedHouse.namaJalan
                       : `${selectedHouse.namaJalan || ''} ${selectedHouse.nomorRumah || ''}`.trim()}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedHouse && selectedHouse.lat && selectedHouse.lng && mapInstanceRef.current) {
+                        const lat = Number(selectedHouse.lat);
+                        const lng = Number(selectedHouse.lng);
+                        mapInstanceRef.current.flyTo([lat, lng], 18, { animate: true, duration: 1 });
+                        document.getElementById('webgis-map-canvas')?.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                    className="mt-2 w-full py-1.5 px-3 bg-emerald-700 hover:bg-emerald-600 text-white font-black text-[11px] rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-emerald-600"
+                  >
+                    <Compass className="w-3.5 h-3.5 text-emerald-300" />
+                    <span>🎯 Zoom &amp; Sorot Titik Ini di Peta</span>
+                  </button>
                 </div>
                 <button
                   onClick={() => setSelectedHouse(null)}
@@ -2262,8 +2587,10 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   type="button"
                   onClick={async () => {
                     if (confirm(`Hapus titik rumah ${selectedHouse.namaKepalaKeluarga}?`)) {
-                      await deleteHouseFromFirestore(selectedHouse.id);
+                      const houseId = selectedHouse.id;
+                      setHouses((prev) => prev.filter((h) => h.id !== houseId));
                       setSelectedHouse(null);
+                      deleteHouseFromFirestore(houseId).catch(() => {});
                       onShowToast?.('Titik rumah berhasil dihapus', 'info');
                     }
                   }}
@@ -2329,8 +2656,10 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                 type="button"
                 onClick={async () => {
                   if (confirm(`Hapus ruas jalan ${selectedRoad.namaJalan}?`)) {
-                    await deleteRoadFromFirestore(selectedRoad.id);
+                    const roadId = selectedRoad.id;
+                    setRoads((prev) => prev.filter((r) => r.id !== roadId));
                     setSelectedRoad(null);
+                    deleteRoadFromFirestore(roadId).catch(() => {});
                     onShowToast?.('Ruas jalan berhasil dihapus', 'info');
                   }
                 }}
