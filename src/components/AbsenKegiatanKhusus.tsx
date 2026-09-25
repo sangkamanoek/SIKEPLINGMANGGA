@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { CustomEvent, EventAttendance, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import { getNetworkNow } from '../lib/networkTimeService';
 import {
   subscribeCustomEventsFromFirestore,
   saveCustomEventToFirestore,
@@ -291,7 +292,7 @@ export const AbsenKegiatanKhusus: React.FC<AbsenKegiatanKhususProps> = ({
 
     setIsSubmittingAbsen(true);
     const attendanceId = `att_${activeCheckInEvent.id}_${activeAccount.id}`;
-    const timestamp = new Date().toISOString();
+    const timestamp = getNetworkNow().toISOString();
 
     const payload: EventAttendance = {
       id: attendanceId,

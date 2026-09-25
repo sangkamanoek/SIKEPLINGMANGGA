@@ -7,120 +7,42 @@ import {
 } from './firestoreService';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { extractNomorLingkungan } from './formatter';
+import {
+  getNetworkNow,
+  getNetworkIsoDate,
+  getNetworkWibTimeString,
+  checkNetworkApelTimeStatus,
+  isNetworkTimeVerified,
+  checkClockTamperStatus,
+  syncNetworkTime,
+  WibTimeStatus as NetworkWibTimeStatus,
+} from './networkTimeService';
 
 const STORAGE_KEY_ATTENDANCE = 'kepling_absen_apel_list';
 
+export type WibTimeStatus = NetworkWibTimeStatus;
+
 /**
- * Utility to format current date YYYY-MM-DD in local time
+ * Utility to format current date YYYY-MM-DD in accurate WIB network time
  */
 export function getTodayDateString(): string {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return getNetworkIsoDate();
 }
 
 /**
- * Utility to format time HH:mm WIB
+ * Utility to format time HH:mm WIB in accurate network time
  */
-export function getCurrentTimeString(): string {
-  const d = new Date();
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes} WIB`;
-}
-
-export interface WibTimeStatus {
-  formattedTime: string;
-  isWorkDay: boolean; // Monday - Friday
-  isWithinWindow: boolean; // 07:30 - 08:30 WIB on Monday - Friday
-  isTooEarly: boolean; // Before 07:30 WIB
-  isLate: boolean; // After 08:30 WIB
-  statusLabel: string;
+export function getCurrentTimeString(includeSeconds = false): string {
+  return getNetworkWibTimeString(includeSeconds);
 }
 
 /**
- * Check if current time & day falls within official Apel Pagi window:
+ * Check if current network time & day falls within official Apel Pagi window:
  * Hari: Senin s/d Jumat
  * Jam: 07:30 - 08:30 WIB
  */
 export function checkApelTimeStatus(): WibTimeStatus {
-  // Gunakan waktu saat ini
-  const now = new Date();
-
-  // Dapatkan jam dan menit di WIB
-  // Asumsi lingkungan server mungkin UTC, maka kita perlu mengonversi secara eksplisit ke WIB
-  const utcHours = now.getUTCHours();
-  const utcMinutes = now.getUTCMinutes();
-  
-  // Konversi UTC ke WIB (UTC+7)
-  let wibHours = utcHours + 7;
-  let wibMinutes = utcMinutes;
-  
-  if (wibHours >= 24) {
-    wibHours -= 24;
-  }
-  
-  const totalMin = wibHours * 60 + wibMinutes;
-  const day = (now.getUTCDay() + (wibHours >= 24 ? 1 : 0)) % 7;
-
-  // Jadwal Resmi: 07:30 - 08:30 WIB
-  const startMin = 7 * 60 + 30; // 450 min
-  const endMin = 8 * 60 + 30;   // 510 min
-
-  const hoursStr = String(wibHours).padStart(2, '0');
-  const minStr = String(wibMinutes).padStart(2, '0');
-  const formattedTime = `${hoursStr}:${minStr} WIB`;
-
-  const isWorkDay = day >= 1 && day <= 5; // Senin - Jumat
-  const isWithinWindow = totalMin >= startMin && totalMin <= endMin;
-  const isLate = totalMin > endMin;
-
-  if (!isWorkDay) {
-    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    return {
-      formattedTime,
-      isWorkDay: false,
-      isWithinWindow: false,
-      isTooEarly: false,
-      isLate: false,
-      statusLabel: `Libur Akhir Pekan (${dayNames[day]}) • Apel Pagi Hanya Senin s/d Jumat`,
-    };
-  }
-
-  // Jika sebelum jam 07:30
-  if (totalMin < startMin) {
-    return {
-      formattedTime,
-      isWorkDay: true,
-      isWithinWindow: false,
-      isTooEarly: true,
-      isLate: false,
-      statusLabel: 'Belum Jam Apel (Jadwal Resmi 07.30 - 08.30 WIB)',
-    };
-  }
-
-  // Jika setelah jam 08:30
-  if (totalMin > endMin) {
-    return {
-      formattedTime,
-      isWorkDay: true,
-      isWithinWindow: false,
-      isTooEarly: false,
-      isLate: true,
-      statusLabel: 'Akses Presensi Ditutup (Lewat Pukul 08.30 WIB) • Otomatis Tidak Mengikuti Apel',
-    };
-  }
-
-  return {
-    formattedTime,
-    isWorkDay: true,
-    isWithinWindow: true,
-    isTooEarly: false,
-    isLate: false,
-    statusLabel: 'Tepat Waktu (Jam Apel Resmi 07.30 - 08.30 WIB)',
-  };
+  return checkNetworkApelTimeStatus();
 }
 
 /**
@@ -199,9 +121,9 @@ export async function submitAbsenApel(
   catatan?: string,
   overrideTanggal?: string
 ): Promise<AbsenApelItem> {
-  const tanggal = overrideTanggal || getTodayDateString();
-  const jam = getCurrentTimeString();
-  const now = new Date();
+  const tanggal = overrideTanggal || getNetworkIsoDate();
+  const jam = getNetworkWibTimeString();
+  const now = getNetworkNow();
   const waktuLengkap = now.toISOString();
 
   // Create document ID e.g. "absen_kepling_1_2026-09-13"

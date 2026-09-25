@@ -45,6 +45,9 @@ import { getDefaultTargetsCapaianMap } from './data/targetsData';
 import { fetchTargetsCapaian, subscribeTargetsFromFirestore } from './lib/targetsApi';
 import { PWAInstallModal } from './components/PWAInstallModal';
 import { PanduanPPTModal } from './components/PanduanPPTModal';
+import { AppUpdateModal } from './components/AppUpdateModal';
+import { AppUpdateToastBanner } from './components/AppUpdateToastBanner';
+import { CURRENT_APP_VERSION } from './lib/appVersionService';
 import { customFetch } from './lib/fetchInterceptor';
 import { AbsenKegiatanKhusus } from './components/AbsenKegiatanKhusus';
 import { SmartHubDashboard } from './components/SmartHubDashboard';
@@ -145,6 +148,7 @@ export default function App() {
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isPPTModalOpen, setIsPPTModalOpen] = useState(false);
   const [isAbsenApelModalOpen, setIsAbsenApelModalOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [customEvents, setCustomEvents] = useState<CustomEvent[]>([]);
   const [attendanceList, setAttendanceList] = useState<AbsenApelItem[]>([]);
   const [eventAttendanceList, setEventAttendanceList] = useState<EventAttendance[]>([]);
@@ -855,6 +859,7 @@ export default function App() {
         onOpenEditProfile={() => setIsEditProfileOpen(true)}
         onOpenPPTModal={() => setIsPPTModalOpen(true)}
         onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
+        onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
         onLogout={handleLogout}
       />
 
@@ -1286,6 +1291,7 @@ export default function App() {
               }}
               onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
               onOpenPPTModal={() => setIsPPTModalOpen(true)}
+              onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
             />
           </ErrorBoundary>
         )}
@@ -1723,9 +1729,20 @@ export default function App() {
         showToast={showToast}
       />
 
+      {/* App Update / What's New Modal */}
+      <AppUpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+      />
+
+      {/* Floating App Update Notification Toast Banner */}
+      <AppUpdateToastBanner
+        onOpenDetails={() => setIsUpdateModalOpen(true)}
+      />
+
       {/* Footer matching Professional Polish style */}
-      <footer className="bg-white border-t border-slate-200 px-4 py-3.5 flex items-center justify-center text-center w-full print:hidden">
-        <div className="flex items-center justify-center gap-2.5 mx-auto">
+      <footer className="bg-white border-t border-slate-200 px-4 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-center w-full print:hidden">
+        <div className="flex items-center justify-center gap-2.5 mx-auto sm:mx-0">
           <span className="bg-[#991B1B] text-white px-3 py-1.5 rounded-md text-[11px] font-bold tracking-wider uppercase shadow-xs">
             #MEDANUNTUKSEMUA
           </span>
@@ -1733,6 +1750,18 @@ export default function App() {
             #SEMUAUNTUKMEDAN
           </span>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setIsUpdateModalOpen(true)}
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-emerald-700 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 px-3 py-1 rounded-full transition-all cursor-pointer shadow-2xs mx-auto sm:mx-0"
+          title="Klik untuk melihat catatan rilis versi dan fitur terbaru aplikasi"
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>SiKepling <strong>{CURRENT_APP_VERSION}</strong></span>
+          <span className="text-slate-400">•</span>
+          <span className="text-emerald-600 font-semibold">Info Pembaruan</span>
+        </button>
       </footer>
     </div>
   );

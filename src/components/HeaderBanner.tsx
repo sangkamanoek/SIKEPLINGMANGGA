@@ -13,8 +13,10 @@ import {
   Wifi,
   WifiOff,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { GoogleUser, SheetMetadata, UserAccount } from '../types';
+import { CURRENT_APP_VERSION, hasUnseenAppUpdate } from '../lib/appVersionService';
 
 interface HeaderBannerProps {
   user: GoogleUser | null;
@@ -30,6 +32,7 @@ interface HeaderBannerProps {
   onLogout?: () => void;
   onOpenPPTModal?: () => void;
   onOpenAbsenApel?: () => void;
+  onOpenUpdateModal?: () => void;
 }
 
 export const HeaderBanner: React.FC<HeaderBannerProps> = ({
@@ -46,11 +49,17 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   onLogout,
   onOpenPPTModal,
   onOpenAbsenApel,
+  onOpenUpdateModal,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [hasNewUpdate, setHasNewUpdate] = useState(false);
+
+  useEffect(() => {
+    setHasNewUpdate(hasUnseenAppUpdate());
+  }, []);
 
   useEffect(() => {
     let syncTimer: any;
@@ -209,6 +218,34 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
             </button>
           )}
 
+          {onOpenUpdateModal && (
+            <button
+              id="btn-open-update-info-header"
+              type="button"
+              onClick={onOpenUpdateModal}
+              className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-emerald-500/50 text-white font-bold text-xs shadow-md transition-all cursor-pointer shrink-0 hover:scale-[1.02] active:scale-[0.98] relative group"
+              title={`Informasi Pembaruan Aplikasi SiKepling ${CURRENT_APP_VERSION} & Apa yang Baru`}
+            >
+              <div className="relative">
+                <Sparkles className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform" />
+                {hasNewUpdate && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                )}
+              </div>
+              <div className="flex flex-col text-left">
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] uppercase tracking-wider text-amber-300 font-black leading-none">
+                    UPDATE
+                  </span>
+                  <span className="text-[9px] text-emerald-400 font-mono font-bold leading-none">
+                    {CURRENT_APP_VERSION}
+                  </span>
+                </div>
+                <span className="leading-tight whitespace-nowrap text-slate-200">Info Rilis</span>
+              </div>
+            </button>
+          )}
+
           {onOpenPPTModal && (
             <button
               id="btn-open-ppt-modal"
@@ -342,6 +379,25 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                     </p>
                     <p className="text-xs font-bold text-white truncate">{activeAccount.nama}</p>
                   </div>
+
+                  {onOpenUpdateModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onOpenUpdateModal();
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-amber-300 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
+                        <span>Pembaruan ({CURRENT_APP_VERSION})</span>
+                      </div>
+                      {hasNewUpdate && (
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                      )}
+                    </button>
+                  )}
 
                   {onOpenPPTModal && (
                     <button

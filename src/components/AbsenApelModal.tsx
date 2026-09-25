@@ -34,6 +34,13 @@ import {
   checkApelTimeStatus,
   calculateAbsentDays,
 } from '../lib/attendanceApi';
+import {
+  getNetworkWibTimeString,
+  isNetworkTimeVerified,
+  checkClockTamperStatus,
+  syncNetworkTime,
+  subscribeNetworkTimeSync,
+} from '../lib/networkTimeService';
 import { getStreetLocationWithMaxAccuracy } from '../lib/geoService';
 import { RekapAbsensiSuperAdmin } from './RekapAbsensiSuperAdmin';
 import { downloadImage } from '../lib/imageDownloader';
@@ -78,6 +85,47 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
 
   // Zoomed image modal
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+
+  // Live Network Time State
+  const [liveNetworkTime, setLiveNetworkTime] = useState<string>(getNetworkWibTimeString(true));
+  const [isNetworkSynced, setIsNetworkSynced] = useState<boolean>(isNetworkTimeVerified());
+  const [isResyncingTime, setIsResyncingTime] = useState<boolean>(false);
+  const [tamperStatus, setTamperStatus] = useState(checkClockTamperStatus());
+
+  // Subscribe to live network time ticker (every 1 second when modal open)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Refresh network time immediately
+    syncNetworkTime().then(() => {
+      setIsNetworkSynced(isNetworkTimeVerified());
+      setTamperStatus(checkClockTamperStatus());
+    });
+
+    const unsubscribe = subscribeNetworkTimeSync((synced) => {
+      setIsNetworkSynced(synced);
+      setTamperStatus(checkClockTamperStatus());
+    });
+
+    const timer = setInterval(() => {
+      setLiveNetworkTime(getNetworkWibTimeString(true));
+      setTamperStatus(checkClockTamperStatus());
+    }, 1000);
+
+    return () => {
+      clearInterval(timer);
+      unsubscribe();
+    };
+  }, [isOpen]);
+
+  const handleManualTimeSync = async () => {
+    setIsResyncingTime(true);
+    await syncNetworkTime();
+    setIsNetworkSynced(isNetworkTimeVerified());
+    setTamperStatus(checkClockTamperStatus());
+    setIsResyncingTime(false);
+    showToast?.('Waktu berhasil disinkronkan langsung dengan Server Jaringan!', 'success');
+  };
 
   useEffect(() => {
     if (activeAccount.role !== 'kepling') {
@@ -664,6 +712,60 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                   )}
                 </div>
               )}
+
+              {/* Network True Time Verified Indicator & Clock Drift Alert */}
+              <div className="space-y-2">
+                <div className="p-3.5 rounded-2xl bg-slate-900 text-white border border-emerald-500/40 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 shrink-0">
+                      <Clock className="w-4 h-4 animate-pulse" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-white text-xs">Waktu Jaringan Resmi (NTP Server)</span>
+                        <span className="px-2 py-0.2 rounded-full bg-emerald-400/20 text-emerald-300 font-mono text-[10px] font-black border border-emerald-400/30 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                          TERKUNCI &amp; SAHIH
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 font-normal mt-0.5">
+                        Waktu dikirimkan langsung oleh jaringan server, anti-manipulasi jam perangkat HP.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <div className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-emerald-400 font-mono text-sm font-black tracking-wider shadow-inner">
+                      {liveNetworkTime}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleManualTimeSync}
+                      disabled={isResyncingTime}
+                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                      title="Sinkronkan Ulang Waktu Jaringan"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isResyncingTime ? 'animate-spin text-emerald-400' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Clock Tamper / Deviation Warning if user's phone clock is manipulated or wrong */}
+                {tamperStatus.isDeviated && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 text-xs flex items-start gap-2.5 animate-fadeIn">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-black text-amber-950 block">
+                        Perbedaan Jam HP Terdeteksi ({tamperStatus.diffMinutes} Menit)
+                      </span>
+                      <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                        Jam di perangkat Anda ({tamperStatus.localTimeStr}) berselisih dari waktu jaringan resmi ({tamperStatus.networkTimeStr}). 
+                        Sistem secara otomatis <strong>mengabaikan jam lokal perangkat</strong> dan menggunakan <strong>waktu jaringan server</strong> untuk memastikan keabsahan presensi.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Apel Pagi Time Limit Notice */}
               {(() => {

@@ -381,6 +381,36 @@ app.get(['/api', '/api/', '/api/index', '/api/index.ts', '/api/health'], (_req, 
   });
 });
 
+// Network True Time API (Official Network/Server Clock for tamper-proof attendance)
+app.all(['/api/time', '/api/network-time', '/api/server-time'], (_req, res) => {
+  const now = new Date();
+  const timestamp = now.getTime();
+  const utcIso = now.toISOString();
+
+  // Precise WIB Calculation (UTC+7)
+  const utcHours = now.getUTCHours();
+  const utcMinutes = now.getUTCMinutes();
+  const utcSeconds = now.getUTCSeconds();
+  let wibHours = utcHours + 7;
+  if (wibHours >= 24) wibHours -= 24;
+
+  const wibTimeFormatted = `${String(wibHours).padStart(2, '0')}:${String(utcMinutes).padStart(2, '0')}:${String(utcSeconds).padStart(2, '0')} WIB`;
+  const wibDate = new Date(timestamp + 7 * 3600000).toISOString().split('T')[0];
+
+  res.setHeader('Date', now.toUTCString());
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+
+  res.json({
+    success: true,
+    timestamp,
+    utcIso,
+    wibTime: wibTimeFormatted,
+    wibDate,
+    timezone: 'Asia/Jakarta (WIB, UTC+7)',
+    serverClockVerified: true,
+  });
+});
+
 // =========================================================================
 // ACCOUNTS & USERNAMES CRUD ENDPOINTS
 // =========================================================================

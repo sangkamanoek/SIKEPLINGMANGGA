@@ -42,6 +42,7 @@ interface SmartHubDashboardProps {
   onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb') => void;
   onOpenAbsenApel: () => void;
   onOpenPPTModal: () => void;
+  onOpenUpdateModal?: () => void;
   isGoogleConnected?: boolean;
   googleUserEmail?: string | null;
   spreadsheetTitle?: string | null;
@@ -55,6 +56,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
   onNavigate,
   onOpenAbsenApel,
   onOpenPPTModal,
+  onOpenUpdateModal,
   isGoogleConnected = false,
   googleUserEmail,
   spreadsheetTitle,
@@ -419,6 +421,17 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+            {onOpenUpdateModal && (
+              <button
+                type="button"
+                onClick={onOpenUpdateModal}
+                className="flex items-center gap-2 px-3.5 py-2 bg-slate-900/90 hover:bg-slate-800 border border-emerald-500/50 text-amber-300 text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer group"
+                title="Lihat informasi pembaruan versi & fitur terkini aplikasi"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform" />
+                <span>Info Update</span>
+              </button>
+            )}
             <button
               onClick={onOpenPPTModal}
               className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer"
