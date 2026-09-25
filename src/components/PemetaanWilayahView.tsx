@@ -1903,7 +1903,9 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                     {selectedHouse.namaKepalaKeluarga}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    {selectedHouse.namaJalan} {selectedHouse.nomorRumah}
+                    {selectedHouse.namaJalan && selectedHouse.nomorRumah && selectedHouse.namaJalan.toLowerCase().includes(selectedHouse.nomorRumah.toLowerCase())
+                      ? selectedHouse.namaJalan
+                      : `${selectedHouse.namaJalan || ''} ${selectedHouse.nomorRumah || ''}`.trim()}
                   </p>
                 </div>
                 <button

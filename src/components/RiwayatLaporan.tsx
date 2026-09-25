@@ -31,6 +31,7 @@ interface RiwayatLaporanProps {
 }
 
 type FilterKegiatanType = 'ALL' | 'PBB' | 'PERLINSOS' | 'IKD' | 'BPJS' | 'POSKAMLING' | 'LAINNYA';
+type FilterKategoriIsuType = 'ALL' | 'KEAMANAN' | 'KEBERSIHAN' | 'INFRASTRUKTUR' | 'PELAYANAN_SOSIAL' | 'PBB_PAJAK';
 
 export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   items,
@@ -46,6 +47,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPetugas, setSelectedPetugas] = useState(initialPetugasFilter || 'ALL');
   const [selectedKegiatan, setSelectedKegiatan] = useState<FilterKegiatanType>('ALL');
+  const [selectedKategoriIsu, setSelectedKategoriIsu] = useState<FilterKategoriIsuType>('ALL');
   const [selectedDate, setSelectedDate] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
@@ -161,9 +163,62 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
         return Boolean(item.kinerja?.kegiatanLainnya?.trim());
       }
 
+      // 5. Filter by Kategori Isu Bidang Spesifik (Keamanan, Kebersihan, Infrastruktur, Sosial, PBB)
+      if (selectedKategoriIsu !== 'ALL') {
+        const kin = item.kinerja || {};
+        const allText = [
+          kin.kegiatanLainnya,
+          kin.infrastrukturSubjek,
+          kin.infrastrukturLokasi,
+          kin.poskamlingPetugas,
+          kin.poskamlingKeterangan,
+          kin.opsirPbbKeterangan,
+          kin.perlinsosKeterangan,
+          item.catatan,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        if (selectedKategoriIsu === 'KEAMANAN') {
+          const isPoskamling = Boolean(
+            (kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat') ||
+              kin.poskamlingAdaGiat
+          );
+          const hasKeyword = /\b(poskamling|siskamling|ronda|keamanan|trantib|ketertiban|patroli|maling|pencurian|sengketa|tawuran|bencana)\b/i.test(
+            allText
+          );
+          if (!isPoskamling && !hasKeyword) return false;
+        } else if (selectedKategoriIsu === 'KEBERSIHAN') {
+          const hasKeyword = /\b(bersih|kebersihan|sampah|got|parit|drainase|kerja\s*bakti|gotong\s*royong|rumput|wrs|retribusi)\b/i.test(
+            allText
+          );
+          if (!hasKeyword) return false;
+        } else if (selectedKategoriIsu === 'INFRASTRUKTUR') {
+          const isInfra = Boolean(kin.infrastrukturAdaGiat || kin.infrastrukturSubjek);
+          const hasKeyword = /\b(infrastruktur|jalan|aspal|berlubang|rusak|penerangan|lampu|jembatan|trotoar|fasum|fasilitas)\b/i.test(
+            allText
+          );
+          if (!isInfra && !hasKeyword) return false;
+        } else if (selectedKategoriIsu === 'PELAYANAN_SOSIAL') {
+          const isSosial =
+            parseFloat(String(kin.perlinsosKk || 0)) > 0 ||
+            parseFloat(String(kin.ikdOrang || 0)) > 0 ||
+            parseFloat(String(kin.bpjsKetenagakerjaanOrang || 0)) > 0;
+          const hasKeyword = /\b(perlinsos|bansos|ikd|bpjs|sosial|dtks|pkh|sembako|bantuan|rentan)\b/i.test(
+            allText
+          );
+          if (!isSosial && !hasKeyword) return false;
+        } else if (selectedKategoriIsu === 'PBB_PAJAK') {
+          const isPbb = parseFloat(String(kin.opsirPbbWp || 0)) > 0;
+          const hasKeyword = /\b(pbb|pajak|wp|sppt|opsir|retribusi)\b/i.test(allText);
+          if (!isPbb && !hasKeyword) return false;
+        }
+      }
+
       return true;
     });
-  }, [items, searchTerm, selectedPetugas, selectedDate, selectedKegiatan]);
+  }, [items, searchTerm, selectedPetugas, selectedDate, selectedKegiatan, selectedKategoriIsu]);
 
   // Aggregate stats across the filtered view
   const stats = useMemo(() => {
@@ -190,6 +245,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     setSearchTerm('');
     setSelectedPetugas('ALL');
     setSelectedKegiatan('ALL');
+    setSelectedKategoriIsu('ALL');
     setSelectedDate('');
   };
 
@@ -197,6 +253,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     searchTerm !== '' ||
     selectedPetugas !== 'ALL' ||
     selectedKegiatan !== 'ALL' ||
+    selectedKategoriIsu !== 'ALL' ||
     selectedDate !== '';
 
   return (
@@ -268,20 +325,37 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
         {/* Input Bar & Dropdowns Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Keyword Search */}
-          <div className={`relative ${isAdmin ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+          <div className="relative">
             <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
             <input
               id="input-cari-riwayat"
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari kata kunci: nama, hari, atau catatan kegiatan..."
+              placeholder="Cari kata kunci: nama, hari, catatan..."
               className="w-full pl-10 pr-4 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
             />
           </div>
 
+          {/* Filter by Kategori Isu Bidang */}
+          <div>
+            <select
+              id="filter-kategori-isu"
+              value={selectedKategoriIsu}
+              onChange={(e) => setSelectedKategoriIsu(e.target.value as FilterKategoriIsuType)}
+              className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-bold"
+            >
+              <option value="ALL">📋 Semua Kategori Isu</option>
+              <option value="KEAMANAN">🛡️ Keamanan & Poskamling (Trantibum)</option>
+              <option value="KEBERSIHAN">🧹 Kebersihan & Lingkungan (Sampah/Got)</option>
+              <option value="INFRASTRUKTUR">🛣️ Infrastruktur & Sarana (Jalan/Fasum)</option>
+              <option value="PELAYANAN_SOSIAL">🤝 Sosial & Kependudukan (Perlinsos/IKD)</option>
+              <option value="PBB_PAJAK">🏛️ Pajak PBB & Retribusi Daerah</option>
+            </select>
+          </div>
+
           {/* Filter by Petugas Kepling - HANYA UNTUK ADMIN */}
-          {isAdmin && (
+          {isAdmin ? (
             <div>
               <select
                 id="filter-petugas"
@@ -297,19 +371,63 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 ))}
               </select>
             </div>
+          ) : (
+            <div>
+              <input
+                id="filter-tanggal"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
+                title="Pilih tanggal spesifik"
+              />
+            </div>
           )}
 
-          {/* Filter by Date */}
-          <div>
-            <input
-              id="filter-tanggal"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
-              title="Pilih tanggal spesifik"
-            />
-          </div>
+          {/* Filter by Date if Admin */}
+          {isAdmin && (
+            <div>
+              <input
+                id="filter-tanggal"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
+                title="Pilih tanggal spesifik"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Quick Kategori Isu Bidang Pills */}
+        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-slate-500 text-[11px] font-extrabold uppercase mr-1 flex items-center gap-1">
+            <Filter className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Kategori Isu Bidang:</span>
+          </span>
+
+          {[
+            { id: 'ALL', label: 'Semua Isu', icon: '📋', activeClass: 'bg-slate-800 text-white shadow-2xs' },
+            { id: 'KEAMANAN', label: 'Keamanan & Poskamling', icon: '🛡️', activeClass: 'bg-amber-500 text-slate-950 font-black shadow-2xs' },
+            { id: 'KEBERSIHAN', label: 'Kebersihan & Lingkungan', icon: '🧹', activeClass: 'bg-teal-700 text-white font-black shadow-2xs' },
+            { id: 'INFRASTRUKTUR', label: 'Infrastruktur & Sarana', icon: '🛣️', activeClass: 'bg-blue-700 text-white font-black shadow-2xs' },
+            { id: 'PELAYANAN_SOSIAL', label: 'Sosial & Kependudukan', icon: '🤝', activeClass: 'bg-purple-700 text-white font-black shadow-2xs' },
+            { id: 'PBB_PAJAK', label: 'Pajak PBB & Retribusi', icon: '🏛️', activeClass: 'bg-emerald-800 text-white font-black shadow-2xs' },
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setSelectedKategoriIsu(cat.id as FilterKategoriIsuType)}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                selectedKategoriIsu === cat.id
+                  ? `${cat.activeClass} scale-105`
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
+              }`}
+            >
+              <span>{cat.icon}</span>
+              <span>{cat.label}</span>
+            </button>
+          ))}
         </div>
 
         {/* Jenis Kegiatan Quick Pills */}

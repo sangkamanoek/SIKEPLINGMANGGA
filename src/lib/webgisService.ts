@@ -120,7 +120,15 @@ export function getLocalHouses(): TitikRumahBangunan[] {
           if (idx < 0) {
             parsed.unshift(def);
           } else if (def.id === 'kantor_lurah_mangga') {
-            parsed[idx] = { ...parsed[idx], ...def };
+            parsed[idx] = {
+              ...parsed[idx],
+              lingkunganId: def.lingkunganId,
+              lingkunganNomor: def.lingkunganNomor,
+              namaJalan: def.namaJalan,
+              nomorRumah: def.nomorRumah,
+              lat: def.lat,
+              lng: def.lng,
+            };
           }
         });
         return parsed;
@@ -184,7 +192,17 @@ export async function fetchAllHouses(): Promise<TitikRumahBangunan[]> {
   if (kantorDef) {
     const idx = list.findIndex((h) => h.id === 'kantor_lurah_mangga');
     if (idx >= 0) {
-      list[idx] = { ...list[idx], lat: kantorDef.lat, lng: kantorDef.lng, namaJalan: kantorDef.namaJalan };
+      list[idx] = {
+        ...list[idx],
+        lingkunganId: kantorDef.lingkunganId,
+        lingkunganNomor: kantorDef.lingkunganNomor,
+        lat: kantorDef.lat,
+        lng: kantorDef.lng,
+        namaJalan: kantorDef.namaJalan,
+        nomorRumah: kantorDef.nomorRumah,
+      };
+      // Also persist correction to online server/Firestore if needed
+      saveHouseToFirestore(list[idx]);
     }
   }
 

@@ -77,9 +77,9 @@ export const DEFAULT_RUAS_JALAN: RuasJalanLingkungan[] = [];
 export const DEFAULT_TITIK_RUMAH: TitikRumahBangunan[] = [
   {
     id: 'kantor_lurah_mangga',
-    lingkunganId: 'kepling_1',
-    lingkunganNomor: 1,
-    namaJalan: 'Jl. Tembakau Raya No. 35',
+    lingkunganId: 'kepling_22',
+    lingkunganNomor: 22,
+    namaJalan: 'Jl. Tembakau Raya',
     nomorRumah: 'No. 35',
     namaKepalaKeluarga: 'Kantor Lurah Kelurahan Mangga',
     nikKk: '1271000000000000',

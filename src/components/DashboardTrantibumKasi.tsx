@@ -27,6 +27,8 @@ import {
   Radio,
   ExternalLink,
   Award,
+  Camera,
+  X,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { LaporanHarianItem, UserAccount } from '../types';
@@ -59,6 +61,16 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
   const [period, setPeriod] = useState<PeriodFilter>('all');
   const [subView, setSubView] = useState<TrantibSubView>('poskamling');
   const [searchQuery, setSearchQuery] = useState('');
+  const [poskamlingDisplayMode, setPoskamlingDisplayMode] = useState<'gallery' | 'table'>('gallery');
+  const [previewImage, setPreviewImage] = useState<{
+    url: string;
+    title: string;
+    date?: string;
+    kepling?: string;
+    status?: string;
+    location?: string;
+    notes?: string;
+  } | null>(null);
 
   // 1. Filter reports based on period
   const filteredReports = useMemo(() => {
@@ -125,6 +137,27 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
         latestPosReport?.uraianTugas ||
         'Situasi pos ronda terpantau aman dan kondusif';
 
+      // Collect all Poskamling photos across reports for this Kepling
+      const poskamlingPhotos: { url: string; date: string; title: string; category?: string }[] = [];
+      const sourceReportsForPhotos = poskamlingReports.length > 0 ? poskamlingReports : keplingReports;
+      sourceReportsForPhotos.forEach((r) => {
+        const dateStr = r.tanggal || 'Hari Ini';
+        if (r.fotoDokumentasi && r.fotoDokumentasi.length > 0) {
+          const posPhotos = r.fotoDokumentasi.filter((p) => p.kategori === 'poskamling');
+          const targetPhotos = posPhotos.length > 0 ? posPhotos : r.fotoDokumentasi;
+          targetPhotos.forEach((p) => {
+            if (p.url) {
+              poskamlingPhotos.push({
+                url: p.url,
+                date: dateStr,
+                title: p.name || p.description || `Dokumentasi Siskamling ${kepling.lingkungan}`,
+                category: p.kategori || 'poskamling',
+              });
+            }
+          });
+        }
+      });
+
       // --- 2. Pemantauan Infrastruktur Wilayah ---
       const infraReports = keplingReports.filter((r) => {
         const k = r.kinerja;
@@ -187,6 +220,8 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
         poskamlingPetugas,
         poskamlingNote,
         poskamlingCount: poskamlingReports.length,
+        poskamlingPhotos,
+        latestPoskamlingPhoto: poskamlingPhotos[0] || null,
         infraSubjek,
         infraLokasi,
         infraMapsLink,
@@ -599,14 +634,161 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
           </div>
         </div>
 
+        {/* Mode Switcher Bar untuk Poskamling */}
+        {subView === 'poskamling' && (
+          <div className="px-5 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-amber-50/50">
+            <div className="flex items-center gap-2">
+              <Camera className="w-4 h-4 text-amber-700" />
+              <span className="text-xs font-black text-amber-950 uppercase tracking-wider">
+                Monitoring Dokumentasi Foto Poskamling (Per Kepling / Per Hari)
+              </span>
+            </div>
+            <div className="inline-flex p-1 rounded-xl bg-slate-200/80 text-xs font-extrabold gap-1">
+              <button
+                type="button"
+                onClick={() => setPoskamlingDisplayMode('gallery')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  poskamlingDisplayMode === 'gallery'
+                    ? 'bg-amber-800 text-white shadow-xs font-black'
+                    : 'text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                <span>🖼️ Galeri Gambar Per Hari</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPoskamlingDisplayMode('table')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  poskamlingDisplayMode === 'table'
+                    ? 'bg-amber-800 text-white shadow-xs font-black'
+                    : 'text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                <span>📊 Tabel Operasional</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 1: POSKAMLING - GALERI FOTO PER HARI (24 KEPLING) */}
+        {subView === 'poskamling' && poskamlingDisplayMode === 'gallery' && (
+          <div className="p-5 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 bg-slate-50/50">
+            {displayedData.map((item) => {
+              const hasPhoto = Boolean(item.latestPoskamlingPhoto?.url);
+              const photoCount = item.poskamlingPhotos?.length || 0;
+
+              return (
+                <div
+                  key={item.kepling.id}
+                  className="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col justify-between group"
+                >
+                  {/* Card Header */}
+                  <div className="p-3 bg-slate-900 text-white flex items-center justify-between">
+                    <div>
+                      <span className="inline-block px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider">
+                        {item.kepling.lingkungan}
+                      </span>
+                      <h4 className="font-bold text-xs text-white truncate max-w-[150px] mt-0.5">
+                        {item.kepling.nama}
+                      </h4>
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-200 bg-amber-950/80 px-2 py-1 rounded-lg border border-amber-700/50">
+                      {item.poskamlingStatus}
+                    </span>
+                  </div>
+
+                  {/* Photo Container */}
+                  <div
+                    className="relative aspect-4/3 bg-slate-100 overflow-hidden group/img cursor-pointer"
+                    onClick={() => {
+                      if (hasPhoto) {
+                        setPreviewImage({
+                          url: item.latestPoskamlingPhoto!.url,
+                          title: `Dokumentasi Poskamling ${item.kepling.lingkungan}`,
+                          date: item.latestPoskamlingPhoto!.date || item.latestDate,
+                          kepling: item.kepling.nama,
+                          status: item.poskamlingStatus,
+                          location: item.poskamlingLokasi,
+                          notes: item.poskamlingNote,
+                        });
+                      }
+                    }}
+                  >
+                    {hasPhoto ? (
+                      <>
+                        <img
+                          src={item.latestPoskamlingPhoto!.url}
+                          alt={`Foto Poskamling ${item.kepling.lingkungan}`}
+                          className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white font-black text-xs gap-1.5 backdrop-blur-2xs">
+                          <Eye className="w-4 h-4 text-amber-300" />
+                          <span>Perbesar Foto</span>
+                        </div>
+                        {photoCount > 1 && (
+                          <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-black/70 text-white font-bold text-[10px] border border-white/20">
+                            +{photoCount} Foto
+                          </span>
+                        )}
+                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/60 text-white font-medium text-[10px] backdrop-blur-xs flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-amber-400" />
+                          {item.latestPoskamlingPhoto!.date}
+                        </span>
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-linear-to-b from-slate-100 to-amber-50/30 text-slate-400">
+                        <Camera className="w-8 h-8 text-slate-300 mb-1" />
+                        <span className="text-[11px] font-bold text-slate-500">Foto Belum Diunggah</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">Siskamling Terpantau Kondusif</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card Info */}
+                  <div className="p-3.5 space-y-2 text-xs border-t border-slate-100 bg-white">
+                    <div className="flex items-start gap-1.5 text-slate-700">
+                      <MapPin className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                      <span className="font-bold text-[11px] text-slate-800 line-clamp-1">{item.poskamlingLokasi}</span>
+                    </div>
+                    <div className="flex items-start gap-1.5 text-slate-600">
+                      <Users className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                      <span className="text-[11px] font-medium line-clamp-1">{item.poskamlingPetugas}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 italic line-clamp-2 bg-slate-50 p-2 rounded-lg border border-slate-100 font-medium">
+                      "{item.poskamlingNote}"
+                    </p>
+
+                    <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {item.latestDate}
+                      </span>
+                      {onSelectKeplingRiwayat && (
+                        <button
+                          type="button"
+                          onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
+                          className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[11px] transition-colors cursor-pointer border border-amber-200 inline-flex items-center gap-1"
+                        >
+                          <span>Riwayat</span>
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <div className="overflow-x-auto">
-          {/* TAB 1: POSKAMLING */}
-          {subView === 'poskamling' && (
+          {/* TAB 1: POSKAMLING - TABEL OPERASIONAL */}
+          {subView === 'poskamling' && poskamlingDisplayMode === 'table' && (
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 text-[11px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
                   <th className="py-3 px-4 text-center w-12">No</th>
                   <th className="py-3 px-4">Kepala Lingkungan</th>
+                  <th className="py-3 px-4 text-center">Foto Siskamling (Harian)</th>
                   <th className="py-3 px-4 text-center bg-amber-50/60 text-amber-950">Status Poskamling</th>
                   <th className="py-3 px-4">Lokasi Pos Ronda</th>
                   <th className="py-3 px-4">Petugas Ronda</th>
@@ -621,6 +803,35 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                     <td className="py-3 px-4">
                       <div className="font-bold text-slate-900">{item.kepling.nama}</div>
                       <div className="text-[11px] text-slate-500 font-medium">{item.kepling.lingkungan}</div>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {item.latestPoskamlingPhoto?.url ? (
+                        <div
+                          className="relative inline-block w-12 h-12 rounded-lg overflow-hidden border border-amber-200 shadow-2xs group cursor-pointer"
+                          onClick={() =>
+                            setPreviewImage({
+                              url: item.latestPoskamlingPhoto!.url,
+                              title: `Dokumentasi Poskamling ${item.kepling.lingkungan}`,
+                              date: item.latestPoskamlingPhoto!.date || item.latestDate,
+                              kepling: item.kepling.nama,
+                              status: item.poskamlingStatus,
+                              location: item.poskamlingLokasi,
+                              notes: item.poskamlingNote,
+                            })
+                          }
+                        >
+                          <img
+                            src={item.latestPoskamlingPhoto.url}
+                            alt="Poskamling"
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                            <Eye className="w-3.5 h-3.5" />
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 italic">Nihil Foto</span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-center bg-amber-50/30">
                       <span className="inline-block px-3 py-1 rounded-full text-xs font-black bg-amber-500 text-white shadow-2xs">
@@ -1024,6 +1235,89 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
           )}
         </div>
       </div>
+
+      {/* Lightbox Modal Dokumentasi Foto Poskamling */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="bg-slate-900 rounded-3xl max-w-3xl w-full border border-amber-500/30 overflow-hidden shadow-2xl relative text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h3 className="font-extrabold text-sm text-white">{previewImage.title}</h3>
+                  {previewImage.kepling && (
+                    <p className="text-xs text-amber-300 font-medium">Kepala Lingkungan: {previewImage.kepling}</p>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="p-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Main Image */}
+            <div className="p-4 bg-black flex items-center justify-center max-h-[60vh] overflow-hidden">
+              <img
+                src={previewImage.url}
+                alt={previewImage.title}
+                className="max-h-[55vh] max-w-full object-contain rounded-xl shadow-lg"
+              />
+            </div>
+
+            {/* Image Details */}
+            <div className="p-5 bg-slate-900 border-t border-slate-800 space-y-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {previewImage.location && (
+                  <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Lokasi Pos Ronda</span>
+                    <span className="font-bold text-amber-200">{previewImage.location}</span>
+                  </div>
+                )}
+                {previewImage.status && (
+                  <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Status Siskamling</span>
+                    <span className="font-bold text-emerald-400">{previewImage.status}</span>
+                  </div>
+                )}
+              </div>
+
+              {previewImage.notes && (
+                <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Keterangan Kamtibmas</span>
+                  <p className="text-slate-200 font-medium mt-0.5">{previewImage.notes}</p>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-slate-400 font-medium flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Tanggal Pelaporan: {previewImage.date || '-'}</span>
+                </span>
+                <a
+                  href={previewImage.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition-colors shadow-2xs"
+                >
+                  <span>Buka Ukuran Penuh</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
