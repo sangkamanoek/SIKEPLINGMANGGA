@@ -649,6 +649,39 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                     <span className="leading-relaxed font-medium">{item.alamat}</span>
                   </div>
 
+                  {/* Badges: Perlinsos, IKD, PBB */}
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10.5px]">
+                    <span
+                      className={`px-2 py-0.5 rounded-full font-bold uppercase whitespace-nowrap ${
+                        item.perlinsos === 'Sudah'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : item.perlinsos === 'Menolak'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-300 font-extrabold'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      Perlinsos: {item.perlinsos || 'Belum'}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full font-bold uppercase whitespace-nowrap ${
+                        item.ikd === 'Sudah'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      IKD: {item.ikd || 'Belum'}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full font-bold uppercase whitespace-nowrap ${
+                        item.pbb === 'Sudah'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      PBB: {item.pbb || 'Belum'}
+                    </span>
+                  </div>
+
                   {/* Foto & Actions row */}
                   <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
                     <div>
@@ -739,8 +772,16 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                         <div className="text-[10px] text-slate-400 font-normal">{item.namaKepling}</div>
                       </td>
                       <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase whitespace-nowrap ${item.perlinsos === 'Sudah' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                          {item.perlinsos}
+                        <span
+                          className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase whitespace-nowrap ${
+                            item.perlinsos === 'Sudah'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : item.perlinsos === 'Menolak'
+                              ? 'bg-rose-100 text-rose-800 border border-rose-300 font-extrabold'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          {item.perlinsos || 'Belum'}
                         </span>
                       </td>
                       <td className="py-3 px-3 text-center">

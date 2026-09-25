@@ -248,7 +248,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
   const handleKunjunganSuccess = (data: KunjunganWargaData) => {
     // Sinkronisasi data kunjungan warga ke formulir kinerja harian
-    if (data.keterangan === 'Sudah') {
+    if (data.perlinsos === 'Sudah' || data.keterangan === 'Sudah') {
       setPerlinsosKk((prev) => {
         const cur = parseInt(prev, 10) || 0;
         return String(cur + 1);
@@ -258,7 +258,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
           ? `${prev}, Kunjungan ${data.namaWarga}`
           : `Kunjungan warga: ${data.namaWarga}`
       );
-    } else if (data.keterangan === 'Menolak') {
+    } else if (data.perlinsos === 'Menolak' || data.keterangan === 'Menolak') {
       setPerlinsosMenolakKk((prev) => {
         const cur = parseInt(prev, 10) || 0;
         return String(cur + 1);

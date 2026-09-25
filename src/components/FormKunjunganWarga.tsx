@@ -14,7 +14,7 @@ import { UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { sanitizeText, safeSetLocalStorage, safeGetLocalStorage } from '../lib/safeStorage';
 
-export type KeteranganKunjunganType = 'Sudah' | 'Belum';
+export type KeteranganKunjunganType = 'Sudah' | 'Belum' | 'Menolak';
 
 export interface KunjunganWargaData {
   id: string;
@@ -25,7 +25,7 @@ export interface KunjunganWargaData {
   lingkunganNomor: number;
   namaKepling: string;
   keplingId: string;
-  perlinsos: 'Sudah' | 'Belum';
+  perlinsos: 'Sudah' | 'Belum' | 'Menolak';
   ikd: 'Sudah' | 'Belum';
   pbb: 'Sudah' | 'Belum';
   keterangan?: string;
@@ -62,7 +62,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const [targetKeplingId, setTargetKeplingId] = useState<string>(
     isSuperAdmin ? 'kepling_1' : currentUser.id
   );
-  const [perlinsos, setPerlinsos] = useState<'Sudah' | 'Belum'>('Belum');
+  const [perlinsos, setPerlinsos] = useState<'Sudah' | 'Belum' | 'Menolak'>('Belum');
   const [ikd, setIkd] = useState<'Sudah' | 'Belum'>('Belum');
   const [pbb, setPbb] = useState<'Sudah' | 'Belum'>('Belum');
   const [fotoDokumentasi, setFotoDokumentasi] = useState<string>('');
@@ -139,6 +139,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       perlinsos,
       ikd,
       pbb,
+      keterangan: perlinsos,
       fotoDokumentasi: fotoDokumentasi || '',
       createdAt: nowIso,
     };
@@ -155,6 +156,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       perlinsos,
       ikd,
       pbb,
+      keterangan: perlinsos,
       createdAt: nowIso,
     };
 
@@ -309,11 +311,12 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
             <label className="font-extrabold text-slate-700 block mb-1">Perlinsos:</label>
             <select
               value={perlinsos}
-              onChange={(e) => setPerlinsos(e.target.value as 'Sudah' | 'Belum')}
+              onChange={(e) => setPerlinsos(e.target.value as 'Sudah' | 'Belum' | 'Menolak')}
               className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 focus:outline-emerald-500"
             >
               <option value="Sudah">Sudah</option>
               <option value="Belum">Belum</option>
+              <option value="Menolak">Menolak</option>
             </select>
           </div>
           <div>
