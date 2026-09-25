@@ -23,6 +23,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { UserAccount, LaporanHarianItem, AbsenApelItem } from '../types';
+import { DeadlineNotifAlert } from './DeadlineNotifAlert';
 import { SpptPbbItem } from '../data/pbbSampleData';
 import {
   DEFAULT_PBB_YEAR,
@@ -419,6 +420,9 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Visual Alert & Deadline 23:30 Push Notif Component */}
+      <DeadlineNotifAlert activeAccount={activeAccount} reports={reports} onNavigate={onNavigate} />
 
       {/* RENDER MODE A: MODERN CONSOLIDATED BENTO-GRID */}
       {dashboardStyle === 'consolidated' ? (

@@ -48,6 +48,7 @@ import { PanduanPPTModal } from './components/PanduanPPTModal';
 import { customFetch } from './lib/fetchInterceptor';
 import { AbsenKegiatanKhusus } from './components/AbsenKegiatanKhusus';
 import { SmartHubDashboard } from './components/SmartHubDashboard';
+import { DeadlineNotifAlert } from './components/DeadlineNotifAlert';
 import { RekapPbbView } from './components/RekapPbbView';
 import { PemetaanWilayahView } from './components/PemetaanWilayahView';
 import { LoginPage } from './components/LoginPage';
@@ -1248,6 +1249,18 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className={`flex-1 max-w-6xl w-full mx-auto p-3.5 sm:p-6 pb-24 md:pb-8 ${isModalOpen ? 'print:hidden' : ''}`}>
+        {/* Global Compact Deadline Alert Bar for Kepling when outside dashboard */}
+        {activeTab !== 'hub' && (
+          <div className="mb-4">
+            <DeadlineNotifAlert
+              activeAccount={activeAccount}
+              reports={reports}
+              onNavigate={(tab) => setActiveTab(tab)}
+              compactMode={true}
+            />
+          </div>
+        )}
+
         {/* Smart Hub Dashboard Tab */}
         {activeTab === 'hub' && (
           <ErrorBoundary fallbackTitle="Gagal Memuat Pusat Menu">

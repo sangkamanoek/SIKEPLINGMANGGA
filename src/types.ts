@@ -235,7 +235,7 @@ export interface LingkunganPolygon {
   updatedBy: string;
 }
 
-export type StatusWrs = 'AKTIF' | 'BELUM_MENOLAK' | 'MANDIRI';
+export type StatusWrs = 'AKTIF' | 'BELUM_MENOLAK' | 'MANDIRI' | 'BEBAS_WRS';
 export type StatusPbb = 'LUNAS' | 'BELUM_LUNAS' | 'BEBAS_PAJAK';
 
 export interface TitikRumahBangunan {
@@ -275,7 +275,16 @@ export interface TitikRumahBangunan {
   luasTanahM2?: number;
   luasBangunanM2?: number;
   // Kategori Bangunan & Fasilitas Publik (Rumah Ibadah, Sekolah, dll)
-  kategoriBangunan?: 'RUMAH_TINGGAL' | 'RUMAH_USAHA' | 'RUMAH_IBADAH' | 'SEKOLAH' | 'KANTOR_FASUM';
+  kategoriBangunan?:
+    | 'RUMAH_TINGGAL'
+    | 'RUMAH_USAHA'
+    | 'RUMAH_IBADAH'
+    | 'SEKOLAH'
+    | 'FASILITAS_KESEHATAN'
+    | 'SPBU_STASIUN'
+    | 'KANTOR_FASUM'
+    | 'RUANG_PUBLIK_TAMAN'
+    | 'PASAR_SARANA_EKONOMI';
   jenisFasilitas?: string; // e.g. "Gereja", "Masjid", "SD Negeri", "SMP", "Universitas", "Mushola"
   // PBB (Pajak Bumi & Bangunan)
   nopPbb?: string; // e.g. "12.71.010.001.001-0001.0"

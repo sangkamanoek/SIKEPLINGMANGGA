@@ -33,6 +33,8 @@ import {
   Phone,
   Filter,
   Coins,
+  ClipboardList,
+  LayoutGrid,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -323,11 +325,26 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
   }, [reports, todayIso, latestAvailableDate, selectedDate]);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'PENDING'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'LATE_PENDING' | 'WAITING'>('ALL');
+  const [displayLayout, setDisplayLayout] = useState<'TABLE' | 'CARDS'>('TABLE');
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [copiedWa, setCopiedWa] = useState(false);
+
+  // Check if 23:30 cutoff time has passed for the selected date or today
+  const isCutoffPassed = useMemo(() => {
+    const targetDateIso = selectedDate || todayIso;
+    if (targetDateIso < todayIso) {
+      return true; // Past dates without report = cutoff passed
+    }
+    if (targetDateIso === todayIso) {
+      const now = new Date();
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      return currentMins >= (23 * 60 + 30); // 23:30 = 1410 minutes
+    }
+    return false; // Future date
+  }, [selectedDate, todayIso]);
 
   // Map of every Kepling to their most recent report across the ENTIRE database
   const keplingLatestReportMap = useMemo(() => {
@@ -380,6 +397,8 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
     let totalIkd = 0;
     let totalBpjs = 0;
     let submittedCount = 0;
+    let latePendingCount = 0;
+    let waitingPendingCount = 0;
 
     KEPLING_ACCOUNTS.forEach((k) => {
       const rep = activeKeplingReportMap.get(k.id);
@@ -389,6 +408,12 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
         totalPerlinsos += Number(rep.kinerja?.perlinsosKk) || 0;
         totalIkd += Number(rep.kinerja?.ikdOrang) || 0;
         totalBpjs += Number(rep.kinerja?.bpjsKetenagakerjaanOrang) || 0;
+      } else {
+        if (isCutoffPassed) {
+          latePendingCount++;
+        } else {
+          waitingPendingCount++;
+        }
       }
     });
 
@@ -399,13 +424,16 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
       totalKepling: KEPLING_ACCOUNTS.length,
       submittedCount,
       pendingCount,
+      latePendingCount,
+      waitingPendingCount,
       completionPct,
       totalPbb,
       totalPerlinsos,
       totalIkd,
       totalBpjs,
+      isCutoffPassed,
     };
-  }, [activeKeplingReportMap]);
+  }, [activeKeplingReportMap, isCutoffPassed]);
 
   // Filtered kepling list
   const filteredList = useMemo(() => {
@@ -413,18 +441,20 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
       const isSubmitted = activeKeplingReportMap.has(k.id);
 
       if (statusFilter === 'SUBMITTED' && !isSubmitted) return false;
-      if (statusFilter === 'PENDING' && isSubmitted) return false;
+      if (statusFilter === 'LATE_PENDING' && (isSubmitted || !isCutoffPassed)) return false;
+      if (statusFilter === 'WAITING' && (isSubmitted || isCutoffPassed)) return false;
 
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         const matchesName = k.nama.toLowerCase().includes(term);
         const matchesLingkungan = k.lingkungan.toLowerCase().includes(term);
-        return matchesName || matchesLingkungan;
+        const matchesJabatan = k.jabatan ? k.jabatan.toLowerCase().includes(term) : false;
+        return matchesName || matchesLingkungan || matchesJabatan;
       }
 
       return true;
     });
-  }, [activeKeplingReportMap, statusFilter, searchTerm]);
+  }, [activeKeplingReportMap, statusFilter, searchTerm, isCutoffPassed]);
 
   const handleCopyRekapWA = () => {
     let tglLabel = 'Semua Tanggal';
@@ -437,7 +467,10 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
     let text = `*REKAPITULASI PENGIRIMAN LAPORAN HARIAN KEPLING*\n`;
     text += `*KELURAHAN MANGGA - KECAMATAN MEDAN TUNTUNGAN*\n`;
     text += `📅 Periode/Tanggal: ${tglLabel}\n`;
-    text += `📊 Progress: ${stats.submittedCount}/${stats.totalKepling} Lingkungan (${stats.completionPct}%)\n\n`;
+    text += `⏰ Cutoff Waktu Lapor: Jam 23:30 WIB\n`;
+    text += `📊 Progress: ${stats.submittedCount}/${stats.totalKepling} Lingkungan (${stats.completionPct}%)\n`;
+    text += `🔴 Belum Melapor (Melewati Cutoff 23:30): ${stats.latePendingCount} Kepling\n`;
+    text += `⏰ Menunggu Laporan: ${stats.waitingPendingCount} Kepling\n\n`;
     text += `*STATUS PELAPORAN 24 LINGKUNGAN:*\n`;
 
     KEPLING_ACCOUNTS.forEach((k) => {
@@ -447,9 +480,11 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
         text += `✅ ${k.lingkungan} (${k.nama})${tglText} - SUDAH LAPOR\n`;
         text += `   - PBB: ${rep.kinerja?.opsirPbbWp || 0} WP | Perlinsos: ${rep.kinerja?.perlinsosKk || 0} KK | IKD: ${rep.kinerja?.ikdOrang || 0} Jiwa | BPJS: ${rep.kinerja?.bpjsKetenagakerjaanOrang || 0} Jiwa\n`;
       } else {
-        const latestRep = keplingLatestReportMap.get(k.id);
-        const prevNote = latestRep?.tanggal ? ` (Laporan Terakhir: ${latestRep.tanggal})` : ' (Belum Pernah Lapor)';
-        text += `❌ ${k.lingkungan} (${k.nama}) - BELUM LAPOR${prevNote}\n`;
+        if (isCutoffPassed) {
+          text += `🔴 ${k.lingkungan} (${k.nama}) - BELUM MELAPOR (MELEWATI CUTOFF 23:30)\n`;
+        } else {
+          text += `⏰ ${k.lingkungan} (${k.nama}) - MENUNGGU LAPORAN (s.d. Jam 23:30)\n`;
+        }
       }
     });
 
@@ -1002,66 +1037,340 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
         </div>
       </div>
 
-      {/* Control Bar: Search & Status Filters */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        {/* Status Filter Buttons */}
-        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
-          <button
-            id="filter-all-status"
-            type="button"
-            onClick={() => setStatusFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${
-              statusFilter === 'ALL'
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Semua ({KEPLING_ACCOUNTS.length})
-          </button>
-          <button
-            id="filter-submitted-status"
-            type="button"
-            onClick={() => setStatusFilter('SUBMITTED')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              statusFilter === 'SUBMITTED'
-                ? 'bg-emerald-700 text-white'
-                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-            }`}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Sudah Lapor ({stats.submittedCount})</span>
-          </button>
-          <button
-            id="filter-pending-status"
-            type="button"
-            onClick={() => setStatusFilter('PENDING')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              statusFilter === 'PENDING'
-                ? 'bg-amber-600 text-white'
-                : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
-            }`}
-          >
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>Belum Lapor ({stats.pendingCount})</span>
-          </button>
+      {/* Control Bar: Layout Toggle, Search & Status Filters */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Status Filter Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto">
+            <button
+              id="filter-all-status"
+              type="button"
+              onClick={() => setStatusFilter('ALL')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                statusFilter === 'ALL'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Semua ({KEPLING_ACCOUNTS.length})
+            </button>
+            <button
+              id="filter-submitted-status"
+              type="button"
+              onClick={() => setStatusFilter('SUBMITTED')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                statusFilter === 'SUBMITTED'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>🟢 Sudah Lapor ({stats.submittedCount})</span>
+            </button>
+            <button
+              id="filter-late-pending-status"
+              type="button"
+              onClick={() => setStatusFilter('LATE_PENDING')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                statusFilter === 'LATE_PENDING'
+                  ? 'bg-rose-600 text-white shadow-xs ring-2 ring-rose-300'
+                  : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+              }`}
+              title="Kepling yang belum melapor hingga melewati batas jam 23:30 WIB"
+            >
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+              <span>🔴 Belum Melapor ({stats.latePendingCount})</span>
+            </button>
+            <button
+              id="filter-waiting-status"
+              type="button"
+              onClick={() => setStatusFilter('WAITING')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                statusFilter === 'WAITING'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+              }`}
+              title="Kepling yang belum melapor namun masih dalam batas waktu s.d. jam 23:30 WIB"
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              <span>⏰ Menunggu Laporan ({stats.waitingPendingCount})</span>
+            </button>
+          </div>
+
+          {/* Layout Toggle (Tabel Monitoring vs Kartu) & Search */}
+          <div className="flex items-center gap-2">
+            {/* View Layout Switcher */}
+            <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs shrink-0">
+              <button
+                type="button"
+                onClick={() => setDisplayLayout('TABLE')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                  displayLayout === 'TABLE'
+                    ? 'bg-emerald-800 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Tampilkan dalam tabel monitoring terstruktur"
+              >
+                <ClipboardList className="w-3.5 h-3.5" />
+                <span>Tabel Monitoring</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDisplayLayout('CARDS')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                  displayLayout === 'CARDS'
+                    ? 'bg-emerald-800 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Tampilkan dalam bentuk kartu grid"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Kartu Grid</span>
+              </button>
+            </div>
+
+            {/* Search Kepling Name / Lingkungan */}
+            <div className="relative flex-1 sm:w-64">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                id="input-search-monitor"
+                type="text"
+                placeholder="Cari Lingkungan / Nama Kepling..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Search Kepling Name / Lingkungan */}
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            id="input-search-monitor"
-            type="text"
-            placeholder="Cari Lingkungan / Nama Kepling..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          />
+        {/* 23:30 Cutoff Info Banner */}
+        <div className="p-2.5 bg-slate-900 text-white rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Aturan Automatic Cutoff 23:30 WIB:</strong> Kepling yang belum mengirim laporan harian setelah jam 23:30 otomatis ditandai dengan badge merah <span className="bg-rose-600 text-white px-2 py-0.5 rounded font-black">🔴 BELUM MELAPOR</span>.
+            </span>
+          </div>
+          <span className="font-mono text-amber-300 font-bold bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+            Cutoff Status Hari Ini: {isCutoffPassed ? 'MELEWATI 23:30 (🔴 CUTOFF AKTIF)' : 'SEBELUM 23:30 (⏰ MENUNGGU)'}
+          </span>
         </div>
       </div>
 
-      {/* Grid of 24 Lingkungan Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+      {/* RENDER LAYOUT 1: TABEL MONITORING SUPER ADMIN */}
+      {displayLayout === 'TABLE' ? (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
+          <div className="p-4 bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-amber-400" />
+              <h3 className="font-extrabold text-sm tracking-tight text-white">
+                Tabel Monitoring Status Pelaporan 24 Kepling
+              </h3>
+            </div>
+            <span className="text-[11px] font-bold text-slate-300">
+              Menampilkan {filteredList.length} dari 24 Kepling
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[950px]">
+              <thead>
+                <tr className="bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-wider border-b border-slate-200">
+                  <th className="py-3 px-4 text-center">Lingkungan</th>
+                  <th className="py-3 px-4">Nama Kepling &amp; Jabatan</th>
+                  <th className="py-3 px-4">Kontak / Telepon</th>
+                  <th className="py-3 px-4 text-center">Status Pelaporan Harian</th>
+                  <th className="py-3 px-4 text-center">Waktu Kirim</th>
+                  <th className="py-3 px-4">Ringkasan Kinerja Harian</th>
+                  <th className="py-3 px-4 text-right">Aksi Super Admin</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {filteredList.map((kepling) => {
+                  const report = activeKeplingReportMap.get(kepling.id);
+                  const hasReported = Boolean(report);
+                  const latestReportAnytime = keplingLatestReportMap.get(kepling.id);
+
+                  return (
+                    <tr
+                      key={kepling.id}
+                      className={`hover:bg-slate-50/80 transition-colors ${
+                        hasReported ? 'bg-white' : isCutoffPassed ? 'bg-rose-50/20' : 'bg-amber-50/10'
+                      }`}
+                    >
+                      {/* Lingkungan Number */}
+                      <td className="py-3.5 px-4 text-center">
+                        <div className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-900 text-white font-black text-xs shadow-2xs">
+                          {kepling.nomorLingkungan}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-bold mt-0.5">
+                          Lk. {kepling.nomorLingkungan}
+                        </div>
+                      </td>
+
+                      {/* Kepling Name & Mapped House */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-black text-slate-900 text-xs sm:text-sm">
+                          {kepling.nama}
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium">
+                          {kepling.jabatan}
+                        </div>
+                        {(() => {
+                          const lStats = kelurahanPemetaan.perLingkunganMap[kepling.id];
+                          if (!lStats || lStats.totalRumah === 0) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => onOpenPemetaan?.(kepling.nomorLingkungan)}
+                              className="mt-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <MapPin className="w-3 h-3 text-emerald-600" />
+                              <span>{lStats.totalRumah} Rumah Terpeta</span>
+                            </button>
+                          );
+                        })()}
+                      </td>
+
+                      {/* Phone */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5 text-slate-700 font-mono text-[11px]">
+                          <Phone className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{kepling.telepon || '0812-3456-7890'}</span>
+                        </div>
+                        {kepling.telepon && (
+                          <a
+                            href={`https://wa.me/${kepling.telepon.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] text-emerald-700 hover:underline font-bold mt-0.5 inline-block"
+                          >
+                            Hubungi WA ↗
+                          </a>
+                        )}
+                      </td>
+
+                      {/* STATUS BADGE WITH RED BADGE AFTER 23:30 */}
+                      <td className="py-3.5 px-4 text-center">
+                        {hasReported ? (
+                          <div className="inline-flex flex-col items-center">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>SUDAH LAPOR</span>
+                            </span>
+                            <span className="text-[10px] text-emerald-700 font-semibold mt-1">
+                              {viewMode === 'LATEST_PER_KEPLING' ? (report.tanggal || 'Ada Data') : 'Laporan Diterima'}
+                            </span>
+                          </div>
+                        ) : isCutoffPassed ? (
+                          <div className="inline-flex flex-col items-center">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-600 text-white border border-rose-700 shadow-sm animate-pulse">
+                              <AlertCircle className="w-3.5 h-3.5 text-white shrink-0" />
+                              <span>BELUM MELAPOR</span>
+                            </span>
+                            <span className="text-[10px] text-rose-700 font-extrabold mt-1">
+                              ⚠️ Melewati Cutoff 23:30
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="inline-flex flex-col items-center">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                              <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span>MENUNGGU LAPORAN</span>
+                            </span>
+                            <span className="text-[10px] text-amber-800 font-semibold mt-1">
+                              ⏰ Tenggat Jam 23:30
+                            </span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Time / Date Submitted */}
+                      <td className="py-3.5 px-4 text-center text-[11px]">
+                        {hasReported && report ? (
+                          <div>
+                            <span className="font-bold text-slate-800 block">
+                              {report.createdAt ? new Date(report.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '18:30'} WIB
+                            </span>
+                            <span className="text-[10px] text-slate-500 block">
+                              {report.tanggal || 'Hari Ini'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 font-mono text-[11px]">-</span>
+                        )}
+                      </td>
+
+                      {/* Performance Summary */}
+                      <td className="py-3.5 px-4">
+                        {hasReported && report ? (
+                          <div className="flex flex-wrap items-center gap-1 text-[11px]">
+                            <span className="bg-emerald-50 text-emerald-900 px-2 py-0.5 rounded border border-emerald-200 font-bold">
+                              PBB: {report.kinerja?.opsirPbbWp || 0} WP
+                            </span>
+                            <span className="bg-blue-50 text-blue-900 px-2 py-0.5 rounded border border-blue-200 font-bold">
+                              Perlinsos: {report.kinerja?.perlinsosKk || 0} KK
+                            </span>
+                            <span className="bg-purple-50 text-purple-900 px-2 py-0.5 rounded border border-purple-200 font-bold">
+                              IKD: {report.kinerja?.ikdOrang || 0} Jiwa
+                            </span>
+                            <span className="bg-teal-50 text-teal-900 px-2 py-0.5 rounded border border-teal-200 font-bold">
+                              BPJS: {report.kinerja?.bpjsKetenagakerjaanOrang || 0} Jiwa
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-slate-400 text-[11px] italic">
+                            {latestReportAnytime
+                              ? `Laporan terakhir dikirim: ${latestReportAnytime.tanggal || 'Sebelumnya'}`
+                              : 'Belum ada catatan laporan.'}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {hasReported && report ? (
+                            <button
+                              id={`btn-view-report-tbl-${kepling.id}`}
+                              type="button"
+                              onClick={() => onSelectReport(report)}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] transition-colors cursor-pointer shadow-2xs"
+                            >
+                              Detail
+                            </button>
+                          ) : (
+                            <button
+                              id={`btn-draft-report-tbl-${kepling.id}`}
+                              type="button"
+                              onClick={() => onDraftForKepling(kepling)}
+                              className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
+                            >
+                              <PlusCircle className="w-3 h-3" />
+                              <span>Inputkan</span>
+                            </button>
+                          )}
+                          <button
+                            id={`btn-history-kepling-tbl-${kepling.id}`}
+                            type="button"
+                            onClick={() => onSwitchToRiwayat(kepling.nama)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition-colors cursor-pointer"
+                          >
+                            Riwayat
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* RENDER LAYOUT 2: GRID OF 24 LINGKUNGAN CARDS */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 animate-fade-in">
         {filteredList.map((kepling) => {
           const report = activeKeplingReportMap.get(kepling.id);
           const hasReported = Boolean(report);
@@ -1070,10 +1379,12 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
           return (
             <div
               key={kepling.id}
-              className={`rounded-xl border p-4 transition-all flex flex-col justify-between ${
+              className={`rounded-2xl border p-4 transition-all flex flex-col justify-between ${
                 hasReported
                   ? 'bg-white border-emerald-200 hover:border-emerald-300 shadow-2xs'
-                  : 'bg-slate-50/70 border-slate-200 hover:border-amber-200'
+                  : isCutoffPassed
+                  ? 'bg-rose-50/30 border-rose-200 hover:border-rose-300 shadow-2xs'
+                  : 'bg-amber-50/30 border-amber-200 hover:border-amber-300 shadow-2xs'
               }`}
             >
               <div>
@@ -1089,14 +1400,19 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                   </div>
 
                   {hasReported ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      <span>{viewMode === 'LATEST_PER_KEPLING' ? (report.tanggal || 'Ada Laporan') : 'Sudah Lapor'}</span>
+                      <span>{viewMode === 'LATEST_PER_KEPLING' ? (report.tanggal || 'Ada Laporan') : 'SUDAH LAPOR'}</span>
+                    </span>
+                  ) : isCutoffPassed ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white border border-rose-700 shadow-xs animate-pulse">
+                      <AlertCircle className="w-3 h-3 text-white" />
+                      <span>BELUM MELAPOR</span>
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                      <AlertCircle className="w-3 h-3 text-amber-600" />
-                      <span>Belum Lapor</span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                      <Clock className="w-3 h-3 text-amber-600" />
+                      <span>MENUNGGU LAPORAN</span>
                     </span>
                   )}
                 </div>
@@ -1224,7 +1540,8 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {filteredList.length === 0 && (
         <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-xs text-slate-400">

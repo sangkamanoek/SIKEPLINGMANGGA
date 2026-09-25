@@ -185,6 +185,11 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
   const [selectedHouse, setSelectedHouse] = useState<TitikRumahBangunan | null>(null);
   const [selectedRoad, setSelectedRoad] = useState<RuasJalanLingkungan | null>(null);
 
+  // Saving & Syncing Loading Status
+  const [isSavingHouse, setIsSavingHouse] = useState(false);
+  const [isSavingRoad, setIsSavingRoad] = useState(false);
+  const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(null);
+
   // Draw Polygon Mode
   const [isDrawingPolygon, setIsDrawingPolygon] = useState(false);
   const [drawLingkunganId, setDrawLingkunganId] = useState<string>(
@@ -749,22 +754,36 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       const lngNum = Number(h.lng);
       if (isNaN(latNum) || isNaN(lngNum) || latNum === 0 || lngNum === 0) return false;
 
-      // Allow public facilities like Kantor Lurah to show across filters
-      const isPublicFacility =
+      // Allow public facilities like Kantor Lurah, Puskesmas, SPBU, Gereja, Sekolah, Taman to show across filters
+      const isChurchOrFasum =
         h.kategoriBangunan === 'KANTOR_FASUM' ||
-        (h.namaKepalaKeluarga && h.namaKepalaKeluarga.toLowerCase().includes('kantor lurah'));
+        h.kategoriBangunan === 'FASILITAS_KESEHATAN' ||
+        h.kategoriBangunan === 'SPBU_STASIUN' ||
+        h.kategoriBangunan === 'RUMAH_IBADAH' ||
+        h.kategoriBangunan === 'SEKOLAH' ||
+        h.kategoriBangunan === 'RUANG_PUBLIK_TAMAN' ||
+        h.kategoriBangunan === 'PASAR_SARANA_EKONOMI' ||
+        h.kategoriBangunan === 'RUMAH_USAHA' ||
+        (h.namaKepalaKeluarga && /kantor|lurah|puskesmas|pustu|spbu|pertashop|posyandu|poskamling|gereja|masjid|mushola|vihara|pura|klenteng|sekolah|pasar|atm|bank|faskes/i.test(h.namaKepalaKeluarga)) ||
+        (h.jenisFasilitas && /kantor|lurah|puskesmas|pustu|spbu|pertashop|posyandu|poskamling|gereja|masjid|mushola|vihara|pura|klenteng|sekolah|pasar|atm|bank|faskes/i.test(h.jenisFasilitas)) ||
+        (h.catatan && /kantor|lurah|puskesmas|pustu|spbu|pertashop|posyandu|poskamling|gereja|masjid|mushola|vihara|pura|klenteng|sekolah|pasar|atm|bank|faskes/i.test(h.catatan));
 
-      if (filterLingkungan !== 'all' && h.lingkunganId !== filterLingkungan && !isPublicFacility) return false;
-      if (filterTheme === 'WRS' && !h.statusWrs && !isPublicFacility) return false;
-      if (filterTheme === 'BANSOS' && !h.penerimaBansos && !isPublicFacility) return false;
-      if (filterTheme === 'PBB' && !h.statusPbb && !isPublicFacility) return false;
+      if (filterLingkungan !== 'all' && h.lingkunganId !== filterLingkungan && !isChurchOrFasum) return false;
+      if (filterTheme === 'WRS' && !h.statusWrs && !isChurchOrFasum) return false;
+      if (filterTheme === 'BANSOS' && !h.penerimaBansos && !isChurchOrFasum) return false;
+      if (filterTheme === 'PBB' && !h.statusPbb && !isChurchOrFasum) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         return (
           h.namaKepalaKeluarga.toLowerCase().includes(q) ||
           h.namaJalan.toLowerCase().includes(q) ||
           h.nomorRumah.toLowerCase().includes(q) ||
-          (h.nopPbb && h.nopPbb.toLowerCase().includes(q))
+          (h.nopPbb && h.nopPbb.toLowerCase().includes(q)) ||
+          (h.jenisFasilitas && h.jenisFasilitas.toLowerCase().includes(q)) ||
+          (h.namaUsaha && h.namaUsaha.toLowerCase().includes(q)) ||
+          (h.catatan && h.catatan.toLowerCase().includes(q)) ||
+          (h.kategoriBangunan && h.kategoriBangunan.toLowerCase().includes(q)) ||
+          (h.asalKk && h.asalKk.toLowerCase().includes(q))
         );
       }
       return true;
@@ -780,15 +799,27 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
         (h.namaKepalaKeluarga && h.namaKepalaKeluarga.toLowerCase().includes('kantor lurah'))
       ) {
         markerColor = '#1e3a8a'; // Dark Navy Blue for Kantor Lurah & Fasilitas Umum
-        iconSymbol = '🏛️';
+        iconSymbol = '🏢';
+      } else if (h.kategoriBangunan === 'FASILITAS_KESEHATAN') {
+        markerColor = '#e11d48'; // Red / Rose for Puskesmas, Pustu, Posyandu, Klinik
+        iconSymbol = '🏥';
+      } else if (h.kategoriBangunan === 'SPBU_STASIUN') {
+        markerColor = '#ea580c'; // Orange for SPBU & Pertashop
+        iconSymbol = '⛽';
       } else if (h.kategoriBangunan === 'RUMAH_IBADAH') {
-        markerColor = '#0d9488'; // Teal / Cyan for House of Worship
+        markerColor = '#0d9488'; // Teal for House of Worship
         iconSymbol = h.jenisFasilitas?.toLowerCase().includes('masjid') || h.jenisFasilitas?.toLowerCase().includes('mushola') ? '🕌' : '⛪';
       } else if (h.kategoriBangunan === 'SEKOLAH') {
         markerColor = '#2563eb'; // Blue for Schools
         iconSymbol = '🏫';
+      } else if (h.kategoriBangunan === 'RUANG_PUBLIK_TAMAN') {
+        markerColor = '#16a34a'; // Emerald Green for Parks / Poskamling
+        iconSymbol = h.jenisFasilitas?.toLowerCase().includes('poskamling') || h.jenisFasilitas?.toLowerCase().includes('ronda') ? '🛡️' : '🛝';
+      } else if (h.kategoriBangunan === 'PASAR_SARANA_EKONOMI') {
+        markerColor = '#9333ea'; // Purple for Markets / Bank / ATM
+        iconSymbol = '🛒';
       } else if (h.kategoriBangunan === 'RUMAH_USAHA') {
-        markerColor = '#d97706'; // Amber for UMKH / Business
+        markerColor = '#d97706'; // Amber for Business
         iconSymbol = '🏪';
       } else if (filterTheme === 'PBB') {
         if (h.statusPbb === 'LUNAS') {
@@ -869,7 +900,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
             👥 <b>${h.jumlahJiwa || (h.jumlahLakiLaki || 0) + (h.jumlahPerempuan || 0)} Jiwa</b> (${h.jumlahLakiLaki || 0}L / ${h.jumlahPerempuan || 0}P)
           </div>
           <div style="margin-top: 3px; font-weight: 600;">
-            WRS: <span style="color: ${h.statusWrs === 'AKTIF' ? '#059669' : '#dc2626'}">${h.statusWrs}</span> | 
+            WRS: <span style="color: ${h.statusWrs === 'AKTIF' ? '#059669' : h.statusWrs === 'BEBAS_WRS' ? '#0284c7' : h.statusWrs === 'MANDIRI' ? '#d97706' : '#dc2626'}">${h.statusWrs === 'BEBAS_WRS' ? 'BEBAS WRS' : h.statusWrs || 'AKTIF'}</span> | 
             PBB: <span style="color: ${h.statusPbb === 'LUNAS' ? '#059669' : '#dc2626'}">${h.statusPbb || 'BELUM_LUNAS'}</span>
           </div>
           ${h.nopPbb ? `<div style="color: #475569; font-size: 10px; margin-top: 2px;">NOP: <b>${h.nopPbb}</b> (Rp ${(h.nominalPbb || 0).toLocaleString('id-ID')})</div>` : ''}
@@ -1192,57 +1223,97 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
   // Handler: Save House
   const handleSaveHouse = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!houseForm.namaKepalaKeluarga.trim()) {
-      alert('Nama Kepala Keluarga wajib diisi!');
+    const isResidential = houseForm.kategoriBangunan === 'RUMAH_TINGGAL';
+    let displayName = houseForm.namaKepalaKeluarga.trim();
+    if (!displayName && !isResidential) {
+      displayName = houseForm.namaUsaha || houseForm.jenisFasilitas || 'Fasilitas Umum';
+    }
+    if (!displayName) {
+      alert(isResidential ? 'Nama Kepala Keluarga wajib diisi!' : 'Nama Bangunan / Fasilitas / Tempat wajib diisi!');
       return;
     }
 
-    const acc = KEPLING_ACCOUNTS.find((a) => a.id === houseForm.lingkunganId);
-    const newHouse: TitikRumahBangunan = {
-      id: editingHouse?.id || `rumah_${Date.now()}`,
-      lingkunganId: houseForm.lingkunganId,
-      lingkunganNomor: acc?.nomorLingkungan || 1,
-      namaJalan: houseForm.namaJalan || 'Jl. Lingkungan',
-      nomorRumah: houseForm.nomorRumah || 'No. -',
-      namaKepalaKeluarga: houseForm.namaKepalaKeluarga,
-      nikKk: houseForm.nikKk,
-      isKkMangga: houseForm.isKkMangga !== false,
-      asalKk: houseForm.isKkMangga ? 'Kelurahan Mangga' : (houseForm.asalKk || 'Luar Kelurahan Mangga'),
-      lat: Number(houseForm.lat) || KELURAHAN_MANGGA_CENTER[0],
-      lng: Number(houseForm.lng) || KELURAHAN_MANGGA_CENTER[1],
-      jumlahJiwa: (Number(houseForm.jumlahLakiLaki) || 0) + (Number(houseForm.jumlahPerempuan) || 0) || 1,
-      jumlahLakiLaki: Number(houseForm.jumlahLakiLaki) || 0,
-      jumlahPerempuan: Number(houseForm.jumlahPerempuan) || 0,
-      jumlahLansia: Number(houseForm.jumlahLansia) || 0,
-      jumlahAnak: Number(houseForm.jumlahAnak) || 0,
-      pekerjaanKk: houseForm.pekerjaanKk,
-      penerimaBansos: houseForm.penerimaBansos,
-      jenisBansos: houseForm.jenisBansos,
-      desilBansos: houseForm.desilBansos,
-      kategoriRentan: houseForm.kategoriRentan,
-      statusWrs: houseForm.statusWrs,
-      tarifRetribusi: Number(houseForm.tarifRetribusi) || 15000,
-      nopPbb: houseForm.nopPbb,
-      statusPbb: houseForm.statusPbb,
-      nominalPbb: Number(houseForm.nominalPbb) || 0,
-      tahunPbb: Number(houseForm.tahunPbb) || 2026,
-      catatan: houseForm.catatan,
-      memilikiUsaha: houseForm.memilikiUsaha,
-      jenisUsaha: houseForm.memilikiUsaha ? houseForm.jenisUsaha : undefined,
-      namaUsaha: houseForm.memilikiUsaha ? houseForm.namaUsaha : undefined,
-      luasTanahM2: Number(houseForm.luasTanahM2) || 0,
-      luasBangunanM2: Number(houseForm.luasBangunanM2) || 0,
-      kategoriBangunan: houseForm.kategoriBangunan,
-      jenisFasilitas: houseForm.kategoriBangunan === 'RUMAH_TINGGAL' || houseForm.kategoriBangunan === 'RUMAH_USAHA' ? undefined : houseForm.jenisFasilitas,
-      createdAt: editingHouse?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdByName: currentUser.nama,
-    };
+    setIsSavingHouse(true);
+    setSaveStatusMessage('⏳ Sedang menyimpan data ke Firestore Database...');
 
-    await saveHouseToFirestore(newHouse);
-    setIsHouseModalOpen(false);
-    setEditingHouse(null);
-    onShowToast?.(`Data rumah ${newHouse.namaKepalaKeluarga} berhasil disimpan!`, 'success');
+    try {
+      const acc = KEPLING_ACCOUNTS.find((a) => a.id === houseForm.lingkunganId);
+      const newHouse: TitikRumahBangunan = {
+        id: editingHouse?.id || `rumah_${Date.now()}`,
+        lingkunganId: houseForm.lingkunganId,
+        lingkunganNomor: acc?.nomorLingkungan || 1,
+        namaJalan: houseForm.namaJalan || 'Jl. Lingkungan',
+        nomorRumah: houseForm.nomorRumah || (isResidential ? 'No. -' : 'S/N'),
+        namaKepalaKeluarga: displayName,
+        nikKk: isResidential ? houseForm.nikKk : undefined,
+        isKkMangga: isResidential ? (houseForm.isKkMangga !== false) : true,
+        asalKk: isResidential ? (houseForm.isKkMangga ? 'Kelurahan Mangga' : (houseForm.asalKk || 'Luar Kelurahan Mangga')) : 'Fasilitas Publik / Tempat Usaha',
+        lat: Number(houseForm.lat) || KELURAHAN_MANGGA_CENTER[0],
+        lng: Number(houseForm.lng) || KELURAHAN_MANGGA_CENTER[1],
+        jumlahJiwa: isResidential ? ((Number(houseForm.jumlahLakiLaki) || 0) + (Number(houseForm.jumlahPerempuan) || 0) || 1) : 0,
+        jumlahLakiLaki: isResidential ? (Number(houseForm.jumlahLakiLaki) || 0) : 0,
+        jumlahPerempuan: isResidential ? (Number(houseForm.jumlahPerempuan) || 0) : 0,
+        jumlahLansia: isResidential ? (Number(houseForm.jumlahLansia) || 0) : 0,
+        jumlahAnak: isResidential ? (Number(houseForm.jumlahAnak) || 0) : 0,
+        pekerjaanKk: isResidential ? houseForm.pekerjaanKk : (houseForm.jenisFasilitas || 'Fasilitas / Usaha'),
+        penerimaBansos: isResidential ? houseForm.penerimaBansos : false,
+        jenisBansos: isResidential ? houseForm.jenisBansos : undefined,
+        desilBansos: isResidential ? houseForm.desilBansos : undefined,
+        kategoriRentan: isResidential ? houseForm.kategoriRentan : false,
+        statusWrs: houseForm.statusWrs,
+        tarifRetribusi: Number(houseForm.tarifRetribusi) || 15000,
+        nopPbb: houseForm.nopPbb,
+        statusPbb: houseForm.statusPbb,
+        nominalPbb: Number(houseForm.nominalPbb) || 0,
+        tahunPbb: Number(houseForm.tahunPbb) || 2026,
+        catatan: houseForm.catatan,
+        memilikiUsaha: houseForm.memilikiUsaha,
+        jenisUsaha: houseForm.memilikiUsaha ? houseForm.jenisUsaha : undefined,
+        namaUsaha: houseForm.memilikiUsaha ? houseForm.namaUsaha : undefined,
+        luasTanahM2: Number(houseForm.luasTanahM2) || 0,
+        luasBangunanM2: Number(houseForm.luasBangunanM2) || 0,
+        kategoriBangunan: houseForm.kategoriBangunan,
+        jenisFasilitas: houseForm.kategoriBangunan === 'RUMAH_TINGGAL' || houseForm.kategoriBangunan === 'RUMAH_USAHA' ? undefined : houseForm.jenisFasilitas,
+        createdAt: editingHouse?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdByName: currentUser.nama,
+      };
+
+      // 1. Save online to Firestore and Server
+      const isSavedOk = await saveHouseToFirestore(newHouse);
+
+      // 2. Immediately update local state so marker appears on map without delay!
+      setHouses((prev) => {
+        const idx = prev.findIndex((h) => h.id === newHouse.id);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = newHouse;
+          return copy;
+        }
+        return [newHouse, ...prev];
+      });
+
+      // 3. Pan map to point & select item
+      if (mapInstanceRef.current && newHouse.lat && newHouse.lng) {
+        mapInstanceRef.current.setView([newHouse.lat, newHouse.lng], 18);
+      }
+      setSelectedHouse(newHouse);
+
+      setIsHouseModalOpen(false);
+      setEditingHouse(null);
+
+      if (isSavedOk) {
+        onShowToast?.(`✅ BERHASIL TERSIMPAN! ${newHouse.namaKepalaKeluarga} telah tersimpan di Firestore`, 'success');
+      } else {
+        onShowToast?.(`⚠️ Data ${newHouse.namaKepalaKeluarga} tersimpan di memori. Akan disinkronkan online.`, 'info');
+      }
+    } catch (err) {
+      console.error('Error saving house:', err);
+      onShowToast?.('Gagal menyimpan data ke Firestore', 'error');
+    } finally {
+      setIsSavingHouse(false);
+      setSaveStatusMessage(null);
+    }
   };
 
   // Handler: Quick Toggle PBB Status
@@ -1459,7 +1530,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
               </div>
             )}
 
-            {/* Add House Pin */}
+            {/* Add Building Pin */}
             <button
               type="button"
               onClick={() => {
@@ -1472,7 +1543,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md cursor-pointer transition-transform hover:scale-[1.02]"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Titik Rumah / WRS</span>
+              <span>+ Tambah Titik Bangunan</span>
             </button>
 
             {/* Add Road */}
@@ -1813,6 +1884,32 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
         <div className="lg:col-span-3 bg-slate-900 rounded-3xl overflow-hidden border border-slate-300 shadow-md relative h-[520px] sm:h-[620px]">
           <div ref={mapContainerRef} className="w-full h-full z-0" />
 
+          {/* Real-time Loading & Saving Warning Status Banner */}
+          {(isSavingHouse || isSavingRoad || isLoading || saveStatusMessage) && (
+            <div className="absolute top-3 left-3 right-3 z-[1000] bg-slate-950/95 text-white p-3 rounded-2xl border-2 border-amber-400/90 shadow-2xl flex items-center justify-between backdrop-blur-md animate-fade-in">
+              <div className="flex items-center gap-3 text-xs">
+                <RefreshCw className="w-5 h-5 text-amber-400 animate-spin shrink-0" />
+                <div>
+                  <div className="font-black text-amber-300 text-xs sm:text-sm">
+                    {isSavingHouse
+                      ? '⏳ SEDANG MENYIMPAN DATA BANGUNAN / GEREJA KE FIRESTORE...'
+                      : isSavingRoad
+                      ? '⏳ SEDANG MENYIMPAN DATA RUAS JALAN KE FIRESTORE...'
+                      : isLoading
+                      ? '⏳ MEMUAT DATA GEOGRAFIS & TITIK LOKASI FIRESTORE...'
+                      : saveStatusMessage || '⏳ PROSES DATA BERLANGSUNG...'}
+                  </div>
+                  <div className="text-[10px] sm:text-xs text-slate-300">
+                    Sistem sedang mensinkronisasi data dengan database Firestore online. Mohon tunggu sejenak.
+                  </div>
+                </div>
+              </div>
+              <span className="hidden sm:inline-block px-2.5 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-xl font-mono text-[10px] font-bold shrink-0">
+                PROSES ONLINE
+              </span>
+            </div>
+          )}
+
           {/* Active Coordinate Picking Banner */}
           {isPickingCoordinate && (
             <div className="absolute top-3 left-3 right-3 z-[1000] bg-emerald-950/95 text-white p-3 rounded-2xl border-2 border-emerald-400 shadow-2xl flex items-center justify-between backdrop-blur-md animate-pulse">
@@ -1960,11 +2057,21 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                     className={`font-black px-2 py-0.5 rounded text-[10px] ${
                       selectedHouse.statusWrs === 'AKTIF'
                         ? 'bg-emerald-100 text-emerald-800'
+                        : selectedHouse.statusWrs === 'BEBAS_WRS'
+                        ? 'bg-sky-100 text-sky-800'
+                        : selectedHouse.statusWrs === 'MANDIRI'
+                        ? 'bg-amber-100 text-amber-800'
                         : 'bg-rose-100 text-rose-800'
                     }`}
                   >
-                    {selectedHouse.statusWrs} (Rp{' '}
-                    {(selectedHouse.tarifRetribusi || 15000).toLocaleString('id-ID')})
+                    {selectedHouse.statusWrs === 'AKTIF'
+                      ? '🟢 AKTIF BERLANGGANAN'
+                      : selectedHouse.statusWrs === 'BEBAS_WRS'
+                      ? '🔵 BEBAS WRS'
+                      : selectedHouse.statusWrs === 'MANDIRI'
+                      ? '🟡 PENGELOLAAN MANDIRI'
+                      : '🔴 BELUM / MENOLAK'}
+                    {selectedHouse.statusWrs === 'AKTIF' && ` (Rp ${(selectedHouse.tarifRetribusi || 15000).toLocaleString('id-ID')})`}
                   </span>
                 </div>
 
@@ -2273,7 +2380,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   lingkungan Anda.
                 </li>
                 <li>
-                  Tekan <b>"+ Titik Rumah"</b> saat di lapangan untuk menandai posisi rumah warga.
+                  Tekan <b>"+ Tambah Titik Bangunan"</b> saat di lapangan untuk menandai posisi bangunan / rumah / fasilitas warga.
                 </li>
               </ul>
             </div>
@@ -2319,7 +2426,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                             : 'bg-slate-100 text-slate-600'
                         }`}
                       >
-                        {countH} Rumah
+                        {countH} Titik
                       </span>
                     </button>
                   );
@@ -2330,14 +2437,14 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
         </div>
       </div>
 
-      {/* MODAL: TAMBAH / EDIT TITIK RUMAH & WRS */}
+      {/* MODAL: TAMBAH / EDIT TITIK BANGUNAN */}
       {isHouseModalOpen && (
         <div className="fixed inset-0 z-[2000] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 my-8 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">
-                  {editingHouse ? 'Edit Titik Rumah Warga' : 'Tambah Titik Rumah & WRS Warga'}
+                  {editingHouse ? 'Edit Titik Bangunan / Fasilitas' : 'Tambah Titik Bangunan'}
                 </h3>
                 <p className="text-xs text-slate-500">
                   Data kependudukan, kepatuhan sampah, dan bantuan sosial
@@ -2352,6 +2459,20 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
             </div>
 
             <form onSubmit={handleSaveHouse} className="space-y-4 text-xs">
+              {/* SAVING IN PROGRESS WARNING INDICATOR */}
+              {isSavingHouse && (
+                <div className="p-4 bg-amber-500/15 border-2 border-amber-500/60 rounded-2xl flex items-center gap-3 text-amber-950 animate-pulse shadow-sm">
+                  <RefreshCw className="w-6 h-6 animate-spin text-amber-600 shrink-0" />
+                  <div>
+                    <div className="font-black text-xs sm:text-sm">
+                      ⏳ SEDANG MENYIMPAN DATA KE FIRESTORE DATABASE
+                    </div>
+                    <div className="text-[11px] text-amber-800">
+                      Sistem sedang mengirim koordinat &amp; data ke server online. Mohon jangan menutup modal...
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Lingkungan Selector */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Pilih Lingkungan:</label>
@@ -2512,7 +2633,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   <input
                     type="text"
                     required
-                    placeholder="misal: Jl. Bunga Raya Gg. Melati"
+                    placeholder="misal: Jl. Tembakau Raya Gg. Mawar"
                     value={houseForm.namaJalan}
                     onChange={(e) =>
                       setHouseForm((prev) => ({ ...prev, namaJalan: e.target.value }))
@@ -2521,11 +2642,13 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">No. Rumah:</label>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    {houseForm.kategoriBangunan === 'RUMAH_TINGGAL' ? 'No. Rumah:' : 'No. Bangunan (Opsional):'}
+                  </label>
                   <input
                     type="text"
-                    required
-                    placeholder="No. 14A"
+                    required={houseForm.kategoriBangunan === 'RUMAH_TINGGAL'}
+                    placeholder={houseForm.kategoriBangunan === 'RUMAH_TINGGAL' ? 'No. 14A' : 'Opsional / S/N'}
                     value={houseForm.nomorRumah}
                     onChange={(e) =>
                       setHouseForm((prev) => ({ ...prev, nomorRumah: e.target.value }))
@@ -2535,16 +2658,20 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                 </div>
               </div>
 
-              {/* Kategori Bangunan / Fasilitas Umum / Ibadah / Sekolah */}
+              {/* Kategori Bangunan / Fasilitas Umum / Ibadah / Sekolah / Kesehatan / SPBU / Pasar */}
               <div className="p-3 bg-teal-50 border border-teal-200 rounded-2xl space-y-2">
-                <label className="block font-black text-teal-950 text-xs">🏛️ Kategori Jenis Bangunan / Fasilitas:</label>
+                <label className="block font-black text-teal-950 text-xs">🏛️ Pilih Kategori Jenis Bangunan / Fasilitas:</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {[
                     { id: 'RUMAH_TINGGAL', label: '🏠 Rumah Tinggal' },
-                    { id: 'RUMAH_USAHA', label: '🏪 Toko / Usaha' },
+                    { id: 'FASILITAS_KESEHATAN', label: '🏥 Puskesmas / Pustu' },
+                    { id: 'SPBU_STASIUN', label: '⛽ SPBU / Pertashop' },
                     { id: 'RUMAH_IBADAH', label: '⛪ Rumah Ibadah' },
                     { id: 'SEKOLAH', label: '🏫 Sekolah / Kampus' },
-                    { id: 'KANTOR_FASUM', label: '🏢 Kantor / Fasum' },
+                    { id: 'KANTOR_FASUM', label: '🏢 Kantor / Pelayanan' },
+                    { id: 'RUANG_PUBLIK_TAMAN', label: '🛝 Taman / Poskamling' },
+                    { id: 'PASAR_SARANA_EKONOMI', label: '🛒 Pasar / Bank / ATM' },
+                    { id: 'RUMAH_USAHA', label: '🏪 Toko / Usaha' },
                   ].map((cat) => (
                     <button
                       key={cat.id}
@@ -2560,6 +2687,37 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                     </button>
                   ))}
                 </div>
+
+                {/* Sub-Kategori Dynamic Selectors */}
+                {houseForm.kategoriBangunan === 'FASILITAS_KESEHATAN' && (
+                  <div className="pt-2 border-t border-teal-200">
+                    <label className="block font-bold text-teal-900 mb-1 text-[11px]">Jenis Fasilitas Kesehatan:</label>
+                    <select
+                      value={houseForm.jenisFasilitas || 'Puskesmas Pembantu (Pustu)'}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, jenisFasilitas: e.target.value }))}
+                      className="w-full p-2 rounded-xl border border-teal-300 bg-white text-xs font-bold text-teal-950"
+                    >
+                      {['Puskesmas Pembantu (Pustu)', 'Puskesmas Induk', 'Posyandu Lingkungan', 'Klinik Pratama / Swasta', 'Rumah Sakit / Bersalin', 'Apotek / Laboratorium'].map((j) => (
+                        <option key={j} value={j}>{j}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {houseForm.kategoriBangunan === 'SPBU_STASIUN' && (
+                  <div className="pt-2 border-t border-teal-200">
+                    <label className="block font-bold text-teal-900 mb-1 text-[11px]">Jenis SPBU / Stasiun Pengisian:</label>
+                    <select
+                      value={houseForm.jenisFasilitas || 'SPBU Pertamina'}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, jenisFasilitas: e.target.value }))}
+                      className="w-full p-2 rounded-xl border border-teal-300 bg-white text-xs font-bold text-teal-950"
+                    >
+                      {['SPBU Pertamina Resmi', 'Pertashop / SPBU Mini', 'Stasiun Pengisian Listrik (EV Charger)', 'Pangkalan / Sub-Agen LPG'].map((j) => (
+                        <option key={j} value={j}>{j}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {houseForm.kategoriBangunan === 'RUMAH_IBADAH' && (
                   <div className="pt-2 border-t border-teal-200">
@@ -2578,13 +2736,58 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
                 {houseForm.kategoriBangunan === 'SEKOLAH' && (
                   <div className="pt-2 border-t border-teal-200">
-                    <label className="block font-bold text-teal-900 mb-1 text-[11px]">Jenjang & Nama Sekolah:</label>
+                    <label className="block font-bold text-teal-900 mb-1 text-[11px]">Jenjang &amp; Nama Sekolah:</label>
                     <select
                       value={houseForm.jenisFasilitas || 'SD Negeri / Swasta'}
                       onChange={(e) => setHouseForm((prev) => ({ ...prev, jenisFasilitas: e.target.value }))}
                       className="w-full p-2 rounded-xl border border-teal-300 bg-white text-xs font-bold text-teal-950"
                     >
-                      {['SD Negeri / Swasta', 'SMP Negeri / Swasta', 'SMA / SMK Negeri / Swasta', 'Universitas / Perguruan Tinggi', 'PAUD / TK'].map((j) => (
+                      {['SD Negeri / Swasta', 'SMP Negeri / Swasta', 'SMA / SMK Negeri / Swasta', 'Universitas / Perguruan Tinggi', 'PAUD / TK', 'Madrasah / Pesantren'].map((j) => (
+                        <option key={j} value={j}>{j}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {houseForm.kategoriBangunan === 'KANTOR_FASUM' && (
+                  <div className="pt-2 border-t border-teal-200">
+                    <label className="block font-bold text-teal-900 mb-1 text-[11px]">Jenis Pelayanan Publik / Kantor:</label>
+                    <select
+                      value={houseForm.jenisFasilitas || 'Kantor Kelurahan'}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, jenisFasilitas: e.target.value }))}
+                      className="w-full p-2 rounded-xl border border-teal-300 bg-white text-xs font-bold text-teal-950"
+                    >
+                      {['Kantor Kelurahan', 'Kantor Polisi / Polsek / Bhabinkamtibmas', 'Pos Koramil / Babinsa', 'Kantor Pos / Logistik', 'Bank / Kantor BUMD', 'Pos Damkar / BPBD'].map((j) => (
+                        <option key={j} value={j}>{j}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {houseForm.kategoriBangunan === 'RUANG_PUBLIK_TAMAN' && (
+                  <div className="pt-2 border-t border-teal-200">
+                    <label className="block font-bold text-teal-900 mb-1 text-[11px]">Jenis Ruang Publik / Sarana:</label>
+                    <select
+                      value={houseForm.jenisFasilitas || 'Poskamling / Pos Ronda'}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, jenisFasilitas: e.target.value }))}
+                      className="w-full p-2 rounded-xl border border-teal-300 bg-white text-xs font-bold text-teal-950"
+                    >
+                      {['Poskamling / Pos Ronda', 'Taman Kota / RPTRA', 'Lapangan Olahraga / Futsal', 'Balai Serbaguna / Gedung Pertemuan', 'TPU / Pemakaman Umum'].map((j) => (
+                        <option key={j} value={j}>{j}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {houseForm.kategoriBangunan === 'PASAR_SARANA_EKONOMI' && (
+                  <div className="pt-2 border-t border-teal-200">
+                    <label className="block font-bold text-teal-900 mb-1 text-[11px]">Jenis Sarana Ekonomi / Pasar:</label>
+                    <select
+                      value={houseForm.jenisFasilitas || 'Pasar Tradisional'}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, jenisFasilitas: e.target.value }))}
+                      className="w-full p-2 rounded-xl border border-teal-300 bg-white text-xs font-bold text-teal-950"
+                    >
+                      {['Pasar Tradisional', 'Minimarket (Indomaret / Alfamart)', 'Bank / Galeri ATM Center', 'Gudang / Sentra Logistik'].map((j) => (
                         <option key={j} value={j}>{j}</option>
                       ))}
                     </select>
@@ -2592,116 +2795,145 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                 )}
               </div>
 
-              {/* Nama KK & NIK */}
-              <div className="grid grid-cols-2 gap-2">
+              {/* Nama KK atau Nama Bangunan / Fasilitas */}
+              <div className={houseForm.kategoriBangunan === 'RUMAH_TINGGAL' ? "grid grid-cols-2 gap-2" : "block"}>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    Nama Kepala Keluarga (KK):
+                    {houseForm.kategoriBangunan === 'RUMAH_TINGGAL'
+                      ? 'Nama Kepala Keluarga (KK):'
+                      : 'Nama Bangunan / Fasilitas / Tempat:'}
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Nama Lengkap KK"
+                    placeholder={
+                      houseForm.kategoriBangunan === 'RUMAH_TINGGAL'
+                        ? 'Nama Lengkap KK'
+                        : houseForm.kategoriBangunan === 'FASILITAS_KESEHATAN'
+                        ? 'contoh: Puskesmas Pembantu Mangga / Pustu'
+                        : houseForm.kategoriBangunan === 'SPBU_STASIUN'
+                        ? 'contoh: SPBU Tembakau Raya / Pertashop'
+                        : houseForm.kategoriBangunan === 'RUMAH_IBADAH'
+                        ? 'contoh: Gereja HKBP / Masjid Al-Ikhlas'
+                        : houseForm.kategoriBangunan === 'SEKOLAH'
+                        ? 'contoh: SD Negeri 060932 Mangga'
+                        : houseForm.kategoriBangunan === 'RUANG_PUBLIK_TAMAN'
+                        ? 'contoh: Poskamling Lingkungan IV'
+                        : houseForm.kategoriBangunan === 'PASAR_SARANA_EKONOMI'
+                        ? 'contoh: Pasar Mangga / Indomaret Tembakau'
+                        : 'Nama Bangunan / Tempat / Pengelola'
+                    }
                     value={houseForm.namaKepalaKeluarga}
                     onChange={(e) =>
                       setHouseForm((prev) => ({ ...prev, namaKepalaKeluarga: e.target.value }))
                     }
-                    className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 font-bold"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">NIK KK (Opsional):</label>
-                  <input
-                    type="text"
-                    placeholder="127101..."
-                    value={houseForm.nikKk}
-                    onChange={(e) => setHouseForm((prev) => ({ ...prev, nikKk: e.target.value }))}
-                    className="w-full p-2.5 rounded-xl border border-slate-300"
-                  />
-                </div>
-              </div>
-
-              {/* STATUS KARTU KELUARGA (KK MANGGA ATAU BUKAN) */}
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl space-y-2">
-                <label className="block font-black text-blue-950 text-xs">
-                  🪪 Domisili / Status Kartu Keluarga (KK):
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setHouseForm((prev) => ({
-                        ...prev,
-                        isKkMangga: true,
-                        asalKk: 'Kelurahan Mangga',
-                      }))
-                    }
-                    className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                      houseForm.isKkMangga
-                        ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
-                        : 'bg-white text-blue-900 border-blue-200 hover:bg-blue-100'
-                    }`}
-                  >
-                    <span className="text-base">🏠</span>
-                    <div>
-                      <div>KK Kelurahan Mangga</div>
-                      <div className={`text-[10px] font-normal ${houseForm.isKkMangga ? 'text-blue-100' : 'text-slate-500'}`}>
-                        Warga Asli / Ber-KK Setempat
-                      </div>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setHouseForm((prev) => ({
-                        ...prev,
-                        isKkMangga: false,
-                        asalKk: prev.asalKk && prev.asalKk !== 'Kelurahan Mangga' ? prev.asalKk : '',
-                      }))
-                    }
-                    className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                      !houseForm.isKkMangga
-                        ? 'bg-amber-600 text-white border-amber-700 shadow-sm'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="text-base">🌐</span>
-                    <div>
-                      <div>Bukan KK Kelurahan Mangga</div>
-                      <div className={`text-[10px] font-normal ${!houseForm.isKkMangga ? 'text-amber-100' : 'text-slate-500'}`}>
-                        Pendatang / Domisili Luar
-                      </div>
-                    </div>
-                  </button>
-                </div>
-
-                {!houseForm.isKkMangga && (
-                  <div className="pt-2 border-t border-blue-200">
-                    <label className="block font-bold text-blue-900 mb-1 text-[11px]">
-                      Keterangan Asal / Domisili KK Luar (Opsional):
-                    </label>
+                {houseForm.kategoriBangunan === 'RUMAH_TINGGAL' && (
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">NIK KK (Opsional):</label>
                     <input
                       type="text"
-                      value={houseForm.asalKk}
-                      onChange={(e) => setHouseForm((prev) => ({ ...prev, asalKk: e.target.value }))}
-                      placeholder="Contoh: Kelurahan Simpang Selayang / Luar Kota Medan"
-                      className="w-full p-2 rounded-xl border border-blue-300 bg-white text-xs font-medium text-slate-800"
+                      placeholder="127101..."
+                      value={houseForm.nikKk}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, nikKk: e.target.value }))}
+                      className="w-full p-2.5 rounded-xl border border-slate-300"
                     />
                   </div>
                 )}
               </div>
+
+              {/* STATUS KARTU KELUARGA (HANYA UNTUK RUMAH TINGGAL) */}
+              {houseForm.kategoriBangunan === 'RUMAH_TINGGAL' ? (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl space-y-2">
+                  <label className="block font-black text-blue-950 text-xs">
+                    🪪 Domisili / Status Kartu Keluarga (KK):
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setHouseForm((prev) => ({
+                          ...prev,
+                          isKkMangga: true,
+                          asalKk: 'Kelurahan Mangga',
+                        }))
+                      }
+                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                        houseForm.isKkMangga
+                          ? 'bg-blue-700 text-white border-blue-700 shadow-sm'
+                          : 'bg-white text-blue-900 border-blue-200 hover:bg-blue-100'
+                      }`}
+                    >
+                      <span className="text-base">🏠</span>
+                      <div>
+                        <div>KK Kelurahan Mangga</div>
+                        <div className={`text-[10px] font-normal ${houseForm.isKkMangga ? 'text-blue-100' : 'text-slate-500'}`}>
+                          Warga Asli / Ber-KK Setempat
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setHouseForm((prev) => ({
+                          ...prev,
+                          isKkMangga: false,
+                          asalKk: prev.asalKk && prev.asalKk !== 'Kelurahan Mangga' ? prev.asalKk : '',
+                        }))
+                      }
+                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                        !houseForm.isKkMangga
+                          ? 'bg-amber-600 text-white border-amber-700 shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="text-base">🌐</span>
+                      <div>
+                        <div>Bukan KK Kelurahan Mangga</div>
+                        <div className={`text-[10px] font-normal ${!houseForm.isKkMangga ? 'text-amber-100' : 'text-slate-500'}`}>
+                          Pendatang / Domisili Luar
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+
+                  {!houseForm.isKkMangga && (
+                    <div className="pt-2 border-t border-blue-200">
+                      <label className="block font-bold text-blue-900 mb-1 text-[11px]">
+                        Keterangan Asal / Domisili KK Luar (Opsional):
+                      </label>
+                      <input
+                        type="text"
+                        value={houseForm.asalKk}
+                        onChange={(e) => setHouseForm((prev) => ({ ...prev, asalKk: e.target.value }))}
+                        placeholder="Contoh: Kelurahan Simpang Selayang / Luar Kota Medan"
+                        className="w-full p-2 rounded-xl border border-blue-300 bg-white text-xs font-medium text-slate-800"
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-2.5 bg-slate-100 border border-slate-300/80 rounded-2xl flex items-center gap-2 text-slate-700 text-[11px]">
+                  <span className="text-base shrink-0">ℹ️</span>
+                  <span>
+                    Kategori <b>Fasilitas Publik / Tempat Usaha</b> tidak memerlukan pengisian data Kartu Keluarga (KK), NIK KK, maupun demografi jiwa.
+                  </span>
+                </div>
+              )}
 
               {/* STATUS WRS (WAJIB RETRIBUSI SAMPAH) */}
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2">
                 <label className="block font-black text-emerald-950">
                   🗑️ Status Wajib Retribusi Sampah (WRS):
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   <label
-                    className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer ${
+                    className={`flex items-center gap-1.5 p-2.5 rounded-xl border cursor-pointer ${
                       houseForm.statusWrs === 'AKTIF'
                         ? 'bg-emerald-600 text-white border-emerald-700 font-bold'
-                        : 'bg-white text-slate-700 border-slate-200'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50'
                     }`}
                   >
                     <input
@@ -2714,10 +2946,26 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                     <span>🟢 Aktif Berlangganan</span>
                   </label>
                   <label
-                    className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer ${
+                    className={`flex items-center gap-1.5 p-2.5 rounded-xl border cursor-pointer ${
+                      houseForm.statusWrs === 'BEBAS_WRS'
+                        ? 'bg-sky-600 text-white border-sky-700 font-bold'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-sky-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="statusWrs"
+                      checked={houseForm.statusWrs === 'BEBAS_WRS'}
+                      onChange={() => setHouseForm((prev) => ({ ...prev, statusWrs: 'BEBAS_WRS' }))}
+                      className="hidden"
+                    />
+                    <span>🔵 Bebas WRS</span>
+                  </label>
+                  <label
+                    className={`flex items-center gap-1.5 p-2.5 rounded-xl border cursor-pointer ${
                       houseForm.statusWrs === 'BELUM_MENOLAK'
                         ? 'bg-rose-600 text-white border-rose-700 font-bold'
-                        : 'bg-white text-slate-700 border-slate-200'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-rose-50'
                     }`}
                   >
                     <input
@@ -2730,6 +2978,22 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                       className="hidden"
                     />
                     <span>🔴 Belum / Menolak</span>
+                  </label>
+                  <label
+                    className={`flex items-center gap-1.5 p-2.5 rounded-xl border cursor-pointer ${
+                      houseForm.statusWrs === 'MANDIRI'
+                        ? 'bg-amber-600 text-white border-amber-700 font-bold'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="statusWrs"
+                      checked={houseForm.statusWrs === 'MANDIRI'}
+                      onChange={() => setHouseForm((prev) => ({ ...prev, statusWrs: 'MANDIRI' }))}
+                      className="hidden"
+                    />
+                    <span>🟡 Pengelolaan Mandiri</span>
                   </label>
                 </div>
               </div>
@@ -2999,25 +3263,29 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
               {/* Luas Tanah & Bangunan (m²) */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-xs text-slate-700 mb-1">Luas Tanah (m²):</label>
+                  <label className="block font-bold text-xs text-slate-700 mb-1">
+                    Luas Tanah (m²) <span className="text-[10px] text-slate-500 font-normal block sm:inline">(Opsional)</span>:
+                  </label>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     value={houseForm.luasTanahM2}
                     onChange={(e) => setHouseForm((prev) => ({ ...prev, luasTanahM2: e.target.value === '' ? '' : +e.target.value }))}
-                    className="w-full p-2 rounded-xl border border-slate-300 font-bold text-xs"
-                    placeholder="Contoh: 100"
+                    className="w-full p-2 rounded-xl border border-slate-300 text-xs"
+                    placeholder="misal: 100 (boleh dikosongkan)"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-xs text-slate-700 mb-1">Luas Bangunan (m²):</label>
+                  <label className="block font-bold text-xs text-slate-700 mb-1">
+                    Luas Bangunan (m²) <span className="text-[10px] text-slate-500 font-normal block sm:inline">(Opsional)</span>:
+                  </label>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     value={houseForm.luasBangunanM2}
                     onChange={(e) => setHouseForm((prev) => ({ ...prev, luasBangunanM2: e.target.value === '' ? '' : +e.target.value }))}
-                    className="w-full p-2 rounded-xl border border-slate-300 font-bold text-xs"
-                    placeholder="Contoh: 70"
+                    className="w-full p-2 rounded-xl border border-slate-300 text-xs"
+                    placeholder="misal: 70 (boleh dikosongkan)"
                   />
                 </div>
               </div>
@@ -3154,16 +3422,25 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
               <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
+                  disabled={isSavingHouse}
                   onClick={() => setIsHouseModalOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 cursor-pointer disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-black hover:bg-emerald-500 shadow-md cursor-pointer"
+                  disabled={isSavingHouse}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-black hover:bg-emerald-500 shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Simpan Data Rumah
+                  {isSavingHouse ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                      <span>Menyimpan ke Firestore...</span>
+                    </>
+                  ) : (
+                    <span>💾 Simpan Data Bangunan</span>
+                  )}
                 </button>
               </div>
             </form>

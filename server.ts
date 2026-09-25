@@ -18,15 +18,43 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Reports Data File
-const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.join(process.cwd(), 'data');
+// Safe DATA_DIR resolver with fallback for read-only container filesystems
+const getWritableDataDir = (): string => {
+  if (process.env.VERCEL) {
+    const tmpDir = path.join('/tmp', 'data');
+    try {
+      if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+    } catch (e) {
+      console.error('Failed to create /tmp/data dir:', e);
+    }
+    return tmpDir;
+  }
+  const primaryDir = path.join(process.cwd(), 'data');
+  try {
+    if (!fs.existsSync(primaryDir)) {
+      fs.mkdirSync(primaryDir, { recursive: true });
+    }
+    const testFile = path.join(primaryDir, `.test_write_${Date.now()}`);
+    fs.writeFileSync(testFile, 'ok', 'utf-8');
+    fs.unlinkSync(testFile);
+    return primaryDir;
+  } catch (err) {
+    console.warn('Primary data directory not writable, falling back to /tmp/data:', err);
+    const fallbackDir = path.join('/tmp', 'data');
+    try {
+      if (!fs.existsSync(fallbackDir)) {
+        fs.mkdirSync(fallbackDir, { recursive: true });
+      }
+    } catch (e2) {
+      console.error('Failed to create fallback data directory:', e2);
+    }
+    return fallbackDir;
+  }
+};
+
+const DATA_DIR = getWritableDataDir();
 const REPORTS_FILE = path.join(DATA_DIR, 'reports.json');
 const DELETED_REPORTS_FILE = path.join(DATA_DIR, 'deleted_reports.json');
-
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 
 const loadStoredDeletedReports = (): string[] => {
   try {
@@ -1202,26 +1230,36 @@ app.get('/api/reverse-geocode', async (req, res) => {
 
 async function startServer() {
   const distPath = path.join(process.cwd(), 'dist');
-  const isProd = fs.existsSync(path.join(distPath, 'index.html'));
+  const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.join(distPath, 'index.html'));
 
   if (!isProd) {
     console.log('Running in development mode with Vite middleware...');
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: {
-        middlewareMode: true,
-        host: '0.0.0.0',
-        port: PORT,
-        hmr: false,
-      },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+    try {
+      const vitePkg = 'vite';
+      const { createServer: createViteServer } = await import(/* @vite-ignore */ vitePkg);
+      const vite = await createViteServer({
+        server: {
+          middlewareMode: true,
+          host: '0.0.0.0',
+          port: PORT,
+          hmr: false,
+        },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } catch (err) {
+      console.error('Error initializing Vite development server middleware:', err);
+    }
   } else {
     console.log('Running in production mode, serving static files from:', distPath);
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send('Aplikasi Kelurahan Mangga - Build static index.html tidak ditemukan');
+      }
     });
   }
 
@@ -1229,6 +1267,14 @@ async function startServer() {
     console.log(`Server Kelurahan Mangga running on http://0.0.0.0:${PORT}`);
   });
 }
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception in server process:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection in server process:', reason);
+});
 
 // In Vercel serverless environment, Vercel handles invocation via api/index.ts
 if (!process.env.VERCEL) {
