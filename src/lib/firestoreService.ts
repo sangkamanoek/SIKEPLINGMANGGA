@@ -654,6 +654,17 @@ export async function saveAttendanceToFirestore(item: AbsenApelItem): Promise<bo
   }
 }
 
+export async function deleteAttendanceFromFirestore(id: string): Promise<boolean> {
+  try {
+    const docRef = doc(db, ATTENDANCE_COLLECTION, id);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err: any) {
+    handleFirestoreError(err, OperationType.DELETE, ATTENDANCE_COLLECTION);
+    return false;
+  }
+}
+
 export function subscribeAttendanceFromFirestore(
   onData: (items: AbsenApelItem[], isFromCache: boolean) => void
 ): Unsubscribe {

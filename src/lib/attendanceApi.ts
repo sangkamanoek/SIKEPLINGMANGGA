@@ -3,6 +3,7 @@ import { safeSetLocalStorage } from './safeStorage';
 import {
   fetchAttendanceFromFirestore,
   saveAttendanceToFirestore,
+  deleteAttendanceFromFirestore,
   subscribeAttendanceFromFirestore,
 } from './firestoreService';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
@@ -95,10 +96,13 @@ export async function loadAllAttendance(): Promise<AbsenApelItem[]> {
 }
 
 /**
- * Delete attendance record online from Server Buffer
+ * Delete attendance record online from Server Buffer and Firestore
  */
 export async function deleteAbsenApel(id: string): Promise<boolean> {
   if (!id) return false;
+  // Concurrently delete from Firestore
+  deleteAttendanceFromFirestore(id).catch(() => {});
+
   try {
     const res = await fetch(`/api/attendance/${encodeURIComponent(id)}`, {
       method: 'DELETE',

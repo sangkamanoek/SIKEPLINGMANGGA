@@ -52,6 +52,7 @@ import {
 } from '../lib/targetsApi';
 import { ModalEditTargetCapaian } from './ModalEditTargetCapaian';
 import { GrafikTrenBulanan } from './GrafikTrenBulanan';
+import { GrafikTrenMingguan } from './GrafikTrenMingguan';
 import { isReportMatchingKepling, getReportIsoDate, isKunjunganMatchingKepling } from '../lib/formatter';
 import {
   Map,
@@ -1895,6 +1896,16 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </div>
           </div>
 
+          {/* Grafik Garis Tren Mingguan Selama Satu Bulan Terakhir (Recharts) */}
+          <GrafikTrenMingguan
+            reports={reports}
+            activeAccount={activeAccount}
+            mode="kepling"
+            attendanceList={attendanceList}
+            kunjunganList={kunjunganList}
+            title={`Tren Capaian & Konsistensi Kinerja Mingguan (${activeAccount.lingkungan})`}
+          />
+
           {/* Grafik Batang Tren Laporan Bulanan (Recharts) */}
           <GrafikTrenBulanan
             reports={reports}
@@ -2144,6 +2155,16 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               </p>
             </div>
           </div>
+
+          {/* Grafik Garis Tren Mingguan Seluruh Lingkungan / Per Kepling (Recharts) */}
+          <GrafikTrenMingguan
+            reports={reports}
+            activeAccount={activeAccount}
+            mode="super_admin"
+            attendanceList={attendanceList}
+            kunjunganList={kunjunganList}
+            title="Tren & Konsistensi Capaian Mingguan Se-Kelurahan Mangga"
+          />
 
           {/* Grafik Batang Tren Laporan Bulanan Seluruh Lingkungan (Recharts) */}
           <GrafikTrenBulanan
