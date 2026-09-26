@@ -89,6 +89,27 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
     };
   }, []);
 
+  const [isBottom5Kepling, setIsBottom5Kepling] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkBottom5 = () => {
+      try {
+        const stored = localStorage.getItem('sikepling_bottom5_monthly_kepling_ids');
+        if (stored && activeAccount.role === 'kepling') {
+          const list = JSON.parse(stored);
+          if (Array.isArray(list)) {
+            setIsBottom5Kepling(list.includes(activeAccount.id));
+          }
+        } else {
+          setIsBottom5Kepling(false);
+        }
+      } catch {}
+    };
+    checkBottom5();
+    window.addEventListener('sikepling_bottom5_updated', checkBottom5);
+    return () => window.removeEventListener('sikepling_bottom5_updated', checkBottom5);
+  }, [activeAccount]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
@@ -304,9 +325,14 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                   activeAccount.nomorLingkungan || 'KL'
                 )}
               </div>
-              <div className="hidden sm:block min-w-0 max-w-[120px] sm:max-w-[150px]">
-                <div className="text-[9px] font-black uppercase tracking-wider text-emerald-300 truncate leading-none">
-                  {activeAccount.role === 'super_admin' ? 'SUPER ADMIN' : activeAccount.lingkungan}
+              <div className="hidden sm:block min-w-0 max-w-[140px] sm:max-w-[180px]">
+                <div className="text-[9px] font-black uppercase tracking-wider text-emerald-300 truncate leading-none flex items-center gap-1">
+                  <span>{activeAccount.role === 'super_admin' ? 'SUPER ADMIN' : activeAccount.lingkungan}</span>
+                  {isBottom5Kepling && (
+                    <span className="bg-red-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded-full animate-pulse shadow-xs">
+                      🚨 TERBURUK
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs font-bold text-white truncate leading-tight mt-0.5">
                   {activeAccount.nama}
@@ -374,10 +400,20 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               {isMobileMenuOpen && (
                 <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-2 z-50 text-left">
                   <div className="px-3 py-2 border-b border-slate-800 mb-1">
-                    <p className="text-[10px] font-black uppercase text-amber-400">
-                      {activeAccount.role === 'super_admin' ? 'SUPER ADMIN' : activeAccount.lingkungan}
+                    <p className="text-[10px] font-black uppercase text-amber-400 flex items-center justify-between">
+                      <span>{activeAccount.role === 'super_admin' ? 'SUPER ADMIN' : activeAccount.lingkungan}</span>
+                      {isBottom5Kepling && (
+                        <span className="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                          🚨 TERBURUK
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs font-bold text-white truncate">{activeAccount.nama}</p>
+                    {isBottom5Kepling && (
+                      <p className="text-[9px] text-red-300 font-bold mt-0.5">
+                        🚨 Lencana: Kinerja Kepling Terburuk
+                      </p>
+                    )}
                   </div>
 
                   {onOpenUpdateModal && (

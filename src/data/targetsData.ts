@@ -47,7 +47,17 @@ export const DEFAULT_PERLINSOS_BASELINES: number[] = [
 ];
 
 /**
- * Generate default Targets & Capaian map for all 24 Kepling (per 21 September 2026)
+ * Baseline Capaian BPJS Ketenagakerjaan berturut-turut Lk 1 s/d 24 (Total 173 Orang):
+ */
+export const DEFAULT_BPJS_BASELINES: number[] = [
+  5, 23, 6, 13, 42, 8,
+  6, 3, 0, 1, 1, 6,
+  1, 2, 4, 7, 7, 4,
+  5, 7, 5, 7, 5, 5
+];
+
+/**
+ * Generate default Targets & Capaian map for all 24 Kepling (per 26 September 2026)
  */
 export function getDefaultTargetsCapaianMap(): TargetsCapaianMap {
   const map: TargetsCapaianMap = {};
@@ -55,6 +65,7 @@ export function getDefaultTargetsCapaianMap(): TargetsCapaianMap {
   KEPLING_ACCOUNTS.forEach((k, index) => {
     const targetPerlinsos = DEFAULT_PERLINSOS_TARGETS[index] ?? 300;
     const baselinePerlinsos = DEFAULT_PERLINSOS_BASELINES[index] ?? 0;
+    const baselineBpjs = DEFAULT_BPJS_BASELINES[index] ?? 0;
     map[k.id] = {
       keplingId: k.id,
       nomorLingkungan: k.nomorLingkungan || (index + 1),
@@ -63,13 +74,13 @@ export function getDefaultTargetsCapaianMap(): TargetsCapaianMap {
       targetPerlinsos,
       targetPbb: 100, // target default WP
       targetIkd: 50,  // target default aktivasi IKD
-      targetBpjs: 10, // target default BPJS TK
+      targetBpjs: 50, // target default BPJS TK (50 per Kepling)
       overridePerlinsos: baselinePerlinsos,
       overridePbb: null,
       overrideIkd: null,
-      overrideBpjs: null,
-      catatanPenyesuaian: 'Data Capaian Perlinsos per 21 September 2026',
-      updatedAt: '2026-09-21T00:00:00.000Z',
+      overrideBpjs: baselineBpjs,
+      catatanPenyesuaian: 'Data Capaian BPJS TK & Perlinsos Resmi Kota Medan',
+      updatedAt: '2026-09-26T00:00:00.000Z',
       updatedBy: 'Super Admin',
     };
   });
@@ -121,7 +132,18 @@ export function calculateEffectiveKinerja(
 
   const baselinePbb = isPbbOverridden ? Number(targetConfig!.overridePbb) : 0;
   const baselineIkd = isIkdOverridden ? Number(targetConfig!.overrideIkd) : 0;
-  const baselineBpjs = isBpjsOverridden ? Number(targetConfig!.overrideBpjs) : 0;
+
+  let baselineBpjs = 0;
+  if (isBpjsOverridden) {
+    baselineBpjs = Number(targetConfig!.overrideBpjs);
+  } else {
+    const idx =
+      keplingIndex ??
+      (targetConfig?.nomorLingkungan ? targetConfig.nomorLingkungan - 1 : undefined);
+    if (idx !== undefined && DEFAULT_BPJS_BASELINES[idx] !== undefined) {
+      baselineBpjs = DEFAULT_BPJS_BASELINES[idx];
+    }
+  }
 
   // Laporan baru Kepling (mulai tanggal 7 September dan seterusnya)
   const reportedPerlinsos = Number(reported?.perlinsos) || 0;

@@ -29,6 +29,8 @@ import {
   Award,
   Camera,
   X,
+  Download,
+  Info,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { LaporanHarianItem, UserAccount } from '../types';
@@ -61,7 +63,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
   const [period, setPeriod] = useState<PeriodFilter>('all');
   const [subView, setSubView] = useState<TrantibSubView>('poskamling');
   const [searchQuery, setSearchQuery] = useState('');
-  const [poskamlingDisplayMode, setPoskamlingDisplayMode] = useState<'gallery' | 'table'>('gallery');
+  const [poskamlingDisplayMode, setPoskamlingDisplayMode] = useState<'gallery' | 'table' | 'unduh_mingguan'>('gallery');
   const [previewImage, setPreviewImage] = useState<{
     url: string;
     title: string;
@@ -101,6 +103,85 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
       return true;
     });
   }, [reports, period]);
+
+  // 1b. Collect all Poskamling photos from last 7 days for direct download
+  const lastWeekPoskamlingPhotos = useMemo(() => {
+    const now = new Date();
+    const photos: {
+      url: string;
+      date: string;
+      name: string;
+      keplingNama: string;
+      lingkungan: string;
+      notes: string;
+    }[] = [];
+
+    reports.forEach((r) => {
+      if (!r.tanggal) return;
+      const reportDate = r.tanggal.split('T')[0];
+      const diffTime = now.getTime() - new Date(reportDate).getTime();
+      const diffDays = diffTime / (1000 * 3600 * 24);
+
+      if (diffDays >= 0 && diffDays <= 7) {
+        if (r.fotoDokumentasi && r.fotoDokumentasi.length > 0) {
+          const posPhotos = r.fotoDokumentasi.filter((p) => p.kategori === 'poskamling');
+          const hasPoskamlingGiat = Boolean(
+            r.kinerja?.poskamlingAdaGiat ||
+            (r.kinerja?.poskamlingStatus && r.kinerja.poskamlingStatus !== 'Tidak Ada Giat')
+          );
+          const targetPhotos = posPhotos.length > 0 ? posPhotos : (hasPoskamlingGiat ? r.fotoDokumentasi : []);
+
+          targetPhotos.forEach((p) => {
+            if (p.url) {
+              photos.push({
+                url: p.url,
+                date: r.tanggal,
+                name: p.name || `Dokumentasi Poskamling ${r.namaKepling}`,
+                keplingNama: r.namaKepling,
+                lingkungan: r.jabatan || 'Kepala Lingkungan',
+                notes: r.kinerja?.poskamlingKeterangan || r.uraianTugas || 'Situasi aman dan kondusif',
+              });
+            }
+          });
+        }
+      }
+    });
+
+    return photos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [reports]);
+
+  const handleDownloadImage = async (url: string, filename: string) => {
+    try {
+      if (url.startsWith('data:')) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      }
+      
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
   // 2. Aggregate All 7 Trantibum Dimensions per Kepling
   const keplingTrantibData = useMemo(() => {
@@ -643,7 +724,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                 Monitoring Dokumentasi Foto Poskamling (Per Kepling / Per Hari)
               </span>
             </div>
-            <div className="inline-flex p-1 rounded-xl bg-slate-200/80 text-xs font-extrabold gap-1">
+            <div className="inline-flex p-1 rounded-xl bg-slate-200/80 text-xs font-extrabold gap-1 flex-wrap">
               <button
                 type="button"
                 onClick={() => setPoskamlingDisplayMode('gallery')}
@@ -665,6 +746,17 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                 }`}
               >
                 <span>📊 Tabel Operasional</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPoskamlingDisplayMode('unduh_mingguan')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                  poskamlingDisplayMode === 'unduh_mingguan'
+                    ? 'bg-amber-800 text-white shadow-xs font-black'
+                    : 'text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                <span>📥 Unduh Foto (1 Minggu Terakhir)</span>
               </button>
             </div>
           </div>
@@ -860,6 +952,69 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                 ))}
               </tbody>
             </table>
+          )}
+
+          {/* TAB 1b: POSKAMLING - DOWNLOAD GALERI 1 MINGGU TERAKHIR */}
+          {subView === 'poskamling' && poskamlingDisplayMode === 'unduh_mingguan' && (
+            <div className="p-5 sm:p-6 bg-slate-50/50">
+              <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-950 p-4 rounded-xl flex items-start gap-2.5">
+                <Info className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <p className="font-black">💡 Galeri Unduh Cepat Laporan Poskamling (7 Hari Terakhir)</p>
+                  <p className="mt-0.5 text-slate-700">Berikut adalah daftar lengkap seluruh gambar/dokumentasi poskamling yang dilaporkan oleh 24 Kepala Lingkungan selama 1 minggu terakhir. Anda dapat mengunduh setiap gambar secara langsung satu per satu dengan tombol unduh di bawah gambar.</p>
+                </div>
+              </div>
+
+              {lastWeekPoskamlingPhotos.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {lastWeekPoskamlingPhotos.map((photo, pIdx) => {
+                    const downloadFileName = `POSKAMLING_${photo.keplingNama.replace(/\s+/g, '_')}_${photo.date.replace(/\s+/g, '_')}.png`;
+                    return (
+                      <div key={pIdx} className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col justify-between shadow-2xs hover:shadow-md transition-all">
+                        <div>
+                          <div className="relative aspect-4/3 bg-slate-100 overflow-hidden group">
+                            <img
+                              src={photo.url}
+                              alt={photo.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/60 text-white font-bold text-[10px]">
+                              {photo.date}
+                            </span>
+                          </div>
+                          <div className="p-3 space-y-1">
+                            <div className="flex items-center justify-between text-[11px] font-black">
+                              <span className="text-slate-900">{photo.keplingNama}</span>
+                              <span className="text-amber-700 text-[10px]">{photo.lingkungan}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 italic line-clamp-2">
+                              "{photo.notes}"
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="p-3 pt-0">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadImage(photo.url, downloadFileName)}
+                            className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg bg-amber-800 hover:bg-amber-900 text-white font-black text-xs transition-colors cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Unduh Gambar</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-white rounded-2xl border border-slate-200">
+                  <Camera className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-slate-600">Tidak ada gambar poskamling diunggah</p>
+                  <p className="text-xs text-slate-400 mt-1">Belum ada laporan poskamling dengan dokumentasi foto selama 1 minggu terakhir.</p>
+                </div>
+              )}
+            </div>
           )}
 
           {/* TAB 2: INFRASTRUKTUR */}

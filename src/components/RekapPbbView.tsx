@@ -1284,7 +1284,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       )}
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isKepling ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-4`}>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Ketetapan (Target)</span>
@@ -1347,24 +1347,27 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/40 to-white shadow-2xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Progres Bulanan (PBB)</span>
-            <div className="p-2 bg-indigo-100 text-indigo-700 rounded-xl">
-              <Calendar className="w-4 h-4" />
+        {/* Progres Bulanan PBB (Hanya untuk Super Admin / Kasi Pemerintahan, disembunyikan untuk Akun Kepling) */}
+        {!isKepling && (
+          <div className="bg-white p-5 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/40 to-white shadow-2xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Progres Bulanan (PBB)</span>
+              <div className="p-2 bg-indigo-100 text-indigo-700 rounded-xl">
+                <Calendar className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-lg sm:text-xl font-black text-indigo-900">
+              {formatRupiah(monthlyProgress.nominalBulanIni)}
+            </div>
+            <div className="flex items-center gap-1 text-[11px] font-black text-emerald-600">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <span>+{monthlyProgress.persentaseKenaikan.toFixed(1)}% Dari Bulan Lalu</span>
+            </div>
+            <div className="text-[10px] text-slate-500 font-medium leading-tight pt-1">
+              Realisasi bulan ini tumbuh konsisten didukung sinkronisasi aktif kepling.
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-black text-indigo-900">
-            {formatRupiah(monthlyProgress.nominalBulanIni)}
-          </div>
-          <div className="flex items-center gap-1 text-[11px] font-black text-emerald-600">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <span>+{monthlyProgress.persentaseKenaikan.toFixed(1)}% Dari Bulan Lalu</span>
-          </div>
-          <div className="text-[10px] text-slate-500 font-medium leading-tight pt-1">
-            Realisasi bulan ini tumbuh konsisten didukung sinkronisasi aktif kepling.
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Dedikasi Perbandingan Wajib Pajak Panel */}

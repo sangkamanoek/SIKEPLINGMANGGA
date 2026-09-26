@@ -424,6 +424,64 @@ export function isReportMatchingKepling(
   return false;
 }
 
+/**
+ * Validasi presisi apakah entri kunjungan warga door-to-door milik akun Kepling / Lingkungan tertentu.
+ */
+export function isKunjunganMatchingKepling(
+  kj: any,
+  kepling: { id: string; nama: string; nomorLingkungan?: number; jabatan?: string; lingkungan?: string }
+): boolean {
+  if (!kj || !kepling) return false;
+
+  const targetNomor =
+    kepling.nomorLingkungan ||
+    extractNomorLingkungan(kepling.lingkungan) ||
+    extractNomorLingkungan(kepling.jabatan) ||
+    extractNomorLingkungan(kepling.id);
+
+  // 1. Pencocokan ID Kepling / ID Lingkungan
+  if (kj.keplingId && kepling.id) {
+    const kjId = String(kj.keplingId).toLowerCase().replace(/_/g, '');
+    const kId = String(kepling.id).toLowerCase().replace(/_/g, '');
+    if (kjId === kId) return true;
+    const kjNum = String(kj.keplingId).replace(/[^0-9]/g, '');
+    const kNum = String(kepling.id).replace(/[^0-9]/g, '');
+    if (kjNum && kNum && parseInt(kjNum, 10) === parseInt(kNum, 10)) return true;
+  }
+  if (kj.lingkunganId && kepling.id) {
+    const kjLId = String(kj.lingkunganId).toLowerCase().replace(/_/g, '');
+    const kId = String(kepling.id).toLowerCase().replace(/_/g, '');
+    if (kjLId === kId) return true;
+  }
+
+  // 2. Pencocokan nomor lingkungan eksak (1 s/d 24)
+  const kjLingkunganNum =
+    (kj.lingkunganNomor !== undefined && kj.lingkunganNomor !== null && kj.lingkunganNomor !== '' ? Number(kj.lingkunganNomor) : null) ||
+    extractNomorLingkungan(kj.lingkungan) ||
+    extractNomorLingkungan(kj.lingkunganNama) ||
+    extractNomorLingkungan(kj.keplingId);
+
+  if (kjLingkunganNum !== null && targetNomor !== null && targetNomor !== undefined) {
+    if (kjLingkunganNum === targetNomor) return true;
+  }
+
+  // 3. Pencocokan nama Kepling
+  const kName = (kepling.nama || '').trim().toLowerCase();
+  if (kName) {
+    if (kj.namaKepling && String(kj.namaKepling).trim().toLowerCase() === kName) return true;
+    if (kj.createdByName && String(kj.createdByName).trim().toLowerCase() === kName) return true;
+  }
+
+  // 4. Pencocokan string nama lingkungan
+  const kLingkungan = (kepling.lingkungan || '').trim().toLowerCase();
+  if (kLingkungan) {
+    if (kj.lingkungan && String(kj.lingkungan).trim().toLowerCase() === kLingkungan) return true;
+    if (kj.lingkunganNama && String(kj.lingkunganNama).trim().toLowerCase() === kLingkungan) return true;
+  }
+
+  return false;
+}
+
 const INT_TO_ROMAN: Record<number, string> = {
   1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V',
   6: 'VI', 7: 'VII', 8: 'VIII', 9: 'IX', 10: 'X',

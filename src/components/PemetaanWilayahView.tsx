@@ -84,6 +84,13 @@ import {
   detectStreetAndGangOverlay,
   StreetOverlayResult,
 } from '../lib/geoService';
+import {
+  getLocalSpptForYear,
+  stripNonDigits,
+  DEFAULT_PBB_YEAR,
+  fetchPbbSpptFromFirestore,
+} from '../lib/pbbService';
+import { SpptPbbItem } from '../data/pbbSampleData';
 import * as XLSX from 'xlsx';
 
 interface PemetaanWilayahViewProps {
@@ -299,6 +306,104 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     if (digits.length >= 13) res += '-' + digits.slice(13, 17);
     if (digits.length >= 17) res += '.' + digits.slice(17, 18);
     return res;
+  };
+
+  // Realisasi SPPT PBB Items for Auto-matching NOP, Ketetapan, & Status Bayar
+  const [pbbSpptList, setPbbSpptList] = useState<SpptPbbItem[]>(() => {
+    return getLocalSpptForYear(DEFAULT_PBB_YEAR);
+  });
+  const [matchedPbbItem, setMatchedPbbItem] = useState<SpptPbbItem | null>(null);
+  const [isPbbPickerOpen, setIsPbbPickerOpen] = useState(false);
+  const [pbbPickerSearch, setPbbPickerSearch] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+    const l2026 = getLocalSpptForYear(2026);
+    const l2025 = getLocalSpptForYear(2025);
+    const combined = [...l2026, ...l2025.filter((i) => !l2026.some((j) => j.nop === i.nop))];
+    if (combined.length > 0) {
+      setPbbSpptList(combined);
+    }
+    fetchPbbSpptFromFirestore(DEFAULT_PBB_YEAR)
+      .then((remote) => {
+        if (isMounted && Array.isArray(remote) && remote.length > 0) {
+          setPbbSpptList((prev) => {
+            const merged = [...remote];
+            prev.forEach((p) => {
+              if (!merged.some((m) => m.nop === p.nop)) {
+                merged.push(p);
+              }
+            });
+            return merged;
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Filtered NOP suggestions for quick autocomplete
+  const pbbNopSuggestions = useMemo(() => {
+    const targetLingId = houseForm.lingkunganId;
+    const lingNum = Number(targetLingId.replace(/\D/g, '')) || (isKepling ? currentUser.nomorLingkungan : undefined);
+    let list = pbbSpptList;
+    if (lingNum) {
+      const lingFiltered = pbbSpptList.filter((i) => i.lingkungan === lingNum);
+      if (lingFiltered.length > 0) list = lingFiltered;
+    }
+    return list;
+  }, [pbbSpptList, houseForm.lingkunganId, isKepling, currentUser.nomorLingkungan]);
+
+  const handleApplySpptToHouse = (sppt: SpptPbbItem) => {
+    setMatchedPbbItem(sppt);
+    const statusMap: StatusPbb = sppt.status === 'Sudah Bayar' ? 'LUNAS' : 'BELUM_LUNAS';
+    setHouseForm((prev) => ({
+      ...prev,
+      nopPbb: formatNopPbb(sppt.nop),
+      statusPbb: statusMap,
+      nominalPbb: sppt.pbbTerutang || prev.nominalPbb,
+      tahunPbb: prev.tahunPbb || DEFAULT_PBB_YEAR,
+      namaKepalaKeluarga: prev.namaKepalaKeluarga.trim() ? prev.namaKepalaKeluarga : sppt.namaWp,
+      namaJalan: prev.namaJalan.trim() ? prev.namaJalan : sppt.alamatOp,
+    }));
+    setIsPbbPickerOpen(false);
+    onShowToast?.(`✅ Data PBB Terhubung: ${sppt.namaWp} (Status: ${sppt.status})`, 'success');
+  };
+
+  const handleNopPbbChange = (val: string) => {
+    const formatted = formatNopPbb(val);
+    const cleanDigits = stripNonDigits(val);
+
+    let match: SpptPbbItem | undefined;
+    if (cleanDigits.length >= 8) {
+      match = pbbSpptList.find((item) => {
+        const itemClean = stripNonDigits(item.nop);
+        return itemClean === cleanDigits || (cleanDigits.length >= 10 && itemClean.endsWith(cleanDigits));
+      });
+    }
+
+    setMatchedPbbItem(match || null);
+
+    setHouseForm((prev) => {
+      if (match) {
+        const statusMap: StatusPbb = match.status === 'Sudah Bayar' ? 'LUNAS' : 'BELUM_LUNAS';
+        return {
+          ...prev,
+          nopPbb: formatted,
+          statusPbb: statusMap,
+          nominalPbb: match.pbbTerutang || prev.nominalPbb,
+          tahunPbb: prev.tahunPbb || DEFAULT_PBB_YEAR,
+          namaKepalaKeluarga: prev.namaKepalaKeluarga.trim() ? prev.namaKepalaKeluarga : match.namaWp,
+          namaJalan: prev.namaJalan.trim() ? prev.namaJalan : match.alamatOp,
+        };
+      }
+      return {
+        ...prev,
+        nopPbb: formatted,
+      };
+    });
   };
 
   // Add Road Form Modal
@@ -1734,6 +1839,8 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                 setHouseForm(getEmptyHouseFormData(isKepling ? currentUser.id : 'kepling_1'));
                 setGoogleMapsUrlInput('');
                 setDetectedStreetOverlay(null);
+                setMatchedPbbItem(null);
+                setIsPbbPickerOpen(false);
                 setIsHouseModalOpen(true);
               }}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md cursor-pointer transition-transform hover:scale-[1.02]"
@@ -2602,6 +2709,16 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                       kategoriBangunan: selectedHouse.kategoriBangunan || 'RUMAH_TINGGAL',
                       jenisFasilitas: selectedHouse.jenisFasilitas || '',
                     });
+                    const cleanD = stripNonDigits(selectedHouse.nopPbb || '');
+                    if (cleanD.length >= 8) {
+                      const match = pbbSpptList.find(
+                        (i) => stripNonDigits(i.nop) === cleanD || (cleanD.length >= 10 && stripNonDigits(i.nop).endsWith(cleanD))
+                      );
+                      setMatchedPbbItem(match || null);
+                    } else {
+                      setMatchedPbbItem(null);
+                    }
+                    setIsPbbPickerOpen(false);
                     setIsHouseModalOpen(true);
                   }}
                   className="flex-1 py-1.5 rounded-xl bg-slate-800 text-white font-bold text-xs hover:bg-slate-700 text-center cursor-pointer"
@@ -3450,47 +3567,190 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                 </div>
 
                 {/* NOP, Ketetapan, Tahun */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div className="sm:col-span-1">
-                    <label className="block font-bold text-slate-700 mb-0.5">NOP PBB:</label>
-                    <input
-                      type="text"
-                      placeholder="12.75.010.009.001-0010.0"
-                      value={houseForm.nopPbb}
-                      onChange={(e) => setHouseForm((prev) => ({ ...prev, nopPbb: formatNopPbb(e.target.value) }))}
-                      className="w-full p-2 rounded-xl border border-slate-300 font-mono text-xs"
-                    />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block font-bold text-slate-700 text-xs">
+                      NOP PBB: <span className="font-normal text-slate-500">(18 Digit)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPbbPickerSearch('');
+                        setIsPbbPickerOpen(!isPbbPickerOpen);
+                      }}
+                      className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100 hover:bg-emerald-200 px-2 py-0.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-3xs"
+                    >
+                      <Search className="w-3 h-3" />
+                      <span>{isPbbPickerOpen ? 'Tutup Daftar' : 'Cari di Database PBB'}</span>
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-0.5">Ketetapan (Rp):</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1000"
-                      placeholder="misal: 150000"
-                      value={houseForm.nominalPbb}
-                      onChange={(e) =>
-                        setHouseForm((prev) => ({ ...prev, nominalPbb: e.target.value === '' ? '' : +e.target.value }))
-                      }
-                      className="w-full p-2 rounded-xl border border-slate-300 font-bold text-xs"
-                    />
+                  {/* NOP Picker Dropdown / Search panel if open */}
+                  {isPbbPickerOpen && (
+                    <div className="p-3 bg-white rounded-2xl border-2 border-emerald-400 shadow-xl space-y-2 animate-fade-in">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-800 border-b border-slate-100 pb-1.5">
+                        <span className="flex items-center gap-1.5 text-emerald-900">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          Pilih SPPT Realisasi PBB:
+                        </span>
+                        <span className="text-[10px] text-slate-500">{pbbNopSuggestions.length} Data Tersedia</span>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Ketik nama WP, NOP, atau alamat objek..."
+                        value={pbbPickerSearch}
+                        onChange={(e) => setPbbPickerSearch(e.target.value)}
+                        className="w-full p-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500"
+                        autoFocus
+                      />
+                      <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 space-y-1 pr-1 custom-scrollbar">
+                        {pbbNopSuggestions
+                          .filter((s) => {
+                            if (!pbbPickerSearch.trim()) return true;
+                            const q = pbbPickerSearch.toLowerCase();
+                            return (
+                              s.nop.toLowerCase().includes(q) ||
+                              s.namaWp.toLowerCase().includes(q) ||
+                              s.alamatOp.toLowerCase().includes(q)
+                            );
+                          })
+                          .slice(0, 20)
+                          .map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => handleApplySpptToHouse(s)}
+                              className="w-full text-left p-2 rounded-xl hover:bg-emerald-50 transition-colors flex items-center justify-between gap-2 cursor-pointer border border-transparent hover:border-emerald-200"
+                            >
+                              <div className="truncate flex-1">
+                                <p className="font-bold text-slate-900 text-xs truncate">{s.namaWp}</p>
+                                <p className="font-mono text-[10px] text-slate-500">{formatNopPbb(s.nop)}</p>
+                                <p className="text-[10px] text-slate-600 truncate">{s.alamatOp}</p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span
+                                  className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                                    s.status === 'Sudah Bayar'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-rose-100 text-rose-800'
+                                  }`}
+                                >
+                                  {s.status === 'Sudah Bayar' ? 'LUNAS' : 'BELUM'}
+                                </span>
+                                <p className="text-[11px] font-bold text-slate-800 mt-0.5">
+                                  Rp {s.pbbTerutang?.toLocaleString('id-ID')}
+                                </p>
+                              </div>
+                            </button>
+                          ))}
+                        {pbbNopSuggestions.length === 0 && (
+                          <p className="text-xs text-slate-400 text-center py-2">Belum ada data SPPT di lingkungan ini.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="sm:col-span-1">
+                      <input
+                        type="text"
+                        list="pbb-nop-datalist"
+                        placeholder="12.75.010.009.001-0010.0"
+                        value={houseForm.nopPbb}
+                        onChange={(e) => handleNopPbbChange(e.target.value)}
+                        className="w-full p-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <datalist id="pbb-nop-datalist">
+                        {pbbNopSuggestions.slice(0, 50).map((s) => (
+                          <option key={s.id} value={formatNopPbb(s.nop)}>
+                            {s.namaWp} - Rp {s.pbbTerutang?.toLocaleString('id-ID')} ({s.status})
+                          </option>
+                        ))}
+                      </datalist>
+                    </div>
+
+                    <div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        placeholder="Ketetapan (Rp)"
+                        value={houseForm.nominalPbb}
+                        onChange={(e) =>
+                          setHouseForm((prev) => ({ ...prev, nominalPbb: e.target.value === '' ? '' : +e.target.value }))
+                        }
+                        className="w-full p-2 rounded-xl border border-slate-300 font-bold text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <input
+                        type="number"
+                        min="2020"
+                        max="2030"
+                        placeholder="Tahun (2026)"
+                        value={houseForm.tahunPbb}
+                        onChange={(e) =>
+                          setHouseForm((prev) => ({ ...prev, tahunPbb: e.target.value === '' ? '' : +e.target.value }))
+                        }
+                        className="w-full p-2 rounded-xl border border-slate-300 font-bold text-xs"
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-0.5">Tahun Pajak:</label>
-                    <input
-                      type="number"
-                      min="2020"
-                      max="2030"
-                      placeholder="misal: 2026"
-                      value={houseForm.tahunPbb}
-                      onChange={(e) =>
-                        setHouseForm((prev) => ({ ...prev, tahunPbb: e.target.value === '' ? '' : +e.target.value }))
-                      }
-                      className="w-full p-2 rounded-xl border border-slate-300 font-bold text-xs"
-                    />
-                  </div>
+                  {/* Realtime PBB Match Feedback Card */}
+                  {matchedPbbItem ? (
+                    <div className="p-3 rounded-2xl bg-emerald-50/90 border border-emerald-300 text-xs text-emerald-950 flex items-start gap-2.5 shadow-2xs animate-fade-in">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center justify-between gap-1 flex-wrap">
+                          <span className="font-black text-emerald-900 text-xs">
+                            ✅ NOP Terhubung ke Realisasi PBB
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-md font-black text-[10px] uppercase shadow-2xs ${
+                              matchedPbbItem.status === 'Sudah Bayar'
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-rose-600 text-white'
+                            }`}
+                          >
+                            {matchedPbbItem.status === 'Sudah Bayar' ? '🟢 SUDAH LUNAS' : '🔴 BELUM LUNAS'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-800">
+                          Wajib Pajak: <strong>{matchedPbbItem.namaWp}</strong> • Ketetapan: <strong>Rp {matchedPbbItem.pbbTerutang?.toLocaleString('id-ID')}</strong>
+                        </p>
+                        <p className="text-[10px] text-slate-600 truncate">
+                          Alamat Objek: {matchedPbbItem.alamatOp}
+                        </p>
+                        <div className="flex gap-2 pt-1 flex-wrap">
+                          {houseForm.namaKepalaKeluarga !== matchedPbbItem.namaWp && (
+                            <button
+                              type="button"
+                              onClick={() => setHouseForm((prev) => ({ ...prev, namaKepalaKeluarga: matchedPbbItem.namaWp }))}
+                              className="px-2 py-0.5 bg-emerald-200 hover:bg-emerald-300 text-emerald-900 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                            >
+                              Gunakan Nama WP: {matchedPbbItem.namaWp}
+                            </button>
+                          )}
+                          {houseForm.namaJalan !== matchedPbbItem.alamatOp && (
+                            <button
+                              type="button"
+                              onClick={() => setHouseForm((prev) => ({ ...prev, namaJalan: matchedPbbItem.alamatOp }))}
+                              className="px-2 py-0.5 bg-emerald-200 hover:bg-emerald-300 text-emerald-900 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                            >
+                              Gunakan Alamat OP: {matchedPbbItem.alamatOp}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : stripNonDigits(houseForm.nopPbb).length >= 10 ? (
+                    <div className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-[11px] text-slate-600 flex items-center gap-1.5">
+                      <Info className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span>NOP belum terdaftar di tabel SPPT PBB (Ketetapan &amp; status bayar tetap bisa diatur manual).</span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

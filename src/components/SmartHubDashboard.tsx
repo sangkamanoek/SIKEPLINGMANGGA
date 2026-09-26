@@ -253,6 +253,12 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
     (a) => a.tanggal.startsWith(todayStr) && a.status === 'Hadir'
   ).length;
 
+  const isPbbAllowed =
+    isKepling ||
+    isAdmin ||
+    activeAccount.role === 'kasi_pemerintahan' ||
+    activeAccount.role === 'petugas_bapenda';
+
   // Define menu items for UIX filtering
   const menuItems = isBapenda
     ? [
@@ -324,7 +330,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
           badgeColor: 'bg-amber-100 text-amber-800',
           action: () => onNavigate(isKepling ? 'capaian' : 'capaian_admin')
         },
-        {
+        ...(isPbbAllowed ? [{
           id: 'pbb_lingkungan',
           title: isKepling ? `Data PBB Lingkungan ${activeAccount.nomorLingkungan || ''}` : `Rekapitulasi Realisasi PBB ${pbbYear}`,
           desc: isKepling
@@ -336,7 +342,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
           badge: isKepling ? 'PBB LINGKUNGAN' : `PBB ${pbbYear}`,
           badgeColor: 'bg-emerald-100 text-emerald-800',
           action: () => onNavigate('rekap_pbb')
-        },
+        }] : []),
         {
           id: 'kegiatan_khusus',
           title: 'Absensi Kegiatan Khusus',
@@ -515,46 +521,48 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
             </div>
 
             {/* Bento Card 2: Capaian & Target Realisasi PBB (Kanan Bawah-style) */}
-            <div 
-              onClick={() => onNavigate('rekap_pbb')}
-              className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
-            >
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] uppercase font-black tracking-widest text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                    📊 Realisasi PBB-P2 {isKepling && activeAccount.nomorLingkungan ? `(Lingk. ${activeAccount.nomorLingkungan})` : `(${pbbYear})`}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-bold">
-                    {spptList.length > 0 ? 'Live Database' : 'Siap Input'}
-                  </span>
+            {isPbbAllowed && (
+              <div 
+                onClick={() => onNavigate('rekap_pbb')}
+                className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] uppercase font-black tracking-widest text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                      📊 Realisasi PBB-P2 {isKepling && activeAccount.nomorLingkungan ? `(Lingk. ${activeAccount.nomorLingkungan})` : `(${pbbYear})`}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-bold">
+                      {spptList.length > 0 ? 'Live Database' : 'Siap Input'}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
+                    Capaian Penerimaan PBB
+                  </h3>
+                  
+                  {/* Custom bar chart representation */}
+                  <div className="pt-2 space-y-2">
+                    <div className="flex items-end justify-between text-xs font-black">
+                      <span className="text-slate-500">Kolektivitas PBB</span>
+                      <span className="text-indigo-600 text-sm">{pbbSummary.percent.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                      <div 
+                        className="h-full bg-indigo-600 rounded-full transition-all duration-1000 group-hover:bg-indigo-500"
+                        style={{ width: `${Math.min(100, pbbSummary.percent)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-slate-600 font-bold pt-1 leading-none">
+                      <span className="text-emerald-700">Lunas: {pbbSummary.lunasCount.toLocaleString('id-ID')} WP</span>
+                      <span className="text-slate-500">Target: {pbbSummary.totalCount.toLocaleString('id-ID')} WP</span>
+                    </div>
+                  </div>
                 </div>
-                <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
-                  Capaian Penerimaan PBB
-                </h3>
-                
-                {/* Custom bar chart representation */}
-                <div className="pt-2 space-y-2">
-                  <div className="flex items-end justify-between text-xs font-black">
-                    <span className="text-slate-500">Kolektivitas PBB</span>
-                    <span className="text-indigo-600 text-sm">{pbbSummary.percent.toFixed(1)}%</span>
-                  </div>
-                  <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                    <div 
-                      className="h-full bg-indigo-600 rounded-full transition-all duration-1000 group-hover:bg-indigo-500"
-                      style={{ width: `${Math.min(100, pbbSummary.percent)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[10px] text-slate-600 font-bold pt-1 leading-none">
-                    <span className="text-emerald-700">Lunas: {pbbSummary.lunasCount.toLocaleString('id-ID')} WP</span>
-                    <span className="text-slate-500">Target: {pbbSummary.totalCount.toLocaleString('id-ID')} WP</span>
-                  </div>
-                </div>
-              </div>
 
-              <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-indigo-600 group-hover:text-indigo-500">
-                <span>Kelola SPPT PBB-P2 →</span>
+                <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-indigo-600 group-hover:text-indigo-500">
+                  <span>Kelola SPPT PBB-P2 →</span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Bento Card 3: Radar Kepatuhan Harian & Presensi (Kanan Atas-style) */}
             <div 

@@ -23,7 +23,9 @@ import {
   logout,
   setAccessToken,
   getAccessToken,
+  db,
 } from './lib/firebase';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import {
   getOrCreateSpreadsheet,
   appendLaporanToSheet,
@@ -192,6 +194,13 @@ export default function App() {
   useEffect(() => {
     if (activeAccount.role === 'petugas_bapenda' && activeTab !== 'rekap_pbb') {
       setActiveTab('rekap_pbb');
+    }
+    if (
+      (activeAccount.role === 'kasi_trantibum' || activeAccount.role === 'kasi_pembangunan') &&
+      activeTab === 'rekap_pbb'
+    ) {
+      setActiveTab('dashboard_kasi');
+      showToast('Akses Dibatasi: Anda tidak memiliki izin untuk melihat Rekapitulasi PBB.', 'error');
     }
   }, [activeAccount.role, activeTab]);
 
@@ -446,7 +455,35 @@ export default function App() {
       }
     });
 
-    // Single lightweight fetch for kunjungan (strips base64 photos to save Vercel bandwidth)
+    // Subscribe to real-time kunjungan_warga directly from Firebase Firestore
+    let unsubscribeKunjungan: (() => void) | null = null;
+    if (db) {
+      try {
+        const qKunjungan = query(collection(db, 'kunjungan_warga'), orderBy('createdAt', 'desc'));
+        unsubscribeKunjungan = onSnapshot(
+          qKunjungan,
+          (snapshot) => {
+            const firestoreItems: any[] = [];
+            snapshot.forEach((doc) => {
+              firestoreItems.push({ id: doc.id, ...doc.data() });
+            });
+            if (firestoreItems.length > 0) {
+              setKunjunganList(firestoreItems);
+              try {
+                safeSetLocalStorage('sikepling_kunjungan_harian_list_v1', JSON.stringify(firestoreItems));
+              } catch {}
+            }
+          },
+          (err) => {
+            console.warn('Firestore snapshot error on kunjungan_warga in App:', err);
+          }
+        );
+      } catch (err) {
+        console.warn('Error subscribing kunjungan_warga in App:', err);
+      }
+    }
+
+    // Single lightweight fetch for kunjungan as fast fallback
     fetch(`/api/kunjungan?light=true&_t=${Date.now()}`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((json) => {
@@ -514,6 +551,7 @@ export default function App() {
       unsubscribeAttendance();
       unsubscribeEvents();
       unsubscribeEventAttendance();
+      if (unsubscribeKunjungan) unsubscribeKunjungan();
       clearInterval(pollNotifications);
       clearInterval(fastSyncInterval);
       unsubscribe();

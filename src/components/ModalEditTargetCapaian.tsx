@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { KeplingTargetCapaian, TargetsCapaianMap, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
-import { DEFAULT_PERLINSOS_TARGETS } from '../data/targetsData';
+import { DEFAULT_PERLINSOS_TARGETS, DEFAULT_BPJS_BASELINES } from '../data/targetsData';
 
 interface ModalEditTargetCapaianProps {
   isOpen: boolean;
@@ -45,6 +45,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
   onResetDefaults,
 }) => {
   const [activeTab, setActiveTab] = useState<'single' | 'bulk'>('single');
+  const [bulkCategory, setBulkCategory] = useState<'bpjs' | 'perlinsos'>('bpjs');
   const [currentKeplingId, setCurrentKeplingId] = useState<string>('kepling_1');
   const [isSaving, setIsSaving] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -53,7 +54,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
   const [targetPerlinsos, setTargetPerlinsos] = useState<number>(300);
   const [targetPbb, setTargetPbb] = useState<number>(100);
   const [targetIkd, setTargetIkd] = useState<number>(50);
-  const [targetBpjs, setTargetBpjs] = useState<number>(10);
+  const [targetBpjs, setTargetBpjs] = useState<number>(50);
 
   const [useOverridePerlinsos, setUseOverridePerlinsos] = useState<boolean>(false);
   const [overridePerlinsos, setOverridePerlinsos] = useState<string>('');
@@ -97,7 +98,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
       setTargetPerlinsos(config.targetPerlinsos ?? 300);
       setTargetPbb(config.targetPbb ?? 100);
       setTargetIkd(config.targetIkd ?? 50);
-      setTargetBpjs(config.targetBpjs ?? 10);
+      setTargetBpjs(config.targetBpjs ?? 50);
 
       if (config.overridePerlinsos !== null && config.overridePerlinsos !== undefined) {
         setUseOverridePerlinsos(true);
@@ -698,15 +699,73 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
           {/* ========================================================================= */}
           {activeTab === 'bulk' && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+              {/* Category Selector Bar */}
+              <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+                <button
+                  type="button"
+                  onClick={() => setBulkCategory('bpjs')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                    bulkCategory === 'bpjs'
+                      ? 'bg-teal-800 text-white shadow-md ring-2 ring-teal-600'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <Shield className="w-4 h-4 text-amber-300" />
+                  <span>Daftar Target BPJS Ketenagakerjaan (50 Orang / Kepling)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkCategory('perlinsos')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                    bulkCategory === 'perlinsos'
+                      ? 'bg-blue-800 text-white shadow-md ring-2 ring-blue-600'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4 text-blue-300" />
+                  <span>Daftar Target PERLINSOS (8.539 KK)</span>
+                </button>
+              </div>
+
+              {/* Banner Info */}
+              <div
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border rounded-2xl p-4 ${
+                  bulkCategory === 'bpjs'
+                    ? 'bg-teal-50/80 border-teal-200'
+                    : 'bg-amber-50 border-amber-200'
+                }`}
+              >
                 <div className="flex items-center gap-2.5">
-                  <Target className="w-5 h-5 text-amber-700 shrink-0" />
+                  <Target
+                    className={`w-5 h-5 shrink-0 ${
+                      bulkCategory === 'bpjs' ? 'text-teal-700' : 'text-amber-700'
+                    }`}
+                  />
                   <div>
                     <h5 className="font-black text-slate-900 text-sm">
-                      Daftar Target PERLINSOS 24 Kepala Lingkungan
+                      {bulkCategory === 'bpjs'
+                        ? 'Daftar Target BPJS TK 24 Kepala Lingkungan'
+                        : 'Daftar Target PERLINSOS 24 Kepala Lingkungan'}
                     </h5>
-                    <p className="text-xs text-amber-900">
-                      Total Target Kelurahan Mangga: <strong className="text-slate-950">8.501 KK</strong>. Anda dapat mengedit target atau override capaian langsung di tabel di bawah.
+                    <p
+                      className={`text-xs ${
+                        bulkCategory === 'bpjs' ? 'text-teal-900' : 'text-amber-900'
+                      }`}
+                    >
+                      {bulkCategory === 'bpjs' ? (
+                        <>
+                          Target resmi setiap Kepling Tahun 2026 adalah{' '}
+                          <strong className="text-slate-950">50 Orang</strong> (Total Kelurahan:{' '}
+                          <strong className="text-slate-950">1.200 Orang</strong>). Total Capaian Saat Ini:{' '}
+                          <strong className="text-slate-950">173 Orang</strong>.
+                        </>
+                      ) : (
+                        <>
+                          Total Target Kelurahan Mangga:{' '}
+                          <strong className="text-slate-950">8.539 KK</strong>. Anda dapat mengedit
+                          target atau override capaian langsung di tabel di bawah.
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -716,8 +775,12 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                     type="button"
                     onClick={handleResetToOfficialDefaults}
                     disabled={isSaving}
-                    className="px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                    title="Kembalikan ke 24 target resmi yang diberikan (429, 330, 342, ...)"
+                    className={`px-3 py-1.5 rounded-xl bg-white border font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer ${
+                      bulkCategory === 'bpjs'
+                        ? 'border-teal-300 text-teal-900 hover:bg-teal-100'
+                        : 'border-amber-300 text-amber-900 hover:bg-amber-100'
+                    }`}
+                    title="Kembalikan target ke standar resmi"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Reset Target Resmi</span>
@@ -742,9 +805,19 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                       <tr>
                         <th className="p-3 text-center w-12">No</th>
                         <th className="p-3">Lingkungan & Nama</th>
-                        <th className="p-3 text-center w-36">Target PERLINSOS (KK)</th>
-                        <th className="p-3 text-center w-32">Laporan (KK)</th>
-                        <th className="p-3 text-center w-40">Override Capaian (KK)</th>
+                        <th className="p-3 text-center w-36">
+                          {bulkCategory === 'bpjs'
+                            ? 'Target BPJS TK (Orang)'
+                            : 'Target PERLINSOS (KK)'}
+                        </th>
+                        <th className="p-3 text-center w-32">
+                          {bulkCategory === 'bpjs' ? 'Laporan (Orang)' : 'Laporan (KK)'}
+                        </th>
+                        <th className="p-3 text-center w-40">
+                          {bulkCategory === 'bpjs'
+                            ? 'Override Capaian (Orang)'
+                            : 'Override Capaian (KK)'}
+                        </th>
                         <th className="p-3 text-center w-24">Aksi</th>
                       </tr>
                     </thead>
@@ -753,7 +826,9 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                         const rowConfig = bulkTargets[k.id] || {
                           keplingId: k.id,
                           targetPerlinsos: DEFAULT_PERLINSOS_TARGETS[index] ?? 300,
+                          targetBpjs: 50,
                           overridePerlinsos: null,
+                          overrideBpjs: DEFAULT_BPJS_BASELINES[index] ?? null,
                         };
                         const reported = reportedStatsMap[k.id] || {
                           pbb: 0,
@@ -762,9 +837,17 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                           bpjs: 0,
                           reportCount: 0,
                         };
+
+                        const isBpjs = bulkCategory === 'bpjs';
+                        const currentTarget = isBpjs
+                          ? rowConfig.targetBpjs ?? 50
+                          : rowConfig.targetPerlinsos ?? DEFAULT_PERLINSOS_TARGETS[index];
+                        const reportedVal = isBpjs ? reported.bpjs : reported.perlinsos;
+                        const currentOverride = isBpjs
+                          ? rowConfig.overrideBpjs
+                          : rowConfig.overridePerlinsos;
                         const isOverridden =
-                          rowConfig.overridePerlinsos !== null &&
-                          rowConfig.overridePerlinsos !== undefined;
+                          currentOverride !== null && currentOverride !== undefined;
 
                         return (
                           <tr key={k.id} className="hover:bg-slate-50/80 transition-colors">
@@ -779,7 +862,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                               <input
                                 type="number"
                                 min="0"
-                                value={rowConfig.targetPerlinsos ?? DEFAULT_PERLINSOS_TARGETS[index]}
+                                value={currentTarget}
                                 onChange={(e) => {
                                   const val = Number(e.target.value);
                                   setBulkTargets((prev) => ({
@@ -791,16 +874,20 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                                         lingkungan: k.lingkungan,
                                         nama: k.nama,
                                       }),
-                                      targetPerlinsos: val,
+                                      [isBpjs ? 'targetBpjs' : 'targetPerlinsos']: val,
                                     },
                                   }));
                                 }}
-                                className="w-28 px-2.5 py-1.5 text-center font-black text-sm bg-blue-50/60 border border-blue-300 rounded-lg text-blue-950 focus:outline-blue-600"
+                                className={`w-28 px-2.5 py-1.5 text-center font-black text-sm border rounded-lg focus:outline-emerald-600 ${
+                                  isBpjs
+                                    ? 'bg-teal-50/60 border-teal-300 text-teal-950'
+                                    : 'bg-blue-50/60 border-blue-300 text-blue-950'
+                                }`}
                               />
                             </td>
                             <td className="p-3 text-center font-bold text-slate-700">
                               <span className="px-2 py-1 bg-slate-100 rounded-lg">
-                                {reported.perlinsos} KK
+                                {reportedVal} {isBpjs ? 'Orang' : 'KK'}
                               </span>
                             </td>
                             <td className="p-3 text-center">
@@ -808,15 +895,15 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                                 <input
                                   type="number"
                                   min="0"
-                                  placeholder={String(reported.perlinsos)}
+                                  placeholder={String(reportedVal)}
                                   value={
-                                    rowConfig.overridePerlinsos !== null &&
-                                    rowConfig.overridePerlinsos !== undefined
-                                      ? rowConfig.overridePerlinsos
+                                    currentOverride !== null && currentOverride !== undefined
+                                      ? currentOverride
                                       : ''
                                   }
                                   onChange={(e) => {
-                                    const val = e.target.value === '' ? null : Number(e.target.value);
+                                    const val =
+                                      e.target.value === '' ? null : Number(e.target.value);
                                     setBulkTargets((prev) => ({
                                       ...prev,
                                       [k.id]: {
@@ -825,9 +912,8 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                                           nomorLingkungan: k.nomorLingkungan || index + 1,
                                           lingkungan: k.lingkungan,
                                           nama: k.nama,
-                                          targetPerlinsos: DEFAULT_PERLINSOS_TARGETS[index] ?? 300,
                                         }),
-                                        overridePerlinsos: val,
+                                        [isBpjs ? 'overrideBpjs' : 'overridePerlinsos']: val,
                                       },
                                     }));
                                   }}
@@ -845,7 +931,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                                         ...prev,
                                         [k.id]: {
                                           ...(prev[k.id] || {}),
-                                          overridePerlinsos: null,
+                                          [isBpjs ? 'overrideBpjs' : 'overridePerlinsos']: null,
                                         },
                                       }));
                                     }}

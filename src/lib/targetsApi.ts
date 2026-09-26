@@ -64,6 +64,21 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
   // 4. Fallback defaults resmi (Fresh baseline)
   if (!resultMap || Object.keys(resultMap).length === 0) {
     resultMap = getDefaultTargetsCapaianMap();
+  } else {
+    // Ensure default baselines for BPJS TK & targetBpjs = 50 if missing in existing stored map
+    const defaults = getDefaultTargetsCapaianMap();
+    Object.keys(defaults).forEach((k) => {
+      if (resultMap && resultMap[k]) {
+        if (resultMap[k].overrideBpjs === undefined || resultMap[k].overrideBpjs === null) {
+          resultMap[k].overrideBpjs = defaults[k].overrideBpjs;
+        }
+        if (!resultMap[k].targetBpjs || resultMap[k].targetBpjs < 50) {
+          resultMap[k].targetBpjs = 50;
+        }
+      } else if (resultMap) {
+        resultMap[k] = defaults[k];
+      }
+    });
   }
 
   safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(resultMap));

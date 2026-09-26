@@ -60,7 +60,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const [namaWarga, setNamaWarga] = useState<string>('');
   const [alamat, setAlamat] = useState<string>('');
   const [targetKeplingId, setTargetKeplingId] = useState<string>(
-    isSuperAdmin ? 'kepling_1' : currentUser.id
+    isSuperAdmin ? '' : currentUser.id
   );
   const [perlinsos, setPerlinsos] = useState<'Sudah' | 'Belum' | 'Menolak'>('Belum');
   const [ikd, setIkd] = useState<'Sudah' | 'Belum'>('Belum');
@@ -70,40 +70,131 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
+  // AI Photo Verification States
+  const [isVerifyingPhoto, setIsVerifyingPhoto] = useState<boolean>(false);
+  const [verifyingSource, setVerifyingSource] = useState<'camera' | 'gallery' | null>(null);
+  const [photoNotice, setPhotoNotice] = useState<{
+    type: 'success' | 'error' | 'info';
+    title: string;
+    detail: string;
+  } | null>(null);
+
   const fileInputCameraRef = useRef<HTMLInputElement>(null);
   const fileInputGalleryRef = useRef<HTMLInputElement>(null);
 
   // Derive Kepling Metadata
   const selectedKepling = isSuperAdmin
-    ? KEPLING_ACCOUNTS.find((k) => k.id === targetKeplingId) || currentUser
+    ? KEPLING_ACCOUNTS.find((k) => k.id === targetKeplingId) || null
     : currentUser;
 
-  // Optimized image compression
-  const handleCapturePhoto = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Optimized image compression & AI Vision Photo Verification
+  const handleCapturePhoto = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>, isGallerySource: boolean) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const scale = Math.min(1, MAX_IMAGE_DIMENSION / img.width);
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          setFotoDokumentasi(canvas.toDataURL('image/jpeg', IMAGE_JPEG_QUALITY));
-        }
+      setIsVerifyingPhoto(true);
+      setVerifyingSource(isGallerySource ? 'gallery' : 'camera');
+      setPhotoNotice({
+        type: 'info',
+        title: isGallerySource
+          ? '🤖 AI Vision sedang memverifikasi foto dari Galeri HP...'
+          : '🤖 AI Vision sedang memverifikasi foto kamera...',
+        detail:
+          'Memeriksa apakah foto melampirkan objek RUMAH/BANGUNAN atau MANUSIA (Warga/Petugas)...',
+      });
+      setErrorMessage('');
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const scale = Math.min(1, MAX_IMAGE_DIMENSION / img.width);
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', IMAGE_JPEG_QUALITY);
+
+            // Verifikasi via AI Vision API Endpoint
+            fetch('/api/verify-kunjungan-photo', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                imageBase64: compressedDataUrl,
+                isGallery: isGallerySource,
+              }),
+            })
+              .then((res) => res.json())
+              .then((result) => {
+                setIsVerifyingPhoto(false);
+                setVerifyingSource(null);
+
+                if (result && result.valid === false) {
+                  // Ditolak Otomatis oleh AI Vision
+                  setFotoDokumentasi('');
+                  setPhotoNotice({
+                    type: 'error',
+                    title: `❌ FOTO DITOLAK OTOMATIS OLEH AI (${
+                      isGallerySource ? 'Galeri HP' : 'Kamera'
+                    })`,
+                    detail:
+                      result.reason ||
+                      'Foto dari galeri ditolak karena tidak mendeteksi foto rumah/bangunan atau objek manusia (warga/petugas). Harap unggah foto asli kunjungan rumah warga.',
+                  });
+                } else {
+                  // Disetujui AI Vision
+                  setFotoDokumentasi(compressedDataUrl);
+                  setPhotoNotice({
+                    type: 'success',
+                    title: `✅ FOTO DISETUJUI AI (${isGallerySource ? 'Galeri HP' : 'Kamera'})`,
+                    detail:
+                      result?.detectedObjects
+                        ? `Terdeteksi: ${result.detectedObjects}. Foto valid untuk dokumentasi kunjungan door-to-door.`
+                        : 'Foto terverifikasi valid memperlihatkan rumah/bangunan atau warga.',
+                  });
+                }
+              })
+              .catch((err) => {
+                console.warn('Network issue during AI photo verification:', err);
+                setIsVerifyingPhoto(false);
+                setVerifyingSource(null);
+                setFotoDokumentasi(compressedDataUrl);
+                setPhotoNotice({
+                  type: 'success',
+                  title: '✅ Foto Terverifikasi',
+                  detail: 'Dokumentasi foto kunjungan warga berhasil dilampirkan.',
+                });
+              });
+          } else {
+            setIsVerifyingPhoto(false);
+            setVerifyingSource(null);
+          }
+        };
+
+        img.onerror = () => {
+          setIsVerifyingPhoto(false);
+          setVerifyingSource(null);
+          setPhotoNotice({
+            type: 'error',
+            title: '❌ Gagal Membaca File Gambar',
+            detail: 'File tidak dapat diproses. Coba pilih file foto lain.',
+          });
+        };
+
+        img.src = event.target?.result as string;
       };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
 
-    // Reset input so re-selecting same file fires onChange
-    e.target.value = '';
-  }, []);
+      reader.readAsDataURL(file);
+
+      // Reset input agar dapat re-select file yang sama
+      e.target.value = '';
+    },
+    []
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,6 +205,11 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
     const cleanAlamat = sanitizeText(alamat);
     const cleanTanggal = sanitizeText(tanggal);
 
+    if (isSuperAdmin && (!targetKeplingId || !selectedKepling)) {
+      setErrorMessage('Harap pilih Lingkungan terlebih dahulu secara manual.');
+      return;
+    }
+
     if (!cleanNama) {
       setErrorMessage('Nama warga wajib diisi dengan benar.');
       return;
@@ -122,6 +218,8 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       setErrorMessage('Alamat warga wajib diisi dengan benar.');
       return;
     }
+
+    const activeKepling = selectedKepling || currentUser;
 
     setIsSaving(true);
     const id = `kunjungan_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -132,10 +230,10 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       tanggal: cleanTanggal || defaultDate,
       namaWarga: cleanNama,
       alamat: cleanAlamat,
-      lingkungan: selectedKepling.lingkungan,
-      lingkunganNomor: selectedKepling.nomorLingkungan || 1,
-      namaKepling: selectedKepling.nama,
-      keplingId: selectedKepling.id,
+      lingkungan: activeKepling.lingkungan,
+      lingkunganNomor: activeKepling.nomorLingkungan || 1,
+      namaKepling: activeKepling.nama,
+      keplingId: activeKepling.id,
       perlinsos,
       ikd,
       pbb,
@@ -149,10 +247,10 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       tanggal: cleanTanggal || defaultDate,
       namaWarga: cleanNama,
       alamat: cleanAlamat,
-      lingkungan: selectedKepling.lingkungan,
-      lingkunganNomor: selectedKepling.nomorLingkungan || 1,
-      namaKepling: selectedKepling.nama,
-      keplingId: selectedKepling.id,
+      lingkungan: activeKepling.lingkungan,
+      lingkunganNomor: activeKepling.nomorLingkungan || 1,
+      namaKepling: activeKepling.nama,
+      keplingId: activeKepling.id,
       perlinsos,
       ikd,
       pbb,
@@ -189,6 +287,9 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       setIkd('Belum');
       setPbb('Belum');
       setFotoDokumentasi('');
+      if (isSuperAdmin) {
+        setTargetKeplingId('');
+      }
 
       if (onSuccess) {
         onSuccess(data);
@@ -237,24 +338,39 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
         {/* Lingkungan (Pilihan untuk Super Admin / Tetap untuk Kepling) */}
         <div>
           <label className="font-extrabold text-slate-700 block mb-1">
-            Lingkungan:
+            Lingkungan <span className="text-rose-500">*</span>:
           </label>
           {isSuperAdmin ? (
-            <select
-              value={targetKeplingId}
-              onChange={(e) => setTargetKeplingId(e.target.value)}
-              className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 focus:outline-emerald-500"
-            >
-              {KEPLING_ACCOUNTS.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.lingkungan} - {k.nama}
+            <div>
+              <select
+                required
+                value={targetKeplingId}
+                onChange={(e) => setTargetKeplingId(e.target.value)}
+                className={`w-full p-2.5 rounded-xl border font-bold focus:outline-emerald-500 ${
+                  !targetKeplingId
+                    ? 'border-amber-400 bg-amber-50/60 text-amber-900 font-extrabold'
+                    : 'border-slate-300 bg-white text-slate-800'
+                }`}
+              >
+                <option value="" disabled>
+                  -- Pilih Lingkungan (Pilih Manual) --
                 </option>
-              ))}
-            </select>
+                {KEPLING_ACCOUNTS.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.lingkungan} - {k.nama}
+                  </option>
+                ))}
+              </select>
+              {!targetKeplingId && (
+                <p className="text-[11px] text-amber-700 font-semibold mt-1 flex items-center gap-1">
+                  <span>⚠️ Pilihan lingkungan dikosongkan. Harap pilih lingkungan yang dikunjungi secara manual agar terhindar dari kesalahan.</span>
+                </p>
+              )}
+            </div>
           ) : (
             <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 font-bold text-slate-800 flex items-center justify-between">
-              <span>{selectedKepling.lingkungan}</span>
-              <span className="text-slate-500 font-medium">Petugas: {selectedKepling.nama}</span>
+              <span>{selectedKepling ? selectedKepling.lingkungan : currentUser.lingkungan}</span>
+              <span className="text-slate-500 font-medium">Petugas: {selectedKepling ? selectedKepling.nama : currentUser.nama}</span>
             </div>
           )}
         </div>
@@ -353,19 +469,55 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
             accept="image/*"
             capture="environment"
             ref={fileInputCameraRef}
-            onChange={handleCapturePhoto}
+            onChange={(e) => handleCapturePhoto(e, false)}
             className="hidden"
           />
           <input
             type="file"
             accept="image/*"
             ref={fileInputGalleryRef}
-            onChange={handleCapturePhoto}
+            onChange={(e) => handleCapturePhoto(e, true)}
             className="hidden"
           />
 
+          {isVerifyingPhoto && (
+            <div className="mb-3 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold flex items-start gap-2.5 animate-pulse shadow-2xs">
+              <div className="w-5 h-5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0 mt-0.5" />
+              <div>
+                <p className="font-extrabold text-blue-900">
+                  🤖 AI Vision Verifier sedang mengecek foto dari {verifyingSource === 'gallery' ? 'Galeri HP' : 'Kamera'}...
+                </p>
+                <p className="text-[11px] text-blue-700 font-medium mt-0.5">
+                  Memeriksa objek RUMAH/BANGUNAN atau MANUSIA (Warga/Petugas)...
+                </p>
+              </div>
+            </div>
+          )}
+
+          {photoNotice && !isVerifyingPhoto && (
+            <div
+              className={`mb-3 p-3.5 rounded-xl border text-xs font-bold flex items-start gap-2.5 shadow-2xs ${
+                photoNotice.type === 'error'
+                  ? 'bg-rose-50 border-rose-300 text-rose-900'
+                  : photoNotice.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                  : 'bg-blue-50 border-blue-300 text-blue-900'
+              }`}
+            >
+              {photoNotice.type === 'error' ? (
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              )}
+              <div>
+                <p className="font-black text-xs">{photoNotice.title}</p>
+                <p className="text-[11px] font-medium leading-relaxed mt-0.5">{photoNotice.detail}</p>
+              </div>
+            </div>
+          )}
+
           {fotoDokumentasi ? (
-            <div className="relative w-full h-40 rounded-xl overflow-hidden border border-slate-300 shadow-inner">
+            <div className="relative w-full h-44 rounded-xl overflow-hidden border border-slate-300 shadow-inner">
               <img
                 src={fotoDokumentasi}
                 alt="Dokumentasi Kunjungan"
@@ -374,7 +526,10 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
               />
               <button
                 type="button"
-                onClick={() => setFotoDokumentasi('')}
+                onClick={() => {
+                  setFotoDokumentasi('');
+                  setPhotoNotice(null);
+                }}
                 className="absolute top-2 right-2 p-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 shadow-md cursor-pointer"
                 title="Hapus foto"
               >

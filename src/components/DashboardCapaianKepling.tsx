@@ -36,7 +36,7 @@ import {
   KeplingTargetCapaian,
   AbsenApelItem,
   EventAttendance,
-  CustomEvent,
+  type CustomEvent,
 } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import {
@@ -52,7 +52,7 @@ import {
 } from '../lib/targetsApi';
 import { ModalEditTargetCapaian } from './ModalEditTargetCapaian';
 import { GrafikTrenBulanan } from './GrafikTrenBulanan';
-import { isReportMatchingKepling, getReportIsoDate } from '../lib/formatter';
+import { isReportMatchingKepling, getReportIsoDate, isKunjunganMatchingKepling } from '../lib/formatter';
 import {
   Map,
   MapPin,
@@ -114,7 +114,38 @@ interface DashboardCapaianKeplingProps {
   kunjunganList?: any[];
 }
 
-type PeriodFilter = 'TODAY' | '7_DAYS' | 'THIS_MONTH' | 'ALL';
+type PeriodFilter =
+  | 'TODAY'
+  | '7_DAYS'
+  | 'THIS_MONTH'
+  | 'ALL'
+  | 'WEEK_1'
+  | 'WEEK_2'
+  | 'WEEK_3'
+  | 'WEEK_4'
+  | string;
+
+export const getPeriodLabel = (p: string) => {
+  if (p === 'TODAY') return 'Hari Ini';
+  if (p === '7_DAYS') return 'Minggu Ini (7 Hari Terakhir)';
+  if (p === 'WEEK_1') return 'Minggu I (1 - 7 Sept)';
+  if (p === 'WEEK_2') return 'Minggu II (8 - 14 Sept)';
+  if (p === 'WEEK_3') return 'Minggu III (15 - 21 Sept)';
+  if (p === 'WEEK_4') return 'Minggu IV (22 - 30 Sept)';
+  if (p === 'THIS_MONTH') return 'Bulan Ini (September 2026)';
+  if (p === 'ALL') return 'Kumulatif (Semua Waktu)';
+  if (p.startsWith('MONTH_')) {
+    const ym = p.replace('MONTH_', '');
+    const [y, m] = ym.split('-');
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    const idx = parseInt(m, 10) - 1;
+    return `Bulan ${monthNames[idx] || m} ${y}`;
+  }
+  return p;
+};
 
 export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = ({
   reports,
@@ -134,6 +165,21 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedKeplingCard, setSelectedKeplingCard] = useState<string | null>(null);
   const [leaderboardSort, setLeaderboardSort] = useState<LeaderboardSortCriterion>('KOMPOSIT');
+
+  const isPbbAllowed = useMemo(() => {
+    return (
+      activeAccount.role === 'super_admin' ||
+      activeAccount.role === 'kasi_pemerintahan' ||
+      activeAccount.role === 'petugas_bapenda' ||
+      activeAccount.role === 'kepling'
+    );
+  }, [activeAccount.role]);
+
+  useEffect(() => {
+    if (!isPbbAllowed && leaderboardSort === 'PBB') {
+      setLeaderboardSort('KOMPOSIT');
+    }
+  }, [isPbbAllowed, leaderboardSort]);
 
   // WebGIS Data State for Real-time Spatial Integration
   const [gisHouses, setGisHouses] = useState<TitikRumahBangunan[]>(getLocalHouses);
@@ -260,6 +306,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   const filteredReportsByPeriod = useMemo(() => {
     return reports.filter((r) => {
       const dateIso = getReportIsoDate(r);
+      if (!dateIso) return true;
       if (period === 'TODAY') {
         return dateIso === todayIso;
       }
@@ -267,7 +314,26 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         return dateIso >= sevenDaysAgo;
       }
       if (period === 'THIS_MONTH') {
-        return dateIso ? dateIso.startsWith(currentYearMonth) : true;
+        return dateIso.startsWith(currentYearMonth);
+      }
+      if (period === 'WEEK_1') {
+        return dateIso.startsWith(currentYearMonth) && parseInt(dateIso.split('-')[2], 10) <= 7;
+      }
+      if (period === 'WEEK_2') {
+        const day = parseInt(dateIso.split('-')[2], 10);
+        return dateIso.startsWith(currentYearMonth) && day >= 8 && day <= 14;
+      }
+      if (period === 'WEEK_3') {
+        const day = parseInt(dateIso.split('-')[2], 10);
+        return dateIso.startsWith(currentYearMonth) && day >= 15 && day <= 21;
+      }
+      if (period === 'WEEK_4') {
+        const day = parseInt(dateIso.split('-')[2], 10);
+        return dateIso.startsWith(currentYearMonth) && day >= 22;
+      }
+      if (period.startsWith('MONTH_')) {
+        const ym = period.replace('MONTH_', '');
+        return dateIso.startsWith(ym);
       }
       return true; // ALL
     });
@@ -365,6 +431,47 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     return [];
   }, [kunjunganList]);
 
+  // Filter Kunjungan Warga berdasarkan Periode Terpilih
+  const filteredKunjunganByPeriod = useMemo(() => {
+    return effectiveKunjunganList.filter((kj: any) => {
+      if (!kj) return false;
+      const dateIso =
+        getReportIsoDate(kj) ||
+        (kj.tanggal && String(kj.tanggal).match(/^\d{4}-\d{2}-\d{2}$/) ? String(kj.tanggal) : '') ||
+        (kj.createdAt ? String(kj.createdAt).split('T')[0] : '');
+      if (!dateIso) return true;
+      if (period === 'TODAY') {
+        return dateIso === todayIso;
+      }
+      if (period === '7_DAYS') {
+        return dateIso >= sevenDaysAgo;
+      }
+      if (period === 'THIS_MONTH') {
+        return dateIso.startsWith(currentYearMonth);
+      }
+      if (period === 'WEEK_1') {
+        return dateIso.startsWith(currentYearMonth) && parseInt(dateIso.split('-')[2], 10) <= 7;
+      }
+      if (period === 'WEEK_2') {
+        const day = parseInt(dateIso.split('-')[2], 10);
+        return dateIso.startsWith(currentYearMonth) && day >= 8 && day <= 14;
+      }
+      if (period === 'WEEK_3') {
+        const day = parseInt(dateIso.split('-')[2], 10);
+        return dateIso.startsWith(currentYearMonth) && day >= 15 && day <= 21;
+      }
+      if (period === 'WEEK_4') {
+        const day = parseInt(dateIso.split('-')[2], 10);
+        return dateIso.startsWith(currentYearMonth) && day >= 22;
+      }
+      if (period.startsWith('MONTH_')) {
+        const ym = period.replace('MONTH_', '');
+        return dateIso.startsWith(ym);
+      }
+      return true; // ALL
+    });
+  }, [effectiveKunjunganList, period, todayIso, sevenDaysAgo, currentYearMonth]);
+
   // Tanggal Apel Pagi yang tercatat secara global
   const distinctApelDates = useMemo(() => {
     const dates = new Set<string>();
@@ -392,9 +499,22 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         targetConfig?.targetPerlinsos ??
         DEFAULT_PERLINSOS_TARGETS[(k.nomorLingkungan || index + 1) - 1] ??
         300;
-      const targetPbb = targetConfig?.targetPbb ?? 100;
+      
+      // Ambil data realisasi SPPT PBB untuk lingkungan ini
+      const lkNum = k.nomorLingkungan || (index + 1);
+      const lkSummary = pbbOverview.lingkunganSummaries.find((s) => s.lingkungan === lkNum);
+
+      // Target PBB (WP): Prioritaskan target riil dari SPPT PBB (totalWp) yang tersinkronisasi (misal: 255 WP untuk Lk XXII).
+      // Jika Super Admin melakukan custom override target PBB manual yang bukan default 100, gunakan nilai tersebut.
+      const targetPbb =
+        (targetConfig?.targetPbb && targetConfig.targetPbb !== 100)
+          ? targetConfig.targetPbb
+          : (lkSummary && lkSummary.totalWp > 0)
+          ? lkSummary.totalWp
+          : (targetConfig?.targetPbb || 100);
+
       const targetIkd = targetConfig?.targetIkd ?? 50;
-      const targetBpjs = targetConfig?.targetBpjs ?? 25;
+      const targetBpjs = (targetConfig?.targetBpjs && targetConfig.targetBpjs >= 50) ? targetConfig.targetBpjs : 50;
 
       // Hitung Capaian Efektif (Realisasi dari Laporan atau Override Super Admin)
       const effective = calculateEffectiveKinerja(reported, targetConfig);
@@ -440,24 +560,27 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         targetPerlinsos > 0 ? Math.round((effective.perlinsos / targetPerlinsos) * 100) : 0;
 
       // 4. REALISASI PBB (Bobot 20%)
-      const pbbPercentage = targetPbb > 0 ? Math.round((effective.pbb / targetPbb) * 100) : 0;
+      const pbbPercentage =
+        targetPbb > 0
+          ? Math.round((effective.pbb / targetPbb) * 100)
+          : (lkSummary && lkSummary.persentaseWpLunas > 0)
+          ? Math.round(lkSummary.persentaseWpLunas)
+          : 0;
 
       // 5. BPJS KETENAGAKERJAAN (Bobot 10%)
       const bpjsPercentage = targetBpjs > 0 ? Math.round((effective.bpjs / targetBpjs) * 100) : 0;
 
       // 6. KUNJUNGAN HARIAN (Bobot 10%)
-      const kKunjunganRecords = effectiveKunjunganList.filter((kj: any) => {
-        if (!kj) return false;
-        if (kj.keplingId && kj.keplingId === k.id) return true;
-        if (kj.lingkunganId && kj.lingkunganId === k.id) return true;
-        if (kj.lingkunganNomor && Number(kj.lingkunganNomor) === k.nomorLingkungan) return true;
-        if (kj.createdByName && k.nama && String(kj.createdByName).toLowerCase() === String(k.nama).toLowerCase()) return true;
-        if (kj.lingkunganNama && k.lingkungan && String(kj.lingkunganNama).toLowerCase() === String(k.lingkungan).toLowerCase()) return true;
-        return false;
-      });
-      const targetKunjunganHarian = 20; // Target referensi 20 kunjungan KK
-      const totalKunjungan = Math.max(kKunjunganRecords.length, kReports.length);
-      const kunjunganPercentage = Math.min(100, Math.round((totalKunjungan / targetKunjunganHarian) * 100));
+      // Dihitung dari: (Jumlah Kunjungan Harian Warga Door to Door) / (Target KK Perlinsos)
+      const kKunjunganRecords = filteredKunjunganByPeriod.filter((kj: any) =>
+        isKunjunganMatchingKepling(kj, k)
+      );
+      const targetKunjunganHarian = targetPerlinsos; // Target KK Perlinsos
+      const totalKunjungan = kKunjunganRecords.length;
+      const kunjunganPercentage =
+        targetPerlinsos > 0
+          ? Math.round((totalKunjungan / targetPerlinsos) * 100)
+          : 0;
 
       // 7. POSKAMLING / SISKAMLING (Bobot 10%)
       const poskamlingGiatReports = kReports.filter(
@@ -533,7 +656,8 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     distinctApelDates,
     eventAttendanceList,
     customEvents,
-    effectiveKunjunganList,
+    filteredKunjunganByPeriod,
+    pbbOverview.lingkunganSummaries,
   ]);
 
   // Sorted leaderboard - Mendukung Pengurutan Komposit 7 Kriteria & Kriteria Spesifik
@@ -576,6 +700,73 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     });
   }, [keplingSummaryList, leaderboardSort]);
 
+  // 1. Peringkat Resmi Komposit Bulanan 24 Kepling (Murni skor bulanan tanpa pengaruh toggle sortir kolom sementara)
+  const monthlyCompositeRanking = useMemo(() => {
+    return [...keplingSummaryList].sort((a, b) => {
+      if (b.compositeScoreDecimal !== a.compositeScoreDecimal) {
+        return b.compositeScoreDecimal - a.compositeScoreDecimal;
+      }
+      if (b.pbbPercentage !== a.pbbPercentage) return b.pbbPercentage - a.pbbPercentage;
+      if (b.perlinsosPercentage !== a.perlinsosPercentage) return b.perlinsosPercentage - a.perlinsosPercentage;
+      if (b.reportCount !== a.reportCount) return b.reportCount - a.reportCount;
+      return (a.kepling.nomorLingkungan || 0) - (b.kepling.nomorLingkungan || 0);
+    });
+  }, [keplingSummaryList]);
+
+  // 2. 5 Akun Kepling dengan Nilai Capaian Terendah Setiap Bulannya (5 Terbawah)
+  const monthlyBottom5Accounts = useMemo(() => {
+    if (monthlyCompositeRanking.length <= 5) return monthlyCompositeRanking;
+    return monthlyCompositeRanking.slice(-5);
+  }, [monthlyCompositeRanking]);
+
+  const monthlyBottom5Ids = useMemo(() => {
+    return new Set(monthlyBottom5Accounts.map((item) => item.kepling.id));
+  }, [monthlyBottom5Accounts]);
+
+  const monthlyBottom5NomorLingkungan = useMemo(() => {
+    return new Set(monthlyBottom5Accounts.map((item) => item.kepling.nomorLingkungan));
+  }, [monthlyBottom5Accounts]);
+
+  // Simpan status 5 terbawah bulanan ke localStorage untuk disinkronkan ke seluruh profil akun pengguna
+  useEffect(() => {
+    try {
+      const b5Array = Array.from(monthlyBottom5Ids);
+      localStorage.setItem('sikepling_bottom5_monthly_kepling_ids', JSON.stringify(b5Array));
+      window.dispatchEvent(new CustomEvent('sikepling_bottom5_updated', { detail: b5Array }));
+    } catch {}
+  }, [monthlyBottom5Ids]);
+
+  // Indeks Kinerja & Peringkat Kepling yang sedang login (untuk Lencana Akun Kepling)
+  const myPerformanceData = useMemo(() => {
+    if (mode !== 'kepling') return null;
+    const idx = monthlyCompositeRanking.findIndex(
+      (item) =>
+        item.kepling.id === activeAccount.id ||
+        item.kepling.nomorLingkungan === activeAccount.nomorLingkungan ||
+        item.kepling.nama.trim().toLowerCase() === activeAccount.nama.trim().toLowerCase()
+    );
+    if (idx === -1) return null;
+    const item = monthlyCompositeRanking[idx];
+    const rank = idx + 1;
+    // Logika 5 Akun Capaian Terendah Setiap Bulannya:
+    const isBottom5 =
+      monthlyBottom5Ids.has(item.kepling.id) ||
+      (item.kepling.nomorLingkungan ? monthlyBottom5NomorLingkungan.has(item.kepling.nomorLingkungan) : false) ||
+      rank >= 20;
+    const isTop3 = rank <= 3;
+    const isTop10 = rank <= 10;
+
+    return {
+      rank,
+      totalKepling: monthlyCompositeRanking.length || 24,
+      item,
+      isBottom5,
+      isTop3,
+      isTop10,
+      score: item.compositeScoreDecimal,
+    };
+  }, [monthlyCompositeRanking, monthlyBottom5Ids, monthlyBottom5NomorLingkungan, activeAccount, mode]);
+
   // Filtered kepling cards for display
   const displayedKeplingCards = useMemo(() => {
     if (!searchQuery.trim()) return sortedLeaderboard;
@@ -595,6 +786,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     let totalTargetPerlinsos = 0;
     let totalIkd = 0;
     let totalBpjs = 0;
+    let totalTargetBpjs = 0;
+    let totalKunjunganSum = 0;
+    let totalApelHadir = 0;
     let totalReports = filteredReportsByPeriod.length;
 
     keplingSummaryList.forEach((item) => {
@@ -603,7 +797,12 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       totalTargetPerlinsos += item.targetPerlinsos;
       totalIkd += item.ikd;
       totalBpjs += item.bpjs;
+      totalTargetBpjs += item.targetBpjs;
+      totalKunjunganSum += item.totalKunjungan;
+      totalApelHadir += item.totalApelHadir;
     });
+
+    const totalKunjungan = Math.max(totalKunjunganSum, filteredKunjunganByPeriod.length);
 
     const activeKeplingCount = keplingSummaryList.filter((k) => k.reportCount > 0).length;
     const kepatuhanRate = Math.round((activeKeplingCount / 24) * 100);
@@ -611,6 +810,17 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       totalTargetPerlinsos > 0
         ? Math.round((totalPerlinsos / totalTargetPerlinsos) * 100)
         : 0;
+    const bpjsPercentage =
+      totalTargetBpjs > 0 ? Math.round((totalBpjs / totalTargetBpjs) * 100) : 0;
+    const kunjunganPercentage =
+      totalTargetPerlinsos > 0
+        ? Math.round((totalKunjungan / totalTargetPerlinsos) * 100)
+        : 0;
+
+    const totalApelSessions = distinctApelDates.size > 0 ? distinctApelDates.size : 1;
+    const totalExpectedApel = totalApelSessions * 24;
+    const apelRatePercentage =
+      totalExpectedApel > 0 ? Math.min(100, Math.round((totalApelHadir / totalExpectedApel) * 100)) : 100;
 
     return {
       totalPbb,
@@ -619,11 +829,18 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       perlinsosPercentage,
       totalIkd,
       totalBpjs,
+      totalTargetBpjs,
+      bpjsPercentage,
+      totalKunjungan,
+      kunjunganPercentage,
+      totalApelHadir,
+      totalApelSessions,
+      apelRatePercentage,
       totalReports,
       activeKeplingCount,
       kepatuhanRate,
     };
-  }, [filteredReportsByPeriod, keplingSummaryList]);
+  }, [filteredReportsByPeriod, keplingSummaryList, distinctApelDates]);
 
   const handlePrint = () => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -660,7 +877,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             <button
               type="button"
               onClick={() => setPeriod('TODAY')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 period === 'TODAY'
                   ? 'bg-white text-emerald-950 shadow-md'
                   : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
@@ -671,18 +888,18 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             <button
               type="button"
               onClick={() => setPeriod('7_DAYS')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 period === '7_DAYS'
                   ? 'bg-white text-emerald-950 shadow-md'
                   : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
               }`}
             >
-              7 Hari
+              7 Hari (Mingguan)
             </button>
             <button
               type="button"
               onClick={() => setPeriod('THIS_MONTH')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 period === 'THIS_MONTH'
                   ? 'bg-white text-emerald-950 shadow-md'
                   : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
@@ -690,16 +907,40 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             >
               Bulan Ini
             </button>
+
+            {/* Select Dropdown for Specific Week or Month */}
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-emerald-900 text-white border border-emerald-500/80 focus:outline-emerald-400 cursor-pointer"
+            >
+              <optgroup label="Filter Minggu Specific">
+                <option value="WEEK_1">Minggu I (1-7 Sept)</option>
+                <option value="WEEK_2">Minggu II (8-14 Sept)</option>
+                <option value="WEEK_3">Minggu III (15-21 Sept)</option>
+                <option value="WEEK_4">Minggu IV (22-30 Sept)</option>
+              </optgroup>
+              <optgroup label="Filter Bulan Specific">
+                <option value="THIS_MONTH">Bulan September 2026</option>
+                <option value="MONTH_2026-08">Bulan Agustus 2026</option>
+                <option value="MONTH_2026-07">Bulan Juli 2026</option>
+                <option value="MONTH_2026-06">Bulan Juni 2026</option>
+              </optgroup>
+              <optgroup label="Akumulasi">
+                <option value="ALL">🏆 Kumulatif (Semua Waktu)</option>
+              </optgroup>
+            </select>
+
             <button
               type="button"
               onClick={() => setPeriod('ALL')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 period === 'ALL'
                   ? 'bg-white text-emerald-950 shadow-md'
                   : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
               }`}
             >
-              Semua
+              Kumulatif
             </button>
 
             {mode === 'super_admin' && (
@@ -741,13 +982,36 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 {activeAccount.nomorLingkungan || 'KL'}
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase">
                     {activeAccount.lingkungan}
                   </span>
                   <span className="text-xs text-slate-400 font-medium">
                     Kelurahan Mangga
                   </span>
+                  {myPerformanceData && (
+                    myPerformanceData.isBottom5 ? (
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-red-600 text-white font-black animate-pulse flex items-center gap-1 shadow-xs">
+                        🚨 KINERJA KEPLING TERBURUK
+                      </span>
+                    ) : myPerformanceData.rank === 1 ? (
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black flex items-center gap-1 shadow-xs">
+                        🥇 KEPLING TERBAIK I
+                      </span>
+                    ) : myPerformanceData.rank === 2 ? (
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-300 text-slate-900 font-black flex items-center gap-1 shadow-xs">
+                        🥈 KEPLING TERBAIK II
+                      </span>
+                    ) : myPerformanceData.rank === 3 ? (
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-950 font-black flex items-center gap-1 shadow-xs">
+                        🥉 KEPLING TERBAIK III
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-300">
+                        Peringkat #{myPerformanceData.rank} dari 24
+                      </span>
+                    )
+                  )}
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mt-0.5">
                   {activeAccount.nama}
@@ -787,6 +1051,208 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               )}
             </div>
           </div>
+
+          {/* ========================================================================= */}
+          {/* LENCANA INDEKS KINERJA KEPLING RESMI (DENGAN PERINGKAT & EVALUASI KHUSUS) */}
+          {/* ========================================================================= */}
+          {myPerformanceData && (
+            <div
+              className={`rounded-3xl p-5 sm:p-6 border-2 shadow-xl relative overflow-hidden transition-all ${
+                myPerformanceData.isBottom5
+                  ? 'bg-gradient-to-r from-red-700 via-rose-700 to-red-800 text-white border-red-400 shadow-red-600/25 ring-2 ring-red-400'
+                  : myPerformanceData.rank === 1
+                  ? 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-slate-950 border-amber-300 shadow-amber-500/20 ring-2 ring-amber-300'
+                  : myPerformanceData.rank === 2
+                  ? 'bg-gradient-to-r from-slate-200 via-slate-100 to-slate-300 text-slate-900 border-slate-400 shadow-md ring-2 ring-slate-300'
+                  : myPerformanceData.rank === 3
+                  ? 'bg-gradient-to-r from-amber-700 via-amber-600 to-amber-800 text-white border-amber-400 shadow-md ring-2 ring-amber-400'
+                  : myPerformanceData.rank <= 10
+                  ? 'bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white border-emerald-400 shadow-emerald-700/20'
+                  : 'bg-gradient-to-r from-slate-800 via-indigo-950 to-slate-900 text-white border-slate-700 shadow-md'
+              }`}
+            >
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                <div className="flex items-start sm:items-center gap-4">
+                  <div
+                    className={`w-16 h-16 rounded-2xl flex items-center justify-center font-black text-3xl shadow-lg shrink-0 border-2 ${
+                      myPerformanceData.isBottom5
+                        ? 'bg-white text-red-700 border-red-300 animate-bounce'
+                        : myPerformanceData.rank === 1
+                        ? 'bg-slate-950 text-amber-400 border-amber-300'
+                        : myPerformanceData.rank === 2
+                        ? 'bg-slate-800 text-slate-100 border-slate-400'
+                        : myPerformanceData.rank === 3
+                        ? 'bg-white text-amber-800 border-amber-300'
+                        : 'bg-white/10 text-white border-white/20'
+                    }`}
+                  >
+                    {myPerformanceData.isBottom5
+                      ? '⚠️'
+                      : myPerformanceData.rank === 1
+                      ? '🥇'
+                      : myPerformanceData.rank === 2
+                      ? '🥈'
+                      : myPerformanceData.rank === 3
+                      ? '🥉'
+                      : myPerformanceData.rank <= 10
+                      ? '⭐'
+                      : '📊'}
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider shadow-sm inline-flex items-center gap-1.5 ${
+                          myPerformanceData.isBottom5
+                            ? 'bg-white text-red-700 border-2 border-red-300'
+                            : myPerformanceData.rank === 1
+                            ? 'bg-slate-950 text-amber-300 border border-amber-400'
+                            : myPerformanceData.rank === 2
+                            ? 'bg-slate-900 text-slate-100 border border-slate-400'
+                            : myPerformanceData.rank === 3
+                            ? 'bg-white text-amber-900 border border-amber-300'
+                            : myPerformanceData.rank <= 10
+                            ? 'bg-emerald-400 text-emerald-950 font-black'
+                            : 'bg-blue-400 text-slate-950 font-black'
+                        }`}
+                      >
+                        {myPerformanceData.isBottom5 && '🚨 LENCANA: KINERJA KEPLING TERBURUK'}
+                        {myPerformanceData.rank === 1 && '🥇 LENCANA: KEPLING TERBAIK I'}
+                        {myPerformanceData.rank === 2 && '🥈 LENCANA: KEPLING TERBAIK II'}
+                        {myPerformanceData.rank === 3 && '🥉 LENCANA: KEPLING TERBAIK III'}
+                        {myPerformanceData.rank > 3 && myPerformanceData.rank <= 10 && '⭐ LENCANA: KINERJA SANGAT BAIK'}
+                        {myPerformanceData.rank > 10 && !myPerformanceData.isBottom5 && '🔷 LENCANA: KINERJA CUKUP'}
+                      </span>
+
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          myPerformanceData.isBottom5
+                            ? 'bg-red-950/70 text-red-200 border border-red-300/40'
+                            : 'bg-black/20 text-white/90 border border-white/20'
+                        }`}
+                      >
+                        Peringkat {myPerformanceData.rank} dari {myPerformanceData.totalKepling} Kepling
+                      </span>
+
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-300 text-amber-950 border border-amber-400 flex items-center gap-1 shadow-2xs">
+                        <Calendar className="w-3 h-3 text-amber-950" />
+                        Periode: {getPeriodLabel(period)}
+                      </span>
+                    </div>
+
+                    <h4 className="text-lg sm:text-xl font-black tracking-tight">
+                      {myPerformanceData.isBottom5 ? (
+                        <span className="text-white">
+                          Status Evaluasi Khusus: Peringkat {myPerformanceData.rank} (5 Terbawah)
+                        </span>
+                      ) : (
+                        <span>
+                          Indeks Kinerja Kepling Terpadu: Peringkat {myPerformanceData.rank}
+                        </span>
+                      )}
+                    </h4>
+
+                    <p
+                      className={`text-xs max-w-2xl leading-relaxed ${
+                        myPerformanceData.isBottom5
+                          ? 'text-red-100 font-medium'
+                          : myPerformanceData.rank === 1
+                          ? 'text-slate-900 font-medium'
+                          : 'text-white/80'
+                      }`}
+                    >
+                      {myPerformanceData.isBottom5
+                        ? 'Akumulasi skor kinerja bulanan Anda berada di 5 peringkat terbawah dari 24 Kepala Lingkungan. Sangat disarankan untuk segera meningkatkan kehadiran apel pagi, percepatan realisasi PBB, pemutakhiran data perlinsos, serta patroli ronda poskamling warga.'
+                        : myPerformanceData.rank === 1
+                        ? 'Selamat! Anda memimpin peringkat kinerja tertinggi se-Kelurahan Mangga pada periode ini. Pertahankan keteladanan dalam kedisiplinan dan pelayanan masyarakat.'
+                        : myPerformanceData.rank <= 3
+                        ? 'Luar biasa! Anda berada di podium 3 besar Kepala Lingkungan terbaik se-Kelurahan Mangga pada periode ini.'
+                        : myPerformanceData.rank <= 10
+                        ? 'Kinerja Anda sangat baik dan berada di zona 10 besar keaktifan lingkungan se-Kelurahan Mangga.'
+                        : 'Kinerja Anda dalam kategori cukup. Tingkatkan keaktifan apel dan penyelesaian target untuk mencapai zona 10 besar.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className={`p-3.5 rounded-2xl text-center min-w-[140px] shrink-0 border shadow-md ${
+                    myPerformanceData.isBottom5
+                      ? 'bg-red-950/80 border-red-400/60 text-white'
+                      : myPerformanceData.rank === 1
+                      ? 'bg-slate-950 text-white border-amber-400'
+                      : myPerformanceData.rank === 2
+                      ? 'bg-slate-900 text-white border-slate-400'
+                      : myPerformanceData.rank === 3
+                      ? 'bg-amber-950 text-white border-amber-400'
+                      : 'bg-black/30 border-white/20 text-white'
+                  }`}
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-wider block opacity-80">
+                    Skor Indeks Kinerja
+                  </span>
+                  <div className="text-3xl font-black tracking-tight mt-0.5">
+                    {myPerformanceData.score}
+                    <span className="text-xs font-bold ml-1 opacity-70">/100 Poin</span>
+                  </div>
+                  <span
+                    className={`inline-block mt-1 text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                      myPerformanceData.isBottom5
+                        ? 'bg-red-600 text-white'
+                        : myPerformanceData.rank <= 3
+                        ? 'bg-amber-400 text-slate-950 font-black'
+                        : myPerformanceData.rank <= 10
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-slate-700 text-slate-200'
+                    }`}
+                  >
+                    {myPerformanceData.isBottom5 ? '⚠️ 5 Terbawah' : `Top #${myPerformanceData.rank}`}
+                  </span>
+                </div>
+              </div>
+
+              {/* 7 Indikator Breakdown Mini Bar untuk Kepling */}
+              {myPerformanceData.item && (
+                <div
+                  className={`mt-4 pt-3 border-t grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-[10px] ${
+                    myPerformanceData.isBottom5
+                      ? 'border-red-400/40'
+                      : myPerformanceData.rank === 1
+                      ? 'border-amber-600/40'
+                      : 'border-white/10'
+                  }`}
+                >
+                  <div className="bg-black/20 p-2 rounded-xl text-center">
+                    <span className="block opacity-80 font-bold">🌅 Apel</span>
+                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.apelPercentage}%</strong>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded-xl text-center">
+                    <span className="block opacity-80 font-bold">👥 Kegiatan</span>
+                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.kegiatanPercentage}%</strong>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded-xl text-center">
+                    <span className="block opacity-80 font-bold">📋 Perlinsos</span>
+                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.perlinsosPercentage}%</strong>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded-xl text-center">
+                    <span className="block opacity-80 font-bold">💰 PBB</span>
+                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.pbbPercentage}%</strong>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded-xl text-center">
+                    <span className="block opacity-80 font-bold">🛡️ BPJS TK</span>
+                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.bpjsPercentage}%</strong>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded-xl text-center">
+                    <span className="block opacity-80 font-bold">🏠 Kunjungan</span>
+                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.kunjunganPercentage}%</strong>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded-xl text-center">
+                    <span className="block opacity-80 font-bold">🔦 Ronda</span>
+                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.poskamlingPercentage}%</strong>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 4 Pilar Kinerja Cards */}
           {(() => {
@@ -979,7 +1445,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </p>
                   </div>
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                    <span>Target: {activeTargetConfig?.targetBpjs || 10} Org</span>
+                    <span>Target: {(activeTargetConfig?.targetBpjs && activeTargetConfig.targetBpjs >= 50) ? activeTargetConfig.targetBpjs : 50} Org</span>
                     <span className="text-amber-700 font-bold">Perlindungan Kerja</span>
                   </div>
                 </div>
@@ -990,7 +1456,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           {/* ========================================================================= */}
           {/* REALISASI PBB-P2 (DATABASE SPPT RESMI)                                   */}
           {/* ========================================================================= */}
-          {myPbbStats && (
+          {isPbbAllowed && myPbbStats && (
             <div className="bg-gradient-to-br from-slate-900 to-emerald-950 rounded-3xl p-6 text-white border border-emerald-800/60 shadow-xl space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -1524,7 +1990,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       {mode === 'super_admin' && (
         <div className="space-y-6">
           {/* Kelurahan Aggregation Metric Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
             {/* Total Laporan */}
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs">
               <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase block">
@@ -1540,27 +2006,29 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </div>
 
             {/* Total PBB Kelurahan (Terkoneksi Realisasi PBB SPPT) */}
-            <div
-              onClick={() => onOpenRekapPbb && onOpenRekapPbb()}
-              className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-200 shadow-xs cursor-pointer hover:border-emerald-400 hover:shadow-sm transition-all group"
-              title="Klik untuk membuka Rekapitulasi Realisasi PBB Kelurahan"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 uppercase block">
-                  Realisasi PBB ({pbbYear})
-                </span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
-                  {pbbOverview.persentaseRealisasiNominal.toFixed(1)}%
-                </span>
+            {isPbbAllowed && (
+              <div
+                onClick={() => onOpenRekapPbb && onOpenRekapPbb()}
+                className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-200 shadow-xs cursor-pointer hover:border-emerald-400 hover:shadow-sm transition-all group"
+                title="Klik untuk membuka Rekapitulasi Realisasi PBB Kelurahan"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 uppercase block">
+                    Realisasi PBB ({pbbYear})
+                  </span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                    {pbbOverview.persentaseRealisasiNominal.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-emerald-900 mt-1">
+                  {pbbOverview.totalWpLunas}
+                  <span className="text-xs font-semibold text-slate-500 ml-1">WP Lunas</span>
+                </div>
+                <p className="text-[11px] text-emerald-700 font-semibold mt-1 truncate">
+                  {formatRupiah(pbbOverview.totalRealisasiNominal)}
+                </p>
               </div>
-              <div className="text-2xl sm:text-3xl font-black text-emerald-900 mt-1">
-                {pbbOverview.totalWpLunas}
-                <span className="text-xs font-semibold text-slate-500 ml-1">WP Lunas</span>
-              </div>
-              <p className="text-[11px] text-emerald-700 font-semibold mt-1 truncate">
-                {formatRupiah(pbbOverview.totalRealisasiNominal)}
-              </p>
-            </div>
+            )}
 
             {/* Total Perlinsos (Target vs Realisasi Kelurahan) */}
             <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-blue-200 shadow-xs">
@@ -1604,16 +2072,75 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </div>
 
             {/* Total BPJS Ketenagakerjaan */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs col-span-2 lg:col-span-1">
-              <span className="text-[10px] sm:text-[11px] font-bold text-amber-700 uppercase block">
-                Total BPJS TK
-              </span>
-              <div className="text-2xl sm:text-3xl font-black text-amber-800 mt-1">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-teal-200 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] sm:text-[11px] font-black text-teal-900 uppercase block">
+                  Total BPJS TK
+                </span>
+                <span className="text-[10px] bg-teal-100 text-teal-900 font-black px-1.5 py-0.5 rounded">
+                  {kelurahanTotals.bpjsPercentage}%
+                </span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-teal-950 mt-1">
                 {kelurahanTotals.totalBpjs}
-                <span className="text-xs font-semibold text-slate-500 ml-1">Orang</span>
+                <span className="text-xs font-semibold text-slate-500 ml-1">
+                  / {kelurahanTotals.totalTargetBpjs} Orang
+                </span>
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2">
+                <div
+                  className="bg-teal-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, kelurahanTotals.bpjsPercentage)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Target 24 Lingk: {kelurahanTotals.totalTargetBpjs} Orang
+              </p>
+            </div>
+
+            {/* Total Kunjungan Warga (Door-to-Door) */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-amber-200 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] sm:text-[11px] font-black text-amber-900 uppercase block">
+                  Total Kunjungan
+                </span>
+                <span className="text-[10px] bg-amber-100 text-amber-900 font-black px-1.5 py-0.5 rounded">
+                  {kelurahanTotals.kunjunganPercentage}%
+                </span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-amber-950 mt-1">
+                {kelurahanTotals.totalKunjungan}
+                <span className="text-xs font-semibold text-slate-500 ml-1">
+                  / {kelurahanTotals.totalTargetPerlinsos} KK
+                </span>
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2">
+                <div
+                  className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, kelurahanTotals.kunjunganPercentage)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Door-to-Door Warga
+              </p>
+            </div>
+
+            {/* Absensi Apel Pagi */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-200 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] sm:text-[11px] font-black text-emerald-900 uppercase block">
+                  Absensi Apel Pagi
+                </span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.5 rounded">
+                  {kelurahanTotals.apelRatePercentage}%
+                </span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-900 mt-1">
+                {kelurahanTotals.totalApelHadir}
+                <span className="text-xs font-semibold text-slate-500 ml-1">Hadir</span>
               </div>
               <p className="text-[11px] text-slate-500 mt-1">
-                Pekerja Rentan Terdata
+                Dari {kelurahanTotals.totalApelSessions} Sesi Apel
               </p>
             </div>
           </div>
@@ -1887,18 +2414,20 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   <span>Perlinsos (20%)</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setLeaderboardSort('PBB')}
-                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
-                    leaderboardSort === 'PBB'
-                      ? 'bg-emerald-700 text-white shadow-sm ring-2 ring-emerald-400 scale-102'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  <span>Realisasi PBB (20%)</span>
-                </button>
+                {isPbbAllowed && (
+                  <button
+                    type="button"
+                    onClick={() => setLeaderboardSort('PBB')}
+                    className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                      leaderboardSort === 'PBB'
+                        ? 'bg-emerald-700 text-white shadow-sm ring-2 ring-emerald-400 scale-102'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Realisasi PBB (20%)</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -1982,10 +2511,12 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       <span className="text-slate-400 block font-medium">📋 Perlinsos</span>
                       <strong className="text-blue-700">{sortedLeaderboard[1].perlinsosPercentage}%</strong> ({sortedLeaderboard[1].perlinsos} KK)
                     </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
-                      <span className="text-slate-400 block font-medium">💰 PBB</span>
-                      <strong className="text-emerald-800">{sortedLeaderboard[1].pbbPercentage}%</strong> ({sortedLeaderboard[1].pbb} WP)
-                    </div>
+                    {isPbbAllowed && (
+                      <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block font-medium">💰 PBB</span>
+                        <strong className="text-emerald-800">{sortedLeaderboard[1].pbbPercentage}%</strong> ({sortedLeaderboard[1].pbb}/{sortedLeaderboard[1].targetPbb} WP)
+                      </div>
+                    )}
                     <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
                       <span className="text-slate-400 block font-medium">🏠 Kunjungan</span>
                       <strong className="text-amber-800">{sortedLeaderboard[1].totalKunjungan} KK</strong>
@@ -2035,10 +2566,12 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       <span className="text-amber-800 block font-medium">📋 Perlinsos</span>
                       <strong className="text-blue-700 font-bold">{sortedLeaderboard[0].perlinsosPercentage}%</strong> ({sortedLeaderboard[0].perlinsos} KK)
                     </div>
-                    <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
-                      <span className="text-amber-800 block font-medium">💰 PBB</span>
-                      <strong className="text-emerald-800 font-bold">{sortedLeaderboard[0].pbbPercentage}%</strong> ({sortedLeaderboard[0].pbb} WP)
-                    </div>
+                    {isPbbAllowed && (
+                      <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
+                        <span className="text-amber-800 block font-medium">💰 PBB</span>
+                        <strong className="text-emerald-800 font-bold">{sortedLeaderboard[0].pbbPercentage}%</strong> ({sortedLeaderboard[0].pbb}/{sortedLeaderboard[0].targetPbb} WP)
+                      </div>
+                    )}
                     <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
                       <span className="text-amber-800 block font-medium">🏠 Kunjungan</span>
                       <strong className="text-amber-900 font-bold">{sortedLeaderboard[0].totalKunjungan} KK</strong>
@@ -2088,10 +2621,12 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       <span className="text-slate-400 block font-medium">📋 Perlinsos</span>
                       <strong className="text-blue-700">{sortedLeaderboard[2].perlinsosPercentage}%</strong> ({sortedLeaderboard[2].perlinsos} KK)
                     </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
-                      <span className="text-slate-400 block font-medium">💰 PBB</span>
-                      <strong className="text-emerald-800">{sortedLeaderboard[2].pbbPercentage}%</strong> ({sortedLeaderboard[2].pbb} WP)
-                    </div>
+                    {isPbbAllowed && (
+                      <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
+                        <span className="text-slate-400 block font-medium">💰 PBB</span>
+                        <strong className="text-emerald-800">{sortedLeaderboard[2].pbbPercentage}%</strong> ({sortedLeaderboard[2].pbb}/{sortedLeaderboard[2].targetPbb} WP)
+                      </div>
+                    )}
                     <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
                       <span className="text-slate-400 block font-medium">🏠 Kunjungan</span>
                       <strong className="text-amber-800">{sortedLeaderboard[2].totalKunjungan} KK</strong>
@@ -2109,14 +2644,16 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             <div className="divide-y divide-slate-100 mt-4 overflow-x-auto">
               <div className="hidden xl:grid grid-cols-12 gap-2 py-2 px-3 text-[11px] font-black text-slate-400 uppercase tracking-wider items-center bg-slate-50/70 rounded-xl mb-1">
                 <div className="col-span-1 text-center">Rank</div>
-                <div className="col-span-2">Kepala Lingkungan</div>
+                <div className={`text-left ${isPbbAllowed ? 'col-span-2' : 'col-span-3'}`}>Kepala Lingkungan</div>
                 <div className="col-span-1 text-center bg-amber-100/70 text-amber-950 py-1 rounded-md font-black">
                   Skor IKKT
                 </div>
                 <div className="col-span-1 text-center">🌅 Apel (15%)</div>
                 <div className="col-span-1 text-center">👥 Giat (15%)</div>
                 <div className="col-span-1 text-center">📋 Perlinsos (20%)</div>
-                <div className="col-span-1 text-center">💰 PBB (20%)</div>
+                {isPbbAllowed && (
+                  <div className="col-span-1 text-center">💰 PBB (20%)</div>
+                )}
                 <div className="col-span-1 text-center">🛡️ BPJS (10%)</div>
                 <div className="col-span-1 text-center">🏠 Kunjungan (10%)</div>
                 <div className="col-span-1 text-center">🔦 Poskamling (10%)</div>
@@ -2145,24 +2682,42 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     {/* Rank Badge & Kepling Info (Mobile + Desktop) */}
                     <div className="col-span-1 flex items-center gap-2 xl:justify-center w-full xl:w-auto justify-between">
                       <div className="flex items-center gap-2">
-                        <span
-                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
-                            isTop1
-                              ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300'
-                              : isTop2
-                              ? 'bg-slate-300 text-slate-900'
-                              : isTop3
-                              ? 'bg-amber-200 text-amber-950'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {index + 1}
-                        </span>
+                        {(() => {
+                          const rankNum = index + 1;
+                          const isBottom5Rank = rankNum >= 20;
+                          return (
+                            <span
+                              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                                isTop1
+                                  ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300'
+                                  : isTop2
+                                  ? 'bg-slate-300 text-slate-900'
+                                  : isTop3
+                                  ? 'bg-amber-200 text-amber-950'
+                                  : isBottom5Rank
+                                  ? 'bg-red-600 text-white ring-2 ring-red-400'
+                                  : 'bg-slate-100 text-slate-600'
+                              }`}
+                              title={isBottom5Rank ? 'Peringkat 5 Terbawah - Kinerja Kepling Terburuk' : `Peringkat #${rankNum}`}
+                            >
+                              {rankNum}
+                            </span>
+                          );
+                        })()}
                         <div className="xl:hidden">
                           <span className="font-bold text-slate-900 block">
                             {item.kepling.lingkungan} • {item.kepling.nama}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-medium">
+                          {(index + 1) >= 20 ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-red-100 text-red-800 border border-red-300 mt-0.5">
+                              🚨 KINERJA KEPLING TERBURUK
+                            </span>
+                          ) : isTop1 ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 mt-0.5">
+                              🥇 KEPLING TERBAIK I
+                            </span>
+                          ) : null}
+                          <span className="text-[10px] text-slate-400 font-medium block">
                             {item.reportCount} Laporan ({item.hariMelapor} Hari)
                           </span>
                         </div>
@@ -2177,11 +2732,31 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </div>
 
                     {/* Info Kepling (Desktop) */}
-                    <div className="col-span-2 hidden xl:block">
-                      <div className="font-bold text-xs text-slate-900 truncate flex items-center gap-1.5">
+                    <div className={`${isPbbAllowed ? 'col-span-2' : 'col-span-3'} hidden xl:block`}>
+                      <div className="font-bold text-xs text-slate-900 truncate flex items-center gap-1.5 flex-wrap">
                         <span>{item.kepling.nama}</span>
                         {item.isOverridden && (
                           <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" title="Capaian disesuaikan Super Admin" />
+                        )}
+                        {(index + 1) >= 20 && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-red-100 text-red-800 border border-red-300 shadow-2xs">
+                            🚨 TERBURUK
+                          </span>
+                        )}
+                        {isTop1 && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                            🥇 TERBAIK I
+                          </span>
+                        )}
+                        {isTop2 && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-slate-200 text-slate-800 border border-slate-300 shadow-2xs">
+                            🥈 TERBAIK II
+                          </span>
+                        )}
+                        {isTop3 && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs">
+                            🥉 TERBAIK III
+                          </span>
                         )}
                       </div>
                       {(() => {
@@ -2260,17 +2835,21 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </div>
 
                     {/* 4. Realisasi PBB */}
-                    <div
-                      onClick={() => onOpenRekapPbb && onOpenRekapPbb()}
-                      className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-emerald-50 transition-colors"
-                      title="Klik untuk membuka Rekapitulasi SPPT PBB"
-                    >
-                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">💰 PBB (20%)</div>
-                      <span className="inline-block font-black text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded text-[11px]">
-                        {item.pbbPercentage}%
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-semibold block">{item.pbb} WP</span>
-                    </div>
+                    {isPbbAllowed && (
+                      <div
+                        onClick={() => onOpenRekapPbb && onOpenRekapPbb()}
+                        className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-emerald-50 transition-colors"
+                        title="Klik untuk membuka Rekapitulasi SPPT PBB"
+                      >
+                        <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">💰 PBB (20%)</div>
+                        <span className="inline-block font-black text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded text-[11px]">
+                          {item.pbbPercentage}%
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-semibold block truncate" title={`${item.pbb} dari target ${item.targetPbb} WP`}>
+                          {item.pbb}/{item.targetPbb} WP
+                        </span>
+                      </div>
+                    )}
 
                     {/* 5. BPJS Ketenagakerjaan */}
                     <div className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg">
@@ -2287,7 +2866,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       <span className="inline-block font-black text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded text-[11px]">
                         {item.kunjunganPercentage}%
                       </span>
-                      <span className="text-[10px] text-slate-500 block">{item.totalKunjungan} KK</span>
+                      <span className="text-[10px] text-slate-500 block truncate" title={`${item.totalKunjungan} dari target ${item.targetPerlinsos} KK Perlinsos`}>
+                        {item.totalKunjungan}/{item.targetPerlinsos} KK
+                      </span>
                     </div>
 
                     {/* 7. Poskamling */}

@@ -420,6 +420,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   const [editInfrastrukturTitikKoordinat, setEditInfrastrukturTitikKoordinat] = useState('');
   const [editInfrastrukturTanggalPelaporan, setEditInfrastrukturTanggalPelaporan] = useState('');
   const [editInfrastrukturPelapor, setEditInfrastrukturPelapor] = useState('');
+  const [editDokumentasiFoto, setEditDokumentasiFoto] = useState<Array<{ id?: string; url: string; name?: string; kategori?: string; timestamp?: string }>>([]);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   // Populate form fields whenever active item changes
   useEffect(() => {
@@ -451,6 +453,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       setEditInfrastrukturTitikKoordinat(item.kinerja?.infrastrukturTitikKoordinat || '');
       setEditInfrastrukturTanggalPelaporan(item.kinerja?.infrastrukturTanggalPelaporan || item.tanggal || '');
       setEditInfrastrukturPelapor(item.kinerja?.infrastrukturPelapor || item.namaKepling || '');
+      setEditDokumentasiFoto(item.dokumentasiFoto ? JSON.parse(JSON.stringify(item.dokumentasiFoto)) : []);
       setIsEditing(false);
       setShowDeleteConfirm(false);
       setShowPrintPreview(false);
@@ -458,6 +461,47 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       setSaveSuccessMsg('');
     }
   }, [item]);
+
+  const compressFile = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 720;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.42));
+          } else {
+            resolve((event.target?.result as string) || '');
+          }
+        };
+        img.onerror = () => {
+          resolve((event.target?.result as string) || '');
+        };
+        img.src = (event.target?.result as string) || '';
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
 
   const getProperFotoLabel = (foto: { name?: string; kategori?: string }, idx: number) => {
     if (!foto?.name && !foto?.kategori) return `Dokumentasi Lapangan ${idx + 1}`;
@@ -788,6 +832,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         tanggal: editTanggal,
         namaKepling: editNamaKepling,
         jabatan: editJabatan,
+        jumlahDokumentasi: editDokumentasiFoto.length,
+        dokumentasiFoto: editDokumentasiFoto,
         kinerja: {
           opsirPbbWp: editOpsirPbbWp,
           opsirPbbKeterangan: editOpsirPbbKet,
@@ -2167,9 +2213,155 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               </div>
             )}
           </div>
+          
+          {/* Kelola Foto (hanya tampil saat mengedit laporan) */}
+          {isEditing && (
+            <div className="space-y-4 pt-4 border-t border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+                <div>
+                  <h4 className="text-xs font-black text-slate-800 uppercase flex items-center gap-1.5">
+                    📸 Kelola & Upload Dokumentasi Foto Laporan
+                  </h4>
+                  <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                    Tambahkan foto baru, sesuaikan nama rincian/keterangan foto, atau hapus foto ganda secara langsung.
+                  </p>
+                </div>
+                
+                <div className="shrink-0 flex items-center gap-2">
+                  <input
+                    type="file"
+                    id="edit-upload-foto-multiple"
+                    multiple
+                    accept="image/*"
+                    onChange={async (e) => {
+                      if (!e.target.files || e.target.files.length === 0) return;
+                      setIsCompressing(true);
+                      try {
+                        const newPhotosList = [...editDokumentasiFoto];
+                        for (let i = 0; i < e.target.files.length; i++) {
+                          const file = e.target.files[i];
+                          const base64 = await compressFile(file);
+                          if (base64) {
+                            newPhotosList.push({
+                              id: `foto_edit_added_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                              url: base64,
+                              name: file.name.replace(/\.[^/.]+$/, ''), // remove extension
+                              kategori: 'lainnya',
+                              timestamp: new Date().toISOString(),
+                            });
+                          }
+                        }
+                        setEditDokumentasiFoto(newPhotosList);
+                      } catch (err) {
+                        console.error('Error compressing files:', err);
+                      } finally {
+                        setIsCompressing(false);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="edit-upload-foto-multiple"
+                    className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                  >
+                    {isCompressing ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Mengompres Foto...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>➕ Upload Foto Tambahan</span>
+                      </>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {editDokumentasiFoto.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {editDokumentasiFoto.map((foto, index) => (
+                    <div
+                      key={foto.id || index}
+                      className="border border-slate-200 rounded-xl bg-white p-2.5 shadow-2xs space-y-2 relative flex flex-col justify-between"
+                    >
+                      {/* Image Thumbnail */}
+                      <div className="aspect-video w-full rounded-lg overflow-hidden bg-slate-100 relative group border border-slate-100 flex items-center justify-center">
+                        <img
+                          src={foto.url}
+                          alt={foto.name}
+                          className="w-full h-full object-cover"
+                        />
+                        {/* Delete Button (Trash Icon) */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const filtered = editDokumentasiFoto.filter((_, idx) => idx !== index);
+                            setEditDokumentasiFoto(filtered);
+                          }}
+                          className="absolute top-2 right-2 bg-rose-600 hover:bg-rose-700 text-white p-2 rounded-lg shadow-md transition-transform hover:scale-110 cursor-pointer"
+                          title="Hapus foto ini satu persatu untuk menghindari ganda"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Photo details: Caption/Rincian & Category selection */}
+                      <div className="space-y-1.5 text-[11px]">
+                        <div>
+                          <label className="text-[9px] uppercase font-black text-slate-400 block mb-0.5">
+                            Rincian / Keterangan Foto
+                          </label>
+                          <input
+                            type="text"
+                            value={foto.name || ''}
+                            placeholder={`Keterangan foto ${index + 1}...`}
+                            onChange={(e) => {
+                              const updated = [...editDokumentasiFoto];
+                              updated[index].name = e.target.value;
+                              setEditDokumentasiFoto(updated);
+                            }}
+                            className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-800 font-bold focus:bg-white focus:outline-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] uppercase font-black text-slate-400 block mb-0.5">
+                            Kategori Pilar / Kegiatan
+                          </label>
+                          <select
+                            value={foto.kategori || 'lainnya'}
+                            onChange={(e) => {
+                              const updated = [...editDokumentasiFoto];
+                              updated[index].kategori = e.target.value;
+                              setEditDokumentasiFoto(updated);
+                            }}
+                            className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-700 font-bold focus:bg-white focus:outline-emerald-500 cursor-pointer"
+                          >
+                            <option value="apel">1. Presensi Apel Pagi</option>
+                            <option value="pbb">2. Opsir PBB (Himbauan/Pembayaran)</option>
+                            <option value="perlinsos">3. Pendataan Perlinsos / Bansos</option>
+                            <option value="ikd">4. Aktivasi Aplikasi IKD</option>
+                            <option value="bpjs">5. BPJS Ketenagakerjaan</option>
+                            <option value="poskamling">6. Siskamling / Pos Ronda</option>
+                            <option value="infrastruktur">7. Pemantauan Infrastruktur</option>
+                            <option value="lainnya">8. Kegiatan Lapangan Lainnya</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50 text-xs text-slate-400 font-medium">
+                  Belum ada dokumentasi foto dalam laporan ini. Klik tombol di atas untuk menambah foto.
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Attached photos */}
-          {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
+          {!isEditing && item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
             <div className="space-y-3 pt-3 border-t border-slate-200">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
