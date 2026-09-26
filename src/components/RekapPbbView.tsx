@@ -1124,7 +1124,12 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 <Building2 className="w-3.5 h-3.5" />
                 {isKepling ? `PBB Lingkungan ${keplingLingkunganNum} \u2022 Kelurahan Mangga` : `Sektor Kasi Pemerintahan \u2022 Kelurahan Mangga`}
               </div>
-              {isKepling ? (
+              {activeAccount?.role === 'petugas_bapenda' ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-300 text-xs font-black">
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>🏛️ Pengawas Bapenda Kota Medan (Akses Lihat Saja / Read-Only)</span>
+                </div>
+              ) : isKepling ? (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black">
                   <Eye className="w-3.5 h-3.5" />
                   <span>👑 Kepala Lingkungan: {activeAccount?.nama} (Mode Lihat Data)</span>

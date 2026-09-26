@@ -99,6 +99,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 }) => {
   const isKepling = currentUser.role === 'kepling';
   const isAdmin = currentUser.role === 'super_admin' || currentUser.role.startsWith('kasi_');
+  const isBapenda = currentUser.role === 'petugas_bapenda';
   const userLingkunganNomor = currentUser.nomorLingkungan || 1;
 
   // Map DOM & Instance Refs
@@ -1626,6 +1627,20 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       setIsSyncingWebgis(false);
     }
   };
+
+  if (isBapenda) {
+    return (
+      <div className="max-w-2xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+        <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-400/40 text-amber-600 flex items-center justify-center mx-auto text-2xl">
+          🔒
+        </div>
+        <h3 className="text-xl font-black text-slate-900">Akses Peta WebGIS Tidak Diizinkan</h3>
+        <p className="text-sm text-slate-600 leading-relaxed">
+          Akun <strong>Petugas Bapenda Kota Medan</strong> dikhususkan hanya untuk melihat data Realisasi Pajak PBB-P2 dan tidak memiliki otoritas untuk melihat atau mengelola Peta Spasial WebGIS.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto px-1 sm:px-2 pb-12 animate-fade-in">

@@ -65,6 +65,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
   const isKepling = activeAccount.role === 'kepling';
   const isAdmin = activeAccount.role === 'super_admin';
   const isKasi = activeAccount.role.startsWith('kasi_');
+  const isBapenda = activeAccount.role === 'petugas_bapenda';
 
   // Toggle state for Classic vs Consolidated Bento-Grid Dashboard layout with LocalStorage persistence
   const [dashboardStyle, setDashboardStyle] = useState<'classic' | 'consolidated'>(() => {
@@ -253,109 +254,123 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
   ).length;
 
   // Define menu items for UIX filtering
-  const menuItems = [
-    {
-      id: 'pemetaan',
-      title: isKepling ? 'Pemetaan Wilayah & WRS' : 'Peta Wilayah & WebGIS 24 Lingkungan',
-      desc: 'Gambar poligon batas wilayah, tandai titik rumah warga, pantau Wajib Retribusi Sampah (WRS), bansos, & kondisi jalan.',
-      category: 'gis',
-      icon: '🗺️',
-      badge: 'WEBGIS SPASIAL',
-      badgeColor: 'bg-amber-400 text-slate-950',
-      bgGradient: 'bg-gradient-to-r from-emerald-950 to-slate-900 text-white border-emerald-600/60',
-      action: () => onNavigate('pemetaan')
-    },
-    {
-      id: 'form',
-      title: 'Formulir Laporan Harian',
-      desc: 'Input kegiatan harian Kepala Lingkungan: trantib, infrastruktur, kebersihan, PBB, & kemasyarakatan.',
-      category: 'laporan',
-      icon: FileText,
-      iconBg: 'bg-emerald-50 text-emerald-600',
-      badge: 'UTAMA',
-      badgeColor: 'bg-red-100 text-red-800',
-      action: () => onNavigate('form')
-    },
-    {
-      id: 'kunjungan',
-      title: 'Kunjungan Harian Warga',
-      desc: 'Log & rekam interaksi sambang, silaturahmi, serta sosialisasi langsung ke rumah warga lingkungan.',
-      category: 'laporan',
-      icon: Users,
-      iconBg: 'bg-emerald-50 text-emerald-600',
-      badge: 'SOSIAL',
-      badgeColor: 'bg-emerald-100 text-emerald-800',
-      action: () => onNavigate('kunjungan')
-    },
-    {
-      id: 'riwayat',
-      title: isKepling ? 'Riwayat Laporan Saya' : 'Database Riwayat Laporan',
-      desc: 'Pusat arsip pencarian, filter, edit, verifikasi, dan ekspor laporan harian seluruh lingkungan.',
-      category: 'laporan',
-      icon: History,
-      iconBg: 'bg-slate-100 text-slate-700',
-      badge: 'ARSIP',
-      badgeColor: 'bg-slate-200 text-slate-800',
-      action: () => onNavigate('riwayat')
-    },
-    {
-      id: 'capaian',
-      title: isKepling ? 'Dashboard Capaian Saya' : 'Kelola Target & Capaian 24 Kepling',
-      desc: 'Grafik real-time realisasi target PBB, Perlinsos (DTKS), dan Trantibum secara transparan.',
-      category: 'capaian',
-      icon: Trophy,
-      iconBg: 'bg-amber-50 text-amber-600',
-      badge: 'TARGET',
-      badgeColor: 'bg-amber-100 text-amber-800',
-      action: () => onNavigate(isKepling ? 'capaian' : 'capaian_admin')
-    },
-    {
-      id: 'pbb_lingkungan',
-      title: isKepling ? `Data PBB Lingkungan ${activeAccount.nomorLingkungan || ''}` : `Rekapitulasi Realisasi PBB ${pbbYear}`,
-      desc: isKepling
-        ? `Pantau target nominal PBB, daftar SPPT Wajib Pajak Lingkungan ${activeAccount.nomorLingkungan || ''}, dan tandai WP lunas.`
-        : `Rekapitulasi target dan realisasi penerimaan PBB-P2 Tahun ${pbbYear} di 24 Lingkungan Kelurahan Mangga.`,
-      category: 'capaian',
-      icon: FileSpreadsheet,
-      iconBg: 'bg-emerald-50 text-emerald-700',
-      badge: isKepling ? 'PBB LINGKUNGAN' : `PBB ${pbbYear}`,
-      badgeColor: 'bg-emerald-100 text-emerald-800',
-      action: () => onNavigate('rekap_pbb')
-    },
-    {
-      id: 'kegiatan_khusus',
-      title: 'Absensi Kegiatan Khusus',
-      desc: 'Absensi check-in kegiatan kelurahan dengan validasi koordinat GPS dan foto selfie kehadiran.',
-      category: 'absen',
-      icon: UserCheck,
-      iconBg: 'bg-emerald-50 text-emerald-600',
-      badge: 'GPS ABSEN',
-      badgeColor: 'bg-teal-100 text-teal-800',
-      action: () => onNavigate('kegiatan_khusus')
-    },
-    ...(isAdmin ? [{
-      id: 'monitoring',
-      title: 'Monitoring 24 Kepling',
-      desc: 'Pantau status keaktifan laporan harian, rekapitulasi apel pagi, dan peta interaktif kelurahan.',
-      category: 'capaian',
-      icon: ShieldCheck,
-      iconBg: 'bg-amber-50 text-amber-600',
-      badge: 'ADMIN',
-      badgeColor: 'bg-rose-100 text-rose-800',
-      action: () => onNavigate('monitoring')
-    }] : []),
-    ...(isKasi ? [{
-      id: 'dashboard_kasi',
-      title: 'Dashboard Bidang Sektoral',
-      desc: 'Halaman khusus rekapitulasi data sektoral Anda (PBB / DTKS / Trantib) dengan akses verifikasi.',
-      category: 'capaian',
-      icon: Award,
-      iconBg: 'bg-teal-50 text-teal-600',
-      badge: 'KASI',
-      badgeColor: 'bg-teal-100 text-teal-800',
-      action: () => onNavigate('dashboard_kasi')
-    }] : [])
-  ];
+  const menuItems = isBapenda
+    ? [
+        {
+          id: 'pbb_lingkungan',
+          title: `Rekapitulasi Realisasi PBB ${pbbYear}`,
+          desc: `Pantau target dan realisasi penerimaan PBB-P2 Tahun ${pbbYear} di 24 Lingkungan Kelurahan Mangga (Akses Lihat Saja / Read-Only).`,
+          category: 'capaian',
+          icon: FileSpreadsheet,
+          iconBg: 'bg-emerald-50 text-emerald-700',
+          badge: `PBB ${pbbYear}`,
+          badgeColor: 'bg-emerald-100 text-emerald-800',
+          action: () => onNavigate('rekap_pbb'),
+        },
+      ]
+    : [
+        {
+          id: 'pemetaan',
+          title: isKepling ? 'Pemetaan Wilayah & WRS' : 'Peta Wilayah & WebGIS 24 Lingkungan',
+          desc: 'Gambar poligon batas wilayah, tandai titik rumah warga, pantau Wajib Retribusi Sampah (WRS), bansos, & kondisi jalan.',
+          category: 'gis',
+          icon: '🗺️',
+          badge: 'WEBGIS SPASIAL',
+          badgeColor: 'bg-amber-400 text-slate-950',
+          bgGradient: 'bg-gradient-to-r from-emerald-950 to-slate-900 text-white border-emerald-600/60',
+          action: () => onNavigate('pemetaan')
+        },
+        {
+          id: 'form',
+          title: 'Formulir Laporan Harian',
+          desc: 'Input kegiatan harian Kepala Lingkungan: trantib, infrastruktur, kebersihan, PBB, & kemasyarakatan.',
+          category: 'laporan',
+          icon: FileText,
+          iconBg: 'bg-emerald-50 text-emerald-600',
+          badge: 'UTAMA',
+          badgeColor: 'bg-red-100 text-red-800',
+          action: () => onNavigate('form')
+        },
+        {
+          id: 'kunjungan',
+          title: 'Kunjungan Harian Warga',
+          desc: 'Log & rekam interaksi sambang, silaturahmi, serta sosialisasi langsung ke rumah warga lingkungan.',
+          category: 'laporan',
+          icon: Users,
+          iconBg: 'bg-emerald-50 text-emerald-600',
+          badge: 'SOSIAL',
+          badgeColor: 'bg-emerald-100 text-emerald-800',
+          action: () => onNavigate('kunjungan')
+        },
+        {
+          id: 'riwayat',
+          title: isKepling ? 'Riwayat Laporan Saya' : 'Database Riwayat Laporan',
+          desc: 'Pusat arsip pencarian, filter, edit, verifikasi, dan ekspor laporan harian seluruh lingkungan.',
+          category: 'laporan',
+          icon: History,
+          iconBg: 'bg-slate-100 text-slate-700',
+          badge: 'ARSIP',
+          badgeColor: 'bg-slate-200 text-slate-800',
+          action: () => onNavigate('riwayat')
+        },
+        {
+          id: 'capaian',
+          title: isKepling ? 'Dashboard Capaian Saya' : 'Kelola Target & Capaian 24 Kepling',
+          desc: 'Grafik real-time realisasi target PBB, Perlinsos (DTKS), dan Trantibum secara transparan.',
+          category: 'capaian',
+          icon: Trophy,
+          iconBg: 'bg-amber-50 text-amber-600',
+          badge: 'TARGET',
+          badgeColor: 'bg-amber-100 text-amber-800',
+          action: () => onNavigate(isKepling ? 'capaian' : 'capaian_admin')
+        },
+        {
+          id: 'pbb_lingkungan',
+          title: isKepling ? `Data PBB Lingkungan ${activeAccount.nomorLingkungan || ''}` : `Rekapitulasi Realisasi PBB ${pbbYear}`,
+          desc: isKepling
+            ? `Pantau target nominal PBB, daftar SPPT Wajib Pajak Lingkungan ${activeAccount.nomorLingkungan || ''}, dan tandai WP lunas.`
+            : `Rekapitulasi target dan realisasi penerimaan PBB-P2 Tahun ${pbbYear} di 24 Lingkungan Kelurahan Mangga.`,
+          category: 'capaian',
+          icon: FileSpreadsheet,
+          iconBg: 'bg-emerald-50 text-emerald-700',
+          badge: isKepling ? 'PBB LINGKUNGAN' : `PBB ${pbbYear}`,
+          badgeColor: 'bg-emerald-100 text-emerald-800',
+          action: () => onNavigate('rekap_pbb')
+        },
+        {
+          id: 'kegiatan_khusus',
+          title: 'Absensi Kegiatan Khusus',
+          desc: 'Absensi check-in kegiatan kelurahan dengan validasi koordinat GPS dan foto selfie kehadiran.',
+          category: 'absen',
+          icon: UserCheck,
+          iconBg: 'bg-emerald-50 text-emerald-600',
+          badge: 'GPS ABSEN',
+          badgeColor: 'bg-teal-100 text-teal-800',
+          action: () => onNavigate('kegiatan_khusus')
+        },
+        ...(isAdmin ? [{
+          id: 'monitoring',
+          title: 'Monitoring 24 Kepling',
+          desc: 'Pantau status keaktifan laporan harian, rekapitulasi apel pagi, dan peta interaktif kelurahan.',
+          category: 'capaian',
+          icon: ShieldCheck,
+          iconBg: 'bg-amber-50 text-amber-600',
+          badge: 'ADMIN',
+          badgeColor: 'bg-rose-100 text-rose-800',
+          action: () => onNavigate('monitoring')
+        }] : []),
+        ...(isKasi ? [{
+          id: 'dashboard_kasi',
+          title: 'Dashboard Bidang Sektoral',
+          desc: 'Halaman khusus rekapitulasi data sektoral Anda (PBB / DTKS / Trantib) dengan akses verifikasi.',
+          category: 'capaian',
+          icon: Award,
+          iconBg: 'bg-teal-50 text-teal-600',
+          badge: 'KASI',
+          badgeColor: 'bg-teal-100 text-teal-800',
+          action: () => onNavigate('dashboard_kasi')
+        }] : [])
+      ];
 
   const filteredMenus = menuItems.filter((item) => {
     const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

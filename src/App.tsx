@@ -174,6 +174,10 @@ export default function App() {
   const [pemetaanTargetLingkungan, setPemetaanTargetLingkungan] = useState<string | undefined>(undefined);
 
   const handleNavigateToPemetaan = (lingkunganNomor?: number | string) => {
+    if (activeAccount.role === 'petugas_bapenda') {
+      showToast('Akses Dibatasi: Petugas Bapenda tidak memiliki izin untuk melihat Peta WebGIS.', 'error');
+      return;
+    }
     if (lingkunganNomor !== undefined && lingkunganNomor !== null && String(lingkunganNomor).trim() !== '') {
       const rawStr = String(lingkunganNomor).trim();
       const idVal = rawStr.startsWith('kepling_') ? rawStr : `kepling_${rawStr}`;
@@ -183,6 +187,13 @@ export default function App() {
     }
     setActiveTab('pemetaan');
   };
+
+  // Enforce Petugas Bapenda strict PBB-only tab
+  useEffect(() => {
+    if (activeAccount.role === 'petugas_bapenda' && activeTab !== 'rekap_pbb') {
+      setActiveTab('rekap_pbb');
+    }
+  }, [activeAccount.role, activeTab]);
 
   // Kasi Dashboard Target Mapping and Pemerintahan date states
   const [targetsMap, setTargetsMap] = useState<TargetsCapaianMap>(getDefaultTargetsCapaianMap);
@@ -752,6 +763,9 @@ export default function App() {
     if (account.role === 'super_admin') {
       setActiveTab('monitoring');
       setRiwayatFilterPetugas(undefined);
+    } else if (account.role === 'petugas_bapenda') {
+      setActiveTab('rekap_pbb');
+      setRiwayatFilterPetugas(undefined);
     } else if (
       account.role === 'kasi_pemerintahan' ||
       account.role === 'kasi_pembangunan' ||
@@ -1044,19 +1058,21 @@ export default function App() {
             ) : (
               <>
                 {/* Admin/Kasi Shared Tab - Hub */}
-                <button
-                  id="tab-hub-admin"
-                  type="button"
-                  onClick={() => setActiveTab('hub')}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                    activeTab === 'hub'
-                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
-                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
-                  }`}
-                >
-                  <Compass className={`w-4 h-4 ${activeTab === 'hub' ? 'text-white' : 'text-emerald-700'}`} />
-                  <span>Pusat Menu</span>
-                </button>
+                {activeAccount.role !== 'petugas_bapenda' && (
+                  <button
+                    id="tab-hub-admin"
+                    type="button"
+                    onClick={() => setActiveTab('hub')}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                      activeTab === 'hub'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                    }`}
+                  >
+                    <Compass className={`w-4 h-4 ${activeTab === 'hub' ? 'text-white' : 'text-emerald-700'}`} />
+                    <span>Pusat Menu</span>
+                  </button>
+                )}
 
                 {/* Kasi Sektoral Dashboard Tab */}
                 {(activeAccount.role === 'kasi_pemerintahan' ||
@@ -1085,7 +1101,7 @@ export default function App() {
                     </span>
                   </button>
                 )}
-                {(activeAccount.role === 'kasi_pemerintahan' || activeAccount.role === 'super_admin') && (
+                {(activeAccount.role === 'kasi_pemerintahan' || activeAccount.role === 'super_admin' || activeAccount.role === 'petugas_bapenda') && (
                   <button
                     id="tab-rekap-pbb-kasi"
                     type="button"
@@ -1099,7 +1115,7 @@ export default function App() {
                     <FileSpreadsheet className={`w-4 h-4 ${activeTab === 'rekap_pbb' ? 'text-white' : 'text-emerald-700'}`} />
                     <span>Realisasi PBB</span>
                     <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'rekap_pbb' ? 'bg-emerald-700 text-emerald-100' : 'bg-emerald-100 text-emerald-800'}`}>
-                      2026
+                      {activeAccount.role === 'petugas_bapenda' ? 'BAPENDA' : '2026'}
                     </span>
                   </button>
                 )}

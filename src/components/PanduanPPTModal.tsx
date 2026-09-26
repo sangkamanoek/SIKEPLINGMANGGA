@@ -529,12 +529,12 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
       
       s1.addText('PEMERINTAH KOTA MEDAN • KECAMATAN MEDAN TUNTUNGAN', {
         x: 1.0, y: 1.2, w: 11.33, h: 0.4,
-        fontSize: 14, bold: true, color: '6EE7B7', align: 'center', characterSpacing: 2
+        fontSize: 14, bold: true, color: '6EE7B7', align: 'center', charSpacing: 2
       });
 
       s1.addText('KELURAHAN MANGGA', {
         x: 1.0, y: 1.7, w: 11.33, h: 0.6,
-        fontSize: 24, bold: true, color: 'ECFDF5', align: 'center', characterSpacing: 4
+        fontSize: 24, bold: true, color: 'ECFDF5', align: 'center', charSpacing: 4
       });
 
       s1.addText('SI-KEPLING MANGGA PRIMA', {
@@ -561,7 +561,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
 
       s1.addText('#MEDANUNTUKSEMUA  •  #SEMUAUNTUKMEDAN', {
         x: 1.0, y: 6.8, w: 11.33, h: 0.4,
-        fontSize: 12, bold: true, color: '34D399', align: 'center', characterSpacing: 2
+        fontSize: 12, bold: true, color: '34D399', align: 'center', charSpacing: 2
       });
 
       // Helper for slide template
@@ -572,7 +572,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
         
         slide.addText(category.toUpperCase(), {
           x: 0.8, y: 0.15, w: 9.0, h: 0.25,
-          fontSize: 10, bold: true, color: '34D399', characterSpacing: 1.5
+          fontSize: 10, bold: true, color: '34D399', charSpacing: 1.5
         });
 
         slide.addText(title, {
@@ -894,7 +894,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
 
       s10.addText('#MEDANUNTUKSEMUA  •  #SEMUAUNTUKMEDAN', {
         x: 1.0, y: 6.3, w: 11.33, h: 0.4,
-        fontSize: 14, bold: true, color: 'FFFFFF', align: 'center', characterSpacing: 2
+        fontSize: 14, bold: true, color: 'FFFFFF', align: 'center', charSpacing: 2
       });
 
       // Download file

@@ -41,6 +41,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const isKepling = activeAccount.role === 'kepling';
   const isAdmin = activeAccount.role === 'super_admin';
   const isKasi = activeAccount.role.startsWith('kasi_');
+  const isBapenda = activeAccount.role === 'petugas_bapenda';
+
+  if (isBapenda) {
+    return null;
+  }
 
   return (
     <aside

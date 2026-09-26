@@ -120,14 +120,16 @@ export type UserRole =
   | 'kepling'
   | 'kasi_pemerintahan'
   | 'kasi_pembangunan'
-  | 'kasi_trantibum';
+  | 'kasi_trantibum'
+  | 'petugas_bapenda';
 
 export const isKelurahanAdmin = (role: UserRole | string): boolean => {
   return (
     role === 'super_admin' ||
     role === 'kasi_pemerintahan' ||
     role === 'kasi_pembangunan' ||
-    role === 'kasi_trantibum'
+    role === 'kasi_trantibum' ||
+    role === 'petugas_bapenda'
   );
 };
 

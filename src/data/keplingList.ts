@@ -58,9 +58,21 @@ export const KASI_ACCOUNTS: UserAccount[] = [
   KASI_TRANTIBUM_ACCOUNT,
 ];
 
+export const PETUGAS_BAPENDA_ACCOUNT: UserAccount = {
+  id: 'petugas_bapenda',
+  role: 'petugas_bapenda',
+  lingkungan: 'Bapenda Kota Medan',
+  nama: 'PETUGAS BAPENDA KOTA MEDAN',
+  jabatan: 'Pengawas / Auditor Pajak Daerah Bapenda Medan (Lihat Saja)',
+  kelurahan: 'Kelurahan Mangga',
+  kecamatan: 'Kecamatan Medan Tuntungan',
+  password: 'bapenda2026',
+};
+
 export const ADMIN_ACCOUNTS: UserAccount[] = [
   SUPER_ADMIN_ACCOUNT,
   ...KASI_ACCOUNTS,
+  PETUGAS_BAPENDA_ACCOUNT,
 ];
 
 export const KEPLING_ACCOUNTS: UserAccount[] = [
@@ -333,6 +345,7 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
 export const ALL_ACCOUNTS: UserAccount[] = [
   SUPER_ADMIN_ACCOUNT,
   ...KASI_ACCOUNTS,
+  PETUGAS_BAPENDA_ACCOUNT,
   ...KEPLING_ACCOUNTS,
 ];
 
@@ -708,6 +721,13 @@ export const getFixedAccountsList = (): FixedAccountOption[] => {
       role: 'kasi_trantibum',
       defaultPasswordHint: 'trantib_mangga2026',
     },
+    {
+      username: 'petugas_bapenda',
+      nama: 'PETUGAS BAPENDA KOTA MEDAN (VIEWER)',
+      lingkungan: 'Bapenda Kota Medan',
+      role: 'petugas_bapenda',
+      defaultPasswordHint: 'bapenda2026',
+    },
     ...KEPLING_ACCOUNTS.map((k) => {
       const eff = getEffectiveAccount(k);
       return {
@@ -750,6 +770,13 @@ export const FIXED_ACCOUNTS_LIST: FixedAccountOption[] = [
     lingkungan: 'Kantor Kelurahan Mangga',
     role: 'kasi_trantibum',
     defaultPasswordHint: 'trantib_mangga2026',
+  },
+  {
+    username: 'petugas_bapenda',
+    nama: 'PETUGAS BAPENDA KOTA MEDAN (VIEWER)',
+    lingkungan: 'Bapenda Kota Medan',
+    role: 'petugas_bapenda',
+    defaultPasswordHint: 'bapenda2026',
   },
   ...KEPLING_ACCOUNTS.map((k) => ({
     username: k.id,
