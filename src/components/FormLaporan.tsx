@@ -88,6 +88,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   useEffect(() => {
     const unsubEvents = subscribeCustomEventsFromFirestore((data) => setEventList(data));
     const unsubAttendance = subscribeEventAttendanceFromFirestore((data) => setEventAttendanceList(data));
+    
     return () => {
       unsubEvents();
       unsubAttendance();

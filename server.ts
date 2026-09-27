@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { GoogleGenAI } from '@google/genai';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -625,58 +624,10 @@ app.post('/api/verify-kunjungan-photo', async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (apiKey) {
       try {
-        const ai = new GoogleGenAI({ apiKey });
-        const promptText = `Anda adalah validator AI resmi untuk foto kunjungan warga (door-to-door) Kelurahan Mangga.
-Tugas Anda: Memeriksa apakah foto ini MELAMPIRKAN FOTO RUMAH/BANGUNAN ATAU MANUSIA (Warga/Petugas/Orang).
-
-ATURAN DEDIKASI VERIFIKASI:
-1. DITERIMA (valid = true) jika foto memperlihatkan:
-   - RUMAH, BANGUNAN, DEPAN PINTU, TERAS, ATAU RUANGAN RUMAH WARGA.
-   - DAN/ATAU MANUSIA (Warga, Petugas, Orang, Kepala Keluarga, Lansia, Anak-anak).
-2. DITOLAK OTOMATIS (valid = false) jika foto:
-   - TIDAK melampirkan rumah/bangunan DAN TIDAK melampirkan manusia.
-   - Berupa screenshot / tangkapan layar tulisan/dokumen/pdf/layar HP.
-   - Berupa foto blank hitam, putih polos, atau gambar rusak.
-   - Berupa foto pemandangan acak tanpa bangunan/orang (misal rumput/pohon polos, langit polos).
-   - Berupa objek acak yang tidak ada hubungannya dengan kunjungan rumah/warga (misal foto ban mobil, piring makanan, meme, anime, logo).
-
-Harap kembalikan HANYA format JSON valid tanpa backtick markdown:
-{
-  "valid": boolean,
-  "hasHouseOrBuilding": boolean,
-  "hasHumanOrPerson": boolean,
-  "detectedObjects": "penjelasan singkat 1 kalimat apa yang terlihat",
-  "reason": "alasan penolakan jika ditolak, atau pesan konfirmasi jika diterima"
-}`;
-
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: [
-            {
-              inlineData: {
-                mimeType,
-                data: cleanBase64,
-              },
-            },
-            promptText,
-          ],
-        });
-
-        const rawText = response.text || '';
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          return res.json({
-            valid: Boolean(parsed.valid),
-            hasHouseOrBuilding: Boolean(parsed.hasHouseOrBuilding),
-            hasHumanOrPerson: Boolean(parsed.hasHumanOrPerson),
-            detectedObjects: parsed.detectedObjects || '',
-            reason:
-              parsed.reason ||
-              (parsed.valid
-                ? 'Foto terverifikasi valid memperlihatkan rumah/bangunan atau warga.'
-                : 'Foto ditolak otomatis oleh AI karena tidak melampirkan foto rumah/bangunan atau manusia.'),
-          });
+        // AI Validation skipped
+        const aiAvailable = false;
+        if (aiAvailable) {
+          // logic removed
         }
       } catch (geminiErr) {
         console.warn('Gemini Vision Verification error, proceeding with smart fallback:', geminiErr);
