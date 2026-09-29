@@ -169,16 +169,23 @@ export function computeLingkunganPemetaanStats(
         totalGereja++;
       }
     } else if (
-      cat === 'SPBU_STASIUN' ||
+      (cat as string) === 'SPBU_STASIUN' ||
       /\b(spbu|pertashop|pertamina)\b/i.test(nameLower) ||
       /\b(spbu|pertashop|pertamina)\b/i.test(jfLower)
     ) {
       totalFasilitasPublik++;
       totalSpbu++;
     } else if (
+      (cat as string) === 'POSKAMLING' ||
+      /\b(poskamling|pos ronda|siskamling|pos kamling)\b/i.test(nameLower) ||
+      /\b(poskamling|pos ronda|siskamling|pos kamling)\b/i.test(jfLower)
+    ) {
+      totalFasilitasPublik++;
+      totalKantorFasum++;
+    } else if (
       cat === 'KANTOR_FASUM' ||
-      /\b(kantor|lurah|balai|poskamling|pelayanan)\b/i.test(nameLower) ||
-      /\b(kantor|lurah|balai|poskamling|pelayanan)\b/i.test(jfLower)
+      /\b(kantor|lurah|balai|pelayanan)\b/i.test(nameLower) ||
+      /\b(kantor|lurah|balai|pelayanan)\b/i.test(jfLower)
     ) {
       totalFasilitasPublik++;
       totalKantorFasum++;

@@ -75,9 +75,45 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["accountId"]
+    },
+    "DataKeluarga": {
+      "title": "Data Keluarga (Kartu Keluarga)",
+      "description": "Basis data kependudukan, demografi, tingkat kesejahteraan (desil/bansos), dan sanitasi keluarga.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nomorKk": { "type": "string" },
+        "nikKepalaKeluarga": { "type": "string" },
+        "namaKepalaKeluarga": { "type": "string" },
+        "telepon": { "type": "string" },
+        "lingkunganId": { "type": "string" },
+        "lingkunganNomor": { "type": "number" },
+        "lingkunganNama": { "type": "string" },
+        "namaJalan": { "type": "string" },
+        "nomorRumah": { "type": "string" },
+        "alamatLengkap": { "type": "string" },
+        "statusDomisili": { "type": "string" },
+        "jumlahAnggotaKeluarga": { "type": "number" },
+        "desilKesejahteraan": { "type": "string" },
+        "penerimaBansos": { "type": "boolean" },
+        "bantuanDiterima": { "type": "array" },
+        "jambanKeluarga": { "type": "string" },
+        "sumberAirMinum": { "type": "string" },
+        "sumberAirBersih": { "type": "string" },
+        "tempatAkhirTinja": { "type": "string" },
+        "pembuanganSampahRumah": { "type": "string" },
+        "statusStuntingRentan": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "nomorKk", "namaKepalaKeluarga", "lingkunganId", "namaJalan"]
     }
   },
   "firestore": {
+    "data_keluarga/{keluargaId}": {
+      "schema": "DataKeluarga",
+      "description": "Koleksi basis data profil keluarga, desil, bansos, dan sanitasi per KK."
+    },
     "reports/{reportId}": {
       "schema": "Report",
       "description": "Koleksi utama laporan harian."

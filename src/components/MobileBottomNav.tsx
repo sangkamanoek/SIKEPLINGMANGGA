@@ -21,7 +21,9 @@ export type AppTabType =
   | 'kunjungan'
   | 'dashboard_kasi'
   | 'kegiatan_khusus'
-  | 'pemetaan';
+  | 'pemetaan'
+  | 'rekap_pbb'
+  | 'database_keluarga';
 
 interface MobileBottomNavProps {
   activeTab: AppTabType;

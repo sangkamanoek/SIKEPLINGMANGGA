@@ -14,6 +14,8 @@ import {
   X,
   MapPin,
   Send,
+  Archive,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { UserAccount, isKelurahanAdmin } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
@@ -28,7 +30,7 @@ import {
   doc,
 } from 'firebase/firestore';
 import { downloadImage, downloadMultipleImages } from '../lib/imageDownloader';
-import { exportKunjunganWargaToExcel } from '../lib/excelExport';
+import { exportKunjunganWargaToExcel, exportKunjunganWargaZipPackage } from '../lib/excelExport';
 import { safeGetLocalStorage, safeSetLocalStorage } from '../lib/safeStorage';
 
 const STORAGE_CACHE_KEY = 'sikepling_kunjungan_harian_list_v1';
@@ -59,6 +61,8 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const [copiedWA, setCopiedWA] = useState<boolean>(false);
   const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false);
   const [isSharingExcel, setIsSharingExcel] = useState<boolean>(false);
+  const [isExportingZip, setIsExportingZip] = useState<boolean>(false);
+  const [zipProgress, setZipProgress] = useState<{ current: number; total: number } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Label tampilan tanggal/periode terpilih untuk Laporan/WA/Print/Excel
@@ -330,6 +334,29 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     }
   };
 
+  // ZIP Package Export Handler (Excel + Seluruh File Foto Asli Resolusi Penuh)
+  const handleExportZip = async () => {
+    if (filtered.length === 0) {
+      alert('Tidak ada data kunjungan untuk diekspor ke paket ZIP.');
+      return;
+    }
+    const photosToPack = filtered.filter((r) => Boolean(r.fotoDokumentasi)).length;
+    setIsExportingZip(true);
+    setZipProgress({ current: 0, total: photosToPack });
+    try {
+      await exportKunjunganWargaZipPackage(filtered, dateDisplayLabel, (curr, tot) => {
+        setZipProgress({ current: curr, total: tot });
+      });
+      showToast('Paket ZIP lengkap (Excel + Folder Foto Asli) berhasil diunduh!');
+    } catch (e) {
+      console.error('Gagal mengemas paket ZIP:', e);
+      alert('Gagal membuat paket ZIP: ' + e);
+    } finally {
+      setIsExportingZip(false);
+      setZipProgress(null);
+    }
+  };
+
   return (
     <div id="lembar-cetak-kunjungan-harian" className="space-y-5">
       {/* Kop Surat Resmi Pemko Medan (Hanya Tampak Saat Cetak PDF/Printer) */}
@@ -547,29 +574,52 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
 
           {/* Export & Sharing Buttons */}
           <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto justify-start sm:justify-end">
-            {/* Share / Bagikan Excel ke WA / HP */}
+            {/* Share / Bagikan Excel Bergambar ke WA / HP */}
             <button
               type="button"
               onClick={handleShareExcel}
               disabled={isSharingExcel}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
-              title="Bagikan file Excel langsung ke WhatsApp / HP"
+              title="Bagikan file Excel dengan FOTO ASLI langsung tertanam di dalam sel ke WhatsApp / HP"
             >
               <Send className="w-3.5 h-3.5 text-emerald-200" />
-              <span>{isSharingExcel ? 'Menyiapkan...' : 'Share Excel'}</span>
+              <span>{isSharingExcel ? 'Menyematkan Foto...' : 'Share Excel Bergambar'}</span>
             </button>
 
-            {/* Unduh File Excel */}
+            {/* Unduh File Excel Bergambar */}
             <button
               type="button"
               onClick={handleExportExcel}
               disabled={isExportingExcel}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
-              title="Unduh tabel kunjungan ke format Excel (.xlsx)"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-400 text-emerald-950 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
+              title="Unduh tabel Excel (.xlsx) dengan foto dokumentasi langsung tertanam di dalam sel"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
-              <span>{isExportingExcel ? 'Exporting...' : 'Unduh .xlsx'}</span>
+              <span className="flex items-center gap-1">
+                <span>{isExportingExcel ? 'Menyematkan Foto...' : 'Unduh Excel (.xlsx)'}</span>
+                <span className="hidden md:inline-block px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-200 text-emerald-900">
+                  + FOTO
+                </span>
+              </span>
             </button>
+
+            {/* Unduh Paket Lengkap ZIP: Excel + Folder Foto Asli */}
+            {photosCount > 0 && (
+              <button
+                type="button"
+                onClick={handleExportZip}
+                disabled={isExportingZip}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-950 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
+                title="Unduh satu paket arsip ZIP berisi file Excel + folder seluruh file foto asli resolusi tinggi"
+              >
+                <Archive className="w-3.5 h-3.5 text-amber-700" />
+                <span>
+                  {isExportingZip
+                    ? `Packing ZIP (${zipProgress?.current}/${zipProgress?.total})...`
+                    : 'Paket ZIP (Excel + Semua Foto)'}
+                </span>
+              </button>
+            )}
 
             {/* Salin Format Teks WA */}
             <button
@@ -750,7 +800,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               <tbody className="divide-y divide-slate-200">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-10 text-center text-slate-400 font-medium">
+                    <td colSpan={10} className="py-10 text-center text-slate-400 font-medium">
                       Belum ada catatan kunjungan pada {dateDisplayLabel}. Gunakan formulir di atas untuk menambahkan.
                     </td>
                   </tr>

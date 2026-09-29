@@ -18,7 +18,26 @@ export interface KinerjaHarian {
   poskamlingStatus?: string; // e.g. 'Aktif Ronda', 'Patroli Bersama', 'Pemeriksaan Pos', 'Situasi Kondusif'
   poskamlingLokasi?: string; // e.g. 'Pos Ronda Lingkungan IV'
   poskamlingPetugas?: string; // e.g. 'Kepling & 3 Warga'
+  poskamlingJumlahPetugas?: number | string; // e.g. 4 or '4 Orang'
+  poskamlingJamOperasional?: string; // e.g. '21.00 - 04.00 WIB'
   poskamlingKeterangan?: string; // e.g. 'Patroli lingkungan berjalan aman dan kondusif'
+
+  // Tugas Tambahan POSYANDU & LAYANAN KESEHATAN WARGA
+  posyanduAdaGiat?: boolean;
+  posyanduNama?: string; // e.g. 'Posyandu Melati Lingkungan IV'
+  posyanduLokasi?: string; // e.g. 'Balai Warga Jl. Bunga Rinte No. 12'
+  posyanduJumlahPetugasKader?: number | string; // e.g. '5 Kader + 1 Bidan Kelurahan'
+  posyanduJumlahWargaTotal?: number | string; // Total kumulatif warga dilayani
+  // Rincian Kelompok Usia Lengkap dari 0 Tahun sampai Lansia
+  posyanduBayi02Tahun?: number | string; // Usia 0 - 2 Tahun (0-23 bulan / Baduta & Imunisasi)
+  posyanduBalita25Tahun?: number | string; // Usia 2 - 5 Tahun (24-59 bulan / Balita & Stunting)
+  posyanduAnak612Tahun?: number | string; // Usia 6 - 12 Tahun (Pra-Sekolah & Anak Sekolah)
+  posyanduRemaja1318Tahun?: number | string; // Usia 13 - 18 Tahun (Remaja & Konseling)
+  posyanduDewasaIbuHamil1959Tahun?: number | string; // Usia 19 - 59 Tahun (Ibu Hamil, Busui, Usia Produktif)
+  posyanduLansia60TahunKeatas?: number | string; // Usia 60+ Tahun (Lansia / Lanjut Usia & PTM)
+  posyanduJenisLayanan?: string[]; // ['Penimbangan & Pengukuran Stunting', 'Imunisasi Lengkap', 'Pemberian Vitamin A & Obat Cacing', 'PMT Balita/Bumil', 'Pemeriksaan ANC Bumil', 'Skrining Lansia & PTM', 'Integrasi Layanan Primer (ILP)']
+  posyanduKeterangan?: string; // Catatan hasil posyandu
+
   kegiatanLainnya?: string;
   // Poin 6: Kegiatan Pemantauan Kondisi Infrastruktur Wilayah
   infrastrukturAdaGiat?: boolean;
@@ -34,7 +53,7 @@ export interface FotoDokumentasi {
   url: string;
   name: string;
   timestamp: string;
-  kategori?: 'poskamling' | 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'apel' | 'umum' | 'infrastruktur' | 'lainnya' | string;
+  kategori?: 'poskamling' | 'posyandu' | 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'apel' | 'umum' | 'infrastruktur' | 'lainnya' | string;
 }
 
 export interface InfoAbsenApelLaporan {
@@ -260,11 +279,20 @@ export interface TitikRumahBangunan {
   jumlahLansia: number;
   jumlahAnak: number;
   pekerjaanKk: string;
-  // Bansos
+  // Tingkat Kesejahteraan & Bansos (Data Utama)
+  desilKesejahteraan?: string; // 'Desil 1 (Sangat Miskin)', 'Desil 2 (Miskin)', 'Desil 3 (Hampir Miskin)', 'Desil 4 (Rentan Miskin)', 'Desil 5 (Menengah Bawah)', 'Desil 6-10 (Mampu / Non-Desil)'
+  desilBansos?: string; // fallback compatibility
   penerimaBansos: boolean;
-  jenisBansos?: string[]; // ['PKH', 'BPNT', 'BLT', 'PBI-JK', 'Lainnya']
-  desilBansos?: string; // 'Desil 1', 'Desil 2', 'Desil 3', 'Desil 4', 'Desil 5', 'Desil 6-10'
+  jenisBansos?: string[]; // ['PKH Medan Makmur', 'PKH Nasional', 'BPNT / Sembako', 'BLT / DBH', 'PBI-JK (BPJS Gratis)', 'Bedah Rumah / RTLH', 'PIP / Beasiswa', 'Lainnya']
   kategoriRentan?: boolean;
+  
+  // Sanitasi & Kesehatan Lingkungan Keluarga
+  jambanKeluarga?: 'Jamban Sendiri (Leher Angsa / Septik SNI)' | 'Jamban Bersama / Komunal' | 'Jamban Cemplung / Plengsengan' | 'Tidak Memiliki Jamban (BABS)' | string;
+  sumberAirMinum?: 'PDAM / Air Perpipaan' | 'Depot Isi Ulang' | 'Air Kemasan Bermerek' | 'Sumur Bor Terlindungi' | 'Sumur Gali' | 'Mata Air / Air Hujan' | string;
+  sumberAirBersih?: 'PDAM Tirtanadi' | 'Sumur Bor Listrik' | 'Sumur Gali' | 'Sungai / Lainnya' | string;
+  pembuanganSampahRumah?: 'Diangkut Petugas / WRS' | 'Bank Sampah / Daur Ulang' | 'Dibakar / Ditimbun Mandiri' | 'Dibuang Sembarangan' | string;
+  statusStuntingRentan?: 'Ada Balita / Baduta Berisiko Stunting' | 'Ada Ibu Hamil KEK / Resti' | 'Bebas Risiko Stunting' | string;
+  tempatAkhirTinja?: 'Tangki Septik / SPALD' | 'Saluran Terbuka / Parit' | 'Lubang Tanah / Lainnya' | string;
   // WRS (Wajib Retribusi Sampah)
   statusWrs: StatusWrs;
   tarifRetribusi?: number; // e.g. 15000
@@ -318,6 +346,153 @@ export interface RuasJalanLingkungan {
   jumlahHunianRumah?: number;
   jumlahUsahaToko?: number;
   fotoJalanUrl?: string;
+  catatan?: string;
+  createdAt: string;
+  updatedAt?: string;
+  createdByName?: string;
+}
+
+// ==========================================
+// DATABASE DATA KELUARGA (FAMILY DATABASE)
+// ==========================================
+
+export type HubunganKeluargaType =
+  | 'Kepala Keluarga'
+  | 'Istri'
+  | 'Anak'
+  | 'Orang Tua'
+  | 'Mertua'
+  | 'Famili Lain'
+  | 'Lainnya';
+
+export type StatusPerkawinanType = 'Belum Kawin' | 'Kawin' | 'Cerai Hidup' | 'Cerai Mati';
+
+export type AgamaType = 'Islam' | 'Kristen Protestan' | 'Katolik' | 'Hindu' | 'Buddha' | 'Konghucu';
+
+export type StatusBpjsKesehatanType =
+  | 'PBI-JK (Bansos APBD/APBN)'
+  | 'Mandiri (Bayar Sendiri)'
+  | 'PPU (Pekerja Penerima Upah)'
+  | 'Belum Memiliki BPJS';
+
+export interface AnggotaKeluarga {
+  id: string; // e.g. "ang_1271010101230001_1"
+  nik: string; // NIK 16 digit
+  nama: string;
+  hubunganKeluarga: HubunganKeluargaType;
+  jenisKelamin: 'L' | 'P';
+  tempatLahir?: string;
+  tanggalLahir?: string; // YYYY-MM-DD
+  usia: number;
+  agama: AgamaType | string;
+  pendidikanTerakhir: string; // 'SD', 'SMP', 'SMA/SMK', 'D3', 'S1', 'S2', 'Belum Sekolah', dll.
+  pekerjaan: string;
+  statusPerkawinan: StatusPerkawinanType;
+  // Kepemilikan Dokumen Adminduk
+  memilikiKtpIkd: boolean; // KTP-el / IKD Aktif
+  memilikiAktaKelahiran: boolean;
+  memilikiKia?: boolean; // Kartu Identitas Anak (<17 th)
+  // Jaminan Sosial Kesehatan & Ketenagakerjaan
+  statusBpjsKesehatan: StatusBpjsKesehatanType;
+  terdaftarBpjsKetenagakerjaan?: boolean;
+  catatanKhusus?: string; // e.g. Disabilitas, Penyakit Kronis, Hamil
+}
+
+export interface DataKeluarga {
+  id: string; // unique ID: e.g. "kk_1271010_1234567890123456"
+  nomorKk: string; // Nomor Kartu Keluarga (16 digit)
+  nikKepalaKeluarga: string; // NIK Kepala Keluarga (16 digit)
+  namaKepalaKeluarga: string;
+  telepon?: string; // Kontak WA / Telp
+
+  // Wilayah Administratif
+  lingkunganId: string; // "kepling_1" ... "kepling_24"
+  lingkunganNomor: number; // 1 - 24
+  lingkunganNama: string; // "Lingkungan I" ... "Lingkungan XXIV"
+  namaJalan: string; // e.g. "Jl. Bunga Raya Gg. Melati"
+  nomorRumah?: string; // e.g. "No. 14A"
+  rt?: string; // e.g. "001"
+  rw?: string; // e.g. "002"
+  alamatLengkap: string;
+  statusDomisili: 'KK Kelurahan Mangga (KTP/KK Setempat)' | 'Bukan KK Mangga (Domisili Luar/Kontrak)' | string;
+  titikKoordinat?: {
+    lat: number;
+    lng: number;
+  };
+
+  // Demografi Keluarga
+  jumlahAnggotaKeluarga: number;
+  jumlahLakiLaki: number;
+  jumlahPerempuan: number;
+  jumlahBalita: number; // 0-5 tahun
+  jumlahUsiaSekolah: number; // 6-18 tahun
+  jumlahUsiaProduktif: number; // 19-59 tahun
+  jumlahLansia: number; // 60+ tahun
+  pekerjaanUtamaKepalaKeluarga?: string;
+  penghasilanRataRata?: string; // e.g. '< 1 Juta', '1 - 2.5 Juta', '2.5 - 5 Juta', '> 5 Juta'
+
+  // Anggota Keluarga Terdaftar
+  anggotaKeluarga: AnggotaKeluarga[];
+
+  // Tingkat Kesejahteraan & Bantuan Sosial (Data Utama)
+  desilKesejahteraan:
+    | 'Desil 1 (Sangat Miskin)'
+    | 'Desil 2 (Miskin)'
+    | 'Desil 3 (Hampir Miskin)'
+    | 'Desil 4 (Rentan Miskin)'
+    | 'Desil 5 (Menengah Bawah)'
+    | 'Desil 6-10 (Mampu / Non-Desil)'
+    | string;
+  penerimaBansos: boolean;
+  bantuanDiterima: string[]; // ['PKH Medan Makmur', 'PKH Nasional', 'BPNT / Sembako', 'BLT / DBH', 'PBI-JK (BPJS Gratis)', 'Bedah Rumah / RTLH', 'PIP / Beasiswa', 'Lainnya']
+  kategoriRentan?: string[]; // ['Lansia Tunggal', 'Penyandang Disabilitas', 'Balita Pantau Stunting', 'Ibu Hamil KEK / Resti', 'Keluarga Rentan']
+
+  // Sanitasi & Kesehatan Lingkungan Keluarga
+  jambanKeluarga:
+    | 'Jamban Sendiri (Leher Angsa / Septik SNI)'
+    | 'Jamban Bersama / Komunal'
+    | 'Jamban Cemplung / Plengsengan'
+    | 'Tidak Memiliki Jamban (BABS)'
+    | string;
+  tempatAkhirTinja: 'Tangki Septik / SPALD' | 'Saluran Terbuka / Parit' | 'Lubang Tanah / Lainnya' | string;
+  sumberAirMinum:
+    | 'PDAM / Air Perpipaan'
+    | 'Depot Isi Ulang'
+    | 'Air Kemasan Bermerek'
+    | 'Sumur Bor Terlindungi'
+    | 'Sumur Gali'
+    | 'Mata Air / Air Hujan'
+    | string;
+  sumberAirBersih: 'PDAM Tirtanadi' | 'Sumur Bor Listrik' | 'Sumur Gali' | 'Sungai / Lainnya' | string;
+  pembuanganSampahRumah:
+    | 'Diangkut Petugas / WRS'
+    | 'Bank Sampah / Daur Ulang'
+    | 'Dibakar / Ditimbun Mandiri'
+    | 'Dibuang Sembarangan'
+    | string;
+  statusStuntingRentan:
+    | 'Bebas Risiko Stunting'
+    | 'Ada Balita / Baduta Berisiko Stunting'
+    | 'Ada Ibu Hamil KEK / Resti'
+    | string;
+
+  // Kondisi Tempat Tinggal / Rumah
+  statusKepemilikanRumah?: 'Milik Sendiri' | 'Sewa / Kontrak' | 'Menumpang / Bebas Sewa' | 'Rumah Dinas' | string;
+  dayaListrik?: 'PLN 450 VA' | 'PLN 900 VA' | 'PLN 1300 VA' | 'PLN 2200 VA+' | 'Tanpa Listrik' | string;
+  memilikiUsahaRumah?: boolean;
+  namaUsahaRumah?: string;
+
+  // Integrasi PBB & WRS
+  nopPbb?: string;
+  statusPbb?: StatusPbb;
+  statusWrs?: StatusWrs;
+
+  // Kaitan dengan Peta Titik Bangunan WebGIS
+  housePointId?: string; // id TitikRumahBangunan if connected
+
+  // Metadata
+  fotoKkUrl?: string;
+  fotoRumahUrl?: string;
   catatan?: string;
   createdAt: string;
   updatedAt?: string;

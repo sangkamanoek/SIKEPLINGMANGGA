@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Camera,
   Trash2,
@@ -14,6 +14,12 @@ import {
   MapPin,
   ExternalLink,
   X,
+  HeartPulse,
+  Baby,
+  Clock,
+  Activity,
+  Stethoscope,
+  Moon,
 } from 'lucide-react';
 import { getMaximumAccuracyPosition } from '../lib/geoService';
 import { FormKunjunganWarga, KunjunganWargaData } from './FormKunjunganWarga';
@@ -148,9 +154,53 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     initialAccount.lingkungan ? `Pos Ronda ${initialAccount.lingkungan}` : 'Pos Ronda Lingkungan'
   );
   const [poskamlingPetugas, setPoskamlingPetugas] = useState<string>('Kepling & Warga Ronda');
+  const [poskamlingJumlahPetugas, setPoskamlingJumlahPetugas] = useState<string>('4');
+  const [poskamlingJamOperasional, setPoskamlingJamOperasional] = useState<string>('21.00 - 04.00 WIB');
   const [poskamlingKeterangan, setPoskamlingKeterangan] = useState<string>(
     'Patroli siskamling lingkungan kondusif dan aman'
   );
+
+  // Tugas Tambahan POSYANDU & LAYANAN KESEHATAN WARGA
+  const [posyanduAdaGiat, setPosyanduAdaGiat] = useState<boolean>(false);
+  const [posyanduNama, setPosyanduNama] = useState<string>(
+    initialAccount.lingkungan ? `Posyandu ${initialAccount.lingkungan}` : 'Posyandu Melati'
+  );
+  const [posyanduLokasi, setPosyanduLokasi] = useState<string>(
+    initialAccount.lingkungan ? `Balai Warga ${initialAccount.lingkungan}` : 'Balai Warga Lingkungan'
+  );
+  const [posyanduJumlahPetugasKader, setPosyanduJumlahPetugasKader] = useState<string>('5');
+  const [posyanduBayi02Tahun, setPosyanduBayi02Tahun] = useState<string>('0');
+  const [posyanduBalita25Tahun, setPosyanduBalita25Tahun] = useState<string>('0');
+  const [posyanduAnak612Tahun, setPosyanduAnak612Tahun] = useState<string>('0');
+  const [posyanduRemaja1318Tahun, setPosyanduRemaja1318Tahun] = useState<string>('0');
+  const [posyanduDewasaIbuHamil1959Tahun, setPosyanduDewasaIbuHamil1959Tahun] = useState<string>('0');
+  const [posyanduLansia60TahunKeatas, setPosyanduLansia60TahunKeatas] = useState<string>('0');
+  const [posyanduJenisLayanan, setPosyanduJenisLayanan] = useState<string[]>([
+    'Penimbangan & Pengukuran (Pantau Stunting)',
+    'Imunisasi Dasar & Lanjutan Lengkap',
+    'Pemberian Vitamin A & Obat Cacing',
+  ]);
+  const [posyanduKeterangan, setPosyanduKeterangan] = useState<string>(
+    'Pelayanan posyandu berjalan tertib, sasaran balita dan lansia terlayani baik'
+  );
+
+  // Perhitungan Otomatis Kumulatif Total Warga Posyandu dari Usia 0 s.d Lansia
+  const posyanduKumulatifTotal = useMemo(() => {
+    const b02 = parseInt(posyanduBayi02Tahun, 10) || 0;
+    const b25 = parseInt(posyanduBalita25Tahun, 10) || 0;
+    const a612 = parseInt(posyanduAnak612Tahun, 10) || 0;
+    const r1318 = parseInt(posyanduRemaja1318Tahun, 10) || 0;
+    const d1959 = parseInt(posyanduDewasaIbuHamil1959Tahun, 10) || 0;
+    const l60 = parseInt(posyanduLansia60TahunKeatas, 10) || 0;
+    return b02 + b25 + a612 + r1318 + d1959 + l60;
+  }, [
+    posyanduBayi02Tahun,
+    posyanduBalita25Tahun,
+    posyanduAnak612Tahun,
+    posyanduRemaja1318Tahun,
+    posyanduDewasaIbuHamil1959Tahun,
+    posyanduLansia60TahunKeatas,
+  ]);
 
   const [kegiatanLainnya, setKegiatanLainnya] = useState<string>('');
   const [selectedLainnyaOptions, setSelectedLainnyaOptions] = useState<string[]>([]);
@@ -417,7 +467,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    kategori: 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'poskamling' | 'lainnya' | 'infrastruktur' | 'umum' = 'umum'
+    kategori: 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'poskamling' | 'posyandu' | 'lainnya' | 'infrastruktur' | 'umum' = 'umum'
   ) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -437,6 +487,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
         else if (kategori === 'ikd') categoryPrefix = '[IKD] ';
         else if (kategori === 'bpjs') categoryPrefix = '[BPJS] ';
         else if (kategori === 'poskamling') categoryPrefix = '[POSKAMLING] ';
+        else if (kategori === 'posyandu') categoryPrefix = '[POSYANDU] ';
         else if (kategori === 'lainnya') categoryPrefix = '[KEGIATAN LAINNYA] ';
         else if (kategori === 'infrastruktur') categoryPrefix = '[INFRASTRUKTUR] ';
 
@@ -564,7 +615,25 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       poskamlingStatus: poskamlingAdaGiat ? poskamlingStatus.trim() : 'Tidak Ada Giat',
       poskamlingLokasi: poskamlingAdaGiat ? poskamlingLokasi.trim() : '',
       poskamlingPetugas: poskamlingAdaGiat ? poskamlingPetugas.trim() : '',
+      poskamlingJumlahPetugas: poskamlingAdaGiat ? poskamlingJumlahPetugas.trim() : '',
+      poskamlingJamOperasional: poskamlingAdaGiat ? poskamlingJamOperasional.trim() : '',
       poskamlingKeterangan: poskamlingAdaGiat ? poskamlingKeterangan.trim() : '',
+
+      // Tugas Tambahan POSYANDU & LAYANAN KESEHATAN WARGA
+      posyanduAdaGiat,
+      posyanduNama: posyanduAdaGiat ? posyanduNama.trim() : '',
+      posyanduLokasi: posyanduAdaGiat ? posyanduLokasi.trim() : '',
+      posyanduJumlahPetugasKader: posyanduAdaGiat ? posyanduJumlahPetugasKader.trim() : '',
+      posyanduJumlahWargaTotal: posyanduAdaGiat ? String(posyanduKumulatifTotal) : '0',
+      posyanduBayi02Tahun: posyanduAdaGiat ? posyanduBayi02Tahun.trim() || '0' : '0',
+      posyanduBalita25Tahun: posyanduAdaGiat ? posyanduBalita25Tahun.trim() || '0' : '0',
+      posyanduAnak612Tahun: posyanduAdaGiat ? posyanduAnak612Tahun.trim() || '0' : '0',
+      posyanduRemaja1318Tahun: posyanduAdaGiat ? posyanduRemaja1318Tahun.trim() || '0' : '0',
+      posyanduDewasaIbuHamil1959Tahun: posyanduAdaGiat ? posyanduDewasaIbuHamil1959Tahun.trim() || '0' : '0',
+      posyanduLansia60TahunKeatas: posyanduAdaGiat ? posyanduLansia60TahunKeatas.trim() || '0' : '0',
+      posyanduJenisLayanan: posyanduAdaGiat ? posyanduJenisLayanan : [],
+      posyanduKeterangan: posyanduAdaGiat ? posyanduKeterangan.trim() : '',
+
       kegiatanLainnya: kegiatanLainnya.trim(),
       // Poin 6: Kegiatan Pemantauan Kondisi Infrastruktur Wilayah
       infrastrukturAdaGiat,
@@ -1807,132 +1876,214 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
             </div>
           </div>
 
-          {/* Section: Tugas Tambahan POSKAMLING & Upload Foto Poskamling */}
-          <div className="bg-white border-2 border-amber-300/80 rounded-xl p-6 shadow-sm space-y-4 relative overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-amber-100">
+          {/* Section: Tugas Tambahan POSKAMLING & POSYANDU */}
+          <div className="bg-white border-2 border-amber-300/80 rounded-xl p-6 shadow-sm space-y-5 relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-amber-100 gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-6 bg-amber-500 rounded-full"></span>
                 <div className="flex items-center gap-2">
                   <Shield className="w-5 h-5 text-amber-600" />
                   <h2 className="text-base font-bold uppercase tracking-wider text-slate-800">
-                    Tugas Tambahan: POSKAMLING / SISKAMLING
+                    Tugas Tambahan: POSKAMLING & POSYANDU
                   </h2>
                 </div>
               </div>
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={poskamlingAdaGiat}
-                  onChange={(e) => setPoskamlingAdaGiat(e.target.checked)}
-                  className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
-                />
-                <span>Ada Kegiatan Poskamling</span>
-              </label>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-amber-900 cursor-pointer select-none bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                  <input
+                    type="checkbox"
+                    checked={poskamlingAdaGiat}
+                    onChange={(e) => setPoskamlingAdaGiat(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                  />
+                  <span>🛡️ Ada Poskamling</span>
+                </label>
+                <label className="flex items-center gap-1.5 text-xs font-bold text-rose-900 cursor-pointer select-none bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
+                  <input
+                    type="checkbox"
+                    checked={posyanduAdaGiat}
+                    onChange={(e) => setPosyanduAdaGiat(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                  />
+                  <span>👶🩺 Ada Posyandu</span>
+                </label>
+              </div>
             </div>
 
-            {poskamlingAdaGiat ? (
-              <div className="space-y-4">
-                {/* Preset status buttons */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Pilih Status / Jenis Kegiatan Poskamling:
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      'Aktif Ronda Malam',
-                      'Patroli Bersama Warga',
-                      'Pemeriksaan Pos Kamling',
-                      'Sosialisasi Kamtibmas Warga',
-                      'Situasi Aman Terkendali',
-                    ].map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setPoskamlingStatus(preset)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          poskamlingStatus === preset
-                            ? 'bg-amber-500 text-slate-950 shadow-xs'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }`}
-                      >
-                        {preset}
-                      </button>
-                    ))}
-                  </div>
+            {/* A. SUB-SECTION: POSKAMLING / SISKAMLING */}
+            <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 space-y-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-[10px] font-black">
+                    A
+                  </span>
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                    POSKAMLING / SISKAMLING
+                  </span>
                 </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${poskamlingAdaGiat ? 'bg-amber-200 text-amber-900' : 'bg-slate-200 text-slate-600'}`}>
+                  {poskamlingAdaGiat ? 'AKTIF BERJALAN' : 'NON-AKTIF'}
+                </span>
+              </div>
 
-                {/* Form fields: Status, Lokasi, Petugas */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {poskamlingAdaGiat ? (
+                <div className="space-y-3">
+                  {/* Status preset buttons */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Status Poskamling
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Pilih Status / Jenis Kegiatan Poskamling:
                     </label>
-                    <input
-                      id="input-poskamling-status"
-                      type="text"
-                      value={poskamlingStatus}
-                      onChange={(e) => setPoskamlingStatus(e.target.value)}
-                      placeholder="Contoh: Aktif Ronda Malam"
-                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-800 font-semibold focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Lokasi Poskamling / Pos Ronda
-                    </label>
-                    <input
-                      id="input-poskamling-lokasi"
-                      type="text"
-                      value={poskamlingLokasi}
-                      onChange={(e) => setPoskamlingLokasi(e.target.value)}
-                      placeholder="Contoh: Pos Ronda Lingkungan IV"
-                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-800 focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Petugas Jaga / Warga Ronda
-                    </label>
-                    <input
-                      id="input-poskamling-petugas"
-                      type="text"
-                      value={poskamlingPetugas}
-                      onChange={(e) => setPoskamlingPetugas(e.target.value)}
-                      placeholder="Contoh: Kepling & 3 Warga Ronda"
-                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-800 focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Catatan Situasi Kamtibmas
-                    </label>
-                    <input
-                      id="input-poskamling-keterangan"
-                      type="text"
-                      value={poskamlingKeterangan}
-                      onChange={(e) => setPoskamlingKeterangan(e.target.value)}
-                      placeholder="Contoh: Situasi malam kondusif dan aman"
-                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-800 focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Tombol Upload Khusus Foto Poskamling */}
-                <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <div>
-                      <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                        <Camera className="w-4 h-4 text-amber-600" />
-                        Unggah / Ambil Foto Khusus Poskamling
-                      </span>
-                      <p className="text-[11px] text-amber-700">
-                        Foto pos ronda, kepling bersama warga ronda, atau absensi jaga malam.
-                      </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        'Aktif Ronda Malam',
+                        'Patroli Bersama Warga',
+                        'Pemeriksaan Pos Kamling',
+                        'Sosialisasi Kamtibmas Warga',
+                        'Situasi Aman Terkendali',
+                      ].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setPoskamlingStatus(preset)}
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                            poskamlingStatus === preset
+                              ? 'bg-amber-500 text-slate-950 shadow-2xs'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
                     </div>
+                  </div>
 
+                  {/* Grid Status & Lokasi */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Status Poskamling
+                      </label>
+                      <input
+                        id="input-poskamling-status"
+                        type="text"
+                        value={poskamlingStatus}
+                        onChange={(e) => setPoskamlingStatus(e.target.value)}
+                        placeholder="Contoh: Aktif Ronda Malam"
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-800 font-semibold focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Lokasi Poskamling / Pos Ronda
+                      </label>
+                      <input
+                        id="input-poskamling-lokasi"
+                        type="text"
+                        value={poskamlingLokasi}
+                        onChange={(e) => setPoskamlingLokasi(e.target.value)}
+                        placeholder="Contoh: Pos Ronda Lingkungan IV"
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-800 focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Jumlah Petugas & Jam Operasional (Sesuai Permintaan User) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-2.5 bg-white rounded-lg border border-amber-200/80">
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-950 mb-1">
+                        👥 Jumlah Petugas / Warga Ronda:
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          id="input-poskamling-jumlah-petugas"
+                          type="text"
+                          value={poskamlingJumlahPetugas}
+                          onChange={(e) => setPoskamlingJumlahPetugas(e.target.value)}
+                          placeholder="Contoh: 4 Orang"
+                          className="w-full px-2.5 py-1.5 text-xs border border-amber-300 rounded-lg bg-white text-slate-800 font-bold focus:ring-1 focus:ring-amber-500"
+                        />
+                        {['3', '4', '5', '6'].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setPoskamlingJumlahPetugas(`${n} Orang`)}
+                            className="px-2 py-1 text-[10px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 rounded border border-amber-300 cursor-pointer"
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-950 mb-1">
+                        ⏰ Jam Operasional Ronda:
+                      </label>
+                      <input
+                        id="input-poskamling-jam-operasional"
+                        type="text"
+                        value={poskamlingJamOperasional}
+                        onChange={(e) => setPoskamlingJamOperasional(e.target.value)}
+                        placeholder="Contoh: 21.00 - 04.00 WIB"
+                        className="w-full px-2.5 py-1.5 text-xs border border-amber-300 rounded-lg bg-white text-slate-800 font-semibold focus:ring-1 focus:ring-amber-500"
+                      />
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        {['21.00 - 04.00 WIB', '22.00 - 05.00 WIB', '20.00 - 04.00 WIB', '24 Jam'].map((jam) => (
+                          <button
+                            key={jam}
+                            type="button"
+                            onClick={() => setPoskamlingJamOperasional(jam)}
+                            className="text-[9px] px-1.5 py-0.5 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 rounded border border-slate-200 cursor-pointer font-medium"
+                          >
+                            {jam}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Rincian Petugas & Catatan Kamtibmas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Nama / Susunan Petugas Jaga
+                      </label>
+                      <input
+                        id="input-poskamling-petugas"
+                        type="text"
+                        value={poskamlingPetugas}
+                        onChange={(e) => setPoskamlingPetugas(e.target.value)}
+                        placeholder="Contoh: Kepling & 3 Warga Ronda"
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-800 focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Catatan Situasi Kamtibmas
+                      </label>
+                      <input
+                        id="input-poskamling-keterangan"
+                        type="text"
+                        value={poskamlingKeterangan}
+                        onChange={(e) => setPoskamlingKeterangan(e.target.value)}
+                        placeholder="Contoh: Situasi malam kondusif dan aman"
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-800 focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tombol Upload Khusus Foto Poskamling */}
+                  <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-lg flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Camera className="w-4 h-4 text-amber-700" />
+                      <div>
+                        <span className="text-xs font-bold text-amber-950 block">
+                          Foto Dokumentasi Poskamling:
+                        </span>
+                        <span className="text-[10px] text-amber-800">
+                          {fotoList.filter((f) => f.kategori === 'poskamling' || f.name.includes('[POSKAMLING]')).length} Foto Terlampir
+                        </span>
+                      </div>
+                    </div>
                     <div>
                       <input
                         id="file-input-poskamling"
@@ -1944,20 +2095,311 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                       />
                       <label
                         htmlFor="file-input-poskamling"
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95"
                       >
                         <Camera className="w-3.5 h-3.5" />
-                        <span>Ambil / Upload Foto Poskamling</span>
+                        <span>+ Upload Foto Poskamling</span>
                       </label>
                     </div>
                   </div>
                 </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic">
+                  Kegiatan Poskamling tidak dicatat untuk hari ini (opsional).
+                </p>
+              )}
+            </div>
+
+            {/* B. SUB-SECTION: POSYANDU & LAYANAN KESEHATAN WARGA */}
+            <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 space-y-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-black">
+                    B
+                  </span>
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                    POSYANDU & LAYANAN KESEHATAN KELUARGA
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {posyanduAdaGiat && (
+                    <span className="text-[10px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-full shadow-2xs animate-pulse">
+                      🎯 Total Kumulatif: {posyanduKumulatifTotal} Jiwa
+                    </span>
+                  )}
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${posyanduAdaGiat ? 'bg-rose-200 text-rose-900' : 'bg-slate-200 text-slate-600'}`}>
+                    {posyanduAdaGiat ? 'AKTIF PELAYANAN' : 'NON-AKTIF'}
+                  </span>
+                </div>
               </div>
-            ) : (
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500 text-center">
-                Kegiatan Poskamling tidak dicatat untuk hari ini (opsional).
-              </div>
-            )}
+
+              {posyanduAdaGiat ? (
+                <div className="space-y-4 pt-1">
+                  {/* Nama, Lokasi, Petugas/Kader Posyandu */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-rose-950 mb-1">
+                        Nama Posyandu:
+                      </label>
+                      <input
+                        id="input-posyandu-nama"
+                        type="text"
+                        value={posyanduNama}
+                        onChange={(e) => setPosyanduNama(e.target.value)}
+                        placeholder="Contoh: Posyandu Melati Lk IV"
+                        className="w-full px-2.5 py-1.5 text-xs border border-rose-200 rounded-lg bg-white text-slate-800 font-semibold focus:ring-1 focus:ring-rose-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-rose-950 mb-1">
+                        Lokasi Posyandu:
+                      </label>
+                      <input
+                        id="input-posyandu-lokasi"
+                        type="text"
+                        value={posyanduLokasi}
+                        onChange={(e) => setPosyanduLokasi(e.target.value)}
+                        placeholder="Contoh: Balai Warga Jl. Bunga Rinte"
+                        className="w-full px-2.5 py-1.5 text-xs border border-rose-200 rounded-lg bg-white text-slate-800 focus:ring-1 focus:ring-rose-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-rose-950 mb-1">
+                        Jumlah Petugas / Kader:
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          id="input-posyandu-kader"
+                          type="text"
+                          value={posyanduJumlahPetugasKader}
+                          onChange={(e) => setPosyanduJumlahPetugasKader(e.target.value)}
+                          placeholder="Contoh: 5 Kader"
+                          className="w-full px-2.5 py-1.5 text-xs border border-rose-200 rounded-lg bg-white text-slate-800 font-bold focus:ring-1 focus:ring-rose-500"
+                        />
+                        {['4', '5', '6'].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setPosyanduJumlahPetugasKader(`${n} Kader`)}
+                            className="px-2 py-1 text-[10px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-900 rounded border border-rose-300 cursor-pointer"
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* RINCIAN WARGA YANG DILAYANI KUMULATIF DARI USIA 0 TAHUN SAMPAI LANSIA */}
+                  <div className="p-3.5 bg-white rounded-xl border-2 border-rose-300 space-y-3 shadow-2xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-rose-100">
+                      <div>
+                        <h4 className="text-xs font-black text-rose-950 flex items-center gap-1.5 uppercase">
+                          <span>📊</span>
+                          Rincian Kumulatif Warga Terlayani per Kelompok Usia (0 Tahun s.d Lansia)
+                        </h4>
+                        <p className="text-[10.5px] text-slate-500 font-medium">
+                          Isi jumlah warga yang dilayani pada masing-masing kelompok usia, sistem akan mengakumulasikan total secara otomatis.
+                        </p>
+                      </div>
+                      <div className="bg-rose-50 px-3 py-1 rounded-lg border border-rose-300 flex items-center gap-1.5 shrink-0">
+                        <span className="text-[11px] font-semibold text-rose-900">Total Terlayani:</span>
+                        <span className="text-sm font-black text-rose-700">{posyanduKumulatifTotal} Jiwa</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                      {/* 1. Usia 0 - 2 Tahun */}
+                      <div className="p-2 rounded-lg bg-rose-50/70 border border-rose-200 space-y-1">
+                        <span className="text-[10px] font-bold text-rose-900 block leading-tight">
+                          👶 Usia 0 - 2 Th<br />
+                          <span className="text-[9px] font-normal text-slate-600">(Bayi/Baduta & Imunisasi)</span>
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={posyanduBayi02Tahun}
+                          onChange={(e) => setPosyanduBayi02Tahun(e.target.value.replace(/^0+(?=\d)/, ''))}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-rose-300 rounded bg-white font-bold text-rose-900 text-center"
+                        />
+                      </div>
+
+                      {/* 2. Usia 2 - 5 Tahun */}
+                      <div className="p-2 rounded-lg bg-rose-50/70 border border-rose-200 space-y-1">
+                        <span className="text-[10px] font-bold text-rose-900 block leading-tight">
+                          🧒 Usia 2 - 5 Th<br />
+                          <span className="text-[9px] font-normal text-slate-600">(Balita & Pantau Stunting)</span>
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={posyanduBalita25Tahun}
+                          onChange={(e) => setPosyanduBalita25Tahun(e.target.value.replace(/^0+(?=\d)/, ''))}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-rose-300 rounded bg-white font-bold text-rose-900 text-center"
+                        />
+                      </div>
+
+                      {/* 3. Usia 6 - 12 Tahun */}
+                      <div className="p-2 rounded-lg bg-rose-50/70 border border-rose-200 space-y-1">
+                        <span className="text-[10px] font-bold text-rose-900 block leading-tight">
+                          👦 Usia 6 - 12 Th<br />
+                          <span className="text-[9px] font-normal text-slate-600">(Anak Usia Sekolah)</span>
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={posyanduAnak612Tahun}
+                          onChange={(e) => setPosyanduAnak612Tahun(e.target.value.replace(/^0+(?=\d)/, ''))}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-rose-300 rounded bg-white font-bold text-rose-900 text-center"
+                        />
+                      </div>
+
+                      {/* 4. Usia 13 - 18 Tahun */}
+                      <div className="p-2 rounded-lg bg-rose-50/70 border border-rose-200 space-y-1">
+                        <span className="text-[10px] font-bold text-rose-900 block leading-tight">
+                          🧑 Usia 13 - 18 Th<br />
+                          <span className="text-[9px] font-normal text-slate-600">(Remaja & Tablet Fe)</span>
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={posyanduRemaja1318Tahun}
+                          onChange={(e) => setPosyanduRemaja1318Tahun(e.target.value.replace(/^0+(?=\d)/, ''))}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-rose-300 rounded bg-white font-bold text-rose-900 text-center"
+                        />
+                      </div>
+
+                      {/* 5. Usia 19 - 59 Tahun */}
+                      <div className="p-2 rounded-lg bg-rose-50/70 border border-rose-200 space-y-1">
+                        <span className="text-[10px] font-bold text-rose-900 block leading-tight">
+                          🤰 Usia 19 - 59 Th<br />
+                          <span className="text-[9px] font-normal text-slate-600">(Bumil, Busui, Dewasa)</span>
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={posyanduDewasaIbuHamil1959Tahun}
+                          onChange={(e) => setPosyanduDewasaIbuHamil1959Tahun(e.target.value.replace(/^0+(?=\d)/, ''))}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-rose-300 rounded bg-white font-bold text-rose-900 text-center"
+                        />
+                      </div>
+
+                      {/* 6. Usia 60+ Tahun */}
+                      <div className="p-2 rounded-lg bg-rose-50/70 border border-rose-200 space-y-1">
+                        <span className="text-[10px] font-bold text-rose-900 block leading-tight">
+                          👵 Usia 60+ Th<br />
+                          <span className="text-[9px] font-normal text-slate-600">(Lansia & Cek PTM)</span>
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={posyanduLansia60TahunKeatas}
+                          onChange={(e) => setPosyanduLansia60TahunKeatas(e.target.value.replace(/^0+(?=\d)/, ''))}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-rose-300 rounded bg-white font-bold text-rose-900 text-center"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pilihan Checklist Jenis Layanan Posyandu */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold text-rose-950 uppercase">
+                      Pilihan Jenis Layanan yang Diberikan:
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        'Penimbangan & Pengukuran (Pantau Stunting)',
+                        'Imunisasi Dasar & Lanjutan Lengkap',
+                        'Pemberian Vitamin A & Obat Cacing',
+                        'Pemberian Makanan Tambahan (PMT) Balita & Bumil',
+                        'Pemeriksaan Ibu Hamil (ANC) & Nifas',
+                        'Pemeriksaan Lansia & Skrining PTM (Tensi/Gula)',
+                        'Integrasi Layanan Primer (ILP) Siklus Hidup',
+                        'Penyuluhan Gizi & Sanitasi Rumah Tangga',
+                      ].map((layanan) => {
+                        const isChecked = posyanduJenisLayanan.includes(layanan);
+                        return (
+                          <button
+                            key={layanan}
+                            type="button"
+                            onClick={() => {
+                              setPosyanduJenisLayanan((prev) =>
+                                isChecked ? prev.filter((l) => l !== layanan) : [...prev, layanan]
+                              );
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-[10.5px] font-semibold border transition-all cursor-pointer flex items-center gap-1 select-none ${
+                              isChecked
+                                ? 'bg-rose-600 border-rose-600 text-white shadow-2xs'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-rose-50'
+                            }`}
+                          >
+                            {isChecked ? <Check className="w-3 h-3 text-white" /> : <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />}
+                            <span>{layanan}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Catatan / Keterangan Posyandu */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Catatan / Keterangan Hasil Pelayanan Posyandu:
+                    </label>
+                    <input
+                      id="input-posyandu-keterangan"
+                      type="text"
+                      value={posyanduKeterangan}
+                      onChange={(e) => setPosyanduKeterangan(e.target.value)}
+                      placeholder="Contoh: Balita terlayani antusias, ditemukan 0 kasus gizi buruk, distribusi PMT lancar"
+                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-800 focus:ring-1 focus:ring-rose-500"
+                    />
+                  </div>
+
+                  {/* Tombol Upload Khusus Foto Posyandu */}
+                  <div className="p-3 bg-rose-100/70 border border-rose-300 rounded-lg flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Camera className="w-4 h-4 text-rose-700" />
+                      <div>
+                        <span className="text-xs font-bold text-rose-950 block">
+                          Foto Dokumentasi Kegiatan Posyandu:
+                        </span>
+                        <span className="text-[10px] text-rose-800">
+                          {fotoList.filter((f) => f.kategori === 'posyandu' || f.name.includes('[POSYANDU]')).length} Foto Terlampir
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <input
+                        id="file-input-posyandu"
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, 'posyandu')}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="file-input-posyandu"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>+ Upload Foto Posyandu</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic">
+                  Kegiatan Posyandu tidak dicatat untuk laporan hari ini (opsional).
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Section 3: Dokumentasi Foto Lapangan */}
@@ -2028,6 +2470,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                             ? 'perlinsos'
                             : foto.name.includes('[POSKAMLING]')
                             ? 'poskamling'
+                            : foto.name.includes('[POSYANDU]')
+                            ? 'posyandu'
                             : foto.name.includes('[IKD]')
                             ? 'ikd'
                             : foto.name.includes('[BPJS]')
@@ -2042,6 +2486,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                             ? 'bg-emerald-700 text-white border-emerald-400'
                             : foto.kategori === 'poskamling' || foto.name.includes('[POSKAMLING]')
                             ? 'bg-amber-500 text-slate-950 border-amber-300'
+                            : foto.kategori === 'posyandu' || foto.name.includes('[POSYANDU]')
+                            ? 'bg-rose-600 text-white border-rose-400'
                             : 'bg-black/75 text-white border-white/20'
                         }`}
                         title="Klik untuk mengubah kategori foto ini"
@@ -2049,6 +2495,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                         <option value="pbb" className="text-slate-900 bg-white">PBB</option>
                         <option value="perlinsos" className="text-slate-900 bg-white">Perlinsos</option>
                         <option value="poskamling" className="text-slate-900 bg-white">Poskamling</option>
+                        <option value="posyandu" className="text-slate-900 bg-white">Posyandu</option>
                         <option value="ikd" className="text-slate-900 bg-white">IKD</option>
                         <option value="bpjs" className="text-slate-900 bg-white">BPJS</option>
                         <option value="lainnya" className="text-slate-900 bg-white">Keg. Lain</option>
@@ -2146,13 +2593,34 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                     <p className="pl-3">- Pelapor: {namaKepling || 'Kepling'}</p>
                   </div>
                 )}
-                {poskamlingAdaGiat && poskamlingStatus && (
+                {poskamlingAdaGiat && (
                   <p className="text-amber-300 mt-1">
                     7. POSKAMLING: <span className="text-amber-200 font-bold">{poskamlingStatus}</span>
                     {poskamlingLokasi && ` (${poskamlingLokasi})`}
-                    {poskamlingPetugas && ` [Petugas: ${poskamlingPetugas}]`}
+                    {poskamlingJumlahPetugas && ` [Petugas: ${poskamlingJumlahPetugas}]`}
+                    {poskamlingJamOperasional && ` [Jam: ${poskamlingJamOperasional}]`}
                     {poskamlingKeterangan && ` - ${poskamlingKeterangan}`}
                   </p>
+                )}
+                {posyanduAdaGiat && (
+                  <div className="text-rose-300 mt-1 space-y-0.5 text-[11px]">
+                    <p className="font-bold">
+                      8. POSYANDU: <span className="text-rose-200">{posyanduNama || 'Posyandu'}</span>
+                      {posyanduLokasi && ` (${posyanduLokasi})`}
+                      {posyanduJumlahPetugasKader && ` [Kader: ${posyanduJumlahPetugasKader}]`}
+                    </p>
+                    <p className="pl-3 text-rose-200 font-bold">
+                      🎯 Total Warga Dilayani: {posyanduKumulatifTotal} Jiwa (0 Th s.d Lansia)
+                    </p>
+                    <p className="pl-3 text-slate-300 text-[10px]">
+                      👶 0-2Th: {posyanduBayi02Tahun || 0} | 🧒 2-5Th: {posyanduBalita25Tahun || 0} | 👦 6-12Th: {posyanduAnak612Tahun || 0} | 🧑 13-18Th: {posyanduRemaja1318Tahun || 0} | 🤰 19-59Th: {posyanduDewasaIbuHamil1959Tahun || 0} | 👵 60+Th: {posyanduLansia60TahunKeatas || 0}
+                    </p>
+                    {posyanduJenisLayanan.length > 0 && (
+                      <p className="pl-3 text-slate-300 text-[10px] truncate">
+                        - Layanan: {posyanduJenisLayanan.join(', ')}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 

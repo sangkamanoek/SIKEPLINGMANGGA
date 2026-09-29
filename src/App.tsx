@@ -56,6 +56,7 @@ import { SmartHubDashboard } from './components/SmartHubDashboard';
 import { DeadlineNotifAlert } from './components/DeadlineNotifAlert';
 import { RekapPbbView } from './components/RekapPbbView';
 import { PemetaanWilayahView } from './components/PemetaanWilayahView';
+import { DatabaseKeluargaView } from './components/DatabaseKeluargaView';
 import { LoginPage } from './components/LoginPage';
 import { UbahPasswordModal } from './components/UbahPasswordModal';
 import { EditProfileModal } from './components/EditProfileModal';
@@ -164,9 +165,9 @@ export default function App() {
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
 
-  // Active view tab: hub | form | capaian | monitoring | capaian_admin | riwayat | kunjungan | dashboard_kasi | kegiatan_khusus | pemetaan
+  // Active view tab: hub | form | capaian | monitoring | capaian_admin | riwayat | kunjungan | dashboard_kasi | kegiatan_khusus | pemetaan | rekap_pbb | database_keluarga
   const [activeTab, setActiveTab] = useState<
-    'hub' | 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb'
+    'hub' | 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb' | 'database_keluarga'
   >('hub');
 
   // Sub-mode untuk tab 'form' bagi Super Admin: 'rangkuman' (default) atau 'formulir' (asistensi)
@@ -1424,6 +1425,7 @@ export default function App() {
                   setActiveTab('riwayat');
                 }}
                 onOpenKunjunganWarga={() => setActiveTab('kunjungan')}
+                onOpenDatabaseKeluarga={() => setActiveTab('database_keluarga')}
               />
             )}
             {(activeAccount.role === 'kasi_trantibum' ||
@@ -1666,6 +1668,7 @@ export default function App() {
               currentUser={activeAccount}
               onShowToast={showToast}
               initialLingkunganFilter={pemetaanTargetLingkungan}
+              onOpenDatabaseKeluarga={() => setActiveTab('database_keluarga')}
             />
           </ErrorBoundary>
         )}
@@ -1674,6 +1677,19 @@ export default function App() {
         {activeTab === 'rekap_pbb' && (
           <ErrorBoundary fallbackTitle="Gagal Memuat Realisasi PBB">
             <RekapPbbView activeAccount={activeAccount} onShowToast={showToast} />
+          </ErrorBoundary>
+        )}
+
+        {/* Tab Database Data Keluarga (KK) */}
+        {activeTab === 'database_keluarga' && (
+          <ErrorBoundary fallbackTitle="Gagal Memuat Database Data Keluarga">
+            <DatabaseKeluargaView
+              currentUser={activeAccount}
+              onShowToast={showToast}
+              onNavigateToWebgis={(lat, lng) => {
+                setActiveTab('pemetaan');
+              }}
+            />
           </ErrorBoundary>
         )}
       </main>

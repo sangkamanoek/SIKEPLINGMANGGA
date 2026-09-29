@@ -36,10 +36,11 @@ interface DashboardPerlinsosKasiProps {
   currentUser: UserAccount;
   onSelectKeplingRiwayat?: (namaKepling: string) => void;
   onOpenKunjunganWarga?: () => void;
+  onOpenDatabaseKeluarga?: () => void;
 }
 
 type PeriodFilter = 'all' | 'today' | '7days' | 'month';
-type SubView = 'perlinsos' | 'kunjungan_warga' | 'bpjs';
+type SubView = 'perlinsos' | 'posyandu' | 'kunjungan_warga' | 'bpjs';
 
 export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
   reports,
@@ -47,6 +48,7 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
   currentUser,
   onSelectKeplingRiwayat,
   onOpenKunjunganWarga,
+  onOpenDatabaseKeluarga,
 }) => {
   const [subView, setSubView] = useState<SubView>('perlinsos');
   const [period, setPeriod] = useState<PeriodFilter>('all');
@@ -184,6 +186,76 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
     });
   }, [filteredReports, targetsMap, period]);
 
+  // 2.5. Aggregate Posyandu statistics per Kepling
+  const keplingPosyanduStats = useMemo(() => {
+    return KEPLING_ACCOUNTS.map((kepling) => {
+      const keplingReports = filteredReports.filter((r) => isReportMatchingKepling(r, kepling));
+      const posyanduReports = keplingReports.filter(
+        (r) => r.kinerja?.posyanduAdaGiat || r.kinerja?.posyanduNama || (r.kinerja?.posyanduJumlahWargaTotal && Number(r.kinerja?.posyanduJumlahWargaTotal) > 0)
+      );
+      const latestPosReport = posyanduReports[0] || keplingReports[0];
+      const kin = latestPosReport?.kinerja;
+
+      const posyanduNama = kin?.posyanduNama || (posyanduReports.length > 0 ? `Posyandu ${kepling.lingkungan}` : 'Posyandu Lingkungan');
+      const posyanduLokasi = kin?.posyanduLokasi || `Balai Warga ${kepling.lingkungan}`;
+      const posyanduKader = kin?.posyanduJumlahPetugasKader ? String(kin.posyanduJumlahPetugasKader) : '5 Kader';
+      
+      const totalWarga = posyanduReports.reduce((sum, r) => sum + (Number(r.kinerja?.posyanduJumlahWargaTotal) || 0), 0) || (Number(kin?.posyanduJumlahWargaTotal) || 0);
+      const bayi02 = posyanduReports.reduce((sum, r) => sum + (Number(r.kinerja?.posyanduBayi02Tahun) || 0), 0) || (Number(kin?.posyanduBayi02Tahun) || 0);
+      const balita25 = posyanduReports.reduce((sum, r) => sum + (Number(r.kinerja?.posyanduBalita25Tahun) || 0), 0) || (Number(kin?.posyanduBalita25Tahun) || 0);
+      const anak612 = posyanduReports.reduce((sum, r) => sum + (Number(r.kinerja?.posyanduAnak612Tahun) || 0), 0) || (Number(kin?.posyanduAnak612Tahun) || 0);
+      const remaja1318 = posyanduReports.reduce((sum, r) => sum + (Number(r.kinerja?.posyanduRemaja1318Tahun) || 0), 0) || (Number(kin?.posyanduRemaja1318Tahun) || 0);
+      const dewasa1959 = posyanduReports.reduce((sum, r) => sum + (Number(r.kinerja?.posyanduDewasaIbuHamil1959Tahun) || 0), 0) || (Number(kin?.posyanduDewasaIbuHamil1959Tahun) || 0);
+      const lansia60 = posyanduReports.reduce((sum, r) => sum + (Number(r.kinerja?.posyanduLansia60TahunKeatas) || 0), 0) || (Number(kin?.posyanduLansia60TahunKeatas) || 0);
+      
+      const layanan = Array.isArray(kin?.posyanduJenisLayanan) && kin.posyanduJenisLayanan.length > 0
+        ? kin.posyanduJenisLayanan
+        : ['Penimbangan & Pengukuran Stunting', 'Imunisasi', 'Vitamin A'];
+      const catatan = kin?.posyanduKeterangan || (posyanduReports.length > 0 ? 'Pelayanan posyandu berjalan tertib' : '-');
+
+      return {
+        kepling,
+        hasActivity: posyanduReports.length > 0 || (Number(kin?.posyanduJumlahWargaTotal) || 0) > 0,
+        posyanduNama,
+        posyanduLokasi,
+        posyanduKader,
+        totalWarga,
+        bayi02,
+        balita25,
+        anak612,
+        remaja1318,
+        dewasa1959,
+        lansia60,
+        layanan,
+        catatan,
+        reportCount: posyanduReports.length,
+      };
+    });
+  }, [filteredReports]);
+
+  // Posyandu Overall Totals
+  const posyanduTotals = useMemo(() => {
+    const totalWargaAll = keplingPosyanduStats.reduce((sum, k) => sum + k.totalWarga, 0);
+    const totalBayi = keplingPosyanduStats.reduce((sum, k) => sum + k.bayi02, 0);
+    const totalBalita = keplingPosyanduStats.reduce((sum, k) => sum + k.balita25, 0);
+    const totalAnak = keplingPosyanduStats.reduce((sum, k) => sum + k.anak612, 0);
+    const totalRemaja = keplingPosyanduStats.reduce((sum, k) => sum + k.remaja1318, 0);
+    const totalDewasa = keplingPosyanduStats.reduce((sum, k) => sum + k.dewasa1959, 0);
+    const totalLansia = keplingPosyanduStats.reduce((sum, k) => sum + k.lansia60, 0);
+    const activePosyanduCount = keplingPosyanduStats.filter((k) => k.hasActivity).length;
+
+    return {
+      totalWargaAll,
+      totalBayi,
+      totalBalita,
+      totalAnak,
+      totalRemaja,
+      totalDewasa,
+      totalLansia,
+      activePosyanduCount,
+    };
+  }, [keplingPosyanduStats]);
+
   // 3. Overall Totals
   const overallTotals = useMemo(() => {
     const totalKk = keplingPerlinsosStats.reduce((sum, k) => sum + k.totalPerlinsos, 0);
@@ -290,6 +362,18 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            {onOpenDatabaseKeluarga && (
+              <button
+                type="button"
+                onClick={onOpenDatabaseKeluarga}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer border border-amber-300"
+                title="Buka Database Master Data Keluarga (KK)"
+              >
+                <Users className="w-4 h-4 text-slate-950" />
+                <span>Database Data Keluarga</span>
+              </button>
+            )}
+
             {onOpenKunjunganWarga && (
               <button
                 type="button"
@@ -342,6 +426,19 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
 
             <button
               type="button"
+              onClick={() => setSubView('posyandu')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                subView === 'posyandu'
+                  ? 'bg-white text-rose-950 shadow-md'
+                  : 'text-blue-100 hover:text-white hover:bg-white/10 font-bold'
+              }`}
+            >
+              <span className="text-sm">👶🩺</span>
+              <span>2. Posyandu & Layanan Kesehatan</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setSubView('kunjungan_warga')}
               className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
                 subView === 'kunjungan_warga'
@@ -350,7 +447,7 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>2. Kunjungan Warga Lapangan</span>
+              <span>3. Kunjungan Warga Lapangan</span>
             </button>
 
             <button
@@ -363,11 +460,11 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
               }`}
             >
               <ShieldCheck className="w-4 h-4" />
-              <span>3. BPJS Ketenagakerjaan</span>
+              <span>4. BPJS Ketenagakerjaan</span>
             </button>
           </div>
 
-          {(subView === 'perlinsos' || subView === 'bpjs') && (
+          {(subView === 'perlinsos' || subView === 'bpjs' || subView === 'posyandu') && (
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-1 bg-blue-950/80 p-1 rounded-xl border border-blue-700/60 text-xs">
                 <button
@@ -727,6 +824,187 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
         </div>
       </div>
         </>
+      )}
+
+      {subView === 'posyandu' && (
+        <div className="space-y-6">
+          {/* Top Metric Banner Posyandu */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold shrink-0 text-xl">
+                🎯
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Warga Terlayani</div>
+                <div className="text-2xl font-black text-slate-900 mt-0.5">
+                  {posyanduTotals.totalWargaAll.toLocaleString('id-ID')} <span className="text-xs font-bold text-rose-700">Jiwa (0 Th - Lansia)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold shrink-0 text-xl">
+                👶
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bayi & Balita (Pantau Stunting)</div>
+                <div className="text-2xl font-black text-slate-900 mt-0.5">
+                  {(posyanduTotals.totalBayi + posyanduTotals.totalBalita).toLocaleString('id-ID')} <span className="text-xs font-bold text-amber-700">Anak (0-5 Th)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold shrink-0 text-xl">
+                👵
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Lansia Terlayani (PTM)</div>
+                <div className="text-2xl font-black text-slate-900 mt-0.5">
+                  {posyanduTotals.totalLansia.toLocaleString('id-ID')} <span className="text-xs font-bold text-indigo-700">Jiwa (60+ Th)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shrink-0 text-xl">
+                🏥
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Posyandu Aktif Pelayanan</div>
+                <div className="text-2xl font-black text-slate-900 mt-0.5">
+                  {posyanduTotals.activePosyanduCount} <span className="text-xs font-bold text-slate-500">/ 24 Lingkungan</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabel Rekapitulasi Pelayanan Posyandu 24 Lingkungan */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-5 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <span className="text-xl">👶🩺</span>
+                  <span>Rekapitulasi Pelayanan Posyandu & Kesehatan Warga 24 Lingkungan</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Data kumulatif warga terlayani dari usia 0 tahun (bayi/baduta), balita, anak, remaja, ibu hamil, hingga lansia
+                </p>
+              </div>
+
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari lingkungan / posyandu..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 text-[11px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                    <th className="py-3 px-4 text-center w-12">No</th>
+                    <th className="py-3 px-4">Kepala Lingkungan</th>
+                    <th className="py-3 px-4">Posyandu & Lokasi</th>
+                    <th className="py-3 px-4 text-center">Kader</th>
+                    <th className="py-3 px-4 text-center bg-rose-50/70 text-rose-950 font-black">Total Terlayani</th>
+                    <th className="py-3 px-4">Rincian Kelompok Usia (0 Th - Lansia)</th>
+                    <th className="py-3 px-4 max-w-xs">Jenis Layanan</th>
+                    <th className="py-3 px-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {keplingPosyanduStats
+                    .filter((item) => {
+                      if (!searchQuery.trim()) return true;
+                      const q = searchQuery.toLowerCase();
+                      return (
+                        item.kepling.nama.toLowerCase().includes(q) ||
+                        item.kepling.lingkungan.toLowerCase().includes(q) ||
+                        item.posyanduNama.toLowerCase().includes(q) ||
+                        item.posyanduLokasi.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((item, index) => (
+                      <tr key={item.kepling.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 text-center font-bold text-slate-500">
+                          {index + 1}
+                        </td>
+
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900">{item.kepling.nama}</div>
+                          <div className="text-[11px] text-slate-500 font-medium">{item.kepling.lingkungan}</div>
+                        </td>
+
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-800">{item.posyanduNama}</div>
+                          <div className="text-[11px] text-slate-500 font-medium truncate max-w-xs">{item.posyanduLokasi}</div>
+                        </td>
+
+                        <td className="py-3 px-4 text-center font-bold text-slate-700">
+                          <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-[11px]">
+                            {item.posyanduKader}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-4 text-center bg-rose-50/40">
+                          <span className="inline-block text-xs font-black px-3 py-1 rounded-full bg-rose-600 text-white shadow-2xs">
+                            {item.totalWarga} Jiwa
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-4">
+                          <div className="flex flex-wrap gap-1">
+                            <span className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-900 text-[10px] font-bold">
+                              👶 0-2Th: {item.bayi02}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-900 text-[10px] font-bold">
+                              🧒 2-5Th: {item.balita25}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-900 text-[10px] font-bold">
+                              👦 6-12Th: {item.anak612}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-purple-50 border border-purple-200 text-purple-900 text-[10px] font-bold">
+                              🧑 13-18Th: {item.remaja1318}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-900 text-[10px] font-bold">
+                              🤰 19-59Th: {item.dewasa1959}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-900 text-[10px] font-bold">
+                              👵 60+Th: {item.lansia60}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-4 max-w-xs">
+                          <p className="text-[10.5px] text-slate-600 font-medium line-clamp-2">
+                            {item.layanan.join(', ')}
+                          </p>
+                        </td>
+
+                        <td className="py-3 px-4 text-right">
+                          {onSelectKeplingRiwayat && (
+                            <button
+                              type="button"
+                              onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
+                              className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold text-xs transition-colors cursor-pointer border border-rose-200"
+                            >
+                              Riwayat
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
 
       {subView === 'kunjungan_warga' && (

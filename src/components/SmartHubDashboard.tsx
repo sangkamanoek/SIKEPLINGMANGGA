@@ -298,6 +298,17 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
           action: () => onNavigate('form')
         },
         {
+          id: 'database_keluarga',
+          title: 'Database Data Keluarga (KK)',
+          desc: 'Pusat data terpadu kependudukan, anggota keluarga (NIK), tingkat kesejahteraan (Desil 1–5), bansos PKH Medan Makmur, dan sanitasi.',
+          category: 'laporan',
+          icon: Users,
+          iconBg: 'bg-blue-50 text-blue-700',
+          badge: 'DATA KELUARGA',
+          badgeColor: 'bg-blue-100 text-blue-900',
+          action: () => onNavigate('database_keluarga')
+        },
+        {
           id: 'kunjungan',
           title: 'Kunjungan Harian Warga',
           desc: 'Log & rekam interaksi sambang, silaturahmi, serta sosialisasi langsung ke rumah warga lingkungan.',

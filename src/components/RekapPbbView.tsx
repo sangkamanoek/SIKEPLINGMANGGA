@@ -212,22 +212,37 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   }, [spptList, selectedYear]);
 
   // Manual Full Sync handler (reconciles server buffer, Firestore, and client state)
-  const handleManualSync = async () => {
+  const handleManualSync = async (forceCloud: boolean = false) => {
     setIsSyncing(true);
     try {
+      if (forceCloud) {
+        if (!window.confirm("⚠️ TINDAKAN TEGAS: Gunakan data dari Cloud (Firebase) dan TIMPA data di HP/Laptop ini? Perubahan lokal yang belum tersimpan akan DIHAPUS. Lanjutkan?")) {
+          setIsSyncing(false);
+          return;
+        }
+      }
+
       // 1. Ambil data ter-update secara online dari Firestore/Server terlebih dahulu
       const onlineItems = await fetchPbbSpptFromFirestore(selectedYear);
       const onlineArray = Array.isArray(onlineItems) ? onlineItems : [];
 
-      // 2. Gabungkan secara cerdas (Conflict Resolution: Status "Sudah Bayar" dan data terbaru dipertahankan)
-      const mergedList = smartMergeSpptItems(onlineArray, spptList);
+      if (forceCloud) {
+        // Abaikan data lokal, gunakan online murni
+        setSpptList(onlineArray);
+        notify(`Pemulihan Data Cloud Berhasil! Data PBB Tahun ${selectedYear} di perangkat ini kini 100% identik dengan Firestore.`, 'success');
+      } else {
+        // 2. Gabungkan secara cerdas (Conflict Resolution: Remote Update Always Wins to satisfy "Abaikan HP/Komputer" request)
+        // Note: smartMergeSpptItems(base, updates) where base=online, updates=local. 
+        // To prioritize remote, we can swap them or set prioritizeRemote: false and use timestamp
+        const mergedList = smartMergeSpptItems(spptList, onlineArray, true); 
 
-      // 3. Simpan hasil penggabungan aman ke server & Firestore (sudah disanitasi otomatis)
-      await batchSavePbbSpptToFirestore(mergedList, selectedYear);
-      
-      // 4. Perbarui state lokal
-      setSpptList(mergedList);
-      notify(`Sinkronisasi Dua Arah Berhasil! Data PBB Tahun ${selectedYear} telah diperbarui secara aman.`, 'success');
+        // 3. Simpan hasil penggabungan aman ke server & Firestore
+        await batchSavePbbSpptToFirestore(mergedList, selectedYear);
+        
+        // 4. Perbarui state lokal
+        setSpptList(mergedList);
+        notify(`Sinkronisasi Dua Arah Berhasil! Data PBB Tahun ${selectedYear} telah diperbarui dengan prioritas data Cloud.`, 'success');
+      }
     } catch (err) {
       console.error('Error during manual sync:', err);
       notify('Gagal sinkronisasi data PBB', 'error');
@@ -267,13 +282,181 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   };
 
   const [rawCsvInput, setRawCsvInput] = useState<string>('');
-  const [importMode, setImportMode] = useState<'master' | 'sync_status'>('master');
+  const [importMode, setImportMode] = useState<'master' | 'sync_status' | 'move_lingkungan'>('master');
+  const [targetMoveLingkungan, setTargetMoveLingkungan] = useState<number>(1);
   const [parseSuccessMsg, setParseSuccessMsg] = useState<string | null>(null);
 
   // States for citizen mapping and upload mapping wizard
   const [webgisHouses, setWebgisHouses] = useState<any[]>([]);
   const [parsedItems, setParsedItems] = useState<any[]>([]);
   const [mappingPreviewActive, setMappingPreviewActive] = useState<boolean>(false);
+
+  const handleParseCsvData = async () => {
+    if (!rawCsvInput.trim()) return;
+
+    const lines = rawCsvInput.split(/\r?\n/).filter(line => line.trim());
+    const results: any[] = [];
+    
+    if (importMode === 'master') {
+      // Handles both 8 columns (with Lingkungan) and 7 columns (with Year, mapping to Lingkungan 0)
+      lines.forEach((line, index) => {
+        // Smart delimiter detection: if tab is present, use tab (Excel paste). 
+        // Otherwise use comma, but handle names with commas correctly if they are tab-separated.
+        const delimiter = line.includes('\t') ? '\t' : ',';
+        const parts = line.split(delimiter).map(p => p.trim().replace(/^"(.*)"$/, '$1'));
+        
+        if (parts.length >= 7) {
+          const nopRaw = stripNonDigits(parts[1]);
+          if (nopRaw.length < 5) return;
+          
+          // Detect if column index 2 is a Year (like 2026) instead of Buku (like "IV, V")
+          const col2 = parts[2] || '';
+          const isYear = /^(202\d)$/.test(col2);
+          
+          const pbbVal = parseInt(parts[5].replace(/[^0-9]/g, ''), 10) || 0;
+          const statusStr = parts[6] || 'Belum Bayar';
+          const isLunas = statusStr.toLowerCase().includes('sudah') || statusStr.toLowerCase().includes('lunas');
+          const formattedNop = formatNop(nopRaw);
+
+          // Smart Lingkungan Resolution:
+          // 1. Column 8 if valid number
+          let detectedLing = parseInt(parts[7], 10);
+
+          // 2. Check if already exists in database
+          if (!detectedLing || isNaN(detectedLing) || detectedLing <= 0) {
+            const existing = spptList.find(i => stripNonDigits(i.nop) === nopRaw);
+            if (existing && existing.lingkungan > 0) {
+              detectedLing = existing.lingkungan;
+            }
+          }
+
+          // 3. Check WebGIS house mapping
+          if (!detectedLing || isNaN(detectedLing) || detectedLing <= 0) {
+            const house = webgisHouses.find(h => stripNonDigits(h.nopPbb || '') === nopRaw);
+            if (house && house.lingkunganNomor > 0) {
+              detectedLing = house.lingkunganNomor;
+            }
+          }
+
+          // 4. Infer from NOP block (e.g. .009.001- -> Block 001 is Lingkungan 1)
+          if (!detectedLing || isNaN(detectedLing) || detectedLing <= 0) {
+            const blockMatch = formattedNop.match(/\.009\.(\d{3})-/i);
+            if (blockMatch) {
+              const bNum = parseInt(blockMatch[1], 10);
+              if (bNum >= 1 && bNum <= 24) {
+                detectedLing = bNum;
+              }
+            }
+          }
+
+          results.push({
+            id: `pbb_${selectedYear}_${nopRaw}`,
+            no: index + 1,
+            nop: formattedNop,
+            buku: isYear ? 'I, II, III' : (parts[2] || 'I, II, III'),
+            namaWp: parts[3].toUpperCase(),
+            alamatOp: parts[4].toUpperCase(),
+            pbbTerutang: pbbVal,
+            jumlahBayar: isLunas ? pbbVal : 0,
+            status: isLunas ? 'Sudah Bayar' : 'Belum Bayar',
+            lingkungan: detectedLing || 0,
+            tahun: selectedYear,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      });
+      setParsedItems(results);
+      setMappingPreviewActive(true);
+    } else if (importMode === 'sync_status') {
+      // Flexible NOP detection for payment status sync
+      lines.forEach(line => {
+        const delimiter = line.includes('\t') ? '\t' : ',';
+        const parts = line.split(delimiter).map(p => p.trim());
+        let detectedNop = '';
+        
+        // Find something that looks like an NOP
+        for (const part of parts) {
+          const clean = stripNonDigits(part);
+          if (clean.length >= 18) {
+            detectedNop = formatNop(clean);
+            break;
+          }
+        }
+
+        if (detectedNop) {
+          const cleanNop = stripNonDigits(detectedNop);
+          // Look for existing item in master
+          const existing = spptList.find(i => stripNonDigits(i.nop) === cleanNop);
+          const house = webgisHouses.find(h => stripNonDigits(h.nopPbb || '') === cleanNop);
+          
+          let lingVal = existing?.lingkungan || house?.lingkunganNomor || 0;
+          if (!lingVal || lingVal <= 0) {
+            const blockMatch = detectedNop.match(/\.009\.(\d{3})-/i);
+            if (blockMatch) {
+              const bNum = parseInt(blockMatch[1], 10);
+              if (bNum >= 1 && bNum <= 24) lingVal = bNum;
+            }
+          }
+
+          results.push({
+            id: existing?.id || `pbb_${selectedYear}_${cleanNop}`,
+            no: existing?.no || 0,
+            nop: detectedNop,
+            buku: existing?.buku || 'IV, V',
+            namaWp: existing?.namaWp || parts.find(p => p.length > 3 && !p.includes('.'))?.toUpperCase() || 'NOP BARU (BELUM DIEDIT)',
+            alamatOp: existing?.alamatOp || house?.namaJalan || 'KELURAHAN MANGGA',
+            pbbTerutang: existing?.pbbTerutang || 0,
+            status: 'Sudah Bayar',
+            mappingSource: existing ? 'Master SPPT' : (house ? 'WebGIS Rumah' : (lingVal > 0 ? `Blok Lingk ${lingVal}` : 'Manual')),
+            lingkungan: lingVal,
+            tahun: selectedYear,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      });
+      setParsedItems(results);
+      setMappingPreviewActive(true);
+    }
+ else if (importMode === 'move_lingkungan') {
+      // Mode 3: Mass move environment for a list of NOPs
+      lines.forEach(line => {
+        const delimiter = line.includes('\t') ? '\t' : ',';
+        const parts = line.split(delimiter).map(p => p.trim());
+        // Since it's move_lingkungan, we usually expect just the NOP, 
+        // but it might be a full line copy-pasted. We take the first NOP found.
+        let targetNopRaw = '';
+        for (const p of parts) {
+          const clean = stripNonDigits(p);
+          if (clean.length >= 10) {
+            targetNopRaw = clean;
+            break;
+          }
+        }
+
+        if (targetNopRaw) {
+          const formattedNop = formatNop(targetNopRaw);
+          const existing = spptList.find(i => stripNonDigits(i.nop) === targetNopRaw);
+          
+          results.push({
+            id: existing?.id || `pbb_${selectedYear}_${targetNopRaw}`,
+            no: existing?.no || 0,
+            nop: formattedNop,
+            buku: existing?.buku || 'IV, V',
+            namaWp: existing?.namaWp || 'NOP BARU (BELUM ADA DI MASTER)',
+            alamatOp: existing?.alamatOp || '-',
+            pbbTerutang: existing?.pbbTerutang || 0,
+            status: existing?.status || 'Belum Bayar',
+            mappingSource: existing ? 'Master SPPT' : 'NOP Baru (Tidak Ada di Master)',
+            lingkungan: existing ? targetMoveLingkungan : 0, // Jika tidak ada di database, otomatis Lingkungan 0
+            tahun: selectedYear,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      });
+      setParsedItems(results);
+      setMappingPreviewActive(true);
+    }
+  };
 
   // Fetch WebGIS / Citizen database points on mount
   useEffect(() => {
@@ -808,242 +991,16 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     reader.readAsText(file);
   };
 
-  // Handle CSV/Text Parse
-  const handleParseCsvData = () => {
-    if (!rawCsvInput.trim()) return;
-
-    if (importMode === 'sync_status') {
-      try {
-        const lines = rawCsvInput.split('\n');
-        const tempItems: any[] = [];
-        let nextIdCount = Date.now();
-
-        // Prepare lookup maps for automatic neighborhood mapping
-        const masterNopMap = new Map<string, SpptPbbItem>();
-        spptList.forEach(item => {
-          if (item && item.nop) {
-            masterNopMap.set(item.nop.replace(/[^0-9]/g, ''), item);
-          }
-        });
-
-        const webgisNopMap = new Map<string, any>();
-        webgisHouses.forEach(h => {
-          if (h && h.nop) {
-            webgisNopMap.set(h.nop.replace(/[^0-9]/g, ''), h);
-          }
-        });
-
-        lines.forEach((rawLine) => {
-          const line = rawLine.trim();
-          if (!line) return;
-
-          // Skip non-data header lines
-          const lower = line.toLowerCase();
-          if (
-            lower.startsWith('kecamatan') ||
-            lower.startsWith('kelurahan') ||
-            lower.includes('daftar objek') ||
-            lower.includes('pbb (rp)') ||
-            (lower.includes('nop') && lower.includes('nama wp'))
-          ) {
-            return;
-          }
-
-          let delimiter = '\t';
-          if (!line.includes('\t')) {
-            if (line.includes(';')) delimiter = ';';
-            else delimiter = ',';
-          }
-
-          const cells = line.split(delimiter).map((c) => c.trim().replace(/^"|"$/g, ''));
-          if (cells.length < 2) return;
-
-          let detectedNop = '';
-          let detectedNama = '';
-          let detectedAlamat = '';
-          let detectedPbb = 0;
-          let detectedStatus: 'Sudah Bayar' | 'Belum Bayar' = 'Sudah Bayar';
-
-          // Check if column 1 contains NOP: [Nomor, NOP, Tahun, Nama WP, Alamat OP, PBB (Rp), Status]
-          const col1Digits = cells[1] ? cells[1].replace(/[^0-9]/g, '') : '';
-          const col0Digits = cells[0] ? cells[0].replace(/[^0-9]/g, '') : '';
-
-          if (col1Digits.length >= 15 && col1Digits.length <= 19) {
-            detectedNop = cells[1];
-            if (cells[3]) detectedNama = String(cells[3]).toUpperCase();
-            if (cells[4]) detectedAlamat = String(cells[4]).toUpperCase();
-            if (cells[5]) {
-              const val = parseInt(cells[5].replace(/[^0-9]/g, ''), 10);
-              if (!isNaN(val) && val > 0) detectedPbb = val;
-            }
-            if (cells[6]) {
-              const st = String(cells[6]).toLowerCase();
-              if (st.includes('belum')) detectedStatus = 'Belum Bayar';
-              else detectedStatus = 'Sudah Bayar';
-            }
-          } else if (col0Digits.length >= 15 && col0Digits.length <= 19) {
-            detectedNop = cells[0];
-            if (cells[1]) detectedNama = String(cells[1]).toUpperCase();
-            if (cells[2]) detectedAlamat = String(cells[2]).toUpperCase();
-            if (cells[3]) {
-              const val = parseInt(cells[3].replace(/[^0-9]/g, ''), 10);
-              if (!isNaN(val) && val > 0) detectedPbb = val;
-            }
-            if (cells[4]) {
-              const st = String(cells[4]).toLowerCase();
-              if (st.includes('belum')) detectedStatus = 'Belum Bayar';
-              else detectedStatus = 'Sudah Bayar';
-            }
-          } else {
-            // Flexible cell scanner fallback
-            cells.forEach((cell) => {
-              cell = cell.trim();
-              const digitsOnly = cell.replace(/[^0-9]/g, '');
-
-              // Identify NOP (typically 15 to 19 digits)
-              if (digitsOnly.length >= 15 && digitsOnly.length <= 19) {
-                detectedNop = cell;
-              }
-              // Identify PBB amount (handles 227,594 or 227.594 or Rp 227.594)
-              else if (
-                cell.toLowerCase().includes('rp') ||
-                /^\d{1,3}([.,]\d{3})+$/.test(cell) ||
-                (digitsOnly.length >= 4 && digitsOnly.length <= 11 && Number(digitsOnly) > 1000)
-              ) {
-                const val = parseInt(digitsOnly, 10);
-                if (!isNaN(val) && val > 0 && digitsOnly !== '2024' && digitsOnly !== '2025' && digitsOnly !== '2026' && digitsOnly !== '2027') {
-                  detectedPbb = val;
-                }
-              }
-              // Identify Status
-              else if (cell.toLowerCase().includes('bayar') || cell.toLowerCase().includes('lunas')) {
-                if (cell.toLowerCase().includes('belum')) {
-                  detectedStatus = 'Belum Bayar';
-                } else {
-                  detectedStatus = 'Sudah Bayar';
-                }
-              }
-            });
-
-            if (!detectedNama || !detectedAlamat) {
-              const textCells = cells.filter((c) => {
-                const trimmed = String(c || '').trim();
-                if (!trimmed) return false;
-                if (trimmed.replace(/[^0-9]/g, '').length >= 15) return false;
-                if (trimmed.toLowerCase().includes('rp')) return false;
-                if (trimmed.toLowerCase().includes('bayar') || trimmed.toLowerCase().includes('lunas')) return false;
-                if (/^\d+$/.test(trimmed.replace(/[^0-9]/g, '')) && trimmed.length < 10) return false;
-                return true;
-              });
-
-              if (!detectedNama && textCells.length > 0) {
-                detectedNama = String(textCells[0]).trim().toUpperCase();
-              }
-              if (!detectedAlamat && textCells.length > 1) {
-                detectedAlamat = String(textCells[1]).trim().toUpperCase();
-              }
-            }
-          }
-
-          if (!detectedNop) return;
-
-          const cleanNop = detectedNop.replace(/[^0-9]/g, '');
-          let targetLingkungan = 1;
-          let isNew = true;
-          let mappingSource: 'Master SPPT' | 'WebGIS Rumah' | 'Blok NOP' | 'Manual' = 'Manual';
-          let masterPbbTerutang = 0;
-
-          // 1. Try to map from Master SPPT Database
-          if (masterNopMap.has(cleanNop)) {
-            const masterItem = masterNopMap.get(cleanNop)!;
-            targetLingkungan = masterItem.lingkungan;
-            isNew = false;
-            mappingSource = 'Master SPPT';
-            if (!detectedNama) detectedNama = masterItem.namaWp;
-            if (!detectedAlamat) detectedAlamat = masterItem.alamatOp;
-            masterPbbTerutang = masterItem.pbbTerutang;
-          }
-          // 2. Infer from NOP block (e.g. 12.75.010.009.001-0004 -> Lingkungan 1, .002- -> Lingk 2, etc.)
-          else {
-            const blockMatch = detectedNop.match(/\.009\.(\d{3})-/i) || cleanNop.match(/009(\d{3})/);
-            if (blockMatch) {
-              const blockNum = parseInt(blockMatch[1], 10);
-              if (blockNum >= 1 && blockNum <= 24) {
-                targetLingkungan = blockNum;
-                mappingSource = 'Blok NOP';
-              }
-            }
-            if (targetLingkungan === 0 && webgisNopMap.has(cleanNop)) {
-              const houseItem = webgisNopMap.get(cleanNop)!;
-              targetLingkungan = Number(houseItem.lingkungan) || 1;
-              mappingSource = 'WebGIS Rumah';
-              if (!detectedNama) detectedNama = houseItem.namaWarga || houseItem.namaPemilik;
-              if (!detectedAlamat) detectedAlamat = houseItem.alamat;
-            }
-          }
-
-          if (targetLingkungan === 0) {
-            targetLingkungan = 0; // Sentinel value indicating NOP Baru
-            isNew = true;
-            mappingSource = 'Manual';
-            if (!detectedNama) detectedNama = 'NOP BARU (BELUM DIEDIT)';
-          }
-
-          const finalPbbTerutang = masterPbbTerutang > 0 ? masterPbbTerutang : (detectedPbb > 0 ? detectedPbb : 100000);
-          // If status is 'Sudah Bayar' and file contains an amount, record it as the actual paid amount (with deductions if lower)
-          const finalJumlahBayar = (detectedStatus === 'Sudah Bayar' && detectedPbb > 0) ? detectedPbb : undefined;
-
-          tempItems.push({
-            id: `import_map_${nextIdCount++}`,
-            nop: detectedNop,
-            namaWp: detectedNama || 'WAJIB PAJAK BARU',
-            alamatOp: detectedAlamat || 'KELURAHAN MANGGA',
-            pbbTerutang: finalPbbTerutang,
-            jumlahBayar: finalJumlahBayar,
-            status: detectedStatus,
-            lingkungan: targetLingkungan,
-            isNew,
-            mappingSource
-          });
-        });
-
-        if (tempItems.length > 0) {
-          setParsedItems(tempItems);
-          setMappingPreviewActive(true);
-          notify(`Berhasil membaca ${tempItems.length} baris NOP. Silakan tinjau hasil pemetaan lingkungan warga di bawah.`, 'info');
-        } else {
-          alert('Sistem tidak menemukan format NOP yang valid di baris data Anda.');
-        }
-      } catch (e) {
-        alert('Terjadi kesalahan saat menganalisis data untuk pemetaan.');
-      }
-      return;
-    }
-
-    // Legacy mode:
-    try {
-      const { summary, spptItems } = parsePbbCsv(rawCsvInput);
-
-      if (spptItems.length > 0) {
-        setSpptList((prev) => [...spptItems, ...prev]);
-        notify(`Berhasil mengimpor ${spptItems.length} data Objek Pajak (SPPT PBB) ke dalam sistem!`, 'success');
-        setRawCsvInput('');
-        setActiveTab('detail_sppt');
-      } else {
-        alert('Gagal membaca format CSV. Pastikan format mengandung NOP, Nama WP, PBB, dan Lingkungan.');
-      }
-    } catch (e) {
-      alert('Terjadi kesalahan saat memproses teks data.');
-    }
-  };
-
   // Commit dynamic mapped records to Firestore
   const handleCommitMappingToFirestore = async () => {
-    // Validate if any NOP has unassigned neighborhood (lingkungan === 0)
+    // Detect if any NOP has unassigned neighborhood (lingkungan === 0)
     const unassignedItems = parsedItems.filter(item => item.lingkungan === 0);
+    
+    // If unassigned items exist, ask for confirmation instead of blocking
     if (unassignedItems.length > 0) {
-      alert(`⚠️ Ada ${unassignedItems.length} NOP Baru yang belum ditentukan nomor lingkungannya!\n\nSilakan tentukan nomor lingkungan (1 s/d 24) pada kotak pilihan merah berkedip terlebih dahulu.`);
-      return;
+      if (!window.confirm(`⚠️ Perhatian: Ada ${unassignedItems.length} data WP yang belum ditentukan lingkungannya.\n\nData ini akan disimpan sebagai "NOP BARU" (Lingkungan 0). Anda bisa memindahkannya ke lingkungan yang benar nanti secara massal.\n\nLanjutkan simpan ke Firestore?`)) {
+        return;
+      }
     }
 
     setIsSyncing(true);
@@ -1060,11 +1017,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           updatedSpptList[existingIdx] = {
             ...updatedSpptList[existingIdx],
             status: parsed.status,
-            namaWp: parsed.namaWp,
-            alamatOp: parsed.alamatOp,
-            pbbTerutang: parsed.pbbTerutang,
-            jumlahBayar: parsed.jumlahBayar ?? (parsed.status === 'Sudah Bayar' ? parsed.pbbTerutang : null),
-            lingkungan: parsed.lingkungan,
+            namaWp: parsed.namaWp || updatedSpptList[existingIdx].namaWp,
+            alamatOp: parsed.alamatOp || updatedSpptList[existingIdx].alamatOp,
+            pbbTerutang: parsed.pbbTerutang || updatedSpptList[existingIdx].pbbTerutang,
+            jumlahBayar: parsed.jumlahBayar ?? (parsed.status === 'Sudah Bayar' ? (parsed.pbbTerutang || updatedSpptList[existingIdx].pbbTerutang) : null),
+            lingkungan: (parsed.lingkungan && parsed.lingkungan > 0) ? parsed.lingkungan : (updatedSpptList[existingIdx].lingkungan || 0),
           };
           itemsToUpload.push(updatedSpptList[existingIdx]);
         } else {
@@ -1105,9 +1062,327 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     }
   };
 
+  // Batch update neighborhood for all currently filtered items (Only Admin)
+  const handleBatchUpdateLingkungan = async (targetLingkungan: number) => {
+    if (!canManageWp) return;
+    if (filteredSpptList.length === 0) return;
+    if (targetLingkungan < 1 || targetLingkungan > 24) return;
+    
+    const count = filteredSpptList.length;
+    const msg = count > 100 
+      ? `PERINGATAN: Anda akan memindahkan ${count.toLocaleString('id-ID')} data Wajib Pajak ke Lingkungan ${targetLingkungan}. Lanjutkan?`
+      : `Pindahkan ${count} data WP yang sedang terfilter ke Lingkungan ${targetLingkungan}?`;
+
+    if (!window.confirm(msg)) {
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const itemsToUpdate = filteredSpptList.map(item => ({
+        ...item,
+        lingkungan: targetLingkungan,
+        updatedAt: new Date().toISOString()
+      }));
+
+      // 1. Save to Cloud Firestore & Server Buffer
+      await batchSavePbbSpptToFirestore(itemsToUpdate, selectedYear);
+
+      // 2. Update Local State
+      setSpptList(prev => {
+        const newMap = new Map<string, SpptPbbItem>(prev.map(i => [i.id, i]));
+        itemsToUpdate.forEach(item => newMap.set(item.id, item));
+        return Array.from(newMap.values()).sort((a, b) => {
+          if (a.lingkungan !== b.lingkungan) return a.lingkungan - b.lingkungan;
+          return a.no - b.no;
+        });
+      });
+
+      notify(`Berhasil! ${count} Wajib Pajak telah dipindahkan ke Lingkungan ${targetLingkungan} secara massal.`, 'success');
+      
+      // If we were filtering by "NOP Baru" or a specific environment, reset filters to show the result
+      if (selectedNopClassification === 'nop_baru' || (selectedLingkungan !== 'all' && selectedLingkungan !== String(targetLingkungan))) {
+        // Option to reset filter
+      }
+    } catch (err) {
+      console.error(err);
+      notify('Gagal melakukan pemindahan data massal', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const formatRupiah = (val: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
   };
+
+  const formatRupiahCompact = (val: number): string => {
+    if (val >= 1_000_000_000) return `Rp ${(val / 1e9).toFixed(1)}M`;
+    if (val >= 1_000_000) return `Rp ${(val / 1e6).toFixed(0)}jt`;
+    if (val >= 1_000) return `Rp ${(val / 1e3).toFixed(0)}rb`;
+    return `Rp ${val}`;
+  };
+
+  // Dynamic Chart Configuration & Logic per Criteria (handles persentase, wp_lunas_pct, target, wp_lunas_qty, lingkungan)
+  const chartConfig = useMemo(() => {
+    switch (sortBy) {
+      case 'wp_lunas_pct':
+        return {
+          title: `Grafik Rasio Wajib Pajak (WP) Lunas per Lingkungan (${selectedYear})`,
+          badge: 'Rasio WP Lunas (%)',
+          dataKey: 'persentaseWpLunas',
+          unit: '% WP Lunas',
+          yDomain: [0, 100] as [number, number],
+          yTickFormatter: (val: number) => `${val}%`,
+          getBarColor: (entry: any) => {
+            const pct = entry.persentaseWpLunas;
+            if (pct >= 80) return '#059669'; // Dark emerald
+            if (pct >= 60) return '#10b981'; // Emerald
+            if (pct >= 40) return '#f59e0b'; // Amber
+            return '#ef4444'; // Red
+          },
+          legend: [
+            { label: 'Sangat Baik (≥ 80% WP Lunas)', color: '#059669' },
+            { label: 'Baik (60% - 79% WP Lunas)', color: '#10b981' },
+            { label: 'Cukup (40% - 59% WP Lunas)', color: '#f59e0b' },
+            { label: 'Kurang (< 40% WP Lunas)', color: '#ef4444' },
+          ],
+          renderTooltip: (data: any) => (
+            <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-lg text-xs space-y-1.5 min-w-[210px]">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                <span className="font-black text-slate-900 text-sm">Lingkungan {data.lingkungan}</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                  {data.persentaseWpLunas.toFixed(1)}% Lunas
+                </span>
+              </div>
+              <div className="space-y-1 text-slate-600 pt-0.5">
+                <div className="flex justify-between">
+                  <span>WP Lunas:</span>
+                  <span className="font-black text-emerald-700">{data.wpLunas} dari {data.totalWp} WP</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Belum Lunas:</span>
+                  <span className="font-bold text-rose-600">{data.wpBelumLunas} WP</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-100 pt-1">
+                  <span>Capaian Nominal:</span>
+                  <span className="font-bold text-slate-800">{data.persentaseRealisasi.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Realisasi (Rp):</span>
+                  <span className="font-bold text-slate-800">{formatRupiah(data.realisasiNominal)}</span>
+                </div>
+              </div>
+            </div>
+          ),
+        };
+
+      case 'target':
+        return {
+          title: `Grafik Target Ketetapan PBB (Rp) per Lingkungan (${selectedYear})`,
+          badge: 'Target PBB (Rp)',
+          dataKey: 'targetNominal',
+          unit: 'Rp',
+          yDomain: [0, (dataMax: number) => Math.max(10_000_000, Math.ceil((dataMax * 1.1) / 10_000_000) * 10_000_000)] as any,
+          yTickFormatter: (val: number) => formatRupiahCompact(val),
+          getBarColor: (entry: any) => {
+            const pct = entry.persentaseRealisasi;
+            if (pct >= 75) return '#059669'; // Dark emerald
+            if (pct >= 50) return '#10b981'; // Emerald
+            if (pct >= 30) return '#f59e0b'; // Amber
+            return '#ef4444'; // Red
+          },
+          legend: [
+            { label: 'Realisasi Target Tinggi (≥ 75%)', color: '#059669' },
+            { label: 'Realisasi Target Sedang (50% - 74%)', color: '#10b981' },
+            { label: 'Realisasi Target Rendah (30% - 49%)', color: '#f59e0b' },
+            { label: 'Tunggakan Kritis (< 30%)', color: '#ef4444' },
+          ],
+          renderTooltip: (data: any) => (
+            <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-lg text-xs space-y-1.5 min-w-[220px]">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                <span className="font-black text-slate-900 text-sm">Lingkungan {data.lingkungan}</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-800">
+                  Target PBB
+                </span>
+              </div>
+              <div className="space-y-1 text-slate-600 pt-0.5">
+                <div className="flex justify-between">
+                  <span>Target Nominal:</span>
+                  <span className="font-black text-slate-900">{formatRupiah(data.targetNominal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Terbayar:</span>
+                  <span className="font-bold text-emerald-700">{formatRupiah(data.realisasiNominal)} ({data.persentaseRealisasi.toFixed(1)}%)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Sisa Tunggakan:</span>
+                  <span className="font-bold text-amber-600">{formatRupiah(data.sisaNominal)}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-100 pt-1">
+                  <span>Total WP:</span>
+                  <span className="font-bold text-slate-700">{data.totalWp} WP ({data.wpLunas} Lunas)</span>
+                </div>
+              </div>
+            </div>
+          ),
+        };
+
+      case 'wp_lunas_qty':
+        return {
+          title: `Grafik Jumlah WP yang Sudah Bayar per Lingkungan (${selectedYear})`,
+          badge: 'Jumlah WP Lunas',
+          dataKey: 'wpLunas',
+          unit: 'WP',
+          yDomain: [0, (dataMax: number) => Math.max(10, Math.ceil((dataMax * 1.1) / 10) * 10)] as any,
+          yTickFormatter: (val: number) => `${val} WP`,
+          getBarColor: (entry: any) => {
+            const pct = entry.persentaseWpLunas;
+            if (pct >= 80) return '#059669';
+            if (pct >= 60) return '#10b981';
+            if (pct >= 40) return '#f59e0b';
+            return '#ef4444';
+          },
+          legend: [
+            { label: 'Kepatuhan WP Tinggi (≥ 80%)', color: '#059669' },
+            { label: 'Kepatuhan WP Sedang (60% - 79%)', color: '#10b981' },
+            { label: 'Kepatuhan WP Cukup (40% - 59%)', color: '#f59e0b' },
+            { label: 'Kepatuhan WP Rendah (< 40%)', color: '#ef4444' },
+          ],
+          renderTooltip: (data: any) => (
+            <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-lg text-xs space-y-1.5 min-w-[210px]">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                <span className="font-black text-slate-900 text-sm">Lingkungan {data.lingkungan}</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                  {data.wpLunas} WP Lunas
+                </span>
+              </div>
+              <div className="space-y-1 text-slate-600 pt-0.5">
+                <div className="flex justify-between">
+                  <span>Jumlah WP Lunas:</span>
+                  <span className="font-black text-emerald-700">{data.wpLunas} WP</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Target WP:</span>
+                  <span className="font-bold text-slate-700">{data.totalWp} WP</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Rasio Pelunasan:</span>
+                  <span className="font-bold text-emerald-700">{data.persentaseWpLunas.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-100 pt-1">
+                  <span>Realisasi (Rp):</span>
+                  <span className="font-bold text-slate-800">{formatRupiah(data.realisasiNominal)}</span>
+                </div>
+              </div>
+            </div>
+          ),
+        };
+
+      case 'lingkungan':
+        return {
+          title: `Grafik Capaian Realisasi PBB Urut Lingkungan 1 - 24 (${selectedYear})`,
+          badge: 'Nomor Lingkungan (1-24)',
+          dataKey: 'persentaseRealisasi',
+          unit: '%',
+          yDomain: [0, (dataMax: number) => Math.max(100, Math.ceil(dataMax / 10) * 10)] as any,
+          yTickFormatter: (val: number) => `${val}%`,
+          getBarColor: (entry: any) => {
+            const pct = entry.persentaseRealisasi;
+            if (pct >= 80) return '#059669';
+            if (pct >= 60) return '#10b981';
+            if (pct >= 40) return '#f59e0b';
+            return '#ef4444';
+          },
+          legend: [
+            { label: 'Sangat Baik (≥ 80%)', color: '#059669' },
+            { label: 'Baik (60% - 79%)', color: '#10b981' },
+            { label: 'Cukup (40% - 59%)', color: '#f59e0b' },
+            { label: 'Kurang (< 40%)', color: '#ef4444' },
+          ],
+          renderTooltip: (data: any) => (
+            <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-lg text-xs space-y-1.5 min-w-[210px]">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                <span className="font-black text-slate-900 text-sm">Lingkungan {data.lingkungan}</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                  {data.persentaseRealisasi.toFixed(1)}% Realisasi
+                </span>
+              </div>
+              <div className="space-y-1 text-slate-600 pt-0.5">
+                <div className="flex justify-between">
+                  <span>Capaian Nominal:</span>
+                  <span className="font-black text-emerald-700">{data.persentaseRealisasi.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Realisasi (Rp):</span>
+                  <span className="font-bold text-slate-800">{formatRupiah(data.realisasiNominal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Target (Rp):</span>
+                  <span className="font-bold text-slate-700">{formatRupiah(data.targetNominal)}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-100 pt-1">
+                  <span>WP Lunas:</span>
+                  <span className="font-bold text-slate-800">{data.wpLunas} dari {data.totalWp} WP ({data.persentaseWpLunas.toFixed(1)}%)</span>
+                </div>
+              </div>
+            </div>
+          ),
+        };
+
+      case 'persentase':
+      default:
+        return {
+          title: `Grafik Capaian Realisasi Nominal PBB (%) per Lingkungan (${selectedYear})`,
+          badge: 'Capaian Nominal (%)',
+          dataKey: 'persentaseRealisasi',
+          unit: '%',
+          yDomain: [0, (dataMax: number) => Math.max(100, Math.ceil(dataMax / 10) * 10)] as any,
+          yTickFormatter: (val: number) => `${val}%`,
+          getBarColor: (entry: any) => {
+            const pct = entry.persentaseRealisasi;
+            if (pct >= 80) return '#059669';
+            if (pct >= 60) return '#10b981';
+            if (pct >= 40) return '#f59e0b';
+            return '#ef4444';
+          },
+          legend: [
+            { label: 'Sangat Baik (≥ 80%)', color: '#059669' },
+            { label: 'Baik (60% - 79%)', color: '#10b981' },
+            { label: 'Cukup (40% - 59%)', color: '#f59e0b' },
+            { label: 'Kurang (< 40%)', color: '#ef4444' },
+          ],
+          renderTooltip: (data: any) => (
+            <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-lg text-xs space-y-1.5 min-w-[210px]">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                <span className="font-black text-slate-900 text-sm">Lingkungan {data.lingkungan}</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                  {data.persentaseRealisasi.toFixed(1)}%
+                </span>
+              </div>
+              <div className="space-y-1 text-slate-600 pt-0.5">
+                <div className="flex justify-between">
+                  <span>Capaian:</span>
+                  <span className="font-black text-emerald-700">{data.persentaseRealisasi.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Realisasi (Rp):</span>
+                  <span className="font-bold text-slate-800">{formatRupiah(data.realisasiNominal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Target (Rp):</span>
+                  <span className="font-bold text-slate-700">{formatRupiah(data.targetNominal)}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-100 pt-1">
+                  <span>WP Lunas:</span>
+                  <span className="font-bold text-slate-800">{data.wpLunas} dari {data.totalWp} WP ({data.persentaseWpLunas.toFixed(1)}%)</span>
+                </div>
+              </div>
+            </div>
+          ),
+        };
+    }
+  }, [sortBy, selectedYear]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -1143,6 +1418,18 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             </div>
 
             <div className="flex flex-wrap items-center gap-2 print:hidden">
+              {/* Hard Reset / Force Cloud Sync (Requested by User: Abaikan HP & Komputer) */}
+              <button
+                type="button"
+                onClick={() => handleManualSync(true)}
+                disabled={isSyncing}
+                title="PAKSA ambil data dari Cloud (Abaikan data lokal di perangkat ini)"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-black text-slate-200 text-[10px] font-black transition-all shadow-md cursor-pointer border border-slate-600"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                <span>Restore from Cloud</span>
+              </button>
+
               {/* Year Dropdown Selector in Header */}
               <div className="flex items-center gap-1.5 bg-emerald-950/80 border border-emerald-400/60 px-3 py-1.5 rounded-xl shadow-xs">
                 <Calendar className="w-4 h-4 text-amber-400" />
@@ -1166,7 +1453,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               {/* Tombol Sinkronkan Data Realtime */}
               <button
                 type="button"
-                onClick={handleManualSync}
+                onClick={() => handleManualSync(false)}
                 disabled={isSyncing}
                 title="Sinkronisasi Data Real-time (Server Buffer & Cloud Firestore)"
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white text-xs font-bold transition-all shadow-md cursor-pointer border border-emerald-300"
@@ -1620,18 +1907,89 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             </div>
           </div>
 
-          {/* Visual Chart: Ringkasan Realisasi PBB Per Lingkungan */}
-          <div className="bg-slate-50/80 rounded-xl border border-slate-200 p-4 print:hidden">
-            <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <BarChart3 className="w-4 h-4 text-emerald-600" />
-              <span>Grafik Realisasi Capaian PBB per Lingkungan ({selectedYear})</span>
-            </h4>
+          {/* Visual Chart: Ringkasan Realisasi PBB Per Lingkungan Dinamis Sesuai Kriteria */}
+          <div className="bg-slate-50/80 rounded-2xl border border-slate-200 p-4 sm:p-5 print:hidden space-y-3 shadow-2xs">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div>
+                <h4 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <BarChart3 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{chartConfig.title}</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                  Metrik Aktif: <span className="font-extrabold text-emerald-800 bg-emerald-100/80 border border-emerald-300 px-1.5 py-0.5 rounded text-[10px]">{chartConfig.badge}</span> • {chartConfig.subtitle}
+                </p>
+              </div>
+
+              {/* Quick Metric Selector Pill Buttons */}
+              <div className="flex flex-wrap items-center gap-1 bg-slate-200/80 p-1 rounded-xl self-start lg:self-auto border border-slate-300/70">
+                <button
+                  type="button"
+                  onClick={() => setSortBy('persentase')}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    sortBy === 'persentase'
+                      ? 'bg-emerald-700 text-white shadow-2xs font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                  title="Tampilkan & urutkan capaian nominal terbayar (%)"
+                >
+                  % Capaian Nominal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('wp_lunas_pct')}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    sortBy === 'wp_lunas_pct'
+                      ? 'bg-emerald-700 text-white shadow-2xs font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                  title="Tampilkan & urutkan rasio kepatuhan WP Lunas (%)"
+                >
+                  % Rasio WP Lunas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('target')}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    sortBy === 'target'
+                      ? 'bg-emerald-700 text-white shadow-2xs font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                  title="Tampilkan & urutkan target nominal PBB (Rp)"
+                >
+                  Target PBB (Rp)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('wp_lunas_qty')}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    sortBy === 'wp_lunas_qty'
+                      ? 'bg-emerald-700 text-white shadow-2xs font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                  title="Tampilkan & urutkan jumlah jiwa/WP yang sudah lunas"
+                >
+                  Jumlah WP Lunas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('lingkungan')}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    sortBy === 'lingkungan'
+                      ? 'bg-emerald-700 text-white shadow-2xs font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                  title="Urutkan berurutan nomor Lingkungan 1 s/d 24"
+                >
+                  No. Lingkungan
+                </button>
+              </div>
+            </div>
             
-            <div className="h-48 w-full">
+            <div className="h-52 w-full pt-1">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={filteredSummaryByLingkungan}
-                  margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                  margin={{ top: 10, right: 10, left: sortBy === 'target' ? 15 : -15, bottom: 0 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis
@@ -1644,8 +2002,9 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   <YAxis
                     tickLine={false}
                     axisLine={false}
-                    domain={[0, 100]}
-                    tickFormatter={(val) => `${val}%`}
+                    width={sortBy === 'target' ? 68 : 42}
+                    domain={chartConfig.yDomain}
+                    tickFormatter={chartConfig.yTickFormatter}
                     tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }}
                   />
                   <RechartsTooltip
@@ -1653,68 +2012,97 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
-                        return (
-                          <div className="bg-white border border-slate-200 p-2.5 rounded-lg shadow-md text-xs">
-                            <p className="font-extrabold text-slate-800 mb-1">Lingkungan {data.lingkungan}</p>
-                            <p className="text-slate-600">Capaian: <span className="font-extrabold text-emerald-700">{data.persentaseRealisasi.toFixed(1)}%</span></p>
-                            <p className="text-slate-600">WP Lunas: <span className="font-bold text-slate-800">{data.wpLunas} dari {data.totalWp} WP</span></p>
-                            <p className="text-slate-600">Realisasi: <span className="font-bold text-slate-800">Rp {data.realisasiNominal.toLocaleString('id-ID')}</span></p>
-                          </div>
-                        );
+                        return chartConfig.renderTooltip(data);
                       }
                       return null;
                     }}
                   />
                   <Bar
-                    dataKey="persentaseRealisasi"
+                    dataKey={chartConfig.dataKey}
                     radius={[4, 4, 0, 0]}
-                    maxBarSize={30}
+                    maxBarSize={32}
                   >
                     {filteredSummaryByLingkungan.map((entry, index) => {
-                      const pct = entry.persentaseRealisasi;
-                      let fill = '#ef4444'; // Red for low (< 40%)
-                      if (pct >= 80) fill = '#059669'; // Dark Emerald for high (>= 80%)
-                      else if (pct >= 60) fill = '#10b981'; // Emerald for good (>= 60%)
-                      else if (pct >= 40) fill = '#f59e0b'; // Amber for moderate (>= 40%)
-                      return <Cell key={`cell-${index}`} fill={fill} />;
+                      const fill = chartConfig.getBarColor(entry);
+                      return <Cell key={`cell-${entry.lingkungan || index}`} fill={fill} />;
                     })}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
             
-            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-2 text-[10px] text-slate-500 font-bold">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#059669]" />
-                <span>Sangat Baik (≥ 80%)</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />
-                <span>Baik (60% - 79%)</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]" />
-                <span>Cukup (40% - 59%)</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" />
-                <span>Kurang (&lt; 40%)</span>
-              </span>
+            {/* Dynamic Legend based on selected criteria */}
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 pt-2 border-t border-slate-200/70 text-[10px] text-slate-600 font-bold">
+              <span className="text-slate-400 font-normal">Keterangan Klasifikasi:</span>
+              {chartConfig.legend.map((item, idx) => (
+                <span key={idx} className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-3xs" style={{ backgroundColor: item.color }} />
+                  <span>{item.label}</span>
+                </span>
+              ))}
             </div>
           </div>
 
-          {/* Table Capaian Per Lingkungan */}
+          {/* Table Capaian Per Lingkungan dengan Kolom Aktif yang Selaras */}
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-left text-xs sm:text-sm">
               <thead className="bg-slate-100 text-slate-700 uppercase font-black tracking-wider text-[11px] border-b border-slate-200">
                 <tr>
                   <th className="py-3.5 px-4 text-center w-12">No</th>
-                  <th className="py-3.5 px-4">Lingkungan</th>
-                  <th className="py-3.5 px-4 text-center">WP Lunas</th>
-                  <th className="py-3.5 px-4 text-right">Target PBB (Rp)</th>
+                  <th 
+                    className={`py-3.5 px-4 cursor-pointer hover:bg-slate-200 transition-colors ${sortBy === 'lingkungan' ? 'bg-emerald-100/70 text-emerald-950 font-black' : ''}`}
+                    onClick={() => {
+                      setSortBy('lingkungan');
+                      setSortOrder(sortBy === 'lingkungan' && sortOrder === 'asc' ? 'desc' : 'asc');
+                    }}
+                    title="Klik untuk mengurutkan berdasarkan nomor lingkungan"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Lingkungan</span>
+                      {sortBy === 'lingkungan' && <span>{sortOrder === 'desc' ? '▼' : '▲'}</span>}
+                    </div>
+                  </th>
+                  <th 
+                    className={`py-3.5 px-4 text-center cursor-pointer hover:bg-slate-200 transition-colors ${sortBy === 'wp_lunas_pct' || sortBy === 'wp_lunas_qty' ? 'bg-emerald-100/70 text-emerald-950 font-black' : ''}`}
+                    onClick={() => {
+                      setSortBy(sortBy === 'wp_lunas_pct' ? 'wp_lunas_qty' : 'wp_lunas_pct');
+                      setSortOrder('desc');
+                    }}
+                    title="Klik untuk mengurutkan berdasarkan WP Lunas / Rasio WP Lunas"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>WP Lunas (% Rasio)</span>
+                      {(sortBy === 'wp_lunas_pct' || sortBy === 'wp_lunas_qty') && <span>{sortOrder === 'desc' ? '▼' : '▲'}</span>}
+                    </div>
+                  </th>
+                  <th 
+                    className={`py-3.5 px-4 text-right cursor-pointer hover:bg-slate-200 transition-colors ${sortBy === 'target' ? 'bg-emerald-100/70 text-emerald-950 font-black' : ''}`}
+                    onClick={() => {
+                      setSortBy('target');
+                      setSortOrder(sortBy === 'target' && sortOrder === 'desc' ? 'asc' : 'desc');
+                    }}
+                    title="Klik untuk mengurutkan berdasarkan Target Ketetapan Nominal PBB"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Target PBB (Rp)</span>
+                      {sortBy === 'target' && <span>{sortOrder === 'desc' ? '▼' : '▲'}</span>}
+                    </div>
+                  </th>
                   <th className="py-3.5 px-4 text-right">Terbayar (Rp)</th>
                   <th className="py-3.5 px-4 text-right">Sisa Terutang (Rp)</th>
-                  <th className="py-3.5 px-4 text-center w-48">% Capaian Realisasi</th>
+                  <th 
+                    className={`py-3.5 px-4 text-center w-48 cursor-pointer hover:bg-slate-200 transition-colors ${sortBy === 'persentase' ? 'bg-emerald-100/70 text-emerald-950 font-black' : ''}`}
+                    onClick={() => {
+                      setSortBy('persentase');
+                      setSortOrder(sortBy === 'persentase' && sortOrder === 'desc' ? 'asc' : 'desc');
+                    }}
+                    title="Klik untuk mengurutkan berdasarkan % Capaian Realisasi Nominal"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>% Capaian Realisasi</span>
+                      {sortBy === 'persentase' && <span>{sortOrder === 'desc' ? '▼' : '▲'}</span>}
+                    </div>
+                  </th>
                   <th className="py-3.5 px-4 text-center">Status</th>
                 </tr>
               </thead>
@@ -1767,17 +2155,32 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                         </div>
                         <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 transition-colors print:hidden" />
                       </td>
-                      <td className="py-3 px-4 text-center font-semibold">
-                        <span className="text-emerald-700 font-bold">{row.wpLunas}</span>
-                        <span className="text-slate-400"> / {row.totalWp}</span>
+                      <td className={`py-3 px-4 text-center ${sortBy === 'wp_lunas_pct' || sortBy === 'wp_lunas_qty' ? 'bg-emerald-50/70 font-black' : 'font-semibold'}`}>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <div>
+                            <span className="text-emerald-700 font-black">{row.wpLunas}</span>
+                            <span className="text-slate-400 text-xs font-normal"> / {row.totalWp}</span>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            row.persentaseWpLunas >= 80 
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                              : row.persentaseWpLunas >= 50 
+                              ? 'bg-teal-100 text-teal-800' 
+                              : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {row.persentaseWpLunas.toFixed(1)}% Lunas
+                          </span>
+                        </div>
                       </td>
-                      <td className="py-3 px-4 text-right font-semibold text-slate-700">{formatRupiah(row.targetNominal)}</td>
+                      <td className={`py-3 px-4 text-right font-semibold ${sortBy === 'target' ? 'bg-blue-50/70 font-black text-blue-950' : 'text-slate-700'}`}>
+                        {formatRupiah(row.targetNominal)}
+                      </td>
                       <td className="py-3 px-4 text-right font-black text-emerald-700">{formatRupiah(row.realisasiNominal)}</td>
                       <td className="py-3 px-4 text-right text-slate-500 font-medium">{formatRupiah(row.sisaNominal)}</td>
-                      <td className="py-3 px-4">
+                      <td className={`py-3 px-4 ${sortBy === 'persentase' ? 'bg-emerald-50/70 font-black' : ''}`}>
                         <div className="space-y-1">
                           <div className="flex justify-between items-center text-xs font-bold">
-                            <span className="text-emerald-800">{row.persentaseRealisasi.toFixed(1)}%</span>
+                            <span className="text-emerald-800 font-black">{row.persentaseRealisasi.toFixed(1)}%</span>
                           </div>
                           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/60">
                             <div
@@ -1885,110 +2288,126 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="relative flex-1 min-w-[240px]">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari Nama WP, NOP, atau Alamat Objek Pajak..."
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Year Filter */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50/80 text-xs font-bold text-emerald-900">
-                <Calendar className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Tahun:</span>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => handleYearChange(parseInt(e.target.value, 10))}
-                  className="bg-white border border-emerald-300 text-emerald-950 font-black rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer text-xs"
-                >
-                  {AVAILABLE_PBB_YEARS.map((yr) => (
-                    <option key={yr} value={yr}>
-                      {yr} {yr === 2026 ? '(Default)' : ''}
-                    </option>
-                  ))}
-                </select>
+          {/* Search, Filter, and Mass Actions */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari Nama WP, NOP, atau Alamat Objek Pajak..."
+                  className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
               </div>
 
-              <select
-                value={selectedStatusFilter}
-                onChange={(e) => setSelectedStatusFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="all">Semua Status (Lunas &amp; Belum)</option>
-                <option value="lunas">Khusus Sudah Bayar (Lunas)</option>
-                <option value="belum">Khusus Belum Bayar</option>
-              </select>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Year Filter */}
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50/80 text-xs font-bold text-emerald-900">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Tahun:</span>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => handleYearChange(parseInt(e.target.value, 10))}
+                    className="bg-white border border-emerald-300 text-emerald-950 font-black rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer text-xs"
+                  >
+                    {AVAILABLE_PBB_YEARS.map((yr) => (
+                      <option key={yr} value={yr}>
+                        {yr} {yr === 2026 ? '(Default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <select
-                value={selectedNopClassification}
-                onChange={(e) => setSelectedNopClassification(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-indigo-300 text-xs font-bold text-indigo-900 bg-indigo-50/50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                title="Klasifikasi NOP Lapangan (Buku, Blok, Prioritas Penagihan)"
-              >
-                <option value="all">📁 Semua Golongan NOP</option>
-                <option value="nop_baru" className="text-rose-600 font-black">🆕 NOP BARU (Belum Masuk Lingkungan)</option>
-                <option value="buku_1">📗 Buku 1 (Ketetapan ≤ Rp 100rb)</option>
-                <option value="buku_2">📘 Buku 2 (Rp 100rb - Rp 500rb)</option>
-                <option value="buku_3">📙 Buku 3 (Rp 500rb - Rp 2jt)</option>
-                <option value="buku_4_5">🟥 Buku 4 &amp; 5 (Komersial &gt; Rp 2jt)</option>
-                <option value="menunggak_besar">⚠️ Tunggakan Besar (≥ Rp 500rb)</option>
-                <option value="menunggak_kecil">💸 Tunggakan Kecil (&lt; Rp 500rb)</option>
-                <option value="blok_ganjil">🔢 Blok NOP Ganjil</option>
-                <option value="blok_genap">🔢 Blok NOP Genap</option>
-              </select>
+                <select
+                  value={selectedStatusFilter}
+                  onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="all">Semua Status (Lunas &amp; Belum)</option>
+                  <option value="lunas">Khusus Sudah Bayar (Lunas)</option>
+                  <option value="belum">Khusus Belum Bayar</option>
+                </select>
 
-              <select
-                value={selectedLingkungan}
-                onChange={(e) => setSelectedLingkungan(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                {!isKepling && <option value="all">Semua Lingkungan (1-24)</option>}
-                {!isKepling && spptList.some(item => item.lingkungan === 0) && (
-                  <option value="0" className="text-rose-600 font-extrabold bg-rose-50">⚠️ TERDETEKSI NOP BARU (0)</option>
+                <select
+                  value={selectedNopClassification}
+                  onChange={(e) => setSelectedNopClassification(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-indigo-300 text-xs font-bold text-indigo-900 bg-indigo-50/50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  title="Klasifikasi NOP Lapangan (Buku, Blok, Prioritas Penagihan)"
+                >
+                  <option value="all">📁 Semua Golongan NOP</option>
+                  <option value="nop_baru" className="text-rose-600 font-black">🆕 NOP BARU (Belum Masuk Lingkungan)</option>
+                  <option value="buku_1">📗 Buku 1 (Ketetapan ≤ Rp 100rb)</option>
+                  <option value="buku_2">📘 Buku 2 (Rp 100rb - Rp 500rb)</option>
+                  <option value="buku_3">📙 Buku 3 (Rp 500rb - Rp 2jt)</option>
+                  <option value="buku_4_5">🟥 Buku 4 &amp; 5 (Komersial &gt; Rp 2jt)</option>
+                  <option value="menunggak_besar">⚠️ Tunggakan Besar (≥ Rp 500rb)</option>
+                  <option value="menunggak_kecil">💸 Tunggakan Kecil (&lt; Rp 500rb)</option>
+                  <option value="blok_ganjil">🔢 Blok NOP Ganjil</option>
+                  <option value="blok_genap">🔢 Blok NOP Genap</option>
+                </select>
+
+                <select
+                  value={selectedLingkungan}
+                  onChange={(e) => setSelectedLingkungan(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  {!isKepling && <option value="all">Semua Lingkungan (1-24)</option>}
+                  {!isKepling && spptList.some(item => item.lingkungan === 0) && (
+                    <option value="0" className="text-rose-600 font-extrabold bg-rose-50">⚠️ TERDETEKSI NOP BARU (0)</option>
+                  )}
+                  {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={String(n)}>
+                      Lingkungan {n} {isKepling && n === keplingLingkunganNum ? '👑 (Lingkungan Anda)' : ''}
+                    </option>
+                  ))}
+                  {isKepling && <option value="all">Tampilkan Semua Lingkungan</option>}
+                </select>
+
+                {canManageWp && (searchQuery || selectedLingkungan !== 'all' || selectedNopClassification !== 'all') && (
+                  <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-xl shadow-xs">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-700" />
+                    <span className="text-[10px] font-black text-amber-800 uppercase mr-1">Koreksi Massal:</span>
+                    <select
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (val > 0) {
+                          handleBatchUpdateLingkungan(val);
+                          e.target.value = "0"; // reset dropdown
+                        }
+                      }}
+                      className="bg-white border border-amber-300 text-amber-950 font-black rounded px-2 py-0.5 text-[10px] cursor-pointer"
+                    >
+                      <option value="0">Pindah Ke Lingk...</option>
+                      {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                        <option key={n} value={n}>Lingkungan {n}</option>
+                      ))}
+                    </select>
+                  </div>
                 )}
-                {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={String(n)}>
-                    Lingkungan {n} {isKepling && n === keplingLingkunganNum ? '👑 (Lingkungan Anda)' : ''}
-                  </option>
-                ))}
-                {isKepling && <option value="all">Tampilkan Semua Lingkungan</option>}
-              </select>
 
-              {isKepling && selectedLingkungan !== String(keplingLingkunganNum) && (
                 <button
-                  onClick={() => setSelectedLingkungan(String(keplingLingkunganNum))}
-                  className="px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-xs font-black cursor-pointer transition-colors"
+                  type="button"
+                  onClick={handleManualSync}
+                  disabled={isSyncing}
+                  title="Sinkronisasi Data Real-time (Firestore & Server Buffer)"
+                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 active:scale-98 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
                 >
-                  👑 Reset ke Lingk {keplingLingkunganNum}
+                  <RefreshCw className={`w-3.5 h-3.5 text-emerald-700 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Data'}</span>
                 </button>
-              )}
 
-              <button
-                type="button"
-                onClick={handleManualSync}
-                disabled={isSyncing}
-                title="Sinkronisasi Data Real-time (Firestore & Server Buffer)"
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 active:scale-98 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 text-emerald-700 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Data'}</span>
-              </button>
-
-              {canManageWp && (
-                <button
-                  onClick={handleOpenAddModal}
-                  className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>+ Tambah WP Baru</span>
-                </button>
-              )}
+                {canManageWp && (
+                  <button
+                    onClick={handleOpenAddModal}
+                    className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Tambah WP Baru</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -2295,7 +2714,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           {!mappingPreviewActive ? (
             <>
               {/* Mode Selector */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
                 <button
                   type="button"
                   onClick={() => {
@@ -2310,8 +2729,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 >
                   <FileSpreadsheet className="w-4 h-4" />
                   <div className="text-left">
-                    <p className="font-black">1. Import Master SPPT Baru</p>
-                    <p className="text-[10px] opacity-80 font-normal">Membutuhkan 8 Kolom Lengkap (termasuk Lingkungan)</p>
+                    <p className="font-black text-[11px]">1. Import Master Baru</p>
+                    <p className="text-[9px] opacity-80 font-normal">8 Kolom Lengkap</p>
                   </div>
                 </button>
 
@@ -2329,11 +2748,54 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 >
                   <RefreshCw className="w-4 h-4" />
                   <div className="text-left">
-                    <p className="font-black">2. Sinkronisasi Status Bayar (Pemetaan NOP)</p>
-                    <p className="text-[10px] opacity-80 font-normal">Hanya butuh kolom NOP. Otomatis dipetakan ke Lingkungan!</p>
+                    <p className="font-black text-[11px]">2. Sinkron Bayar (NOP)</p>
+                    <p className="text-[9px] opacity-80 font-normal">Otomatis Petakan Lingk.</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportMode('move_lingkungan');
+                    setRawCsvInput('');
+                  }}
+                  className={`px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2 justify-center cursor-pointer ${
+                    importMode === 'move_lingkungan'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                  <div className="text-left">
+                    <p className="font-black text-[11px]">3. Pindah Lingkungan Massal</p>
+                    <p className="text-[9px] opacity-80 font-normal">Pindah List NOP ke Lingk. Lain</p>
                   </div>
                 </button>
               </div>
+
+              {/* Destination Selector (Only for Move Lingkungan mode) */}
+              {importMode === 'move_lingkungan' && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-100 rounded-xl text-amber-700">
+                      <MapPin className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-amber-900">Pilih Lingkungan Tujuan</p>
+                      <p className="text-[10px] text-amber-700">Semua NOP yang Anda tempel di bawah akan dipindahkan ke lingkungan ini.</p>
+                    </div>
+                  </div>
+                  <select
+                    value={targetMoveLingkungan}
+                    onChange={(e) => setTargetMoveLingkungan(parseInt(e.target.value, 10))}
+                    className="w-full sm:w-48 bg-white border-2 border-amber-300 text-amber-950 font-black rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer text-sm shadow-sm"
+                  >
+                    {Array.from({ length: 24 }, (_, i) => i + 1).map(n => (
+                      <option key={n} value={n}>Lingkungan {n}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* File Upload Dropzone */}
               <div className="space-y-1.5">
@@ -2366,7 +2828,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                     <span>Metode B: Tempel (Paste) Salinan Tabel dari Excel</span>
                   </label>
                   <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-                    {importMode === 'master' ? 'Format: NO | NOP | BUKU | NAMA | ALAMAT | PBB | STATUS | LING' : 'Format Bebas: NOP akan dicari otomatis'}
+                    {importMode === 'master' 
+                      ? 'Format: NO | NOP | BUKU | NAMA | ALAMAT | PBB | STATUS | LING' 
+                      : importMode === 'move_lingkungan'
+                      ? 'List NOP (Satu NOP per baris)'
+                      : 'Format Bebas: NOP akan dicari otomatis'}
                   </span>
                 </div>
 
@@ -2376,6 +2842,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   onChange={(e) => setRawCsvInput(e.target.value)}
                   placeholder={importMode === 'master' 
                     ? `Contoh (Format 8 Kolom):\n1,12.75.010.009.001-0001.0,"IV, V",MULIA MELIALA,JL LETJEN DJAMIN GINTING 88, Rp 2.835.604 ,Belum Bayar,1\n2,12.75.010.009.001-0002.0,"IV, V",PANTAS MELIALA,JL LETJEN DJAMIN GINTING 86, Rp 3.209.724 ,Belum Bayar,1`
+                    : importMode === 'move_lingkungan'
+                    ? `Tempel/Paste daftar NOP yang ingin dipindahkan ke Lingkungan ${targetMoveLingkungan}:\n12.75.010.009.008-0030.0\n12.75.010.009.008-0045.0\n12.75.010.009.008-0177.0`
                     : `Tempel/Paste kolom dari Excel WP Sudah Bayar Anda (sistem otomatis mencari NOP):\n12.75.010.009.001-0004\tGINTING\tSudah Bayar\n12.75.010.009.001-0016\tOPONG GINTING\tSudah Bayar\n12.75.010.009.002-0002\tMOMIN SITEPU\tSudah Bayar`}
                   className="w-full p-3.5 rounded-xl border border-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 leading-relaxed"
                 />
@@ -2384,11 +2852,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-xs">
                 <p className="font-black text-amber-900 flex items-center gap-1.5">
                   <Info className="w-4 h-4 text-amber-700 shrink-0" />
-                  <span>{importMode === 'master' ? 'Cara Import Master SPPT:' : 'Cara Sinkronisasi Massal (Pemetaan NOP):'}</span>
+                  <span>{importMode === 'master' ? 'Cara Import Master SPPT:' : importMode === 'move_lingkungan' ? 'Cara Pindah Lingkungan Massal:' : 'Cara Sinkronisasi Massal (Pemetaan NOP):'}</span>
                 </p>
                 <p className="text-amber-800 text-[11px] leading-relaxed">
                   {importMode === 'master' 
-                    ? 'Gunakan opsi ini saat pertama kali mengimpor master database SPPT PBB tahunan Kelurahan Mangga yang memiliki kolom lingkungan lengkap.'
+                    ? 'Gunakan opsi ini saat pertama kali mengimpor master database SPPT PBB tahunan Kelurahan Mangga. Jika Anda belum memiliki data lingkungan, Anda bisa mengosongkan kolom lingkungan (data akan disimpan sebagai "NOP BARU" untuk dipetakan massal nanti).'
+                    : importMode === 'move_lingkungan'
+                    ? `Gunakan opsi ini jika Anda memiliki daftar NOP yang ingin dipindahkan ke suatu lingkungan. Cukup tempel daftar NOP dan pilih Lingkungan ${targetMoveLingkungan}. NOP yang terdaftar di database akan dipindahkan ke Lingkungan ${targetMoveLingkungan}, sedangkan NOP yang belum terdaftar di database akan otomatis ditandai sebagai "Lingkungan 0 (NOP BARU)" agar data lingkungan tujuan tetap akurat.`
                     : 'Gunakan opsi ini jika Excel pembayaran Anda TIDAK memuat kolom lingkungan. Sistem akan mencocokkan NOP di setiap baris dengan database Master SPPT & pemetaan WebGIS Rumah warga Kelurahan Mangga untuk mencari tahu nomor lingkungan aslinya secara otomatis!'}
                 </p>
               </div>
@@ -2402,24 +2872,42 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 <button
                   onClick={handleParseCsvData}
                   disabled={!rawCsvInput.trim()}
-                  className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-2 shadow-2xs"
+                  className={`px-5 py-2.5 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-2 shadow-2xs ${
+                    importMode === 'move_lingkungan' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-700 hover:bg-emerald-800'
+                  }`}
                 >
                   <RefreshCw className="w-4 h-4" />
-                  <span>{importMode === 'master' ? 'Proses Impor Master SPPT' : 'Analisis &amp; Petakan Lingkungan (NOP)'}</span>
+                  <span>{importMode === 'master' ? 'Proses Impor Master SPPT' : importMode === 'move_lingkungan' ? `Proses Pindah Ke Lingkungan ${targetMoveLingkungan}` : 'Analisis & Petakan Lingkungan (NOP)'}</span>
                 </button>
               </div>
             </>
           ) : (
             /* INTERACTIVE MAPPING PREVIEW & REVIEW WIZARD */
             <div className="space-y-4 animate-fade-in">
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
-                <h3 className="text-xs font-black text-emerald-950 flex items-center gap-1.5">
+              <div className={`p-4 rounded-xl border space-y-1 ${
+                parsedItems.some(i => i.lingkungan === 0)
+                  ? 'bg-amber-50/90 border-amber-300 text-amber-950'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+              }`}>
+                <h3 className="text-xs font-black flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   <span>Review Hasil Pemetaan Lingkungan &amp; Status Pembayaran PBB</span>
                 </h3>
-                <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  Ditemukan <b>{parsedItems.length} data WP</b>. Sistem secara otomatis mencocokkan NOP dengan <b>basis data master warga</b> dan <b>WebGIS rumah</b> untuk mendeteksi lingkungannya masing-masing. Silakan koreksi lingkungan jika diperlukan sebelum menekan tombol simpan massal ke Firestore.
-                </p>
+                <div className="text-[11px] leading-relaxed">
+                  {importMode === 'move_lingkungan' ? (
+                    <p>
+                      Total diproses: <b>{parsedItems.length} NOP</b>. Sebanyak{' '}
+                      <b className="text-emerald-700">{parsedItems.filter(i => i.lingkungan > 0).length} NOP ditemukan di database master</b> (akan dipindahkan ke Lingkungan {targetMoveLingkungan}), dan{' '}
+                      <span className="font-black text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                        {parsedItems.filter(i => i.lingkungan === 0).length} NOP TIDAK ADA di database (otomatis ditandai sebagai Lingkungan 0 / NOP Baru)
+                      </span>.
+                    </p>
+                  ) : (
+                    <p>
+                      Ditemukan <b>{parsedItems.length} data WP</b>. Sistem secara otomatis mencocokkan NOP dengan <b>basis data master warga</b> dan <b>WebGIS rumah</b> untuk mendeteksi lingkungannya masing-masing. Silakan koreksi lingkungan jika diperlukan sebelum menekan tombol simpan massal ke Firestore.
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-slate-200 max-h-96">
@@ -2489,7 +2977,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                               }`}
                             >
                               {item.lingkungan === 0 && (
-                                <option value="0">⚠️ PILIH LINGKUNGAN</option>
+                                <option value="0">⚠️ Lingkungan 0 (NOP Baru)</option>
                               )}
                               {Array.from({ length: 24 }, (_, i) => i + 1).map(num => (
                                 <option key={num} value={num}>Lingkungan {num}</option>

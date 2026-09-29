@@ -412,7 +412,25 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   const [editPoskamlingStatus, setEditPoskamlingStatus] = useState('');
   const [editPoskamlingLokasi, setEditPoskamlingLokasi] = useState('');
   const [editPoskamlingPetugas, setEditPoskamlingPetugas] = useState('');
+  const [editPoskamlingJumlahPetugas, setEditPoskamlingJumlahPetugas] = useState('');
+  const [editPoskamlingJamOperasional, setEditPoskamlingJamOperasional] = useState('');
   const [editPoskamlingKet, setEditPoskamlingKet] = useState('');
+
+  // Posyandu edit states
+  const [editPosyanduAdaGiat, setEditPosyanduAdaGiat] = useState(false);
+  const [editPosyanduNama, setEditPosyanduNama] = useState('');
+  const [editPosyanduLokasi, setEditPosyanduLokasi] = useState('');
+  const [editPosyanduJumlahPetugasKader, setEditPosyanduJumlahPetugasKader] = useState('');
+  const [editPosyanduJumlahWargaTotal, setEditPosyanduJumlahWargaTotal] = useState('');
+  const [editPosyanduBayi02Tahun, setEditPosyanduBayi02Tahun] = useState('0');
+  const [editPosyanduBalita25Tahun, setEditPosyanduBalita25Tahun] = useState('0');
+  const [editPosyanduAnak612Tahun, setEditPosyanduAnak612Tahun] = useState('0');
+  const [editPosyanduRemaja1318Tahun, setEditPosyanduRemaja1318Tahun] = useState('0');
+  const [editPosyanduDewasaIbuHamil1959Tahun, setEditPosyanduDewasaIbuHamil1959Tahun] = useState('0');
+  const [editPosyanduLansia60TahunKeatas, setEditPosyanduLansia60TahunKeatas] = useState('0');
+  const [editPosyanduJenisLayanan, setEditPosyanduJenisLayanan] = useState<string[]>([]);
+  const [editPosyanduKet, setEditPosyanduKet] = useState('');
+
   const [editKegiatanLainnya, setEditKegiatanLainnya] = useState('');
   const [editInfrastrukturAdaGiat, setEditInfrastrukturAdaGiat] = useState<boolean>(true);
   const [editInfrastrukturSubjek, setEditInfrastrukturSubjek] = useState('');
@@ -445,7 +463,23 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       setEditPoskamlingStatus(item.kinerja?.poskamlingStatus || '');
       setEditPoskamlingLokasi(item.kinerja?.poskamlingLokasi || '');
       setEditPoskamlingPetugas(item.kinerja?.poskamlingPetugas || '');
+      setEditPoskamlingJumlahPetugas(item.kinerja?.poskamlingJumlahPetugas ? String(item.kinerja.poskamlingJumlahPetugas) : '');
+      setEditPoskamlingJamOperasional(item.kinerja?.poskamlingJamOperasional || '');
       setEditPoskamlingKet(item.kinerja?.poskamlingKeterangan || '');
+
+      setEditPosyanduAdaGiat(item.kinerja?.posyanduAdaGiat ?? Boolean(item.kinerja?.posyanduNama));
+      setEditPosyanduNama(item.kinerja?.posyanduNama || '');
+      setEditPosyanduLokasi(item.kinerja?.posyanduLokasi || '');
+      setEditPosyanduJumlahPetugasKader(item.kinerja?.posyanduJumlahPetugasKader ? String(item.kinerja.posyanduJumlahPetugasKader) : '');
+      setEditPosyanduJumlahWargaTotal(item.kinerja?.posyanduJumlahWargaTotal ? String(item.kinerja.posyanduJumlahWargaTotal) : '');
+      setEditPosyanduBayi02Tahun(item.kinerja?.posyanduBayi02Tahun ? String(item.kinerja.posyanduBayi02Tahun) : '0');
+      setEditPosyanduBalita25Tahun(item.kinerja?.posyanduBalita25Tahun ? String(item.kinerja.posyanduBalita25Tahun) : '0');
+      setEditPosyanduAnak612Tahun(item.kinerja?.posyanduAnak612Tahun ? String(item.kinerja.posyanduAnak612Tahun) : '0');
+      setEditPosyanduRemaja1318Tahun(item.kinerja?.posyanduRemaja1318Tahun ? String(item.kinerja.posyanduRemaja1318Tahun) : '0');
+      setEditPosyanduDewasaIbuHamil1959Tahun(item.kinerja?.posyanduDewasaIbuHamil1959Tahun ? String(item.kinerja.posyanduDewasaIbuHamil1959Tahun) : '0');
+      setEditPosyanduLansia60TahunKeatas(item.kinerja?.posyanduLansia60TahunKeatas ? String(item.kinerja.posyanduLansia60TahunKeatas) : '0');
+      setEditPosyanduJenisLayanan(Array.isArray(item.kinerja?.posyanduJenisLayanan) ? item.kinerja.posyanduJenisLayanan : []);
+      setEditPosyanduKet(item.kinerja?.posyanduKeterangan || '');
       setEditKegiatanLainnya(item.kinerja?.kegiatanLainnya || '');
       setEditInfrastrukturAdaGiat(item.kinerja?.infrastrukturAdaGiat ?? Boolean(item.kinerja?.infrastrukturSubjek));
       setEditInfrastrukturSubjek(item.kinerja?.infrastrukturSubjek || '');
@@ -552,6 +586,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       lainnya: [],
       infrastruktur: [],
       poskamling: [],
+      posyandu: [],
     };
 
     photos.forEach((foto) => {
@@ -572,6 +607,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         groups.infrastruktur.push(foto);
       } else if (cat === 'poskamling' || name.includes('[poskamling]') || name.includes('poskamling') || name.includes('ronda') || name.includes('siskamling')) {
         groups.poskamling.push(foto);
+      } else if (cat === 'posyandu' || name.includes('[posyandu]') || name.includes('posyandu') || name.includes('kader') || name.includes('balita') || name.includes('imunisasi')) {
+        groups.posyandu.push(foto);
       } else {
         groups.lainnya.push(foto);
       }
@@ -586,6 +623,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       { key: 'lainnya', title: '5. Dokumentasi Kegiatan Lainnya', badgeBg: 'bg-slate-100', textClr: 'text-slate-900', borderClr: 'border-slate-300' },
       { key: 'infrastruktur', title: '6. Dokumentasi Pemantauan Kondisi Infrastruktur Wilayah', badgeBg: 'bg-emerald-100', textClr: 'text-emerald-950', borderClr: 'border-emerald-400' },
       { key: 'poskamling', title: '7. Dokumentasi Pos Ronda / SISKAMLING', badgeBg: 'bg-amber-100', textClr: 'text-amber-950', borderClr: 'border-amber-300' },
+      { key: 'posyandu', title: '8. Dokumentasi Kegiatan POSYANDU & Kesehatan', badgeBg: 'bg-rose-100', textClr: 'text-rose-950', borderClr: 'border-rose-300' },
     ];
 
     return metaList
@@ -773,7 +811,23 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             poskamlingStatus: editPoskamlingStatus,
             poskamlingLokasi: editPoskamlingLokasi,
             poskamlingPetugas: editPoskamlingPetugas,
+            poskamlingJumlahPetugas: editPoskamlingJumlahPetugas,
+            poskamlingJamOperasional: editPoskamlingJamOperasional,
             poskamlingKeterangan: editPoskamlingKet,
+            // Posyandu
+            posyanduAdaGiat: editPosyanduAdaGiat,
+            posyanduNama: editPosyanduNama,
+            posyanduLokasi: editPosyanduLokasi,
+            posyanduJumlahPetugasKader: editPosyanduJumlahPetugasKader,
+            posyanduJumlahWargaTotal: editPosyanduJumlahWargaTotal,
+            posyanduBayi02Tahun: editPosyanduBayi02Tahun,
+            posyanduBalita25Tahun: editPosyanduBalita25Tahun,
+            posyanduAnak612Tahun: editPosyanduAnak612Tahun,
+            posyanduRemaja1318Tahun: editPosyanduRemaja1318Tahun,
+            posyanduDewasaIbuHamil1959Tahun: editPosyanduDewasaIbuHamil1959Tahun,
+            posyanduLansia60TahunKeatas: editPosyanduLansia60TahunKeatas,
+            posyanduJenisLayanan: editPosyanduJenisLayanan,
+            posyanduKeterangan: editPosyanduKet,
           },
           jumlahDokumentasi: item?.jumlahDokumentasi || 0,
         }
@@ -790,6 +844,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       kecamatan: activeItem?.kecamatan || 'Medan Tuntungan',
       absenApelJam: absenApelData?.jam || '07.35 WIB',
       absenApelStatus: absenApelData?.status || 'HADIR',
+      kinerja: kin,
       opsirPbbWp: kin.opsirPbbWp || '0',
       opsirPbbKeterangan: kin.opsirPbbKeterangan || '',
       perlinsosKk: kin.perlinsosKk || '0',
@@ -813,7 +868,23 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       poskamlingStatus: kin.poskamlingStatus || '',
       poskamlingLokasi: kin.poskamlingLokasi || '',
       poskamlingPetugas: kin.poskamlingPetugas || '',
+      poskamlingJumlahPetugas: kin.poskamlingJumlahPetugas || '',
+      poskamlingJamOperasional: kin.poskamlingJamOperasional || '',
       poskamlingKeterangan: kin.poskamlingKeterangan || '',
+      // Posyandu
+      posyanduAdaGiat: Boolean(kin.posyanduAdaGiat || kin.posyanduNama),
+      posyanduNama: kin.posyanduNama || '',
+      posyanduLokasi: kin.posyanduLokasi || '',
+      posyanduJumlahPetugasKader: kin.posyanduJumlahPetugasKader || '',
+      posyanduJumlahWargaTotal: kin.posyanduJumlahWargaTotal || '0',
+      posyanduBayi02Tahun: kin.posyanduBayi02Tahun || '0',
+      posyanduBalita25Tahun: kin.posyanduBalita25Tahun || '0',
+      posyanduAnak612Tahun: kin.posyanduAnak612Tahun || '0',
+      posyanduRemaja1318Tahun: kin.posyanduRemaja1318Tahun || '0',
+      posyanduDewasaIbuHamil1959Tahun: kin.posyanduDewasaIbuHamil1959Tahun || '0',
+      posyanduLansia60TahunKeatas: kin.posyanduLansia60TahunKeatas || '0',
+      posyanduJenisLayanan: kin.posyanduJenisLayanan || [],
+      posyanduKeterangan: kin.posyanduKeterangan || '',
       totalFoto: activeItem?.jumlahDokumentasi || (activeItem?.dokumentasiFoto ? activeItem.dokumentasiFoto.length : 0),
     });
 
@@ -858,7 +929,23 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
           poskamlingStatus: editPoskamlingStatus,
           poskamlingLokasi: editPoskamlingLokasi,
           poskamlingPetugas: editPoskamlingPetugas,
+          poskamlingJumlahPetugas: editPoskamlingJumlahPetugas,
+          poskamlingJamOperasional: editPoskamlingJamOperasional,
           poskamlingKeterangan: editPoskamlingKet,
+          // Posyandu
+          posyanduAdaGiat: editPosyanduAdaGiat,
+          posyanduNama: editPosyanduNama,
+          posyanduLokasi: editPosyanduLokasi,
+          posyanduJumlahPetugasKader: editPosyanduJumlahPetugasKader,
+          posyanduJumlahWargaTotal: editPosyanduJumlahWargaTotal,
+          posyanduBayi02Tahun: editPosyanduBayi02Tahun,
+          posyanduBalita25Tahun: editPosyanduBalita25Tahun,
+          posyanduAnak612Tahun: editPosyanduAnak612Tahun,
+          posyanduRemaja1318Tahun: editPosyanduRemaja1318Tahun,
+          posyanduDewasaIbuHamil1959Tahun: editPosyanduDewasaIbuHamil1959Tahun,
+          posyanduLansia60TahunKeatas: editPosyanduLansia60TahunKeatas,
+          posyanduJenisLayanan: editPosyanduJenisLayanan,
+          posyanduKeterangan: editPosyanduKet,
         },
       };
 
@@ -1221,15 +1308,56 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                             )}
                           </td>
                         </tr>
-                        {item.kinerja?.poskamlingStatus && (
+                        {(item.kinerja?.poskamlingStatus || item.kinerja?.poskamlingAdaGiat) && (
                           <tr>
                             <td className="text-center font-bold border border-black py-1">8</td>
                             <td className="font-bold border border-black px-1.5 py-1">Pos Ronda / SISKAMLING (Tugas Tambahan)</td>
-                            <td className="text-center font-bold border border-black py-1">{item.kinerja.poskamlingStatus}</td>
-                            <td className="border border-black px-1.5 py-1">
-                              {item.kinerja.poskamlingLokasi ? `Lokasi: ${item.kinerja.poskamlingLokasi}. ` : ''}
-                              {item.kinerja.poskamlingPetugas ? `Petugas: ${item.kinerja.poskamlingPetugas}. ` : ''}
-                              {item.kinerja.poskamlingKeterangan || 'Patroli siskamling lingkungan kondusif dan aman'}
+                            <td className="text-center font-bold border border-black py-1">{item.kinerja.poskamlingStatus || 'Aktif Ronda'}</td>
+                            <td className="border border-black px-1.5 py-1 text-[7.5pt]">
+                              <div>
+                                {item.kinerja.poskamlingLokasi && <span><strong>Lokasi:</strong> {item.kinerja.poskamlingLokasi} &nbsp;|&nbsp; </span>}
+                                {item.kinerja.poskamlingJumlahPetugas && <span><strong>Jml Petugas:</strong> {item.kinerja.poskamlingJumlahPetugas} &nbsp;|&nbsp; </span>}
+                                {item.kinerja.poskamlingJamOperasional && <span><strong>Jam Operasional:</strong> {item.kinerja.poskamlingJamOperasional}</span>}
+                              </div>
+                              {item.kinerja.poskamlingPetugas && <div><strong>Susunan Petugas:</strong> {item.kinerja.poskamlingPetugas}</div>}
+                              <div><strong>Catatan Kamtibmas:</strong> {item.kinerja.poskamlingKeterangan || 'Patroli siskamling lingkungan kondusif dan aman'}</div>
+                            </td>
+                          </tr>
+                        )}
+                        {(item.kinerja?.posyanduNama || item.kinerja?.posyanduAdaGiat || (item.kinerja?.posyanduJumlahWargaTotal && Number(item.kinerja.posyanduJumlahWargaTotal) > 0)) && (
+                          <tr>
+                            <td className="text-center font-bold border border-black py-1">9</td>
+                            <td className="font-bold border border-black px-1.5 py-1">Posyandu & Layanan Kesehatan Warga</td>
+                            <td className="text-center font-bold border border-black py-1">
+                              {item.kinerja.posyanduJumlahWargaTotal || 0} Jiwa Terlayani
+                            </td>
+                            <td className="border border-black px-1.5 py-1 text-[7.5pt]">
+                              <div>
+                                <strong>Posyandu:</strong> {item.kinerja.posyanduNama || 'Posyandu Lingkungan'}
+                                {item.kinerja.posyanduLokasi ? ` (${item.kinerja.posyanduLokasi})` : ''}
+                                {item.kinerja.posyanduJumlahPetugasKader ? ` • <strong>Kader/Petugas:</strong> ${item.kinerja.posyanduJumlahPetugasKader}` : ''}
+                              </div>
+                              <div className="mt-0.5 text-[7pt] text-slate-800 font-sans">
+                                <strong>Rincian Kumulatif Usia (0 Th s.d Lansia):</strong>
+                                {[
+                                  item.kinerja.posyanduBayi02Tahun && Number(item.kinerja.posyanduBayi02Tahun) > 0 ? ` 👶 0-2 Th: ${item.kinerja.posyanduBayi02Tahun}` : '',
+                                  item.kinerja.posyanduBalita25Tahun && Number(item.kinerja.posyanduBalita25Tahun) > 0 ? ` 🧒 2-5 Th: ${item.kinerja.posyanduBalita25Tahun}` : '',
+                                  item.kinerja.posyanduAnak612Tahun && Number(item.kinerja.posyanduAnak612Tahun) > 0 ? ` 👦 6-12 Th: ${item.kinerja.posyanduAnak612Tahun}` : '',
+                                  item.kinerja.posyanduRemaja1318Tahun && Number(item.kinerja.posyanduRemaja1318Tahun) > 0 ? ` 🧑 13-18 Th: ${item.kinerja.posyanduRemaja1318Tahun}` : '',
+                                  item.kinerja.posyanduDewasaIbuHamil1959Tahun && Number(item.kinerja.posyanduDewasaIbuHamil1959Tahun) > 0 ? ` 🤰 19-59 Th (Bumil/Dewasa): ${item.kinerja.posyanduDewasaIbuHamil1959Tahun}` : '',
+                                  item.kinerja.posyanduLansia60TahunKeatas && Number(item.kinerja.posyanduLansia60TahunKeatas) > 0 ? ` 👵 60+ Th (Lansia): ${item.kinerja.posyanduLansia60TahunKeatas}` : '',
+                                ].filter(Boolean).join(' • ') || ' Terlayani kumulatif'}
+                              </div>
+                              {Array.isArray(item.kinerja.posyanduJenisLayanan) && item.kinerja.posyanduJenisLayanan.length > 0 && (
+                                <div className="mt-0.5 text-[7pt]">
+                                  <strong>Layanan:</strong> {item.kinerja.posyanduJenisLayanan.join(', ')}
+                                </div>
+                              )}
+                              {item.kinerja.posyanduKeterangan && (
+                                <div className="mt-0.5 text-[7pt] text-slate-700">
+                                  <strong>Catatan:</strong> {item.kinerja.posyanduKeterangan}
+                                </div>
+                              )}
                             </td>
                           </tr>
                         )}
@@ -2095,7 +2223,33 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                        Petugas / Warga Jaga
+                        👥 Jumlah Petugas
+                      </label>
+                      <input
+                        type="text"
+                        value={editPoskamlingJumlahPetugas}
+                        onChange={(e) => setEditPoskamlingJumlahPetugas(e.target.value)}
+                        placeholder="Misal: 4 Orang"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        ⏰ Jam Operasional
+                      </label>
+                      <input
+                        type="text"
+                        value={editPoskamlingJamOperasional}
+                        onChange={(e) => setEditPoskamlingJamOperasional(e.target.value)}
+                        placeholder="Misal: 21.00 - 04.00 WIB"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        Susunan Petugas Jaga
                       </label>
                       <input
                         type="text"
@@ -2120,19 +2274,29 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="space-y-1 text-slate-700">
+                <div className="space-y-1.5 text-slate-700 bg-white/80 p-2.5 rounded-lg border border-amber-200">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                     {item.kinerja?.poskamlingLokasi && (
                       <p>
                         📍 <strong>Lokasi:</strong> {item.kinerja.poskamlingLokasi}
                       </p>
                     )}
-                    {item.kinerja?.poskamlingPetugas && (
+                    {item.kinerja?.poskamlingJumlahPetugas && (
                       <p>
-                        👮 <strong>Petugas/Warga:</strong> {item.kinerja.poskamlingPetugas}
+                        👥 <strong>Jml Petugas:</strong> {item.kinerja.poskamlingJumlahPetugas}
+                      </p>
+                    )}
+                    {item.kinerja?.poskamlingJamOperasional && (
+                      <p>
+                        ⏰ <strong>Jam Operasional:</strong> {item.kinerja.poskamlingJamOperasional}
                       </p>
                     )}
                   </div>
+                  {item.kinerja?.poskamlingPetugas && (
+                    <p>
+                      👮 <strong>Susunan Petugas:</strong> {item.kinerja.poskamlingPetugas}
+                    </p>
+                  )}
                   <p className="text-slate-600">
                     📝 <strong>Situasi:</strong>{' '}
                     {item.kinerja?.poskamlingKeterangan || 'Situasi lingkungan aman dan kondusif.'}
@@ -2140,6 +2304,188 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 </div>
               )}
             </div>
+
+            {/* 8. POSYANDU & LAYANAN KESEHATAN WARGA */}
+            {(item.kinerja?.posyanduNama || item.kinerja?.posyanduAdaGiat || (item.kinerja?.posyanduJumlahWargaTotal && Number(item.kinerja.posyanduJumlahWargaTotal) > 0) || isEditing) && (
+              <div className="mt-3 p-3.5 bg-rose-50/70 border border-rose-200 rounded-xl text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-rose-900 flex items-center gap-1.5 uppercase text-[11px]">
+                    <span className="text-sm">👶🩺</span>
+                    8. TUGAS TAMBAHAN: POSYANDU & KESEHATAN WARGA
+                  </span>
+                  {item.kinerja?.posyanduJumlahWargaTotal && Number(item.kinerja.posyanduJumlahWargaTotal) > 0 && (
+                    <span className="px-2 py-0.5 rounded bg-rose-600 text-white font-black text-[10px]">
+                      🎯 {item.kinerja.posyanduJumlahWargaTotal} Jiwa Terlayani
+                    </span>
+                  )}
+                </div>
+
+                {isEditing ? (
+                  <div className="space-y-2.5 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                          Nama Posyandu
+                        </label>
+                        <input
+                          type="text"
+                          value={editPosyanduNama}
+                          onChange={(e) => setEditPosyanduNama(e.target.value)}
+                          placeholder="Posyandu Melati Lk IV"
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                          Lokasi Posyandu
+                        </label>
+                        <input
+                          type="text"
+                          value={editPosyanduLokasi}
+                          onChange={(e) => setEditPosyanduLokasi(e.target.value)}
+                          placeholder="Balai Warga Jl. Bunga Rinte"
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                          Jumlah Kader / Petugas
+                        </label>
+                        <input
+                          type="text"
+                          value={editPosyanduJumlahPetugasKader}
+                          onChange={(e) => setEditPosyanduJumlahPetugasKader(e.target.value)}
+                          placeholder="5 Kader"
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Age breakdown edit inputs */}
+                    <div className="p-2.5 bg-white rounded-lg border border-rose-200 space-y-1.5">
+                      <span className="text-[10px] font-bold text-rose-950 uppercase block">
+                        Rincian Warga Terlayani per Rentang Usia (0 Tahun - Lansia):
+                      </span>
+                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                        <div>
+                          <label className="text-[9px] text-slate-500 block">👶 0-2 Th</label>
+                          <input
+                            type="number"
+                            value={editPosyanduBayi02Tahun}
+                            onChange={(e) => setEditPosyanduBayi02Tahun(e.target.value)}
+                            className="w-full px-1.5 py-1 text-xs border rounded text-center font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-slate-500 block">🧒 2-5 Th</label>
+                          <input
+                            type="number"
+                            value={editPosyanduBalita25Tahun}
+                            onChange={(e) => setEditPosyanduBalita25Tahun(e.target.value)}
+                            className="w-full px-1.5 py-1 text-xs border rounded text-center font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-slate-500 block">👦 6-12 Th</label>
+                          <input
+                            type="number"
+                            value={editPosyanduAnak612Tahun}
+                            onChange={(e) => setEditPosyanduAnak612Tahun(e.target.value)}
+                            className="w-full px-1.5 py-1 text-xs border rounded text-center font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-slate-500 block">🧑 13-18 Th</label>
+                          <input
+                            type="number"
+                            value={editPosyanduRemaja1318Tahun}
+                            onChange={(e) => setEditPosyanduRemaja1318Tahun(e.target.value)}
+                            className="w-full px-1.5 py-1 text-xs border rounded text-center font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-slate-500 block">🤰 19-59 Th</label>
+                          <input
+                            type="number"
+                            value={editPosyanduDewasaIbuHamil1959Tahun}
+                            onChange={(e) => setEditPosyanduDewasaIbuHamil1959Tahun(e.target.value)}
+                            className="w-full px-1.5 py-1 text-xs border rounded text-center font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-slate-500 block">👵 60+ Th</label>
+                          <input
+                            type="number"
+                            value={editPosyanduLansia60TahunKeatas}
+                            onChange={(e) => setEditPosyanduLansia60TahunKeatas(e.target.value)}
+                            className="w-full px-1.5 py-1 text-xs border rounded text-center font-bold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        Catatan / Hasil Posyandu
+                      </label>
+                      <input
+                        type="text"
+                        value={editPosyanduKet}
+                        onChange={(e) => setEditPosyanduKet(e.target.value)}
+                        placeholder="Pelayanan posyandu berjalan tertib dan lancar"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs text-slate-800"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 text-slate-700 bg-white/80 p-2.5 rounded-lg border border-rose-200">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <p>
+                        🏥 <strong>Posyandu:</strong> {item.kinerja?.posyanduNama || 'Posyandu Lingkungan'}
+                        {item.kinerja?.posyanduLokasi ? ` (${item.kinerja.posyanduLokasi})` : ''}
+                      </p>
+                      {item.kinerja?.posyanduJumlahPetugasKader && (
+                        <p>
+                          👩‍⚕️ <strong>Petugas/Kader:</strong> {item.kinerja.posyanduJumlahPetugasKader}
+                        </p>
+                      )}
+                      {item.kinerja?.posyanduJumlahWargaTotal && (
+                        <p className="text-rose-700 font-bold">
+                          🎯 <strong>Total Dilayani:</strong> {item.kinerja.posyanduJumlahWargaTotal} Jiwa
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Age breakdown tags */}
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {[
+                        item.kinerja?.posyanduBayi02Tahun && Number(item.kinerja.posyanduBayi02Tahun) > 0 ? `👶 0-2 Th: ${item.kinerja.posyanduBayi02Tahun}` : '',
+                        item.kinerja?.posyanduBalita25Tahun && Number(item.kinerja.posyanduBalita25Tahun) > 0 ? `🧒 2-5 Th: ${item.kinerja.posyanduBalita25Tahun}` : '',
+                        item.kinerja?.posyanduAnak612Tahun && Number(item.kinerja.posyanduAnak612Tahun) > 0 ? `👦 6-12 Th: ${item.kinerja.posyanduAnak612Tahun}` : '',
+                        item.kinerja?.posyanduRemaja1318Tahun && Number(item.kinerja.posyanduRemaja1318Tahun) > 0 ? `🧑 13-18 Th: ${item.kinerja.posyanduRemaja1318Tahun}` : '',
+                        item.kinerja?.posyanduDewasaIbuHamil1959Tahun && Number(item.kinerja.posyanduDewasaIbuHamil1959Tahun) > 0 ? `🤰 19-59 Th: ${item.kinerja.posyanduDewasaIbuHamil1959Tahun}` : '',
+                        item.kinerja?.posyanduLansia60TahunKeatas && Number(item.kinerja.posyanduLansia60TahunKeatas) > 0 ? `👵 60+ Th: ${item.kinerja.posyanduLansia60TahunKeatas}` : '',
+                      ].filter(Boolean).map((ageTag, aIdx) => (
+                        <span key={aIdx} className="px-2 py-0.5 rounded bg-rose-100 text-rose-900 font-semibold text-[10px]">
+                          {ageTag}
+                        </span>
+                      ))}
+                    </div>
+
+                    {Array.isArray(item.kinerja?.posyanduJenisLayanan) && item.kinerja.posyanduJenisLayanan.length > 0 && (
+                      <p className="text-[11px] text-slate-600">
+                        🩺 <strong>Layanan:</strong> {item.kinerja.posyanduJenisLayanan.join(', ')}
+                      </p>
+                    )}
+                    {item.kinerja?.posyanduKeterangan && (
+                      <p className="text-[11px] text-slate-600">
+                        📝 <strong>Catatan:</strong> {item.kinerja.posyanduKeterangan}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* HASIL KUNJUNGAN / SAMBANG WARGA DOOR-TO-DOOR */}
             {relevantKunjungan.length > 0 && (

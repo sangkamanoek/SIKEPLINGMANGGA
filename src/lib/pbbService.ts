@@ -199,9 +199,10 @@ export function stripNonDigits(val: string): string {
 }
 
 /**
- * Smart merge SPPT items: overlays updates on top of base items without losing other records
+ * Smart merge SPPT items: overlays updates on top of base items.
+ * Logic built to prioritize remote (updates) data when conflict occurs.
  */
-export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbItem[]): SpptPbbItem[] {
+export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbItem[], prioritizeRemote: boolean = true): SpptPbbItem[] {
   if (!Array.isArray(updates) || updates.length === 0) return baseList;
   const map = new Map<string, SpptPbbItem>();
   const nopMap = new Map<string, string>(); // cleaned nop -> canonical id
@@ -226,39 +227,40 @@ export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbIte
 
     if (map.has(targetId)) {
       const existing = map.get(targetId)!;
-      const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
-      const updateTime = update.updatedAt ? new Date(update.updatedAt).getTime() : 0;
-
-      let finalStatus: 'Sudah Bayar' | 'Belum Bayar';
-      let finalJumlahBayar: number | undefined;
-
-      if (existingTime > updateTime) {
-        // Local existing is newer than incoming update
-        finalStatus = existing.status;
-        finalJumlahBayar = existing.jumlahBayar !== undefined ? existing.jumlahBayar : (existing.status === 'Sudah Bayar' ? existing.pbbTerutang : null);
-      } else if (updateTime > existingTime) {
-        // Incoming update is newer than local existing
-        finalStatus = update.status;
-        finalJumlahBayar = update.jumlahBayar !== undefined ? update.jumlahBayar : (update.status === 'Sudah Bayar' ? update.pbbTerutang : null);
+      
+      if (prioritizeRemote) {
+        // REMOTE (update) ALWAYS WINS - Discards local changes to prevent "Total Target" anomalies
+        map.set(targetId, {
+          ...existing,
+          ...update,
+          id: targetId,
+        });
       } else {
-        // Timestamps equal or not present: "Sudah Bayar" is preserved (payment confirmation wins)
-        finalStatus = (existing.status === 'Sudah Bayar' || update.status === 'Sudah Bayar') ? 'Sudah Bayar' : 'Belum Bayar';
-        const paidCandidate = existing.status === 'Sudah Bayar' 
-          ? (existing.jumlahBayar ?? existing.pbbTerutang) 
-          : (update.status === 'Sudah Bayar' ? (update.jumlahBayar ?? update.pbbTerutang) : null);
-        finalJumlahBayar = finalStatus === 'Sudah Bayar' ? paidCandidate : null;
-      }
+        // Standard conflict resolution based on timestamp
+        const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+        const updateTime = update.updatedAt ? new Date(update.updatedAt).getTime() : 0;
 
-      map.set(targetId, {
-        ...existing,
-        ...update,
-        status: finalStatus,
-        jumlahBayar: finalJumlahBayar ?? null,
-        keterangan: update.keterangan || existing.keterangan || '',
-        id: targetId,
-      });
+        let finalStatus: 'Sudah Bayar' | 'Belum Bayar';
+        let finalJumlahBayar: number | undefined;
+
+        if (existingTime > updateTime) {
+          finalStatus = existing.status;
+          finalJumlahBayar = existing.jumlahBayar !== undefined ? existing.jumlahBayar : (existing.status === 'Sudah Bayar' ? existing.pbbTerutang : null);
+        } else {
+          finalStatus = update.status;
+          finalJumlahBayar = update.jumlahBayar !== undefined ? update.jumlahBayar : (update.status === 'Sudah Bayar' ? update.pbbTerutang : null);
+        }
+
+        map.set(targetId, {
+          ...existing,
+          ...update,
+          status: finalStatus,
+          jumlahBayar: finalJumlahBayar ?? null,
+          id: targetId,
+        });
+      }
     } else {
-      // New record added by user
+      // New record added from remote
       const newItemPaid = update.jumlahBayar !== undefined 
         ? update.jumlahBayar 
         : (update.status === 'Sudah Bayar' ? update.pbbTerutang : null);
@@ -678,5 +680,83 @@ export async function wipeAllPbbSpptEverywhere(years: number[] = [2025, 2026, 20
   } catch (err: any) {
     console.error('Error in wipeAllPbbSpptEverywhere:', err);
     return { success: false, message: err?.message || 'Gagal menghapus data PBB' };
+  }
+}
+
+/**
+ * Reset seluruh status WP menjadi 'Belum Bayar' di Firestore, server, dan memori
+ */
+export async function resetAllPbbStatusEverywhere(year: number = DEFAULT_PBB_YEAR): Promise<{ success: boolean; message: string; count: number }> {
+  try {
+    const nowIso = new Date().toISOString();
+    let totalUpdated = 0;
+
+    // 1. Reset on Server Buffer
+    try {
+      await fetch('/api/pbb/reset', { method: 'POST' });
+    } catch (e) {
+      console.warn('Server reset PBB notice:', e);
+    }
+
+    // 2. Reset on Firestore in batches
+    const colName = `${PBB_COLLECTION_PREFIX}${year}`;
+    const colRef = collection(db, colName);
+    const snap = await getDocs(colRef);
+
+    const docsToReset: { id: string; ref: any }[] = [];
+    snap.forEach((d) => {
+      const data = d.data() as SpptPbbItem;
+      if (data.status !== 'Belum Bayar' || (data.jumlahBayar !== null && data.jumlahBayar !== undefined)) {
+        docsToReset.push({ id: d.id, ref: d.ref });
+      }
+    });
+
+    for (let i = 0; i < docsToReset.length; i += 400) {
+      const chunk = docsToReset.slice(i, i + 400);
+      const batch = writeBatch(db);
+      for (const item of chunk) {
+        batch.update(item.ref, {
+          status: 'Belum Bayar',
+          jumlahBayar: null,
+          updatedAt: nowIso,
+        });
+      }
+      await batch.commit();
+      totalUpdated += chunk.length;
+    }
+
+    // 3. Clear/Update LocalStorage
+    const key = getPbbStorageKey(year);
+    const local = safeGetLocalStorage<SpptPbbItem[]>(key, []);
+    if (Array.isArray(local) && local.length > 0) {
+      const updatedLocal = local.map((x) => ({
+        ...x,
+        status: 'Belum Bayar' as const,
+        jumlahBayar: null,
+        updatedAt: nowIso,
+      }));
+      safeSetLocalStorage(key, JSON.stringify(updatedLocal));
+    }
+
+    // 4. Dispatch broadcast
+    if (pbbBroadcastChannel) {
+      pbbBroadcastChannel.postMessage({ type: 'PBB_RESET_ALL_STATUS', year });
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pbb-data-updated', { detail: { year, resetStatus: true } }));
+    }
+
+    return {
+      success: true,
+      message: `Berhasil mereset seluruh status Wajib Pajak (${totalUpdated} WP) menjadi "Belum Bayar" di Cloud Firestore & Server.`,
+      count: totalUpdated,
+    };
+  } catch (err: any) {
+    console.error('Error in resetAllPbbStatusEverywhere:', err);
+    return {
+      success: false,
+      message: err?.message || 'Gagal mereset status PBB',
+      count: 0,
+    };
   }
 }

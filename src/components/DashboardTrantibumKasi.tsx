@@ -213,6 +213,8 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
         (poskamlingReports.length > 0 ? 'Aktif Ronda' : 'Terpantau Kondusif');
       const poskamlingLokasi = pkKinerj?.poskamlingLokasi || `Pos Ronde ${kepling.lingkungan}`;
       const poskamlingPetugas = pkKinerj?.poskamlingPetugas || `${kepling.nama} & Warga`;
+      const poskamlingJumlahPetugas = pkKinerj?.poskamlingJumlahPetugas ? String(pkKinerj.poskamlingJumlahPetugas) : '';
+      const poskamlingJamOperasional = pkKinerj?.poskamlingJamOperasional || '';
       const poskamlingNote =
         pkKinerj?.poskamlingKeterangan ||
         latestPosReport?.uraianTugas ||
@@ -299,6 +301,8 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
         poskamlingStatus,
         poskamlingLokasi,
         poskamlingPetugas,
+        poskamlingJumlahPetugas,
+        poskamlingJamOperasional,
         poskamlingNote,
         poskamlingCount: poskamlingReports.length,
         poskamlingPhotos,
@@ -930,8 +934,22 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                         {item.poskamlingStatus}
                       </span>
                     </td>
-                    <td className="py-3 px-4 font-semibold text-slate-800">{item.poskamlingLokasi}</td>
-                    <td className="py-3 px-4 font-medium text-slate-700">{item.poskamlingPetugas}</td>
+                    <td className="py-3 px-4 font-semibold text-slate-800">
+                      <div>{item.poskamlingLokasi}</div>
+                      {item.poskamlingJamOperasional && (
+                        <div className="text-[10px] text-amber-800 font-bold mt-0.5">
+                          ⏰ {item.poskamlingJamOperasional}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 font-medium text-slate-700">
+                      <div>{item.poskamlingPetugas}</div>
+                      {item.poskamlingJumlahPetugas && (
+                        <div className="text-[10px] text-slate-500 font-bold mt-0.5">
+                          👥 {item.poskamlingJumlahPetugas}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-3 px-4 max-w-xs">
                       <p className="text-[11px] text-slate-600 truncate font-medium" title={item.poskamlingNote}>
                         {item.poskamlingNote}

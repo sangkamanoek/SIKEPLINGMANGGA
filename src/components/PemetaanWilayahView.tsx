@@ -47,6 +47,13 @@ import {
   Sliders,
   DollarSign,
   HeartHandshake,
+  Droplets,
+  Activity,
+  Baby,
+  FileText,
+  Table,
+  Check,
+  Sparkles,
 } from 'lucide-react';
 import {
   UserAccount,
@@ -91,18 +98,21 @@ import {
   fetchPbbSpptFromFirestore,
 } from '../lib/pbbService';
 import { SpptPbbItem } from '../data/pbbSampleData';
+import { TabulasiWilayahView } from './TabulasiWilayahView';
 import * as XLSX from 'xlsx';
 
 interface PemetaanWilayahViewProps {
   currentUser: UserAccount;
   onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
   initialLingkunganFilter?: string;
+  onOpenDatabaseKeluarga?: () => void;
 }
 
 export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
   currentUser,
   onShowToast,
   initialLingkunganFilter,
+  onOpenDatabaseKeluarga,
 }) => {
   const isKepling = currentUser.role === 'kepling';
   const isAdmin = currentUser.role === 'super_admin' || currentUser.role.startsWith('kasi_');
@@ -213,6 +223,16 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
   const [isKmlTextModalOpen, setIsKmlTextModalOpen] = useState(false);
   const [kmlRawInputText, setKmlRawInputText] = useState('');
   const [editingHouse, setEditingHouse] = useState<TitikRumahBangunan | null>(null);
+  
+  // Tabulation View Mode: PETA vs TABULASI
+  const [gisViewTab, setGisViewTab] = useState<'PETA' | 'TABULASI'>('PETA');
+  const [tabulasiLevel, setTabulasiLevel] = useState<'KELURAHAN' | 'LINGKUNGAN' | 'JALAN'>('KELURAHAN');
+  const [tabulasiFilterLingkungan, setTabulasiFilterLingkungan] = useState<string>('all');
+  const [tabulasiFilterDesil, setTabulasiFilterDesil] = useState<string>('all');
+  const [tabulasiFilterBansos, setTabulasiFilterBansos] = useState<string>('all');
+  const [tabulasiFilterSanitasi, setTabulasiFilterSanitasi] = useState<string>('all');
+  const [tabulasiSearch, setTabulasiSearch] = useState<string>('');
+
   const getEmptyHouseFormData = (lingkunganId?: string) => ({
     lingkunganId: lingkunganId || (isKepling ? currentUser.id : 'kepling_1'),
     namaJalan: '',
@@ -229,12 +249,23 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     jumlahLansia: '' as number | string,
     jumlahAnak: '' as number | string,
     pekerjaanKk: '',
+    // Tingkat Kesejahteraan & Bansos (Data Utama)
+    desilKesejahteraan: '',
+    desilBansos: '',
     penerimaBansos: false,
     jenisBansos: [] as string[],
-    desilBansos: '',
     kategoriRentan: false,
+    // Sanitasi & Kesehatan Lingkungan Keluarga
+    jambanKeluarga: 'Jamban Sendiri (Leher Angsa / Septik SNI)',
+    sumberAirMinum: 'PDAM / Air Perpipaan',
+    sumberAirBersih: 'PDAM Tirtanadi',
+    pembuanganSampahRumah: 'Diangkut Petugas / WRS',
+    statusStuntingRentan: 'Bebas Risiko Stunting',
+    tempatAkhirTinja: 'Tangki Septik / SPALD',
+    // WRS
     statusWrs: 'AKTIF' as StatusWrs,
     tarifRetribusi: 15000,
+    // PBB
     nopPbb: '',
     statusPbb: 'LUNAS' as StatusPbb,
     nominalPbb: '' as number | string,
@@ -265,10 +296,17 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     jumlahLansia: number | string;
     jumlahAnak: number | string;
     pekerjaanKk: string;
+    desilKesejahteraan: string;
+    desilBansos: string;
     penerimaBansos: boolean;
     jenisBansos: string[];
-    desilBansos: string;
     kategoriRentan: boolean;
+    jambanKeluarga: string;
+    sumberAirMinum: string;
+    sumberAirBersih: string;
+    pembuanganSampahRumah: string;
+    statusStuntingRentan: string;
+    tempatAkhirTinja: string;
     statusWrs: StatusWrs;
     tarifRetribusi: number | string;
     nopPbb: string;
@@ -1508,10 +1546,20 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
         jumlahLansia: isResidential ? (Number(houseForm.jumlahLansia) || 0) : 0,
         jumlahAnak: isResidential ? (Number(houseForm.jumlahAnak) || 0) : 0,
         pekerjaanKk: isResidential ? houseForm.pekerjaanKk : (houseForm.jenisFasilitas || 'Fasilitas / Usaha'),
-        penerimaBansos: isResidential ? houseForm.penerimaBansos : false,
+        // Tingkat Kesejahteraan & Bansos (Data Utama)
+        desilKesejahteraan: isResidential ? houseForm.desilKesejahteraan : undefined,
+        desilBansos: isResidential ? (houseForm.desilKesejahteraan || houseForm.desilBansos) : undefined,
+        penerimaBansos: isResidential ? (houseForm.penerimaBansos || (!!houseForm.desilKesejahteraan && !houseForm.desilKesejahteraan.includes('Desil 6'))) : false,
         jenisBansos: isResidential ? houseForm.jenisBansos : undefined,
-        desilBansos: isResidential ? houseForm.desilBansos : undefined,
-        kategoriRentan: isResidential ? houseForm.kategoriRentan : false,
+        kategoriRentan: isResidential ? (houseForm.kategoriRentan || houseForm.statusStuntingRentan !== 'Bebas Risiko Stunting') : false,
+        // Sanitasi & Kesehatan Lingkungan Keluarga
+        jambanKeluarga: isResidential ? houseForm.jambanKeluarga : undefined,
+        sumberAirMinum: isResidential ? houseForm.sumberAirMinum : undefined,
+        sumberAirBersih: isResidential ? houseForm.sumberAirBersih : undefined,
+        pembuanganSampahRumah: isResidential ? houseForm.pembuanganSampahRumah : undefined,
+        statusStuntingRentan: isResidential ? houseForm.statusStuntingRentan : undefined,
+        tempatAkhirTinja: isResidential ? houseForm.tempatAkhirTinja : undefined,
+        // WRS & PBB
         statusWrs: houseForm.statusWrs,
         tarifRetribusi: Number(houseForm.tarifRetribusi) || 15000,
         nopPbb: houseForm.nopPbb,
@@ -1628,7 +1676,42 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
   const handleExportExcel = () => {
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: Data Rumah, WRS & PBB
+    // Sheet 1: Tabulasi Rekapitulasi 24 Lingkungan (Kelurahan)
+    const rekapLingkunganRows = Array.from({ length: 24 }, (_, idx) => {
+      const lingNum = idx + 1;
+      const lingHouses = houses.filter((h) => h.lingkunganNomor === lingNum && (h.kategoriBangunan === 'RUMAH_TINGGAL' || !h.kategoriBangunan));
+      const totalKk = lingHouses.length;
+      const totalJiwa = lingHouses.reduce((acc, h) => acc + (h.jumlahJiwa || (h.jumlahLakiLaki || 0) + (h.jumlahPerempuan || 0) || 1), 0);
+      const desil1_2 = lingHouses.filter((h) => (h.desilKesejahteraan || h.desilBansos || '').includes('Desil 1') || (h.desilKesejahteraan || h.desilBansos || '').includes('Desil 2')).length;
+      const desil3_5 = lingHouses.filter((h) => ['Desil 3', 'Desil 4', 'Desil 5'].some((d) => (h.desilKesejahteraan || h.desilBansos || '').includes(d))).length;
+      const pkhMedanMakmur = lingHouses.filter((h) => h.jenisBansos?.some((b) => b.toLowerCase().includes('medan makmur'))).length;
+      const totalBansos = lingHouses.filter((h) => h.penerimaBansos || (h.jenisBansos && h.jenisBansos.length > 0)).length;
+      const jambanSendiri = lingHouses.filter((h) => (h.jambanKeluarga || '').includes('Sendiri')).length;
+      const airMinumLayak = lingHouses.filter((h) => (h.sumberAirMinum || '').includes('PDAM') || (h.sumberAirMinum || '').includes('Depot')).length;
+      const restiStunting = lingHouses.filter((h) => (h.statusStuntingRentan || '').includes('Stunting') || (h.statusStuntingRentan || '').includes('Resti')).length;
+      const wrsAktif = lingHouses.filter((h) => h.statusWrs === 'AKTIF').length;
+      const pbbLunas = lingHouses.filter((h) => h.statusPbb === 'LUNAS').length;
+
+      return {
+        No: lingNum,
+        Lingkungan: `Lingkungan ${lingNum}`,
+        'Total KK': totalKk,
+        'Total Jiwa': totalJiwa,
+        'Desil 1-2 (Sangat Miskin/Miskin)': desil1_2,
+        'Desil 3-5 (Rentan/Menengah)': desil3_5,
+        'Total Penerima Bansos': totalBansos,
+        'Penerima PKH Medan Makmur': pkhMedanMakmur,
+        'Jamban Sendiri / SNI': jambanSendiri,
+        'Akses Air Minum Layak': airMinumLayak,
+        'Keluarga Berisiko Stunting / Resti': restiStunting,
+        'WRS Aktif': wrsAktif,
+        'PBB Lunas': pbbLunas,
+      };
+    });
+    const wsRekap = XLSX.utils.json_to_sheet(rekapLingkunganRows);
+    XLSX.utils.book_append_sheet(wb, wsRekap, 'Rekap Tabulasi 24 Lingkungan');
+
+    // Sheet 2: Data Rinci Rumah, Kesejahteraan & Sanitasi
     const houseRows = houses.map((h, i) => ({
       No: i + 1,
       Lingkungan: `Lingkungan ${h.lingkunganNomor}`,
@@ -1644,24 +1727,31 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       Lansia: h.jumlahLansia,
       Anak: h.jumlahAnak,
       'Pekerjaan KK': h.pekerjaanKk,
+      'Tingkat Kesejahteraan (Desil)': h.desilKesejahteraan || h.desilBansos || 'Desil 6-10 (Non-Desil)',
+      'Penerima Bansos': h.penerimaBansos ? 'YA' : 'TIDAK',
+      'Jenis Bansos': h.jenisBansos?.join(', ') || '-',
+      'PKH Medan Makmur': h.jenisBansos?.some((b) => b.toLowerCase().includes('medan makmur')) ? 'YA' : 'TIDAK',
+      'Jamban Keluarga': h.jambanKeluarga || 'Jamban Sendiri (Septik SNI)',
+      'Sumber Air Minum': h.sumberAirMinum || 'PDAM / Air Perpipaan',
+      'Sumber Air Bersih': h.sumberAirBersih || 'PDAM Tirtanadi',
+      'Pengelolaan Sampah': h.pembuanganSampahRumah || 'Diangkut Petugas / WRS',
+      'Status Risiko Stunting': h.statusStuntingRentan || 'Bebas Risiko Stunting',
+      'Tempat Akhir Tinja': h.tempatAkhirTinja || 'Tangki Septik / SPALD',
       'Status WRS': h.statusWrs,
       'Tarif WRS (Rp)': h.tarifRetribusi || 15000,
       'NOP PBB': h.nopPbb || '-',
       'Status PBB': h.statusPbb || 'BELUM_LUNAS',
       'Ketetapan PBB (Rp)': h.nominalPbb || 0,
       'Tahun Pajak PBB': h.tahunPbb || 2026,
-      'Penerima Bansos': h.penerimaBansos ? 'YA' : 'TIDAK',
-      'Jenis Bansos': h.jenisBansos?.join(', ') || '-',
-      'Desil Bansos': h.desilBansos || '-',
       'Kategori Rentan': h.kategoriRentan ? 'YA' : 'TIDAK',
       Koordinat: `${h.lat}, ${h.lng}`,
       Catatan: h.catatan || '-',
       'Diinput Oleh': h.createdByName || '-',
     }));
     const wsHouses = XLSX.utils.json_to_sheet(houseRows);
-    XLSX.utils.book_append_sheet(wb, wsHouses, 'Data Rumah, WRS & PBB');
+    XLSX.utils.book_append_sheet(wb, wsHouses, 'Data Rinci Kesejahteraan & Sanitasi');
 
-    // Sheet 2: Data Jalan
+    // Sheet 3: Data Ruas Jalan
     const roadRows = roads.map((r, i) => ({
       No: i + 1,
       Lingkungan: `Lingkungan ${r.lingkunganNomor}`,
@@ -1771,8 +1861,57 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
             </p>
           </div>
 
-          {/* Quick Action Buttons */}
+          {/* Quick Action Buttons & Master Mode Switcher */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* View Mode Switcher: PETA SPASIAL vs TABULASI TERPADU */}
+            <div className="inline-flex rounded-2xl bg-black/40 p-1 border border-emerald-500/50 text-xs font-black shadow-inner mr-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setGisViewTab('PETA');
+                  setTimeout(() => {
+                    if (mapInstanceRef.current) {
+                      mapInstanceRef.current.invalidateSize();
+                    }
+                  }, 150);
+                }}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
+                  gisViewTab === 'PETA'
+                    ? 'bg-emerald-500 text-slate-950 font-black shadow-md'
+                    : 'text-emerald-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Compass className="w-4 h-4" />
+                <span>🗺️ Peta WebGIS</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGisViewTab('TABULASI')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
+                  gisViewTab === 'TABULASI'
+                    ? 'bg-emerald-500 text-slate-950 font-black shadow-md'
+                    : 'text-emerald-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Table className="w-4 h-4" />
+                <span>📊 Tabulasi Data</span>
+                <span className="bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded-full text-[9px] font-black">
+                  Baru
+                </span>
+              </button>
+              {onOpenDatabaseKeluarga && (
+                <button
+                  type="button"
+                  onClick={onOpenDatabaseKeluarga}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-emerald-200 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                  title="Buka Database Master Data Keluarga"
+                >
+                  <Users className="w-4 h-4 text-emerald-300" />
+                  <span>👨‍👩‍👧‍👦 Data Keluarga (KK)</span>
+                </button>
+              )}
+            </div>
+
             {/* Draw Polygon Button */}
             {!isDrawingPolygon ? (
               <div className="flex items-center gap-2">
@@ -1929,7 +2068,36 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
         )}
       </div>
 
-      {/* STATS ROLL-UP CARDS */}
+      {/* CONDITIONAL CONTENT: TABULASI TERPADU vs PETA WEBGIS */}
+      {gisViewTab === 'TABULASI' ? (
+        <TabulasiWilayahView
+          houses={houses}
+          roads={roads}
+          currentUser={currentUser}
+          onShowToast={onShowToast}
+          onOpenDatabaseKeluarga={onOpenDatabaseKeluarga}
+          onSelectHouseForMap={(house) => {
+            setGisViewTab('PETA');
+            setSelectedHouse(house);
+            setTimeout(() => {
+              if (mapInstanceRef.current) {
+                mapInstanceRef.current.invalidateSize();
+                mapInstanceRef.current.flyTo([house.lat, house.lng], 19, { animate: true, duration: 1.2 });
+              }
+            }, 200);
+          }}
+          onSwitchToMap={() => {
+            setGisViewTab('PETA');
+            setTimeout(() => {
+              if (mapInstanceRef.current) {
+                mapInstanceRef.current.invalidateSize();
+              }
+            }, 200);
+          }}
+        />
+      ) : (
+        <>
+          {/* STATS ROLL-UP CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
         {/* KK */}
         <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
@@ -2629,20 +2797,65 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   </div>
                 </div>
 
-                {/* Bansos */}
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded-xl">
-                  <span className="text-slate-600 font-medium">Bansos:</span>
-                  <span
-                    className={`font-black px-2 py-0.5 rounded text-[10px] ${
-                      selectedHouse.penerimaBansos
-                        ? 'bg-purple-100 text-purple-800'
-                        : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {selectedHouse.penerimaBansos
-                      ? `YA (${selectedHouse.jenisBansos?.join(', ') || 'Bansos'})`
-                      : 'BUKAN'}
+                {/* Tingkat Kesejahteraan & Bansos */}
+                <div className="bg-purple-50/80 p-2.5 rounded-xl border border-purple-200 space-y-1 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-purple-950 font-bold flex items-center gap-1">
+                      ⭐ Kesejahteraan:
+                    </span>
+                    <span className="font-extrabold text-[10px] bg-purple-700 text-white px-2 py-0.5 rounded-full">
+                      {selectedHouse.desilKesejahteraan || selectedHouse.desilBansos || 'Desil 6-10 (Non-Desil)'}
+                    </span>
+                  </div>
+                  {selectedHouse.penerimaBansos && selectedHouse.jenisBansos && selectedHouse.jenisBansos.length > 0 && (
+                    <div className="pt-1 flex flex-wrap gap-1">
+                      {selectedHouse.jenisBansos.map((b) => (
+                        <span
+                          key={b}
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                            b.toLowerCase().includes('medan makmur')
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'bg-purple-200 text-purple-900'
+                          }`}
+                        >
+                          {b}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Sanitasi & Kesehatan */}
+                <div className="bg-sky-50/80 p-2.5 rounded-xl border border-sky-200 space-y-1.5 text-[11px]">
+                  <span className="text-sky-950 font-black flex items-center gap-1 text-xs">
+                    💧 Sanitasi &amp; Kesehatan:
                   </span>
+                  <div className="grid grid-cols-2 gap-1.5 text-slate-700">
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Jamban:</span>
+                      <span className="font-bold text-slate-900 truncate block">
+                        {selectedHouse.jambanKeluarga || 'Jamban Sendiri'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Air Minum:</span>
+                      <span className="font-bold text-slate-900 truncate block">
+                        {selectedHouse.sumberAirMinum || 'PDAM'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Air Bersih:</span>
+                      <span className="font-bold text-slate-900 truncate block">
+                        {selectedHouse.sumberAirBersih || 'PDAM Tirtanadi'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Stunting:</span>
+                      <span className={`font-bold truncate block ${selectedHouse.statusStuntingRentan && selectedHouse.statusStuntingRentan !== 'Bebas Risiko Stunting' ? 'text-rose-700' : 'text-emerald-700'}`}>
+                        {selectedHouse.statusStuntingRentan || 'Bebas Risiko'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Luas & Usaha */}
@@ -2690,8 +2903,15 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                       pekerjaanKk: selectedHouse.pekerjaanKk,
                       penerimaBansos: selectedHouse.penerimaBansos,
                       jenisBansos: selectedHouse.jenisBansos || [],
-                      desilBansos: selectedHouse.desilBansos || '',
+                      desilKesejahteraan: selectedHouse.desilKesejahteraan || selectedHouse.desilBansos || '',
+                      desilBansos: selectedHouse.desilKesejahteraan || selectedHouse.desilBansos || '',
                       kategoriRentan: selectedHouse.kategoriRentan || false,
+                      jambanKeluarga: selectedHouse.jambanKeluarga || 'Jamban Sendiri (Leher Angsa / Septik SNI)',
+                      sumberAirMinum: selectedHouse.sumberAirMinum || 'PDAM / Air Perpipaan',
+                      sumberAirBersih: selectedHouse.sumberAirBersih || 'PDAM Tirtanadi',
+                      pembuanganSampahRumah: selectedHouse.pembuanganSampahRumah || 'Diangkut Petugas / WRS',
+                      statusStuntingRentan: selectedHouse.statusStuntingRentan || 'Bebas Risiko Stunting',
+                      tempatAkhirTinja: selectedHouse.tempatAkhirTinja || 'Tangki Septik / SPALD',
                       statusWrs: selectedHouse.statusWrs,
                       tarifRetribusi: selectedHouse.tarifRetribusi || 15000,
                       nopPbb: selectedHouse.nopPbb || '',
@@ -2929,6 +3149,8 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
           )}
         </div>
       </div>
+      </>
+      )}
 
       {/* MODAL: TAMBAH / EDIT TITIK BANGUNAN */}
       {isHouseModalOpen && (
@@ -3754,78 +3976,261 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                 </div>
               </div>
 
-              {/* BANTUAN SOSIAL */}
-              <div className="p-3 bg-purple-50 border border-purple-200 rounded-2xl space-y-2">
+              {/* TINGKAT KESEJAHTERAAN KELUARGA (DATA UTAMA) & BANSOS */}
+              <div className="p-4 bg-gradient-to-br from-purple-50 via-indigo-50/40 to-slate-50 border border-purple-200/90 rounded-2xl space-y-3 shadow-2xs">
                 <div className="flex items-center justify-between">
-                  <label className="font-black text-purple-950">🎁 Bantuan Sosial (Bansos):</label>
-                  <label className="flex items-center gap-2 font-bold text-purple-900 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={houseForm.penerimaBansos}
-                      onChange={(e) =>
-                        setHouseForm((prev) => ({ ...prev, penerimaBansos: e.target.checked }))
-                      }
-                      className="w-4 h-4 rounded text-purple-600"
-                    />
-                    <span>Penerima Bansos</span>
-                  </label>
-                </div>
-                {houseForm.penerimaBansos && (
-                  <div className="space-y-2 pt-1">
-                    <div className="flex flex-wrap gap-2">
-                      {['PKH', 'BPNT', 'BLT', 'PBI-JK'].map((prog) => (
-                        <label
-                          key={prog}
-                          className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-purple-200 text-purple-900 font-semibold cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={houseForm.jenisBansos.includes(prog)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setHouseForm((prev) => ({
-                                  ...prev,
-                                  jenisBansos: [...prev.jenisBansos, prog],
-                                }));
-                              } else {
-                                setHouseForm((prev) => ({
-                                  ...prev,
-                                  jenisBansos: prev.jenisBansos.filter((x) => x !== prog),
-                                }));
-                              }
-                            }}
-                            className="rounded text-purple-600"
-                          />
-                          <span>{prog}</span>
-                        </label>
-                      ))}
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-purple-600 text-white text-xs">⭐</span>
+                    <div>
+                      <h4 className="font-black text-xs sm:text-sm text-purple-950 uppercase tracking-tight">
+                        Tingkat Kesejahteraan Keluarga (Data Utama)
+                      </h4>
+                      <p className="text-[10px] text-purple-700">
+                        Klasifikasi Desil Kemiskinan &amp; Bantuan Sosial Terintegrasi
+                      </p>
                     </div>
-                    <div className="pt-2 border-t border-purple-200">
-                      <label className="block font-bold text-xs text-purple-900 mb-1">Klasifikasi Desil Kemiskinan:</label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {['Desil 1', 'Desil 2', 'Desil 3', 'Desil 4', 'Desil 5', 'Desil 6-10'].map((d) => (
+                  </div>
+                  {houseForm.desilKesejahteraan && !houseForm.desilKesejahteraan.includes('Desil 6') && (
+                    <span className="bg-purple-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-2xs animate-pulse">
+                      Target Bansos Aktif
+                    </span>
+                  )}
+                </div>
+
+                {/* Desil Selector Buttons */}
+                <div>
+                  <label className="block font-bold text-xs text-purple-900 mb-1.5">
+                    Pilih Kategori Desil Kesejahteraan:
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {[
+                      { id: 'Desil 1 (Sangat Miskin)', label: 'Desil 1 (Sangat Miskin)', color: 'border-rose-300 hover:bg-rose-50' },
+                      { id: 'Desil 2 (Miskin)', label: 'Desil 2 (Miskin)', color: 'border-rose-300 hover:bg-rose-50' },
+                      { id: 'Desil 3 (Hampir Miskin)', label: 'Desil 3 (Hampir Miskin)', color: 'border-amber-300 hover:bg-amber-50' },
+                      { id: 'Desil 4 (Rentan Miskin)', label: 'Desil 4 (Rentan Miskin)', color: 'border-amber-300 hover:bg-amber-50' },
+                      { id: 'Desil 5 (Menengah Bawah)', label: 'Desil 5 (Menengah Bawah)', color: 'border-blue-300 hover:bg-blue-50' },
+                      { id: 'Desil 6-10 (Mampu / Non-Desil)', label: 'Desil 6-10 (Mampu)', color: 'border-slate-300 hover:bg-slate-100' },
+                    ].map((d) => {
+                      const isSelected = houseForm.desilKesejahteraan === d.id || (!houseForm.desilKesejahteraan && houseForm.desilBansos === d.id);
+                      return (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => {
+                            const isLowDesil = !d.id.includes('Desil 6');
+                            setHouseForm((prev) => ({
+                              ...prev,
+                              desilKesejahteraan: d.id,
+                              desilBansos: d.id,
+                              penerimaBansos: isLowDesil ? true : prev.penerimaBansos,
+                            }));
+                          }}
+                          className={`p-2 rounded-xl border text-xs font-bold text-left transition-all cursor-pointer flex items-center justify-between gap-1 ${
+                            isSelected
+                              ? 'bg-purple-800 text-white border-purple-800 shadow-xs scale-[1.01]'
+                              : `bg-white text-slate-700 ${d.color}`
+                          }`}
+                        >
+                          <span className="truncate">{d.label}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-purple-200 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Conditional Pilihan Bantuan yang Diterima (Desil 1 s/d 5 otomatis muncul) */}
+                {(houseForm.penerimaBansos || (houseForm.desilKesejahteraan && !houseForm.desilKesejahteraan.includes('Desil 6'))) && (
+                  <div className="pt-2.5 border-t border-purple-200 space-y-2 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <label className="font-black text-xs text-purple-950 flex items-center gap-1.5">
+                        <HeartHandshake className="w-3.5 h-3.5 text-purple-700" />
+                        <span>Program Bantuan Yang Diterima Warga:</span>
+                      </label>
+                      <span className="text-[10px] text-purple-600 font-semibold">
+                        {houseForm.jenisBansos.length} Bantuan Terpilih
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { name: 'PKH Medan Makmur', badge: 'Pemko Medan', highlight: true },
+                        { name: 'PKH Nasional', badge: 'Kemensos' },
+                        { name: 'BPNT / Sembako', badge: 'Kemensos' },
+                        { name: 'BLT / DBH', badge: 'Dana Bagi Hasil' },
+                        { name: 'PBI-JK (BPJS Gratis)', badge: 'Kemenkes' },
+                        { name: 'Bedah Rumah / RTLH', badge: 'Disperkim' },
+                        { name: 'PIP / Beasiswa', badge: 'Kemendikbud' },
+                        { name: 'Lainnya', badge: 'Bansos Daerah' },
+                      ].map((prog) => {
+                        const isChecked = houseForm.jenisBansos.includes(prog.name);
+                        return (
                           <label
-                            key={d}
-                            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-bold cursor-pointer transition-colors ${
-                              houseForm.desilBansos === d
+                            key={prog.name}
+                            className={`flex flex-col justify-between p-2 rounded-xl border text-xs cursor-pointer transition-all ${
+                              prog.highlight
+                                ? isChecked
+                                  ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                                  : 'bg-emerald-50 text-emerald-950 border-emerald-300 hover:bg-emerald-100'
+                                : isChecked
                                 ? 'bg-purple-700 text-white border-purple-700 shadow-xs'
-                                : 'bg-white text-purple-900 border-purple-200 hover:bg-purple-100'
+                                : 'bg-white text-slate-800 border-purple-200 hover:bg-purple-50'
                             }`}
                           >
-                            <input
-                              type="radio"
-                              name="desilBansos"
-                              checked={houseForm.desilBansos === d}
-                              onChange={() => setHouseForm((prev) => ({ ...prev, desilBansos: d }))}
-                              className="hidden"
-                            />
-                            <span>{d}</span>
+                            <div className="flex items-start justify-between gap-1">
+                              <span className="font-extrabold text-[11px] leading-tight">{prog.name}</span>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setHouseForm((prev) => ({
+                                      ...prev,
+                                      jenisBansos: [...prev.jenisBansos, prog.name],
+                                      penerimaBansos: true,
+                                    }));
+                                  } else {
+                                    setHouseForm((prev) => ({
+                                      ...prev,
+                                      jenisBansos: prev.jenisBansos.filter((x) => x !== prog.name),
+                                    }));
+                                  }
+                                }}
+                                className="rounded text-purple-600 mt-0.5"
+                              />
+                            </div>
+                            <span className={`text-[9px] mt-1 font-semibold ${isChecked ? 'text-purple-200' : 'text-slate-500'}`}>
+                              {prog.badge}
+                            </span>
                           </label>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* DATA SANITASI & KESEHATAN LINGKUNGAN KELUARGA */}
+              <div className="p-4 bg-gradient-to-br from-sky-50 via-cyan-50/40 to-slate-50 border border-sky-200/90 rounded-2xl space-y-3 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-sky-600 text-white text-xs">💧</span>
+                  <div>
+                    <h4 className="font-black text-xs sm:text-sm text-sky-950 uppercase tracking-tight">
+                      Data Sanitasi &amp; Kesehatan Keluarga
+                    </h4>
+                    <p className="text-[10px] text-sky-700">
+                      Jamban, Sumber Air Minum, Air Bersih, Sampah, dan Pencegahan Stunting
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Jamban */}
+                  <div>
+                    <label className="block font-bold text-xs text-sky-950 mb-1">
+                      🚾 Jenis Jamban Keluarga:
+                    </label>
+                    <select
+                      value={houseForm.jambanKeluarga || 'Jamban Sendiri (Leher Angsa / Septik SNI)'}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, jambanKeluarga: e.target.value }))}
+                      className="w-full p-2.5 rounded-xl border border-sky-300 bg-white font-bold text-xs text-slate-800"
+                    >
+                      <option value="Jamban Sendiri (Leher Angsa / Septik SNI)">✅ Jamban Sendiri (Leher Angsa / Septik SNI)</option>
+                      <option value="Jamban Bersama / Komunal">🚻 Jamban Bersama / Komunal</option>
+                      <option value="Jamban Cemplung / Plengsengan">⚠️ Jamban Cemplung / Plengsengan</option>
+                      <option value="Tidak Memiliki Jamban (BABS)">❌ Tidak Memiliki Jamban (BABS)</option>
+                    </select>
+                  </div>
+
+                  {/* Sumber Air Minum */}
+                  <div>
+                    <label className="block font-bold text-xs text-sky-950 mb-1">
+                      🚰 Sumber Air Minum Utama:
+                    </label>
+                    <select
+                      value={houseForm.sumberAirMinum || 'PDAM / Air Perpipaan'}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, sumberAirMinum: e.target.value }))}
+                      className="w-full p-2.5 rounded-xl border border-sky-300 bg-white font-bold text-xs text-slate-800"
+                    >
+                      <option value="PDAM / Air Perpipaan">🚰 PDAM / Air Perpipaan</option>
+                      <option value="Depot Isi Ulang">💧 Depot Air Minum Isi Ulang</option>
+                      <option value="Air Kemasan Bermerek">🧴 Air Kemasan Bermerek</option>
+                      <option value="Sumur Bor Terlindungi">🏞️ Sumur Bor Terlindungi</option>
+                      <option value="Sumur Gali">🪣 Sumur Gali</option>
+                      <option value="Mata Air / Air Hujan">🌧️ Mata Air / Air Hujan</option>
+                    </select>
+                  </div>
+
+                  {/* Sumber Air Bersih */}
+                  <div>
+                    <label className="block font-bold text-xs text-sky-950 mb-1">
+                      💧 Sumber Air Bersih (Mandi &amp; Cuci):
+                    </label>
+                    <select
+                      value={houseForm.sumberAirBersih || 'PDAM Tirtanadi'}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, sumberAirBersih: e.target.value }))}
+                      className="w-full p-2.5 rounded-xl border border-sky-300 bg-white font-bold text-xs text-slate-800"
+                    >
+                      <option value="PDAM Tirtanadi">💧 PDAM Tirtanadi</option>
+                      <option value="Sumur Bor Listrik">⚡ Sumur Bor Listrik</option>
+                      <option value="Sumur Gali">🪣 Sumur Gali</option>
+                      <option value="Sungai / Lainnya">🌊 Sungai / Lainnya</option>
+                    </select>
+                  </div>
+
+                  {/* Pembuangan Sampah */}
+                  <div>
+                    <label className="block font-bold text-xs text-sky-950 mb-1">
+                      🚛 Pengelolaan Sampah Rumah Tangga:
+                    </label>
+                    <select
+                      value={houseForm.pembuanganSampahRumah || 'Diangkut Petugas / WRS'}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, pembuanganSampahRumah: e.target.value }))}
+                      className="w-full p-2.5 rounded-xl border border-sky-300 bg-white font-bold text-xs text-slate-800"
+                    >
+                      <option value="Diangkut Petugas / WRS">🚛 Diangkut Petugas / WRS</option>
+                      <option value="Bank Sampah / Daur Ulang">♻️ Bank Sampah / Kompos / Daur Ulang</option>
+                      <option value="Dibakar / Ditimbun Mandiri">🔥 Dibakar / Ditimbun Mandiri</option>
+                      <option value="Dibuang Sembarangan">⚠️ Dibuang Sembarangan</option>
+                    </select>
+                  </div>
+
+                  {/* Status Stunting / Resti */}
+                  <div>
+                    <label className="block font-bold text-xs text-sky-950 mb-1">
+                      👶 Status Balita &amp; Ibu Hamil (Pencegahan Stunting):
+                    </label>
+                    <select
+                      value={houseForm.statusStuntingRentan || 'Bebas Risiko Stunting'}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, statusStuntingRentan: e.target.value }))}
+                      className={`w-full p-2.5 rounded-xl border font-bold text-xs ${
+                        houseForm.statusStuntingRentan && houseForm.statusStuntingRentan !== 'Bebas Risiko Stunting'
+                          ? 'bg-rose-50 border-rose-400 text-rose-950'
+                          : 'bg-white border-sky-300 text-slate-800'
+                      }`}
+                    >
+                      <option value="Bebas Risiko Stunting">✅ Bebas Risiko Stunting</option>
+                      <option value="Ada Balita / Baduta Berisiko Stunting">👶 Ada Balita / Baduta Berisiko Stunting</option>
+                      <option value="Ada Ibu Hamil KEK / Resti">🤰 Ada Ibu Hamil KEK / Risiko Tinggi</option>
+                    </select>
+                  </div>
+
+                  {/* Tempat Akhir Tinja */}
+                  <div>
+                    <label className="block font-bold text-xs text-sky-950 mb-1">
+                      🛡️ Tempat Pembuangan Akhir Tinja:
+                    </label>
+                    <select
+                      value={houseForm.tempatAkhirTinja || 'Tangki Septik / SPALD'}
+                      onChange={(e) => setHouseForm((prev) => ({ ...prev, tempatAkhirTinja: e.target.value }))}
+                      className="w-full p-2.5 rounded-xl border border-sky-300 bg-white font-bold text-xs text-slate-800"
+                    >
+                      <option value="Tangki Septik / SPALD">🛡️ Tangki Septik / SPALD (Standar SNI)</option>
+                      <option value="Saluran Terbuka / Parit">⚠️ Saluran Terbuka / Parit</option>
+                      <option value="Lubang Tanah / Lainnya">🕳️ Lubang Tanah / Cubluk</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {/* Demografi: Jiwa, Laki, Perempuan, Lansia, Anak */}

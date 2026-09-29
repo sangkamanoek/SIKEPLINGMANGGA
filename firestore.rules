@@ -77,6 +77,16 @@ service cloud.firestore {
       allow delete: if true;
     }
 
+    // Database Data Keluarga (Profil Kartu Keluarga, Desil, Bansos, Sanitasi)
+    match /data_keluarga/{keluargaId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'nomorKk', 'namaKepalaKeluarga'])
+                            && isValidString(request.resource.data.id, 1, 120)
+                            && isValidString(request.resource.data.nomorKk, 5, 50)
+                            && isValidString(request.resource.data.namaKepalaKeluarga, 1, 200);
+      allow delete: if true;
+    }
+
     // WebGIS Batas Lingkungan, Titik Rumah & Ruas Jalan
     match /webgis_polygons/{docId} {
       allow read, write: if true;

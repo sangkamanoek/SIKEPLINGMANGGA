@@ -1030,6 +1030,7 @@ app.post('/api/pbb/reset', (_req, res) => {
         pbbCache[year] = pbbCache[year].map((item) => ({
           ...item,
           status: 'Belum Bayar',
+          jumlahBayar: null,
           updatedAt: new Date().toISOString(),
         }));
       }

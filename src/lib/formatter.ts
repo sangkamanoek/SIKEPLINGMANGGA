@@ -214,12 +214,45 @@ export function generateLaporanWhatsAppText(item: LaporanHarianItem): string {
   }
 
   // 7. Poskamling / Siskamling if active
-  if (kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat') {
-    const pStatus = kin.poskamlingStatus;
+  if (kin.poskamlingAdaGiat || (kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat')) {
+    const pStatus = kin.poskamlingStatus || 'Aktif Ronda';
     const pLokasi = kin.poskamlingLokasi ? ` (${kin.poskamlingLokasi})` : '';
-    const pPetugas = kin.poskamlingPetugas ? ` - Petugas: ${kin.poskamlingPetugas}` : '';
-    const pKet = kin.poskamlingKeterangan ? ` [${kin.poskamlingKeterangan}]` : '';
-    lines.push(`7. POSKAMLING / SISKAMLING : ${pStatus}${pLokasi}${pPetugas}${pKet}`);
+    const pPetugas = kin.poskamlingJumlahPetugas
+      ? ` - Petugas: ${kin.poskamlingJumlahPetugas}`
+      : kin.poskamlingPetugas
+      ? ` - Petugas: ${kin.poskamlingPetugas}`
+      : '';
+    const pJam = kin.poskamlingJamOperasional ? ` [Jam: ${kin.poskamlingJamOperasional}]` : '';
+    const pKet = kin.poskamlingKeterangan ? ` - Catatan: ${kin.poskamlingKeterangan}` : '';
+    lines.push(`7. POSKAMLING / SISKAMLING : ${pStatus}${pLokasi}${pPetugas}${pJam}${pKet}`);
+  }
+
+  // 8. Posyandu & Layanan Kesehatan Warga if active
+  if (kin.posyanduAdaGiat || kin.posyanduNama || (kin.posyanduJumlahWargaTotal && Number(kin.posyanduJumlahWargaTotal) > 0)) {
+    const pNama = kin.posyanduNama || 'Posyandu Lingkungan';
+    const pLok = kin.posyanduLokasi ? ` (${kin.posyanduLokasi})` : '';
+    const pKader = kin.posyanduJumlahPetugasKader ? ` - Kader/Petugas: ${kin.posyanduJumlahPetugasKader}` : '';
+    const pTotal = kin.posyanduJumlahWargaTotal ? ` - Total Warga Dilayani: ${kin.posyanduJumlahWargaTotal} Jiwa (Kumulatif Usia 0 Th s.d Lansia)` : '';
+    lines.push(`8. POSYANDU & LAYANAN KESEHATAN : ${pNama}${pLok}${pKader}${pTotal}`);
+
+    // Rincian Kelompok Usia jika ada
+    const ageBreakdown: string[] = [];
+    if (kin.posyanduBayi02Tahun && Number(kin.posyanduBayi02Tahun) > 0) ageBreakdown.push(`👶 Usia 0-2 Th (Bayi/Baduta): ${kin.posyanduBayi02Tahun} Jiwa`);
+    if (kin.posyanduBalita25Tahun && Number(kin.posyanduBalita25Tahun) > 0) ageBreakdown.push(`🧒 Usia 2-5 Th (Balita): ${kin.posyanduBalita25Tahun} Jiwa`);
+    if (kin.posyanduAnak612Tahun && Number(kin.posyanduAnak612Tahun) > 0) ageBreakdown.push(`👦 Usia 6-12 Th (Anak Sekolah): ${kin.posyanduAnak612Tahun} Jiwa`);
+    if (kin.posyanduRemaja1318Tahun && Number(kin.posyanduRemaja1318Tahun) > 0) ageBreakdown.push(`🧑 Usia 13-18 Th (Remaja): ${kin.posyanduRemaja1318Tahun} Jiwa`);
+    if (kin.posyanduDewasaIbuHamil1959Tahun && Number(kin.posyanduDewasaIbuHamil1959Tahun) > 0) ageBreakdown.push(`🤰 Usia 19-59 Th (Bumil/Dewasa): ${kin.posyanduDewasaIbuHamil1959Tahun} Jiwa`);
+    if (kin.posyanduLansia60TahunKeatas && Number(kin.posyanduLansia60TahunKeatas) > 0) ageBreakdown.push(`👵 Usia 60+ Th (Lansia): ${kin.posyanduLansia60TahunKeatas} Jiwa`);
+
+    if (ageBreakdown.length > 0) {
+      lines.push(`   *Rincian Usia Terlayani:* ${ageBreakdown.join(' | ')}`);
+    }
+    if (Array.isArray(kin.posyanduJenisLayanan) && kin.posyanduJenisLayanan.length > 0) {
+      lines.push(`   *Layanan:* ${kin.posyanduJenisLayanan.join(', ')}`);
+    }
+    if (kin.posyanduKeterangan) {
+      lines.push(`   *Catatan Posyandu:* ${kin.posyanduKeterangan}`);
+    }
   }
 
   lines.push('');
@@ -279,8 +312,29 @@ export function formatReportToText(input: any): string {
     kin.infrastrukturAdaGiat || kin.infrastrukturSubjek
       ? `6. KEGIATAN PEMANTAUAN KONDISI INFRASTRUKTUR WILAYAH :\n   1. SUBJEK : ${kin.infrastrukturSubjek || '-'}\n   2. LOKASI : ${kin.infrastrukturLokasi || '-'}\n   3. Titik Koordinat : ${kin.infrastrukturTitikKoordinat || '-'}\n   4. Tanggal Pelaporan : ${kin.infrastrukturTanggalPelaporan || tanggal || '-'}\n   5. Pelapor : ${kin.infrastrukturPelapor || namaKepling || '-'}`
       : `6. KEGIATAN PEMANTAUAN KONDISI INFRASTRUKTUR WILAYAH : Nihil / Tidak Ada Temuan Kerusakan`,
-    kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat'
-      ? `7. POSKAMLING / SISKAMLING : ${kin.poskamlingStatus}${kin.poskamlingLokasi ? ` (${kin.poskamlingLokasi})` : ''}${kin.poskamlingPetugas ? ` - Petugas: ${kin.poskamlingPetugas}` : ''}${kin.poskamlingKeterangan ? ` [${kin.poskamlingKeterangan}]` : ''}`
+    kin.poskamlingAdaGiat || (kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat')
+      ? `7. POSKAMLING / SISKAMLING : ${kin.poskamlingStatus || 'Aktif Ronda'}${kin.poskamlingLokasi ? ` (${kin.poskamlingLokasi})` : ''}${kin.poskamlingJumlahPetugas ? ` - Petugas: ${kin.poskamlingJumlahPetugas}` : kin.poskamlingPetugas ? ` - Petugas: ${kin.poskamlingPetugas}` : ''}${kin.poskamlingJamOperasional ? ` [Jam: ${kin.poskamlingJamOperasional}]` : ''}${kin.poskamlingKeterangan ? ` - Catatan: ${kin.poskamlingKeterangan}` : ''}`
+      : '',
+    kin.posyanduAdaGiat || kin.posyanduNama || (kin.posyanduJumlahWargaTotal && Number(kin.posyanduJumlahWargaTotal) > 0)
+      ? `8. POSYANDU & LAYANAN KESEHATAN : ${kin.posyanduNama || 'Posyandu'}${kin.posyanduLokasi ? ` (${kin.posyanduLokasi})` : ''}${kin.posyanduJumlahPetugasKader ? ` - Kader: ${kin.posyanduJumlahPetugasKader}` : ''}${kin.posyanduJumlahWargaTotal ? ` - Total Dilayani: ${kin.posyanduJumlahWargaTotal} Jiwa (0 Th - Lansia)` : ''}${
+          [
+            kin.posyanduBayi02Tahun && Number(kin.posyanduBayi02Tahun) > 0 ? `0-2 Th: ${kin.posyanduBayi02Tahun}` : '',
+            kin.posyanduBalita25Tahun && Number(kin.posyanduBalita25Tahun) > 0 ? `2-5 Th: ${kin.posyanduBalita25Tahun}` : '',
+            kin.posyanduAnak612Tahun && Number(kin.posyanduAnak612Tahun) > 0 ? `6-12 Th: ${kin.posyanduAnak612Tahun}` : '',
+            kin.posyanduRemaja1318Tahun && Number(kin.posyanduRemaja1318Tahun) > 0 ? `13-18 Th: ${kin.posyanduRemaja1318Tahun}` : '',
+            kin.posyanduDewasaIbuHamil1959Tahun && Number(kin.posyanduDewasaIbuHamil1959Tahun) > 0 ? `19-59 Th: ${kin.posyanduDewasaIbuHamil1959Tahun}` : '',
+            kin.posyanduLansia60TahunKeatas && Number(kin.posyanduLansia60TahunKeatas) > 0 ? `60+ Th: ${kin.posyanduLansia60TahunKeatas}` : '',
+          ].filter(Boolean).length > 0
+            ? `\n   - Rincian Usia: ${[
+                kin.posyanduBayi02Tahun && Number(kin.posyanduBayi02Tahun) > 0 ? `0-2 Th: ${kin.posyanduBayi02Tahun}` : '',
+                kin.posyanduBalita25Tahun && Number(kin.posyanduBalita25Tahun) > 0 ? `2-5 Th: ${kin.posyanduBalita25Tahun}` : '',
+                kin.posyanduAnak612Tahun && Number(kin.posyanduAnak612Tahun) > 0 ? `6-12 Th: ${kin.posyanduAnak612Tahun}` : '',
+                kin.posyanduRemaja1318Tahun && Number(kin.posyanduRemaja1318Tahun) > 0 ? `13-18 Th: ${kin.posyanduRemaja1318Tahun}` : '',
+                kin.posyanduDewasaIbuHamil1959Tahun && Number(kin.posyanduDewasaIbuHamil1959Tahun) > 0 ? `19-59 Th: ${kin.posyanduDewasaIbuHamil1959Tahun}` : '',
+                kin.posyanduLansia60TahunKeatas && Number(kin.posyanduLansia60TahunKeatas) > 0 ? `60+ Th: ${kin.posyanduLansia60TahunKeatas}` : '',
+              ].filter(Boolean).join(', ')}`
+            : ''
+        }${Array.isArray(kin.posyanduJenisLayanan) && kin.posyanduJenisLayanan.length > 0 ? `\n   - Layanan: ${kin.posyanduJenisLayanan.join(', ')}` : ''}${kin.posyanduKeterangan ? `\n   - Catatan: ${kin.posyanduKeterangan}` : ''}`
       : '',
     `----------------------------------------`,
     `Dokumentasi : ${input.totalFoto ?? input.jumlahDokumentasi ?? (input.dokumentasiFoto ? input.dokumentasiFoto.length : 0)} Foto Terlampir`,
