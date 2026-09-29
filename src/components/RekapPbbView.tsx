@@ -170,9 +170,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   useEffect(() => {
     // 1. Initial fetch from Firestore & Server Buffer
     fetchPbbSpptFromFirestore(selectedYear).then((items) => {
-      if (Array.isArray(items)) {
+      if (Array.isArray(items) && items.length > 0) {
         lastFirestoreItemsRef.current = items;
-        setSpptList(items);
+        setSpptList(prev => {
+          if (!prev || prev.length === 0) return items;
+          // Protect local recent modifications (e.g. moved lingkungan) from being reverted
+          return smartMergeSpptItems(items, prev, false);
+        });
         const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastSyncTime(nowStr);
         try {
@@ -185,7 +189,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     const unsubscribe = subscribePbbSpptFromFirestore(selectedYear, (items) => {
       if (Array.isArray(items)) {
         lastFirestoreItemsRef.current = items;
-        setSpptList(items);
+        setSpptList(prev => {
+          if (!prev || prev.length === 0) return items;
+          // Protect local recent modifications from being reverted
+          return smartMergeSpptItems(items, prev, false);
+        });
         const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastSyncTime(nowStr);
         try {
@@ -229,19 +237,30 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       if (forceCloud) {
         // Abaikan data lokal, gunakan online murni
         setSpptList(onlineArray);
+        lastFirestoreItemsRef.current = onlineArray;
+        saveLocalSpptForYear(onlineArray, selectedYear);
         notify(`Pemulihan Data Cloud Berhasil! Data PBB Tahun ${selectedYear} di perangkat ini kini 100% identik dengan Firestore.`, 'success');
       } else {
-        // 2. Gabungkan secara cerdas (Conflict Resolution: Remote Update Always Wins to satisfy "Abaikan HP/Komputer" request)
-        // Note: smartMergeSpptItems(base, updates) where base=online, updates=local. 
-        // To prioritize remote, we can swap them or set prioritizeRemote: false and use timestamp
-        const mergedList = smartMergeSpptItems(spptList, onlineArray, true); 
+        // 2. Gabungkan secara cerdas:
+        // Gunakan onlineArray sebagai base dan spptList (lokal) sebagai updates dengan perbandingan timestamp.
+        // Dengan cara ini, jika ada NOP yang baru dipindahkan lingkungannya di layar, perubahannya TIDAK AKAN tertimpa data lama server!
+        const mergedList = smartMergeSpptItems(onlineArray, spptList, false); 
 
         // 3. Simpan hasil penggabungan aman ke server & Firestore
         await batchSavePbbSpptToFirestore(mergedList, selectedYear);
         
-        // 4. Perbarui state lokal
+        // 4. Perbarui state lokal & reference
         setSpptList(mergedList);
-        notify(`Sinkronisasi Dua Arah Berhasil! Data PBB Tahun ${selectedYear} telah diperbarui dengan prioritas data Cloud.`, 'success');
+        lastFirestoreItemsRef.current = mergedList;
+        saveLocalSpptForYear(mergedList, selectedYear);
+
+        const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastSyncTime(nowStr);
+        try {
+          localStorage.setItem(`sikepling_pbb_last_sync_time_${selectedYear}`, nowStr);
+        } catch {}
+
+        notify(`Sinkronisasi Berhasil! Seluruh perubahan pemindahan lingkungan telah tersimpan permanen di Cloud Firestore.`, 'success');
       }
     } catch (err) {
       console.error('Error during manual sync:', err);
@@ -1008,6 +1027,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       const updatedSpptList = [...spptList];
       const itemsToUpload: SpptPbbItem[] = [];
 
+      const nowIso = new Date().toISOString();
+
       parsedItems.forEach(parsed => {
         const cleanNop = parsed.nop.replace(/[^0-9]/g, '');
         const existingIdx = updatedSpptList.findIndex(x => x.nop.replace(/[^0-9]/g, '') === cleanNop);
@@ -1021,22 +1042,24 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             alamatOp: parsed.alamatOp || updatedSpptList[existingIdx].alamatOp,
             pbbTerutang: parsed.pbbTerutang || updatedSpptList[existingIdx].pbbTerutang,
             jumlahBayar: parsed.jumlahBayar ?? (parsed.status === 'Sudah Bayar' ? (parsed.pbbTerutang || updatedSpptList[existingIdx].pbbTerutang) : null),
-            lingkungan: (parsed.lingkungan && parsed.lingkungan > 0) ? parsed.lingkungan : (updatedSpptList[existingIdx].lingkungan || 0),
+            lingkungan: typeof parsed.lingkungan === 'number' ? parsed.lingkungan : (updatedSpptList[existingIdx].lingkungan ?? 0),
+            updatedAt: nowIso,
           };
           itemsToUpload.push(updatedSpptList[existingIdx]);
         } else {
           // Add new item if not exists
           const newItem: SpptPbbItem = {
-            id: `sppt_new_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            id: parsed.id || `sppt_new_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
             no: updatedSpptList.length + 1,
             nop: parsed.nop,
-            buku: 'I, II, III',
+            buku: parsed.buku || 'IV, V',
             namaWp: parsed.namaWp,
             alamatOp: parsed.alamatOp,
             pbbTerutang: parsed.pbbTerutang,
             jumlahBayar: parsed.jumlahBayar ?? (parsed.status === 'Sudah Bayar' ? parsed.pbbTerutang : null),
             status: parsed.status,
-            lingkungan: parsed.lingkungan,
+            lingkungan: typeof parsed.lingkungan === 'number' ? parsed.lingkungan : 0,
+            updatedAt: nowIso,
           };
           updatedSpptList.push(newItem);
           itemsToUpload.push(newItem);
@@ -1046,8 +1069,10 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       // 2. Save updates to Server Buffer & Firebase Firestore
       await batchSavePbbSpptToFirestore(itemsToUpload, selectedYear);
 
-      // 3. Update local React state
+      // 3. Update local React state & reference & localStorage
       setSpptList(updatedSpptList);
+      lastFirestoreItemsRef.current = updatedSpptList;
+      saveLocalSpptForYear(updatedSpptList, selectedYear);
       setMappingPreviewActive(false);
       setParsedItems([]);
       setRawCsvInput('');
@@ -1066,7 +1091,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const handleBatchUpdateLingkungan = async (targetLingkungan: number) => {
     if (!canManageWp) return;
     if (filteredSpptList.length === 0) return;
-    if (targetLingkungan < 1 || targetLingkungan > 24) return;
+    if (targetLingkungan < 0 || targetLingkungan > 24) return;
     
     const count = filteredSpptList.length;
     const msg = count > 100 
@@ -1079,26 +1104,31 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
     setIsSyncing(true);
     try {
+      const now = new Date().toISOString();
       const itemsToUpdate = filteredSpptList.map(item => ({
         ...item,
         lingkungan: targetLingkungan,
-        updatedAt: new Date().toISOString()
+        updatedAt: now
       }));
 
-      // 1. Save to Cloud Firestore & Server Buffer
-      await batchSavePbbSpptToFirestore(itemsToUpdate, selectedYear);
-
-      // 2. Update Local State
+      // 1. Update Local State immediately
+      let newSpptListState: SpptPbbItem[] = [];
       setSpptList(prev => {
         const newMap = new Map<string, SpptPbbItem>(prev.map(i => [i.id, i]));
         itemsToUpdate.forEach(item => newMap.set(item.id, item));
-        return Array.from(newMap.values()).sort((a, b) => {
+        newSpptListState = Array.from(newMap.values()).sort((a, b) => {
           if (a.lingkungan !== b.lingkungan) return a.lingkungan - b.lingkungan;
           return a.no - b.no;
         });
+        lastFirestoreItemsRef.current = newSpptListState;
+        return newSpptListState;
       });
 
-      notify(`Berhasil! ${count} Wajib Pajak telah dipindahkan ke Lingkungan ${targetLingkungan} secara massal.`, 'success');
+      // 2. Save to Cloud Firestore & Server Buffer
+      await batchSavePbbSpptToFirestore(itemsToUpdate, selectedYear);
+      saveLocalSpptForYear(newSpptListState, selectedYear);
+
+      notify(`Berhasil! ${count} Wajib Pajak telah dipindahkan ke Lingkungan ${targetLingkungan} secara permanen di Cloud Firestore.`, 'success');
       
       // If we were filtering by "NOP Baru" or a specific environment, reset filters to show the result
       if (selectedNopClassification === 'nop_baru' || (selectedLingkungan !== 'all' && selectedLingkungan !== String(targetLingkungan))) {

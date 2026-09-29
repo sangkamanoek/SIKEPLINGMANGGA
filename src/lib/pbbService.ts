@@ -200,9 +200,9 @@ export function stripNonDigits(val: string): string {
 
 /**
  * Smart merge SPPT items: overlays updates on top of base items.
- * Logic built to prioritize remote (updates) data when conflict occurs.
+ * Uses updatedAt timestamps to ensure recent edits (such as moving lingkungan) are strictly preserved.
  */
-export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbItem[], prioritizeRemote: boolean = true): SpptPbbItem[] {
+export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbItem[], prioritizeRemote: boolean = false): SpptPbbItem[] {
   if (!Array.isArray(updates) || updates.length === 0) return baseList;
   const map = new Map<string, SpptPbbItem>();
   const nopMap = new Map<string, string>(); // cleaned nop -> canonical id
@@ -227,40 +227,27 @@ export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbIte
 
     if (map.has(targetId)) {
       const existing = map.get(targetId)!;
-      
-      if (prioritizeRemote) {
-        // REMOTE (update) ALWAYS WINS - Discards local changes to prevent "Total Target" anomalies
+      const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+      const updateTime = update.updatedAt ? new Date(update.updatedAt).getTime() : 0;
+
+      // Conflict resolution:
+      // If existing item was modified more recently than incoming update, KEEP existing item!
+      // Otherwise, apply update.
+      if (existingTime > updateTime) {
         map.set(targetId, {
-          ...existing,
           ...update,
+          ...existing,
           id: targetId,
         });
       } else {
-        // Standard conflict resolution based on timestamp
-        const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
-        const updateTime = update.updatedAt ? new Date(update.updatedAt).getTime() : 0;
-
-        let finalStatus: 'Sudah Bayar' | 'Belum Bayar';
-        let finalJumlahBayar: number | undefined;
-
-        if (existingTime > updateTime) {
-          finalStatus = existing.status;
-          finalJumlahBayar = existing.jumlahBayar !== undefined ? existing.jumlahBayar : (existing.status === 'Sudah Bayar' ? existing.pbbTerutang : null);
-        } else {
-          finalStatus = update.status;
-          finalJumlahBayar = update.jumlahBayar !== undefined ? update.jumlahBayar : (update.status === 'Sudah Bayar' ? update.pbbTerutang : null);
-        }
-
         map.set(targetId, {
           ...existing,
           ...update,
-          status: finalStatus,
-          jumlahBayar: finalJumlahBayar ?? null,
           id: targetId,
         });
       }
     } else {
-      // New record added from remote
+      // New record added
       const newItemPaid = update.jumlahBayar !== undefined 
         ? update.jumlahBayar 
         : (update.status === 'Sudah Bayar' ? update.pbbTerutang : null);
@@ -448,7 +435,9 @@ export function cleanPbbItemForFirestore(item: SpptPbbItem): Record<string, any>
     alamatOp: item.alamatOp ? String(item.alamatOp).trim() : '',
     pbbTerutang: terutang,
     status: isLunas ? 'Sudah Bayar' : 'Belum Bayar',
-    lingkungan: Number(item.lingkungan) || 1,
+    lingkungan: typeof item.lingkungan === 'number' && !isNaN(item.lingkungan)
+      ? item.lingkungan
+      : (!isNaN(Number(item.lingkungan)) ? Number(item.lingkungan) : 0),
     jumlahBayar: jBayar, // Guaranteed to be number or null, NEVER undefined!
     keterangan: item.keterangan ? String(item.keterangan).trim() : '',
     updatedAt: item.updatedAt || new Date().toISOString(),
@@ -467,7 +456,7 @@ export async function savePbbSpptToFirestore(item: SpptPbbItem, year: number = D
   broadcastPbbChange(safePayload, year);
 
   // 2. Save to Express Server Buffer (/api/pbb) for zero-latency multi-user sync
-  savePbbToApi(safePayload, year).catch(() => {});
+  await savePbbToApi(safePayload, year).catch(() => {});
 
   // 3. Save to Cloud Firestore
   try {
@@ -491,7 +480,7 @@ export async function batchSavePbbSpptToFirestore(items: SpptPbbItem[], year: nu
   const sanitizedItems = items.map((item) => cleanPbbItemForFirestore(item) as unknown as SpptPbbItem);
 
   // 1. Save to Server Buffer
-  batchSavePbbToApi(sanitizedItems, year).catch(() => {});
+  await batchSavePbbToApi(sanitizedItems, year).catch(() => {});
 
   // 2. Save to Firestore in chunks of 400
   try {
