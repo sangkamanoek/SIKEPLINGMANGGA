@@ -101,7 +101,9 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
     const spptLunas = spptLingkungan.filter((s) => s.status === 'Sudah Bayar');
 
     const spptNominalLunas = spptLunas.reduce((acc, curr) => {
-      const actualPaid = curr.jumlahBayar !== undefined && curr.jumlahBayar !== null ? Number(curr.jumlahBayar) : (Number(curr.pbbTerutang) || 0);
+      const actualPaid = (curr.jumlahBayar !== undefined && curr.jumlahBayar !== null && Number(curr.jumlahBayar) > 0)
+        ? Number(curr.jumlahBayar)
+        : (Number(curr.pbbTerutang) || 0);
       return acc + actualPaid;
     }, 0);
     const spptNominalTotal = spptLingkungan.reduce((acc, curr) => acc + (Number(curr.pbbTerutang) || 0), 0);

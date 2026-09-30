@@ -666,13 +666,19 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       prev.map((item) => {
         if (item.id === id) {
           const newStatus = item.status === 'Sudah Bayar' ? 'Belum Bayar' : 'Sudah Bayar';
-          const updatedItem = {
+          // Auto-fill realisasi bayar with PBB terutang when marked as Sudah Bayar (Lunas)
+          const newJumlahBayar = newStatus === 'Sudah Bayar'
+            ? (item.jumlahBayar && item.jumlahBayar > 0 ? item.jumlahBayar : item.pbbTerutang)
+            : null;
+
+          const updatedItem: SpptPbbItem = {
             ...item,
             status: newStatus as 'Sudah Bayar' | 'Belum Bayar',
+            jumlahBayar: newJumlahBayar,
             updatedAt: new Date().toISOString(),
           };
           savePbbSpptToFirestore(updatedItem, selectedYear).catch(() => {});
-          let msg = `Status NOP ${item.nop} (${item.namaWp}) diubah menjadi "${newStatus}"`;
+          let msg = `Status NOP ${item.nop} (${item.namaWp}) diubah menjadi "${newStatus}" (Realisasi: ${formatRupiah(newJumlahBayar || 0)})`;
           if (selectedStatusFilter === 'belum' && newStatus === 'Sudah Bayar') {
             msg += ' (Catatan: Data berpindah dari filter "Khusus Belum Bayar". Ubah filter ke "Semua" atau "Khusus Sudah Bayar" untuk melihatnya).';
           }
@@ -896,10 +902,19 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         if (selectedStatusFilter === 'belum' && item.status !== 'Belum Bayar') return false;
       }
 
-      // NOP Classification filter (Buku / Blok NOP / Arrears priority)
+      // NOP Classification filter (Buku / Blok NOP / Arrears priority / Diskon Pembayaran)
       if (selectedNopClassification !== 'all') {
         if (selectedNopClassification === 'nop_baru') {
           if (item.lingkungan !== 0) return false;
+        } else if (selectedNopClassification === 'diskon_pembayaran') {
+          const hasDiscount = (
+            Boolean(item.isDiskon) ||
+            Boolean(item.diskonPembayaran && item.diskonPembayaran > 0) ||
+            Boolean(item.persenDiskon && item.persenDiskon > 0) ||
+            (item.jumlahBayar !== undefined && item.jumlahBayar !== null && item.jumlahBayar < item.pbbTerutang && item.jumlahBayar > 0) ||
+            (item.keterangan && /diskon|stimulus|keringanan|potongan|bebas denda|bebas pbb/i.test(item.keterangan))
+          );
+          if (!hasDiscount) return false;
         } else if (selectedNopClassification === 'buku_1') {
           if (item.pbbTerutang > 100000) return false;
         } else if (selectedNopClassification === 'buku_2') {
@@ -2402,6 +2417,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 >
                   <option value="all">📁 Semua Golongan NOP</option>
                   <option value="nop_baru" className="text-rose-600 font-black">🆕 NOP BARU (Belum Masuk Lingkungan)</option>
+                  <option value="diskon_pembayaran" className="text-emerald-700 font-black bg-emerald-50">🏷️ Mendapat Diskon / Keringanan Pembayaran (Stimulus PBB)</option>
                   <option value="buku_1">📗 Buku 1 (Ketetapan ≤ Rp 100rb)</option>
                   <option value="buku_2">📘 Buku 2 (Rp 100rb - Rp 500rb)</option>
                   <option value="buku_3">📙 Buku 3 (Rp 500rb - Rp 2jt)</option>
@@ -2578,11 +2594,22 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                       <td className="py-2.5 px-3 text-center font-bold text-slate-400">{globalIdx}</td>
                       <td className="py-2.5 px-3 font-mono font-bold text-slate-700">{item.nop}</td>
                       <td className="py-2.5 px-3 font-black text-slate-900">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span>{item.namaWp}</span>
                           {item.lingkungan === 0 && (
                             <span className="px-2 py-0.5 rounded text-[8px] font-black bg-rose-600 text-white animate-pulse border border-rose-700 whitespace-nowrap">
                               🆕 NOP BARU
+                            </span>
+                          )}
+                          {(
+                            Boolean(item.isDiskon) ||
+                            Boolean(item.diskonPembayaran && item.diskonPembayaran > 0) ||
+                            Boolean(item.persenDiskon && item.persenDiskon > 0) ||
+                            (item.jumlahBayar !== undefined && item.jumlahBayar !== null && item.jumlahBayar < item.pbbTerutang && item.jumlahBayar > 0) ||
+                            (item.keterangan && /diskon|stimulus|keringanan|potongan|bebas denda|bebas pbb/i.test(item.keterangan))
+                          ) && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1 whitespace-nowrap" title="Mendapat Diskon / Keringanan Pembayaran PBB">
+                              🏷️ DISKON
                             </span>
                           )}
                         </div>
@@ -2593,15 +2620,19 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                       <td className="py-2.5 px-3 text-right font-black text-emerald-700">
                         {(() => {
                           if (item.status !== 'Sudah Bayar') return 'Rp 0';
-                          const paid = item.jumlahBayar !== undefined && item.jumlahBayar !== null ? item.jumlahBayar : item.pbbTerutang;
+                          const paid = (item.jumlahBayar !== undefined && item.jumlahBayar !== null && item.jumlahBayar > 0)
+                            ? item.jumlahBayar
+                            : item.pbbTerutang;
                           return formatRupiah(paid);
                         })()}
                       </td>
                       <td className="py-2.5 px-3 text-center font-black">
                         {(() => {
                           if (item.status !== 'Sudah Bayar') return <span className="text-rose-600">0%</span>;
-                          const paid = item.jumlahBayar !== undefined && item.jumlahBayar !== null ? item.jumlahBayar : item.pbbTerutang;
-                          const pct = (paid / item.pbbTerutang) * 100;
+                          const paid = (item.jumlahBayar !== undefined && item.jumlahBayar !== null && item.jumlahBayar > 0)
+                            ? item.jumlahBayar
+                            : item.pbbTerutang;
+                          const pct = item.pbbTerutang > 0 ? (paid / item.pbbTerutang) * 100 : 100;
                           if (pct < 100) {
                             return (
                               <div className="flex flex-col items-center leading-none gap-0.5">
@@ -3319,6 +3350,58 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                           </span>
                         );
                       })()}
+                    </div>
+
+                    <div className="pt-2 border-t border-emerald-200/60 mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-extrabold text-emerald-900 uppercase">Preset Stimulus Diskon PBB:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
+                          if (base > 0) {
+                            setFormJumlahBayar(String(Math.round(base * 0.9)));
+                            setFormKeterangan((prev) => prev || 'Mendapat Diskon Stimulus PBB 10% Bapenda Pemko Medan');
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-extrabold cursor-pointer border border-emerald-300"
+                      >
+                        🏷️ Diskon 10%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
+                          if (base > 0) {
+                            setFormJumlahBayar(String(Math.round(base * 0.8)));
+                            setFormKeterangan((prev) => prev || 'Mendapat Diskon Stimulus PBB 20% Bapenda Pemko Medan');
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-extrabold cursor-pointer border border-emerald-300"
+                      >
+                        🏷️ Diskon 20%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
+                          if (base > 0) {
+                            setFormJumlahBayar(String(Math.round(base * 0.5)));
+                            setFormKeterangan((prev) => prev || 'Mendapat Diskon Keringanan PBB 50%');
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-extrabold cursor-pointer border border-emerald-300"
+                      >
+                        🏷️ Diskon 50%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormJumlahBayar(formPbbTerutang);
+                        }}
+                        className="px-2 py-0.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-bold cursor-pointer border border-slate-300"
+                      >
+                        Reset Penuh (100%)
+                      </button>
                     </div>
                   </div>
                 )}

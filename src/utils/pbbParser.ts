@@ -123,6 +123,7 @@ export function parsePbbCsv(csvText: string) {
           namaWp,
           alamatOp,
           pbbTerutang: pbbVal,
+          jumlahBayar: isLunas ? pbbVal : null,
           status: isLunas ? 'Sudah Bayar' : 'Belum Bayar',
           lingkungan: lingVal,
         });
