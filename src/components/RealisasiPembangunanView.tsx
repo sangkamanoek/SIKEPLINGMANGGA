@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Wrench,
   Plus,
@@ -22,6 +22,11 @@ import {
   Zap,
   Lightbulb,
   Building2,
+  Layers,
+  Camera,
+  Image as ImageIcon,
+  Link2,
+  Loader2,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { UserAccount, RealisasiPembangunan, JenisPembangunanType, StatusRealisasiType } from '../types';
@@ -31,7 +36,46 @@ interface RealisasiPembangunanViewProps {
   currentUser: UserAccount;
 }
 
-const STORAGE_KEY = 'mangga_realisasi_pembangunan_v1';
+const STORAGE_KEY = 'mangga_realisasi_pembangunan_v2';
+
+// Helper function to compress image files from phone camera / gallery
+const compressImageFile = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 1200;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error('Gagal memuat gambar'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Gagal membaca file'));
+    reader.readAsDataURL(file);
+  });
+};
 
 // Initial realistic seed data for Kelurahan Mangga (24 Lingkungan)
 const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
@@ -149,6 +193,25 @@ const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
     createdAt: '2026-09-22T09:15:00.000Z',
     createdByName: 'Junaidi (Kepling XVIII)',
   },
+  {
+    id: 'pemb_7',
+    lingkunganId: 'kepling_10',
+    lingkunganNomor: 10,
+    jenisPembangunan: 'PEMASANGAN_PAVING_BLOK',
+    namaProyek: 'Pemasangan Paving Blok Halaman Posyandu & Gang Pemukiman',
+    lokasiDetail: 'Gg. Bunga Cempaka Lingkungan X',
+    sumberDana: 'Dana Kelurahan Mangga',
+    statusRealisasi: 'SELESAI_100%',
+    volumeRealisasi: '180 Meter Persegi',
+    biayaEstimasiRp: 52000000,
+    tanggalMulai: '2026-09-12',
+    tanggalSelesai: '2026-09-24',
+    fotoSebelumUrl: 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?w=600&auto=format&fit=crop&q=80',
+    fotoSesudahUrl: 'https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=600&auto=format&fit=crop&q=80',
+    keterangan: 'Pemasangan paving block K-300 rapi dan kokoh, mempermudah akses warga.',
+    createdAt: '2026-09-25T11:00:00.000Z',
+    createdByName: 'Syahril (Kepling X)',
+  },
 ];
 
 export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> = ({ currentUser }) => {
@@ -203,6 +266,40 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
   const [formFotoSesudah, setFormFotoSesudah] = useState('');
   const [formKeterangan, setFormKeterangan] = useState('');
 
+  // Photo Upload States & Refs for Mobile Camera / Gallery
+  const [isProcessingBefore, setIsProcessingBefore] = useState(false);
+  const [isProcessingAfter, setIsProcessingAfter] = useState(false);
+  const [showUrlInputBefore, setShowUrlInputBefore] = useState(false);
+  const [showUrlInputAfter, setShowUrlInputAfter] = useState(false);
+
+  const fileBeforeCameraRef = useRef<HTMLInputElement>(null);
+  const fileBeforeGalleryRef = useRef<HTMLInputElement>(null);
+  const fileAfterCameraRef = useRef<HTMLInputElement>(null);
+  const fileAfterGalleryRef = useRef<HTMLInputElement>(null);
+
+  const handleProcessImage = async (
+    file: File,
+    type: 'sebelum' | 'sesudah'
+  ) => {
+    if (type === 'sebelum') setIsProcessingBefore(true);
+    else setIsProcessingAfter(true);
+
+    try {
+      const compressedDataUrl = await compressImageFile(file);
+      if (type === 'sebelum') {
+        setFormFotoSebelum(compressedDataUrl);
+      } else {
+        setFormFotoSesudah(compressedDataUrl);
+      }
+    } catch (err) {
+      console.error('Gagal memproses gambar:', err);
+      alert('Gagal memproses file foto. Pastikan format file adalah gambar valid.');
+    } finally {
+      if (type === 'sebelum') setIsProcessingBefore(false);
+      else setIsProcessingAfter(false);
+    }
+  };
+
   // Lock lingkungan if user is Kepling
   const isKeplingRole = currentUser.role === 'kepling' || Boolean(currentUser.nomorLingkungan);
 
@@ -246,6 +343,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     const totalProyek = filteredItems.length;
     const countJalan = filteredItems.filter((i) => i.jenisPembangunan === 'PERBAIKAN_JALAN').length;
     const countDrainase = filteredItems.filter((i) => i.jenisPembangunan === 'PERBAIKAN_DRAINASE').length;
+    const countPaving = filteredItems.filter((i) => i.jenisPembangunan === 'PEMASANGAN_PAVING_BLOK').length;
     const countLampu = filteredItems.filter((i) => i.jenisPembangunan === 'PERBAIKAN_LAMPU_LPJU').length;
     const countTiang = filteredItems.filter((i) => i.jenisPembangunan === 'PENAMBAHAN_TIANG_LPJU').length;
     const countSelesai = filteredItems.filter((i) => i.statusRealisasi === 'SELESAI_100%').length;
@@ -255,6 +353,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       totalProyek,
       countJalan,
       countDrainase,
+      countPaving,
       countLampu,
       countTiang,
       countSelesai,
@@ -277,6 +376,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     setFormFotoSebelum('');
     setFormFotoSesudah('');
     setFormKeterangan('');
+    setShowUrlInputBefore(false);
+    setShowUrlInputAfter(false);
     setIsModalOpen(true);
   };
 
@@ -295,6 +396,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     setFormFotoSebelum(item.fotoSebelumUrl || '');
     setFormFotoSesudah(item.fotoSesudahUrl || '');
     setFormKeterangan(item.keterangan || '');
+    setShowUrlInputBefore(Boolean(item.fotoSebelumUrl && !item.fotoSebelumUrl.startsWith('data:')));
+    setShowUrlInputAfter(Boolean(item.fotoSesudahUrl && !item.fotoSesudahUrl.startsWith('data:')));
     setIsModalOpen(true);
   };
 
@@ -373,11 +476,13 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
           ? 'Perbaikan Drainase'
           : item.jenisPembangunan === 'PERBAIKAN_LAMPU_LPJU'
           ? 'Perbaikan Lampu LPJU'
-          : 'Penambahan Tiang LPJU Baru',
+          : item.jenisPembangunan === 'PENAMBAHAN_TIANG_LPJU'
+          ? 'Penambahan Tiang LPJU Baru'
+          : 'Pemasangan Paving Blok',
       'Nama Proyek / Kegiatan': item.namaProyek,
       'Lokasi Detail': item.lokasiDetail,
       'Volume Realisasi': item.volumeRealisasi,
-      'Sumber Dana': item.sumberDana,
+      'Pelaksana Kegiatan': item.sumberDana,
       'Status Realisasi': item.statusRealisasi,
       'Estimasi Biaya (Rp)': item.biayaEstimasiRp ? item.biayaEstimasiRp.toLocaleString('id-ID') : '-',
       'Tanggal Mulai': item.tanggalMulai || '-',
@@ -407,6 +512,13 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-100 text-cyan-900 border border-cyan-300 font-extrabold text-[11px]">
             <Zap className="w-3.5 h-3.5 text-cyan-700" />
             <span>Perbaikan Drainase</span>
+          </span>
+        );
+      case 'PEMASANGAN_PAVING_BLOK':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-100 text-orange-900 border border-orange-300 font-extrabold text-[11px]">
+            <Layers className="w-3.5 h-3.5 text-orange-700" />
+            <span>Paving Blok</span>
           </span>
         );
       case 'PERBAIKAN_LAMPU_LPJU':
@@ -512,49 +624,60 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       </div>
 
       {/* SUMMARY STATS GRID */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-slate-50 border border-blue-200 shadow-2xs space-y-1">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-50 to-slate-50 border border-blue-200 shadow-2xs space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold text-blue-900 uppercase tracking-tight">Perbaikan Jalan</span>
             <div className="p-1.5 rounded-xl bg-blue-600 text-white">
               <Wrench className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-blue-950">{stats.countJalan} Proyek</div>
-          <p className="text-[10px] text-blue-700 font-semibold">Pengaspalan Hotmix &amp; Rabat Beton</p>
+          <div className="text-xl sm:text-2xl font-black text-blue-950">{stats.countJalan} Proyek</div>
+          <p className="text-[10px] text-blue-700 font-semibold">Pengaspalan Hotmix &amp; Rabat</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-50 to-slate-50 border border-cyan-200 shadow-2xs space-y-1">
+        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-cyan-50 to-slate-50 border border-cyan-200 shadow-2xs space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold text-cyan-900 uppercase tracking-tight">Perbaikan Drainase</span>
             <div className="p-1.5 rounded-xl bg-cyan-600 text-white">
               <Zap className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-cyan-950">{stats.countDrainase} Proyek</div>
-          <p className="text-[10px] text-cyan-700 font-semibold">Normalisasi Parit &amp; Pasang U-Ditch</p>
+          <div className="text-xl sm:text-2xl font-black text-cyan-950">{stats.countDrainase} Proyek</div>
+          <p className="text-[10px] text-cyan-700 font-semibold">Normalisasi &amp; U-Ditch</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-slate-50 border border-amber-200 shadow-2xs space-y-1">
+        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-orange-50 to-slate-50 border border-orange-200 shadow-2xs space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-extrabold text-amber-900 uppercase tracking-tight">Perbaikan Lampu LPJU</span>
+            <span className="text-[11px] font-extrabold text-orange-900 uppercase tracking-tight">Paving Blok</span>
+            <div className="p-1.5 rounded-xl bg-orange-600 text-white">
+              <Layers className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-orange-950">{stats.countPaving} Proyek</div>
+          <p className="text-[10px] text-orange-700 font-semibold">Paving Gang &amp; Fasum</p>
+        </div>
+
+        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-50 to-slate-50 border border-amber-200 shadow-2xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold text-amber-900 uppercase tracking-tight">Lampu LPJU</span>
             <div className="p-1.5 rounded-xl bg-amber-500 text-white">
               <Lightbulb className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-amber-950">{stats.countLampu} Proyek</div>
-          <p className="text-[10px] text-amber-700 font-semibold">Lampu Jalan Mati / Rusak Diperbaiki</p>
+          <div className="text-xl sm:text-2xl font-black text-amber-950">{stats.countLampu} Proyek</div>
+          <p className="text-[10px] text-amber-700 font-semibold">Lampu Jalan Diperbaiki</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-slate-50 border border-emerald-200 shadow-2xs space-y-1">
+        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-50 to-slate-50 border border-emerald-200 shadow-2xs space-y-1 col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold text-emerald-900 uppercase tracking-tight">Tiang LPJU Baru</span>
             <div className="p-1.5 rounded-xl bg-emerald-600 text-white">
               <Building2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-emerald-950">{stats.countTiang} Proyek</div>
-          <p className="text-[10px] text-emerald-700 font-semibold">Pemasangan Tiang &amp; Titik Baru LPJU</p>
+          <div className="text-xl sm:text-2xl font-black text-emerald-950">{stats.countTiang} Proyek</div>
+          <p className="text-[10px] text-emerald-700 font-semibold">Pemasangan Titik Baru</p>
         </div>
       </div>
 
@@ -611,6 +734,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               <option value="all">🌐 Semua Bidang Pembangunan</option>
               <option value="PERBAIKAN_JALAN">🛣️ Perbaikan Jalan</option>
               <option value="PERBAIKAN_DRAINASE">🌊 Perbaikan Drainase</option>
+              <option value="PEMASANGAN_PAVING_BLOK">🧱 Pemasangan Paving Blok</option>
               <option value="PERBAIKAN_LAMPU_LPJU">💡 Perbaikan Lampu LPJU</option>
               <option value="PENAMBAHAN_TIANG_LPJU">🔌 Penambahan Tiang LPJU Baru</option>
             </select>
@@ -714,7 +838,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                         <span className="font-extrabold text-slate-900">{item.volumeRealisasi}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 block font-bold">SUMBER DANA</span>
+                        <span className="text-slate-400 block font-bold">PELAKSANA KEGIATAN</span>
                         <span className="font-bold text-slate-800">{item.sumberDana}</span>
                       </div>
                     </div>
@@ -833,7 +957,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   <th className="p-3">Nama Proyek / Kegiatan</th>
                   <th className="p-3">Lokasi Detail</th>
                   <th className="p-3">Volume</th>
-                  <th className="p-3">Sumber Dana</th>
+                  <th className="p-3">Pelaksana Kegiatan</th>
                   <th className="p-3 text-center">Status</th>
                   <th className="p-3 text-center w-20">Aksi</th>
                 </tr>
@@ -939,6 +1063,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   >
                     <option value="PERBAIKAN_JALAN">🛣️ Perbaikan Jalan (Pengaspalan / Rabat)</option>
                     <option value="PERBAIKAN_DRAINASE">🌊 Perbaikan Drainase (Parit / U-Ditch)</option>
+                    <option value="PEMASANGAN_PAVING_BLOK">🧱 Pemasangan Paving Blok</option>
                     <option value="PERBAIKAN_LAMPU_LPJU">💡 Perbaikan Lampu LPJU (Mati/Rusak)</option>
                     <option value="PENAMBAHAN_TIANG_LPJU">🔌 Penambahan Tiang LPJU Baru</option>
                   </select>
@@ -991,10 +1116,10 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   />
                 </div>
 
-                {/* Sumber Dana */}
+                {/* Pelaksana Kegiatan */}
                 <div>
                   <label className="block text-slate-700 font-black mb-1">
-                    Sumber Dana
+                    Pelaksana Kegiatan *
                   </label>
                   <select
                     value={formSumberDana}
@@ -1051,29 +1176,356 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                 </div>
               </div>
 
-              {/* Foto URLs (Sebelum vs Sesudah) */}
-              <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-200 space-y-3">
-                <div className="font-extrabold text-blue-950 text-xs">📷 Link Dokumentasi Foto Lapangan</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">Foto Sebelum (Before)</label>
-                    <input
-                      type="url"
-                      placeholder="URL Foto Kondisi Rusak/Awal..."
-                      value={formFotoSebelum}
-                      onChange={(e) => setFormFotoSebelum(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 font-mono text-[11px]"
-                    />
+              {/* Dokumentasi Foto Lapangan (Upload Langsung dari Kamera HP / Galeri) */}
+              <div className="p-4 bg-gradient-to-br from-blue-50/80 via-slate-50 to-indigo-50/60 rounded-2xl border border-blue-200/80 space-y-4">
+                <div>
+                  <div className="font-extrabold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-blue-700" />
+                    <span>Dokumentasi Foto Lapangan (Upload HP / Kamera)</span>
                   </div>
-                  <div>
-                    <label className="block text-emerald-800 font-bold mb-1">Foto Sesudah (After 100%)</label>
-                    <input
-                      type="url"
-                      placeholder="URL Foto Kondisi Selesai..."
-                      value={formFotoSesudah}
-                      onChange={(e) => setFormFotoSesudah(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 font-mono text-[11px]"
-                    />
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    Ambil foto langsung dengan kamera HP di lokasi proyek atau pilih dari galeri HP Anda.
+                  </p>
+                </div>
+
+                {/* Hidden File Inputs for Mobile Camera & Gallery */}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  ref={fileBeforeCameraRef}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleProcessImage(file, 'sebelum');
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileBeforeGalleryRef}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleProcessImage(file, 'sebelum');
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  ref={fileAfterCameraRef}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleProcessImage(file, 'sesudah');
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileAfterGalleryRef}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleProcessImage(file, 'sesudah');
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Foto Sebelum (Before) */}
+                  <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2.5 shadow-3xs">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+                        Foto Sebelum (Before)
+                      </label>
+                      {formFotoSebelum && (
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          ✓ Foto Siap
+                        </span>
+                      )}
+                    </div>
+
+                    {formFotoSebelum ? (
+                      <div className="space-y-2">
+                        <div className="relative rounded-xl overflow-hidden border border-slate-200 group bg-slate-900 h-36">
+                          <img
+                            src={formFotoSebelum}
+                            alt="Foto Sebelum"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPreviewPhoto({
+                                  title: 'Foto Sebelum (Before)',
+                                  url: formFotoSebelum,
+                                  category: 'sebelum',
+                                })
+                              }
+                              className="px-2.5 py-1.5 rounded-lg bg-white/90 hover:bg-white text-slate-800 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Lihat</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFormFotoSebelum('')}
+                              className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Hapus</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewPhoto({
+                                title: 'Foto Sebelum (Before)',
+                                url: formFotoSebelum,
+                                category: 'sebelum',
+                              })
+                            }
+                            className="text-[10px] text-blue-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Perbesar Foto</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormFotoSebelum('')}
+                            className="text-[10px] text-rose-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Ganti / Hapus</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {isProcessingBefore ? (
+                          <div className="h-28 rounded-xl bg-blue-50 border border-blue-200 border-dashed flex flex-col items-center justify-center gap-2 text-blue-700">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span className="text-[11px] font-bold">Memproses foto dari HP...</span>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => fileBeforeCameraRef.current?.click()}
+                              className="h-24 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 flex flex-col items-center justify-center gap-1.5 p-2 transition-all cursor-pointer group active:scale-95 shadow-3xs"
+                            >
+                              <div className="p-2 rounded-full bg-blue-600 text-white group-hover:scale-110 transition-transform">
+                                <Camera className="w-4 h-4" />
+                              </div>
+                              <span className="text-[11px] font-black leading-tight text-center">
+                                Kamera HP
+                              </span>
+                              <span className="text-[9px] text-blue-700 font-medium">Jepret Langsung</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => fileBeforeGalleryRef.current?.click()}
+                              className="h-24 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-900 border border-slate-200 flex flex-col items-center justify-center gap-1.5 p-2 transition-all cursor-pointer group active:scale-95 shadow-3xs"
+                            >
+                              <div className="p-2 rounded-full bg-slate-700 text-white group-hover:scale-110 transition-transform">
+                                <ImageIcon className="w-4 h-4" />
+                              </div>
+                              <span className="text-[11px] font-black leading-tight text-center">
+                                Galeri HP
+                              </span>
+                              <span className="text-[9px] text-slate-500 font-medium">Pilih dari File</span>
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="pt-1">
+                          {showUrlInputBefore ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="url"
+                                placeholder="Paste link URL gambar..."
+                                value={formFotoSebelum}
+                                onChange={(e) => setFormFotoSebelum(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 font-mono text-[10px]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowUrlInputBefore(false)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setShowUrlInputBefore(true)}
+                              className="text-[10px] text-blue-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Link2 className="w-3 h-3" />
+                              <span>Atau masukkan link URL foto</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Foto Sesudah (After 100%) */}
+                  <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2.5 shadow-3xs">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                        Foto Sesudah (After 100%)
+                      </label>
+                      {formFotoSesudah && (
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          ✓ Foto Siap
+                        </span>
+                      )}
+                    </div>
+
+                    {formFotoSesudah ? (
+                      <div className="space-y-2">
+                        <div className="relative rounded-xl overflow-hidden border border-emerald-200 group bg-slate-900 h-36">
+                          <img
+                            src={formFotoSesudah}
+                            alt="Foto Sesudah"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPreviewPhoto({
+                                  title: 'Foto Sesudah (After 100%)',
+                                  url: formFotoSesudah,
+                                  category: 'sesudah',
+                                })
+                              }
+                              className="px-2.5 py-1.5 rounded-lg bg-white/90 hover:bg-white text-slate-800 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Lihat</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFormFotoSesudah('')}
+                              className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Hapus</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewPhoto({
+                                title: 'Foto Sesudah (After 100%)',
+                                url: formFotoSesudah,
+                                category: 'sesudah',
+                              })
+                            }
+                            className="text-[10px] text-emerald-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Perbesar Foto</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormFotoSesudah('')}
+                            className="text-[10px] text-rose-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Ganti / Hapus</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {isProcessingAfter ? (
+                          <div className="h-28 rounded-xl bg-emerald-50 border border-emerald-200 border-dashed flex flex-col items-center justify-center gap-2 text-emerald-700">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span className="text-[11px] font-bold">Memproses foto dari HP...</span>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => fileAfterCameraRef.current?.click()}
+                              className="h-24 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 flex flex-col items-center justify-center gap-1.5 p-2 transition-all cursor-pointer group active:scale-95 shadow-3xs"
+                            >
+                              <div className="p-2 rounded-full bg-emerald-600 text-white group-hover:scale-110 transition-transform">
+                                <Camera className="w-4 h-4" />
+                              </div>
+                              <span className="text-[11px] font-black leading-tight text-center">
+                                Kamera HP
+                              </span>
+                              <span className="text-[9px] text-emerald-700 font-medium">Jepret Langsung</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => fileAfterGalleryRef.current?.click()}
+                              className="h-24 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-900 border border-slate-200 flex flex-col items-center justify-center gap-1.5 p-2 transition-all cursor-pointer group active:scale-95 shadow-3xs"
+                            >
+                              <div className="p-2 rounded-full bg-slate-700 text-white group-hover:scale-110 transition-transform">
+                                <ImageIcon className="w-4 h-4" />
+                              </div>
+                              <span className="text-[11px] font-black leading-tight text-center">
+                                Galeri HP
+                              </span>
+                              <span className="text-[9px] text-slate-500 font-medium">Pilih dari File</span>
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="pt-1">
+                          {showUrlInputAfter ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="url"
+                                placeholder="Paste link URL gambar..."
+                                value={formFotoSesudah}
+                                onChange={(e) => setFormFotoSesudah(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 font-mono text-[10px]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowUrlInputAfter(false)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setShowUrlInputAfter(true)}
+                              className="text-[10px] text-emerald-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Link2 className="w-3 h-3" />
+                              <span>Atau masukkan link URL foto</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -312,7 +312,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
         {
           id: 'realisasi_pembangunan',
           title: 'Realisasi Pembangunan Infrastruktur',
-          desc: 'Monitoring realisasi perbaikan jalan, normalisasi drainase, perbaikan lampu LPJU, dan penambahan tiang LPJU baru.',
+          desc: 'Monitoring realisasi perbaikan jalan, drainase, pemasangan paving blok, lampu LPJU, dan penambahan tiang baru.',
           category: 'pemetaan',
           icon: Wrench,
           iconBg: 'bg-indigo-50 text-indigo-700',

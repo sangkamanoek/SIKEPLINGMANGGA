@@ -337,7 +337,8 @@ export type JenisPembangunanType =
   | 'PERBAIKAN_JALAN'
   | 'PERBAIKAN_DRAINASE'
   | 'PERBAIKAN_LAMPU_LPJU'
-  | 'PENAMBAHAN_TIANG_LPJU';
+  | 'PENAMBAHAN_TIANG_LPJU'
+  | 'PEMASANGAN_PAVING_BLOK';
 
 export type StatusRealisasiType =
   | 'USULAN'
