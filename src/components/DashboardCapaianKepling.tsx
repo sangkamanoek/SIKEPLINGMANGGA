@@ -2539,10 +2539,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       </div>
                     )}
                     <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
+                      <span className="text-slate-400 block font-medium">🛡️ BPJS TK</span>
+                      <strong className="text-teal-800">{sortedLeaderboard[1].bpjsPercentage}%</strong> ({sortedLeaderboard[1].bpjs} Org)
+                    </div>
+                    <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
                       <span className="text-slate-400 block font-medium">🏠 Kunjungan</span>
                       <strong className="text-amber-800">{sortedLeaderboard[1].totalKunjungan} KK</strong>
                     </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
+                    <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100 col-span-2">
                       <span className="text-slate-400 block font-medium">🔦 Poskamling</span>
                       <strong className="text-purple-800">{sortedLeaderboard[1].poskamlingCount} Giat</strong>
                     </div>
@@ -2594,10 +2598,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       </div>
                     )}
                     <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
+                      <span className="text-amber-800 block font-medium">🛡️ BPJS TK</span>
+                      <strong className="text-teal-800 font-bold">{sortedLeaderboard[0].bpjsPercentage}%</strong> ({sortedLeaderboard[0].bpjs} Org)
+                    </div>
+                    <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
                       <span className="text-amber-800 block font-medium">🏠 Kunjungan</span>
                       <strong className="text-amber-900 font-bold">{sortedLeaderboard[0].totalKunjungan} KK</strong>
                     </div>
-                    <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
+                    <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200 col-span-2">
                       <span className="text-amber-800 block font-medium">🔦 Poskamling</span>
                       <strong className="text-purple-800 font-bold">{sortedLeaderboard[0].poskamlingCount} Giat</strong>
                     </div>
@@ -2649,10 +2657,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       </div>
                     )}
                     <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
+                      <span className="text-slate-400 block font-medium">🛡️ BPJS TK</span>
+                      <strong className="text-teal-800">{sortedLeaderboard[2].bpjsPercentage}%</strong> ({sortedLeaderboard[2].bpjs} Org)
+                    </div>
+                    <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
                       <span className="text-slate-400 block font-medium">🏠 Kunjungan</span>
                       <strong className="text-amber-800">{sortedLeaderboard[2].totalKunjungan} KK</strong>
                     </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
+                    <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100 col-span-2">
                       <span className="text-slate-400 block font-medium">🔦 Poskamling</span>
                       <strong className="text-purple-800">{sortedLeaderboard[2].poskamlingCount} Giat</strong>
                     </div>

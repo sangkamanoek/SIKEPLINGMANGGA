@@ -1384,8 +1384,10 @@ export default function App() {
           </div>
         )}
 
-        {/* Smart Hub Dashboard Tab */}
-        {activeTab === 'hub' && (
+        {/* Animated Container for Active Tab Content */}
+        <div key={activeTab} className="animate-tab-fade">
+          {/* Smart Hub Dashboard Tab */}
+          {activeTab === 'hub' && (
           <ErrorBoundary fallbackTitle="Gagal Memuat Pusat Menu">
             <SmartHubDashboard
               activeAccount={activeAccount}
@@ -1760,6 +1762,7 @@ export default function App() {
             <RealisasiPembangunanView currentUser={activeAccount} />
           </ErrorBoundary>
         )}
+        </div>
       </main>
 
       {/* Mobile Bottom Navigation Bar (Thumb-friendly for Kepling & Staff) */}
