@@ -1142,6 +1142,40 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     }
   };
 
+  // Batch delete all currently filtered items (Only Admin)
+  const handleBatchDeleteFilteredSppt = async () => {
+    if (!canManageWp) return;
+    if (filteredSpptList.length === 0) return;
+
+    const count = filteredSpptList.length;
+    const confirmMsg = `⚠️ KONFIRMASI HAPUS MASSAL:\n\nApakah Anda yakin ingin MENGHAPUS ${count.toLocaleString('id-ID')} data Wajib Pajak PBB yang sedang terfilter ini secara PERMANEN dari Cloud Firestore?\n\nTindakan ini tidak dapat dibatalkan.`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsSyncing(true);
+    try {
+      const idsToDelete = new Set(filteredSpptList.map(item => item.id));
+
+      // 1. Delete each from Firestore & Server Buffer
+      for (const item of filteredSpptList) {
+        deletePbbSpptFromFirestore(item.id, selectedYear).catch(() => {});
+      }
+
+      // 2. Update local state
+      const updatedList = spptList.filter(item => !idsToDelete.has(item.id));
+      setSpptList(updatedList);
+      lastFirestoreItemsRef.current = updatedList;
+      saveLocalSpptForYear(updatedList, selectedYear);
+
+      notify(`Berhasil menghapus ${count} data Wajib Pajak terfilter dari sistem dan Firestore.`, 'info');
+    } catch (err) {
+      console.error(err);
+      notify('Gagal menghapus data massal', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const formatRupiah = (val: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
   };
@@ -2395,25 +2429,45 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   {isKepling && <option value="all">Tampilkan Semua Lingkungan</option>}
                 </select>
 
-                {canManageWp && (searchQuery || selectedLingkungan !== 'all' || selectedNopClassification !== 'all') && (
-                  <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-xl shadow-xs">
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-700" />
-                    <span className="text-[10px] font-black text-amber-800 uppercase mr-1">Koreksi Massal:</span>
-                    <select
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        if (val > 0) {
-                          handleBatchUpdateLingkungan(val);
-                          e.target.value = "0"; // reset dropdown
-                        }
-                      }}
-                      className="bg-white border border-amber-300 text-amber-950 font-black rounded px-2 py-0.5 text-[10px] cursor-pointer"
+                {canManageWp && (searchQuery || selectedLingkungan !== 'all' || selectedNopClassification !== 'all') && filteredSpptList.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-xl shadow-xs">
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-amber-700" />
+                      <span className="text-[10px] font-black text-amber-800 uppercase mr-1">Koreksi Massal:</span>
+                      <select
+                        onChange={(e) => {
+                          const strVal = e.target.value;
+                          if (strVal === "move_to_0") {
+                            handleBatchUpdateLingkungan(0);
+                            e.target.value = "0";
+                          } else {
+                            const val = parseInt(strVal, 10);
+                            if (val > 0) {
+                              handleBatchUpdateLingkungan(val);
+                              e.target.value = "0"; // reset dropdown
+                            }
+                          }
+                        }}
+                        className="bg-white border border-amber-300 text-amber-950 font-black rounded px-2 py-0.5 text-[10px] cursor-pointer"
+                      >
+                        <option value="0">Pindah Ke Lingk...</option>
+                        <option value="move_to_0" className="text-rose-600 font-bold">⚠️ Lingkungan 0 (NOP Baru)</option>
+                        {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                          <option key={n} value={n}>Lingkungan {n}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Batch Delete Filtered Items Button */}
+                    <button
+                      type="button"
+                      onClick={handleBatchDeleteFilteredSppt}
+                      className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[10px] rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-2xs shrink-0"
+                      title={`Hapus Permanen ${filteredSpptList.length} data yang sedang terfilter`}
                     >
-                      <option value="0">Pindah Ke Lingk...</option>
-                      {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
-                        <option key={n} value={n}>Lingkungan {n}</option>
-                      ))}
-                    </select>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus {filteredSpptList.length} Data Terfilter</span>
+                    </button>
                   </div>
                 )}
 
@@ -2475,6 +2529,14 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Mobile Scroll Hint Banner */}
+          <div className="flex sm:hidden items-center justify-between gap-2 px-3 py-2 bg-amber-50 text-amber-900 text-[11px] font-bold rounded-xl border border-amber-200">
+            <span className="flex items-center gap-1">
+              ↔️ Geser tabel ke kanan untuk melihat Tombol Hapus 🗑️ &amp; Edit ✏️
+            </span>
+            <span className="text-amber-800 font-extrabold shrink-0">{filteredSpptList.length} Data</span>
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -3134,13 +3196,16 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
                 {/* Lingkungan */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Lingkungan (1-24)</label>
+                  <label className="text-xs font-bold text-slate-700">Lingkungan</label>
                   <select
                     value={formLingkungan}
                     onChange={(e) => setFormLingkungan(parseInt(e.target.value, 10))}
                     disabled={isKepling}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white disabled:bg-slate-100 disabled:text-slate-600"
                   >
+                    {!isKepling && (
+                      <option value={0} className="text-rose-600 font-bold">⚠️ Lingkungan 0 (NOP Baru / Belum Masuk Lingkungan)</option>
+                    )}
                     {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
                       <option key={n} value={n}>
                         Lingkungan {n} {isKepling && n === keplingLingkunganNum ? '(Lingkungan Anda)' : ''}
