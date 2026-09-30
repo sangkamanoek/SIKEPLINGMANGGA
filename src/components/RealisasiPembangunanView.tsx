@@ -219,9 +219,9 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
   const [items, setItems] = useState<RealisasiPembangunan[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {
       console.warn('Failed to load realisasi pembangunan from storage', e);
@@ -248,6 +248,43 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<RealisasiPembangunan | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<{ title: string; url: string; category: string } | null>(null);
+
+  // Delete & Confirmation States (Replaces native window.confirm for iframe & mobile compatibility)
+  const [itemToDelete, setItemToDelete] = useState<RealisasiPembangunan | null>(null);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3500);
+  };
+
+  const promptDeleteItem = (item: RealisasiPembangunan) => {
+    setItemToDelete(item);
+  };
+
+  const confirmDeleteItem = () => {
+    if (!itemToDelete) return;
+    const targetId = itemToDelete.id;
+    const targetName = itemToDelete.namaProyek;
+    setItems((prev) => prev.filter((i) => i.id !== targetId));
+    setItemToDelete(null);
+    showToast(`Laporan "${targetName.slice(0, 30)}..." berhasil dihapus.`);
+  };
+
+  const confirmClearAll = () => {
+    setItems([]);
+    setIsClearAllModalOpen(false);
+    showToast('Seluruh contoh laporan pembangunan berhasil dibersihkan.');
+  };
+
+  const handleRestoreSamples = () => {
+    setItems(INITIAL_REALISASI_DATA);
+    showToast('Data contoh laporan pembangunan berhasil dimuat kembali.');
+  };
 
   // Form States
   const [formLingkunganNo, setFormLingkunganNo] = useState<number>(
@@ -378,6 +415,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     setFormKeterangan('');
     setShowUrlInputBefore(false);
     setShowUrlInputAfter(false);
+    setFormError(null);
     setIsModalOpen(true);
   };
 
@@ -398,21 +436,17 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     setFormKeterangan(item.keterangan || '');
     setShowUrlInputBefore(Boolean(item.fotoSebelumUrl && !item.fotoSebelumUrl.startsWith('data:')));
     setShowUrlInputAfter(Boolean(item.fotoSesudahUrl && !item.fotoSesudahUrl.startsWith('data:')));
+    setFormError(null);
     setIsModalOpen(true);
-  };
-
-  const handleDelete = (id: string) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus data realisasi pembangunan ini?')) {
-      setItems((prev) => prev.filter((i) => i.id !== id));
-    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNamaProyek.trim()) {
-      alert('Nama proyek pembangunan wajib diisi.');
+      setFormError('Nama proyek pembangunan wajib diisi.');
       return;
     }
+    setFormError(null);
 
     const keplingObj = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === formLingkunganNo);
     const keplingName = keplingObj ? keplingObj.nama : `Kepling Lingkungan ${formLingkunganNo}`;
@@ -619,6 +653,17 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               <Printer className="w-4 h-4 text-amber-300" />
               <span>Cetak Laporan</span>
             </button>
+            {items.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsClearAllModalOpen(true)}
+                className="px-3.5 py-2.5 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 font-bold text-xs backdrop-blur-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Hapus Semua Contoh Data Laporan"
+              >
+                <Trash2 className="w-4 h-4 text-rose-300" />
+                <span>Bersihkan Contoh Data</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -781,23 +826,37 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
 
       {/* CONTENT DISPLAY AREA */}
       {filteredItems.length === 0 ? (
-        <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 space-y-3">
+        <div className="p-10 sm:p-14 text-center bg-white rounded-3xl border border-slate-200 space-y-3 shadow-2xs">
           <div className="p-4 rounded-full bg-blue-50 text-blue-600 inline-block">
             <Wrench className="w-8 h-8" />
           </div>
-          <h3 className="font-extrabold text-slate-800 text-sm">
-            Tidak Ada Data Realisasi Pembangunan
+          <h3 className="font-extrabold text-slate-800 text-base">
+            {items.length === 0 ? 'Belum Ada Data Realisasi Pembangunan' : 'Tidak Ada Data Sesuai Filter'}
           </h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
-            Tidak ditemukan data pembangunan yang sesuai dengan kriteria filter atau pencarian Anda. Silakan tambah data baru.
+          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+            {items.length === 0
+              ? 'Seluruh data contoh telah dibersihkan. Anda dapat langsung menginput data realisasi baru dari lapangan atau memuat kembali contoh data kapan saja.'
+              : 'Tidak ditemukan data pembangunan yang sesuai dengan kriteria filter atau pencarian Anda. Silakan ubah filter atau tambah data baru.'}
           </p>
-          <button
-            type="button"
-            onClick={openAddModal}
-            className="px-4 py-2 rounded-xl bg-blue-700 text-white text-xs font-bold hover:bg-blue-800 transition-colors cursor-pointer"
-          >
-            + Tambah Realisasi Baru
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={openAddModal}
+              className="px-4 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Tambah Realisasi Baru</span>
+            </button>
+            {items.length === 0 && (
+              <button
+                type="button"
+                onClick={handleRestoreSamples}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🔄 Muat Kembali Data Contoh</span>
+              </button>
+            )}
+          </div>
         </div>
       ) : viewMode === 'card' ? (
         /* GALLERY / CARD VIEW */
@@ -933,9 +992,9 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDelete(item.id)}
+                    onClick={() => promptDeleteItem(item)}
                     className="p-1.5 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 cursor-pointer"
-                    title="Hapus"
+                    title="Hapus Data"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -986,8 +1045,9 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => promptDeleteItem(item)}
                           className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer"
+                          title="Hapus Data"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1031,6 +1091,14 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
 
             {/* Modal Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs font-semibold text-slate-800">
+              {formError && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2.5 animate-shake">
+                  <div className="p-1 rounded-full bg-rose-100 text-rose-600 shrink-0">
+                    <X className="w-3.5 h-3.5" />
+                  </div>
+                  <span>{formError}</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Wilayah Lingkungan */}
                 <div>
@@ -1594,6 +1662,117 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* IN-APP CONFIRM DELETE MODAL (MOBILE & IFRAME COMPATIBLE) */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4 animate-scale-up">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-rose-100 text-rose-600">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900">
+                  Hapus Laporan Ini?
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Konfirmasi penghapusan data realisasi pembangunan
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-slate-600 bg-slate-200 px-2 py-0.5 rounded text-[10px]">
+                  Lingkungan {itemToDelete.lingkunganNomor}
+                </span>
+                <span className="font-bold text-slate-500 text-[11px]">
+                  {itemToDelete.sumberDana}
+                </span>
+              </div>
+              <p className="font-black text-slate-900 leading-snug">
+                {itemToDelete.namaProyek}
+              </p>
+              <p className="text-[11px] text-slate-600">
+                📍 {itemToDelete.lokasiDetail}
+              </p>
+            </div>
+
+            <p className="text-xs text-rose-600 font-semibold bg-rose-50 p-2.5 rounded-xl border border-rose-100">
+              ⚠️ Perhatian: Data yang dihapus tidak dapat dipulihkan.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setItemToDelete(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteItem}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Ya, Hapus Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CLEAR ALL SAMPLES MODAL */}
+      {isClearAllModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4 animate-scale-up">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-amber-100 text-amber-700">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900">
+                  Bersihkan Semua Contoh Data?
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Mulai dari lembar kerja kosong
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Tindakan ini akan mengosongkan seluruh {items.length} contoh data laporan agar Anda dapat mengisi data riil baru langsung dari awal. (Anda tetap dapat memuat kembali data contoh kapan saja melalui tombol di halaman kosong).
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsClearAllModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmClearAll}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Bersihkan Semua</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST NOTIFICATION */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 text-xs font-bold flex items-center gap-2.5 animate-slide-up backdrop-blur-md">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>
