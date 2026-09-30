@@ -569,14 +569,14 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
               className="px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="all">Semua Tingkat Kesejahteraan</option>
-              <option value="DESIL_1_2">Desil 1 & 2 (Sangat Miskin / Miskin)</option>
-              <option value="DESIL_3_5">Desil 3 – 5 (Hampir / Rentan Miskin)</option>
-              <option value="DESIL_6_10">Desil 6 – 10 (Mampu / Non-Desil)</option>
-              <option value="Desil 1 (Sangat Miskin)">Desil 1 (Sangat Miskin)</option>
-              <option value="Desil 2 (Miskin)">Desil 2 (Miskin)</option>
-              <option value="Desil 3 (Hampir Miskin)">Desil 3 (Hampir Miskin)</option>
-              <option value="Desil 4 (Rentan Miskin)">Desil 4 (Rentan Miskin)</option>
-              <option value="Desil 5 (Menengah Bawah)">Desil 5 (Menengah Bawah)</option>
+              <option value="DESIL_1_2">Desil 1 &amp; 2</option>
+              <option value="DESIL_3_5">Desil 3 – 5</option>
+              <option value="DESIL_6_10">Desil 6 – 10</option>
+              <option value="Desil 1">Desil 1</option>
+              <option value="Desil 2">Desil 2</option>
+              <option value="Desil 3">Desil 3</option>
+              <option value="Desil 4">Desil 4</option>
+              <option value="Desil 5">Desil 5</option>
             </select>
 
             {/* Filter Bansos */}
@@ -843,7 +843,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                 <div className="space-y-3 text-xs font-semibold">
                   <div>
                     <div className="flex justify-between text-rose-900 mb-1">
-                      <span>Desil 1 (Sangat Miskin)</span>
+                      <span>Desil 1</span>
                       <span>{stats.countDesil1} KK ({stats.totalKk ? Math.round((stats.countDesil1 / stats.totalKk) * 100) : 0}%)</span>
                     </div>
                     <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
@@ -853,7 +853,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
 
                   <div>
                     <div className="flex justify-between text-rose-800 mb-1">
-                      <span>Desil 2 (Miskin)</span>
+                      <span>Desil 2</span>
                       <span>{stats.countDesil2} KK ({stats.totalKk ? Math.round((stats.countDesil2 / stats.totalKk) * 100) : 0}%)</span>
                     </div>
                     <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
@@ -863,7 +863,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
 
                   <div>
                     <div className="flex justify-between text-amber-900 mb-1">
-                      <span>Desil 3–5 (Hampir / Rentan Miskin)</span>
+                      <span>Desil 3–5</span>
                       <span>{stats.countDesil3 + stats.countDesil4 + stats.countDesil5} KK ({stats.totalKk ? Math.round(((stats.countDesil3 + stats.countDesil4 + stats.countDesil5) / stats.totalKk) * 100) : 0}%)</span>
                     </div>
                     <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
@@ -873,7 +873,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
 
                   <div>
                     <div className="flex justify-between text-slate-700 mb-1">
-                      <span>Desil 6–10 / Non-Desil (Mampu)</span>
+                      <span>Desil 6–10</span>
                       <span>{stats.countDesil6Plus} KK ({stats.totalKk ? Math.round((stats.countDesil6Plus / stats.totalKk) * 100) : 0}%)</span>
                     </div>
                     <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
@@ -1544,6 +1544,8 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
   const [statusDomisili, setStatusDomisili] = useState<string>(
     initialData?.statusDomisili || 'KK Kelurahan Mangga (KTP/KK Setempat)'
   );
+  const [kewarganegaraan, setKewarganegaraan] = useState<string>(initialData?.kewarganegaraan || 'WNI');
+  const [negaraAsalWna, setNegaraAsalWna] = useState<string>(initialData?.negaraAsalWna || '');
   const [pekerjaanKk, setPekerjaanKk] = useState<string>(initialData?.pekerjaanUtamaKepalaKeluarga || 'Wiraswasta');
 
   // Anggota Keluarga List
@@ -1665,9 +1667,11 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
       jumlahLansia: totalLansia,
       pekerjaanUtamaKepalaKeluarga: pekerjaanKk,
       anggotaKeluarga: anggotaList,
-      desilKesejahteraan: desil,
-      penerimaBansos: bantuanDiterima.length > 0 || desil.includes('Desil 1') || desil.includes('Desil 2') || desil.includes('Desil 3'),
-      bantuanDiterima,
+      desilKesejahteraan: kewarganegaraan === 'WNA' ? '' : desil,
+      penerimaBansos: kewarganegaraan === 'WNA' ? false : (bantuanDiterima.length > 0 || desil.includes('Desil 1') || desil.includes('Desil 2') || desil.includes('Desil 3')),
+      bantuanDiterima: kewarganegaraan === 'WNA' ? [] : bantuanDiterima,
+      kewarganegaraan,
+      negaraAsalWna: kewarganegaraan === 'WNA' ? negaraAsalWna : '',
       jambanKeluarga: jamban,
       tempatAkhirTinja: tempatTinja,
       sumberAirMinum: airMinum,
@@ -1847,6 +1851,54 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                     </option>
                   </select>
                 </div>
+
+                <div>
+                  <label className="block text-xs font-black text-purple-950 mb-1">
+                    Status Kewarganegaraan *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setKewarganegaraan('WNI');
+                        setNegaraAsalWna('');
+                      }}
+                      className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        kewarganegaraan !== 'WNA'
+                          ? 'bg-purple-800 text-white border-purple-800 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-50'
+                      }`}
+                    >
+                      <span>🇮🇩 WNI</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setKewarganegaraan('WNA');
+                        setDesil('');
+                        setBantuanDiterima([]);
+                      }}
+                      className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        kewarganegaraan === 'WNA'
+                          ? 'bg-rose-700 text-white border-rose-800 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-rose-50'
+                      }`}
+                    >
+                      <span>🌐 WNA</span>
+                    </button>
+                  </div>
+                  {kewarganegaraan === 'WNA' && (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        placeholder="Negara Asal / Paspor WNA (contoh: Malaysia, China)"
+                        value={negaraAsalWna}
+                        onChange={(e) => setNegaraAsalWna(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-purple-50 border border-purple-300 text-xs font-bold text-purple-950"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -2003,64 +2055,78 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
           {/* TAB 3: DESIL & BANSOS */}
           {activeTab === 'BANSOS' && (
             <div className="space-y-4">
-              <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-200 space-y-3">
-                <label className="block text-xs font-black text-rose-950">
-                  Tingkat Kesejahteraan Keluarga (Desil 1 s/d 5 = Rentan & Membuka Pilihan Bantuan) *
-                </label>
-                <select
-                  value={desil}
-                  onChange={(e) => setDesil(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-rose-200 text-xs font-black text-rose-950 focus:outline-none focus:ring-2 focus:ring-rose-500"
-                >
-                  <option value="Desil 1 (Sangat Miskin)">Desil 1 (Sangat Miskin / Miskin Ekstrem)</option>
-                  <option value="Desil 2 (Miskin)">Desil 2 (Miskin)</option>
-                  <option value="Desil 3 (Hampir Miskin)">Desil 3 (Hampir Miskin)</option>
-                  <option value="Desil 4 (Rentan Miskin)">Desil 4 (Rentan Miskin)</option>
-                  <option value="Desil 5 (Menengah Bawah)">Desil 5 (Menengah Bawah)</option>
-                  <option value="Desil 6-10 (Mampu / Non-Desil)">Desil 6-10 (Mampu / Non-Desil)</option>
-                </select>
-                <p className="text-[11px] text-slate-500 font-medium">
-                  Sesuai ketentuan, keluarga dengan kategori Desil 1 s/d 5 diprioritaskan menerima program jaminan sosial dan bantuan pemerintah.
-                </p>
-              </div>
-
-              {/* Bantuan Sosial Multi-Checklist */}
-              <div className="space-y-2">
-                <label className="block text-xs font-black text-slate-700">
-                  Pilihan Bantuan Yang Diterima (Centang Bantuan Yang Aktif):
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {[
-                    'PKH Medan Makmur',
-                    'PKH Nasional',
-                    'BPNT / Sembako',
-                    'BLT / DBH',
-                    'PBI-JK (BPJS Gratis)',
-                    'Bedah Rumah / RTLH',
-                    'PIP / Beasiswa',
-                    'Bantuan Disabilitas / Lansia',
-                  ].map((program) => {
-                    const isChecked = bantuanDiterima.includes(program);
-                    return (
-                      <button
-                        type="button"
-                        key={program}
-                        onClick={() => handleToggleBansos(program)}
-                        className={`flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer text-left ${
-                          isChecked
-                            ? program === 'PKH Medan Makmur'
-                              ? 'bg-purple-100 border-purple-400 text-purple-950 shadow-xs'
-                              : 'bg-emerald-50 border-emerald-400 text-emerald-950 shadow-xs'
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span>{program}</span>
-                        {isChecked && <Check className="w-4 h-4 text-emerald-700" />}
-                      </button>
-                    );
-                  })}
+              {kewarganegaraan === 'WNA' ? (
+                <div className="p-4 bg-purple-100/80 rounded-2xl border border-purple-300 space-y-2 text-purple-950">
+                  <div className="text-xs font-black flex items-center gap-2">
+                    <span className="text-base">🌐</span>
+                    <span>Status Kewarganegaraan: WNA (Warga Negara Asing)</span>
+                  </div>
+                  <p className="text-xs text-purple-800 font-medium">
+                    Secara otomatis tidak diminta status Desil Kesejahteraan maupun Program Bantuan Sosial.
+                  </p>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-200 space-y-3">
+                    <label className="block text-xs font-black text-rose-950">
+                      Tingkat Kesejahteraan Keluarga (Pilih Kategori Desil) *
+                    </label>
+                    <select
+                      value={desil}
+                      onChange={(e) => setDesil(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-rose-200 text-xs font-black text-rose-950 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    >
+                      <option value="Desil 1">Desil 1</option>
+                      <option value="Desil 2">Desil 2</option>
+                      <option value="Desil 3">Desil 3</option>
+                      <option value="Desil 4">Desil 4</option>
+                      <option value="Desil 5">Desil 5</option>
+                      <option value="Desil 6-10">Desil 6-10</option>
+                    </select>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Sesuai ketentuan, keluarga dengan kategori Desil 1 s/d 5 diprioritaskan menerima program jaminan sosial dan bantuan pemerintah.
+                    </p>
+                  </div>
+
+                  {/* Bantuan Sosial Multi-Checklist */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-black text-slate-700">
+                      Pilihan Bantuan Yang Diterima (Centang Bantuan Yang Aktif):
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        'PKH Medan Makmur',
+                        'PKH Nasional',
+                        'BPNT / Sembako',
+                        'BLT / DBH',
+                        'PBI-JK (BPJS Gratis)',
+                        'Bedah Rumah / RTLH',
+                        'PIP / Beasiswa',
+                        'Bantuan Disabilitas / Lansia',
+                      ].map((program) => {
+                        const isChecked = bantuanDiterima.includes(program);
+                        return (
+                          <button
+                            type="button"
+                            key={program}
+                            onClick={() => handleToggleBansos(program)}
+                            className={`flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer text-left ${
+                              isChecked
+                                ? program === 'PKH Medan Makmur'
+                                  ? 'bg-purple-100 border-purple-400 text-purple-950 shadow-xs'
+                                  : 'bg-emerald-50 border-emerald-400 text-emerald-950 shadow-xs'
+                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>{program}</span>
+                            {isChecked && <Check className="w-4 h-4 text-emerald-700" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

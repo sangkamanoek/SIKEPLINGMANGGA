@@ -267,9 +267,11 @@ export interface TitikRumahBangunan {
   nomorRumah: string; // e.g. "No. 14A"
   namaKepalaKeluarga: string;
   nikKk?: string;
-  // Status Kartu Keluarga (KK)
+  // Status Kartu Keluarga (KK) & Kewarganegaraan
   isKkMangga?: boolean; // true: KK Kelurahan Mangga, false: Bukan KK Mangga (Luar)
   asalKk?: string;
+  kewarganegaraan?: 'WNI' | 'WNA' | string; // 'WNI' or 'WNA' (Warga Negara Asing)
+  negaraAsalWna?: string; // Country of origin or passport info if WNA
   lat: number;
   lng: number;
   // Demografi
@@ -330,6 +332,44 @@ export interface TitikRumahBangunan {
 
 export type KondisiJalanType = 'BAIK' | 'RUSAK_SEDANG' | 'RUSAK_BERAT';
 export type KondisiDrainaseType = 'LANCAR' | 'TERSUMBAT' | 'TIDAK_ADA';
+
+export type JenisPembangunanType =
+  | 'PERBAIKAN_JALAN'
+  | 'PERBAIKAN_DRAINASE'
+  | 'PERBAIKAN_LAMPU_LPJU'
+  | 'PENAMBAHAN_TIANG_LPJU';
+
+export type StatusRealisasiType =
+  | 'USULAN'
+  | 'PROSES_PENGERJAAN'
+  | 'SELESAI_100%'
+  | 'PEMELIHARAAN';
+
+export interface RealisasiPembangunan {
+  id: string;
+  lingkunganId: string;
+  lingkunganNomor: number;
+  jenisPembangunan: JenisPembangunanType;
+  namaProyek: string;
+  lokasiDetail: string;
+  sumberDana: 'APBD Kota Medan' | 'Dinas SDABMBK' | 'Dinas Perkim' | 'Dinas Perhubungan (Dishub)' | 'Pokir DPRD' | 'Dana Kelurahan' | 'Swadaya Masyarakat' | string;
+  statusRealisasi: StatusRealisasiType;
+  volumeRealisasi: string;
+  biayaEstimasiRp?: number;
+  tanggalMulai?: string;
+  tanggalSelesai?: string;
+  fotoSebelumUrl?: string;
+  fotoSesudahUrl?: string;
+  titikKoordinat?: {
+    lat: number;
+    lng: number;
+  };
+  pelaksanaTeknis?: string;
+  keterangan?: string;
+  createdAt: string;
+  updatedAt?: string;
+  createdByName?: string;
+}
 
 export interface RuasJalanLingkungan {
   id: string;
@@ -415,6 +455,8 @@ export interface DataKeluarga {
   rw?: string; // e.g. "002"
   alamatLengkap: string;
   statusDomisili: 'KK Kelurahan Mangga (KTP/KK Setempat)' | 'Bukan KK Mangga (Domisili Luar/Kontrak)' | string;
+  kewarganegaraan?: 'WNI' | 'WNA' | string;
+  negaraAsalWna?: string;
   titikKoordinat?: {
     lat: number;
     lng: number;

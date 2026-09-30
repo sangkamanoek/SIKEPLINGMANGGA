@@ -64,6 +64,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
   const [subView, setSubView] = useState<TrantibSubView>('poskamling');
   const [searchQuery, setSearchQuery] = useState('');
   const [poskamlingDisplayMode, setPoskamlingDisplayMode] = useState<'gallery' | 'table' | 'unduh_mingguan'>('gallery');
+  const [selectedKeplingDetail, setSelectedKeplingDetail] = useState<typeof keplingTrantibData[0] | null>(null);
   const [previewImage, setPreviewImage] = useState<{
     url: string;
     title: string;
@@ -116,34 +117,46 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
       notes: string;
     }[] = [];
 
-    reports.forEach((r) => {
+  reports.forEach((r) => {
       if (!r.tanggal) return;
-      const reportDate = r.tanggal.split('T')[0];
-      const diffTime = now.getTime() - new Date(reportDate).getTime();
-      const diffDays = diffTime / (1000 * 3600 * 24);
+      const docPhotos = r.dokumentasiFoto || (r as any).fotoDokumentasi || [];
+      if (docPhotos.length > 0) {
+        const posPhotos = docPhotos.filter(
+          (p) =>
+            p.kategori === 'poskamling' ||
+            p.kategori === 'poskamling_siskamling' ||
+            p.kategori === 'keamanan' ||
+            (p.name && p.name.toLowerCase().includes('poskamling')) ||
+            (p.name && p.name.toLowerCase().includes('ronda')) ||
+            (p.name && p.name.toLowerCase().includes('siskamling'))
+        );
+        const hasPoskamlingGiat = Boolean(
+          r.kinerja?.poskamlingAdaGiat ||
+          (r.kinerja?.poskamlingStatus && r.kinerja.poskamlingStatus !== 'Tidak Ada Giat')
+        );
+        const targetPhotos = posPhotos.length > 0 ? posPhotos : (hasPoskamlingGiat ? docPhotos : docPhotos);
 
-      if (diffDays >= 0 && diffDays <= 7) {
-        if (r.fotoDokumentasi && r.fotoDokumentasi.length > 0) {
-          const posPhotos = r.fotoDokumentasi.filter((p) => p.kategori === 'poskamling');
-          const hasPoskamlingGiat = Boolean(
-            r.kinerja?.poskamlingAdaGiat ||
-            (r.kinerja?.poskamlingStatus && r.kinerja.poskamlingStatus !== 'Tidak Ada Giat')
-          );
-          const targetPhotos = posPhotos.length > 0 ? posPhotos : (hasPoskamlingGiat ? r.fotoDokumentasi : []);
-
-          targetPhotos.forEach((p) => {
-            if (p.url) {
-              photos.push({
-                url: p.url,
-                date: r.tanggal,
-                name: p.name || `Dokumentasi Poskamling ${r.namaKepling}`,
-                keplingNama: r.namaKepling,
-                lingkungan: r.jabatan || 'Kepala Lingkungan',
-                notes: r.kinerja?.poskamlingKeterangan || r.uraianTugas || 'Situasi aman dan kondusif',
-              });
-            }
-          });
-        }
+        targetPhotos.forEach((p) => {
+          if (p.url) {
+            photos.push({
+              url: p.url,
+              date: r.tanggal,
+              name: p.name || `Dokumentasi Poskamling ${r.namaKepling}`,
+              keplingNama: r.namaKepling,
+              lingkungan: r.jabatan || 'Kepala Lingkungan',
+              notes: r.kinerja?.poskamlingKeterangan || r.uraianTugas || 'Situasi aman dan kondusif',
+            });
+          }
+        });
+      } else if (r.absenApel?.fotoSelfieUrl) {
+        photos.push({
+          url: r.absenApel.fotoSelfieUrl,
+          date: r.tanggal,
+          name: `Dokumentasi Patroli ${r.namaKepling}`,
+          keplingNama: r.namaKepling,
+          lingkungan: r.jabatan || 'Kepala Lingkungan',
+          notes: r.kinerja?.poskamlingKeterangan || r.uraianTugas || 'Situasi aman dan kondusif',
+        });
       }
     });
 
@@ -225,18 +238,34 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
       const sourceReportsForPhotos = poskamlingReports.length > 0 ? poskamlingReports : keplingReports;
       sourceReportsForPhotos.forEach((r) => {
         const dateStr = r.tanggal || 'Hari Ini';
-        if (r.fotoDokumentasi && r.fotoDokumentasi.length > 0) {
-          const posPhotos = r.fotoDokumentasi.filter((p) => p.kategori === 'poskamling');
-          const targetPhotos = posPhotos.length > 0 ? posPhotos : r.fotoDokumentasi;
+        const docPhotos = r.dokumentasiFoto || (r as any).fotoDokumentasi || [];
+        if (docPhotos.length > 0) {
+          const posPhotos = docPhotos.filter(
+            (p) =>
+              p.kategori === 'poskamling' ||
+              p.kategori === 'poskamling_siskamling' ||
+              p.kategori === 'keamanan' ||
+              (p.name && p.name.toLowerCase().includes('poskamling')) ||
+              (p.name && p.name.toLowerCase().includes('ronda')) ||
+              (p.name && p.name.toLowerCase().includes('siskamling'))
+          );
+          const targetPhotos = posPhotos.length > 0 ? posPhotos : docPhotos;
           targetPhotos.forEach((p) => {
             if (p.url) {
               poskamlingPhotos.push({
                 url: p.url,
                 date: dateStr,
-                title: p.name || p.description || `Dokumentasi Siskamling ${kepling.lingkungan}`,
+                title: p.name || `Dokumentasi Siskamling ${kepling.lingkungan}`,
                 category: p.kategori || 'poskamling',
               });
             }
+          });
+        } else if (r.absenApel?.fotoSelfieUrl) {
+          poskamlingPhotos.push({
+            url: r.absenApel.fotoSelfieUrl,
+            date: dateStr,
+            title: `Dokumentasi Patroli ${kepling.lingkungan}`,
+            category: 'poskamling',
           });
         }
       });
@@ -858,16 +887,14 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                       <span className="text-[10px] font-bold text-slate-400">
                         {item.latestDate}
                       </span>
-                      {onSelectKeplingRiwayat && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
-                          className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[11px] transition-colors cursor-pointer border border-amber-200 inline-flex items-center gap-1"
-                        >
-                          <span>Riwayat</span>
-                          <ChevronRight className="w-3 h-3" />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedKeplingDetail(item)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[11px] transition-colors cursor-pointer border border-amber-200 inline-flex items-center gap-1"
+                      >
+                        <span>Rincian Trantib</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -956,15 +983,13 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                       </p>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      {onSelectKeplingRiwayat && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
-                          className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-200"
-                        >
-                          Riwayat
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedKeplingDetail(item)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-200"
+                      >
+                        Rincian Trantib
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1083,15 +1108,13 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                       </p>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      {onSelectKeplingRiwayat && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
-                          className="px-2.5 py-1 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-900 font-bold text-xs transition-colors cursor-pointer border border-orange-200"
-                        >
-                          Riwayat
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedKeplingDetail(item)}
+                        className="px-2.5 py-1 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-900 font-bold text-xs transition-colors cursor-pointer border border-orange-200"
+                      >
+                        Rincian Trantib
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1106,7 +1129,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                 <tr className="bg-slate-50/80 text-[11px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
                   <th className="py-3 px-4 text-center w-12">No</th>
                   <th className="py-3 px-4">Kepala Lingkungan</th>
-                  <th className="py-3 px-4 text-center bg-emerald-50/60 text-emerald-950 font-black">Status Mediasi & Harmonisasi</th>
+                  <th className="py-3 px-4 text-center bg-emerald-50/60 text-emerald-950 font-black">Status Mediasi &amp; Harmonisasi</th>
                   <th className="py-3 px-4 text-center">Jumlah Giat Mediasi</th>
                   <th className="py-3 px-4 max-w-md">Catatan / Uraian Penyelesaian Masalah Warga</th>
                   <th className="py-3 px-4 text-right">Aksi</th>
@@ -1134,15 +1157,13 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                       </p>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      {onSelectKeplingRiwayat && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-xs transition-colors cursor-pointer border border-emerald-200"
-                        >
-                          Riwayat
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedKeplingDetail(item)}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-xs transition-colors cursor-pointer border border-emerald-200"
+                      >
+                        Rincian Trantib
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1158,7 +1179,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                   <th className="py-3 px-4 text-center w-12">No</th>
                   <th className="py-3 px-4">Kepala Lingkungan</th>
                   <th className="py-3 px-4 text-center bg-amber-50/60 text-amber-950 font-black">Status Kesiapsiagaan Posko Trantibum</th>
-                  <th className="py-3 px-4 max-w-md">Catatan Posko & Patroli Ketertiban Umum</th>
+                  <th className="py-3 px-4 max-w-md">Catatan Posko &amp; Patroli Ketertiban Umum</th>
                   <th className="py-3 px-4 text-right">Aksi</th>
                 </tr>
               </thead>
@@ -1181,15 +1202,13 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                       </p>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      {onSelectKeplingRiwayat && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
-                          className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-200"
-                        >
-                          Riwayat
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedKeplingDetail(item)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-200"
+                      >
+                        Rincian Trantib
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1205,7 +1224,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                   <th className="py-3 px-4 text-center w-12">No</th>
                   <th className="py-3 px-4">Kepala Lingkungan</th>
                   <th className="py-3 px-4 text-center bg-emerald-50/60 text-emerald-950 font-black">Status Posko Bersemi</th>
-                  <th className="py-3 px-4 max-w-md">Catatan Keasrian & Operasional Posko Bersemi</th>
+                  <th className="py-3 px-4 max-w-md">Catatan Keasrian &amp; Operasional Posko Bersemi</th>
                   <th className="py-3 px-4 text-right">Aksi</th>
                 </tr>
               </thead>
@@ -1228,15 +1247,13 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                       </p>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      {onSelectKeplingRiwayat && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-xs transition-colors cursor-pointer border border-emerald-200"
-                        >
-                          Riwayat
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedKeplingDetail(item)}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-xs transition-colors cursor-pointer border border-emerald-200"
+                      >
+                        Rincian Trantib
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1251,9 +1268,9 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                 <tr className="bg-slate-50/80 text-[11px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
                   <th className="py-3 px-4 text-center w-12">No</th>
                   <th className="py-3 px-4">Kepala Lingkungan</th>
-                  <th className="py-3 px-4 text-center bg-blue-50/60 text-blue-950 font-black">Status Kebersihan & Sampah</th>
+                  <th className="py-3 px-4 text-center bg-blue-50/60 text-blue-950 font-black">Status Kebersihan &amp; Sampah</th>
                   <th className="py-3 px-4 text-center">Giat Gotong Royong</th>
-                  <th className="py-3 px-4 max-w-md">Catatan Timbulan Sampah & Saluran Air</th>
+                  <th className="py-3 px-4 max-w-md">Catatan Timbulan Sampah &amp; Saluran Air</th>
                   <th className="py-3 px-4 text-right">Aksi</th>
                 </tr>
               </thead>
@@ -1279,15 +1296,13 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                       </p>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      {onSelectKeplingRiwayat && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
-                          className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-xs transition-colors cursor-pointer border border-blue-200"
-                        >
-                          Riwayat
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedKeplingDetail(item)}
+                        className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-xs transition-colors cursor-pointer border border-blue-200"
+                      >
+                        Rincian Trantib
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1303,7 +1318,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                   <th className="py-3 px-4 text-center w-12">No</th>
                   <th className="py-3 px-4">Kepala Lingkungan</th>
                   <th className="py-3 px-4 text-center bg-amber-50/60 text-amber-950 font-black">Indikator Faktor 74</th>
-                  <th className="py-3 px-4 max-w-md">Catatan Inspeksi Aspek Trantibum & Keamanan Wilayah</th>
+                  <th className="py-3 px-4 max-w-md">Catatan Inspeksi Aspek Trantibum &amp; Keamanan Wilayah</th>
                   <th className="py-3 px-4 text-right">Aksi</th>
                 </tr>
               </thead>
@@ -1326,15 +1341,13 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                       </p>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      {onSelectKeplingRiwayat && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
-                          className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-200"
-                        >
-                          Riwayat
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedKeplingDetail(item)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-200"
+                      >
+                        Rincian Trantib
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1487,6 +1500,151 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL DETAIL TRANTIB KEPLING */}
+      {selectedKeplingDetail && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-amber-200 shadow-2xl custom-scrollbar">
+            {/* Header Modal */}
+            <div className="p-5 bg-gradient-to-r from-amber-900 via-slate-900 to-amber-950 text-white rounded-t-3xl flex items-center justify-between sticky top-0 z-10">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-2xl bg-amber-500/20 border border-amber-400/30 text-amber-300">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">
+                    {selectedKeplingDetail.kepling.nama}
+                  </h3>
+                  <p className="text-xs text-amber-300 font-medium">
+                    {selectedKeplingDetail.kepling.lingkungan} • Seksi Ketentraman &amp; Ketertiban Umum
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedKeplingDetail(null)}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-xs text-slate-800">
+              {/* Bidang 1: Poskamling & Siskamling */}
+              <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-amber-950 flex items-center gap-2 text-xs">
+                    <ShieldAlert className="w-4 h-4 text-amber-700" />
+                    1. Operasional Poskamling &amp; Siskamling
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-600 text-white font-bold text-[10px]">
+                    {selectedKeplingDetail.poskamlingStatus}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-700">
+                  <div>📍 Lokasi: <b>{selectedKeplingDetail.poskamlingLokasi}</b></div>
+                  <div>👥 Petugas: <b>{selectedKeplingDetail.poskamlingPetugas}</b> ({selectedKeplingDetail.poskamlingJumlahPetugas || '4'} Orang)</div>
+                  <div>⏰ Jam Operasional: <b>{selectedKeplingDetail.poskamlingJamOperasional || '21.00 - 04.00 WIB'}</b></div>
+                  <div>📆 Laporan Terakhir: <b>{selectedKeplingDetail.latestDate}</b></div>
+                </div>
+                <div className="bg-white p-2.5 rounded-xl border border-amber-200 text-slate-700 italic">
+                  "{selectedKeplingDetail.poskamlingNote}"
+                </div>
+
+                {/* Photos for Poskamling */}
+                {selectedKeplingDetail.poskamlingPhotos.length > 0 && (
+                  <div className="pt-2">
+                    <span className="font-bold text-amber-900 block mb-1.5">📷 Foto Dokumentasi Ronda Malam ({selectedKeplingDetail.poskamlingPhotos.length}):</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {selectedKeplingDetail.poskamlingPhotos.slice(0, 6).map((foto, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() =>
+                            setPreviewImage({
+                              url: foto.url,
+                              title: `Dokumentasi Siskamling ${selectedKeplingDetail.kepling.lingkungan}`,
+                              date: foto.date,
+                              kepling: selectedKeplingDetail.kepling.nama,
+                              status: selectedKeplingDetail.poskamlingStatus,
+                              location: selectedKeplingDetail.poskamlingLokasi,
+                              notes: selectedKeplingDetail.poskamlingNote,
+                            })
+                          }
+                          className="group relative h-24 rounded-xl overflow-hidden border border-amber-300 bg-slate-100 cursor-pointer"
+                        >
+                          <img src={foto.url} alt={foto.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
+                            <Eye className="w-4 h-4" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bidang 2: Posko Trantibum */}
+              <div className="p-4 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-indigo-950 flex items-center gap-2 text-xs">
+                    <Radio className="w-4 h-4 text-indigo-700" />
+                    2. Kesiapsiagaan Posko Trantibum
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white font-bold text-[10px]">
+                    {selectedKeplingDetail.poskoTrantibStatus}
+                  </span>
+                </div>
+                <p className="text-slate-700 text-[11px] bg-white p-2.5 rounded-xl border border-indigo-200">
+                  {selectedKeplingDetail.poskoTrantibNote}
+                </p>
+              </div>
+
+              {/* Bidang 3: Pemantauan Kebersihan */}
+              <div className="p-4 bg-cyan-50/70 border border-cyan-200 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-cyan-950 flex items-center gap-2 text-xs">
+                    <Trash2 className="w-4 h-4 text-cyan-700" />
+                    3. Pemantauan Kebersihan &amp; Sampah
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-cyan-600 text-white font-bold text-[10px]">
+                    {selectedKeplingDetail.kebersihanStatus}
+                  </span>
+                </div>
+                <p className="text-slate-700 text-[11px] bg-white p-2.5 rounded-xl border border-cyan-200">
+                  {selectedKeplingDetail.kebersihanNote}
+                </p>
+              </div>
+
+              {/* Bidang 4: Infrastruktur & Patam / Faktor Trantib */}
+              <div className="p-4 bg-orange-50/70 border border-orange-200 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-orange-950 flex items-center gap-2 text-xs">
+                    <Wrench className="w-4 h-4 text-orange-700" />
+                    4. Infrastruktur Wilayah &amp; Patroli Malam (Patam)
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-orange-600 text-white font-bold text-[10px]">
+                    {selectedKeplingDetail.infraSubjek}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-700 space-y-1">
+                  <div>📍 Lokasi: <b>{selectedKeplingDetail.infraLokasi}</b></div>
+                  <div className="bg-white p-2.5 rounded-xl border border-orange-200">{selectedKeplingDetail.infraNote}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 rounded-b-3xl flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedKeplingDetail(null)}
+                className="px-5 py-2 rounded-xl bg-slate-900 text-white font-black text-xs hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Tutup Detail
+              </button>
             </div>
           </div>
         </div>

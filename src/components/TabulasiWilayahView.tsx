@@ -562,12 +562,12 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
         ['Kelompok Anak & Balita (0-17 Thn)', kelurahanMacroStats.totalAnak, 'Jiwa', '-'],
         [],
         ['TINGKAT KESEJAHTERAAN KELUARGA (DESIL)', '', '', ''],
-        ['Desil 1 (Sangat Miskin)', kelurahanMacroStats.desil1, 'KK', `${Math.round((kelurahanMacroStats.desil1 / (kelurahanMacroStats.totalKk || 1)) * 100)}% - Prioritas Utama PKH`],
-        ['Desil 2 (Miskin)', kelurahanMacroStats.desil2, 'KK', `${Math.round((kelurahanMacroStats.desil2 / (kelurahanMacroStats.totalKk || 1)) * 100)}% - Bantuan Pangan BPNT`],
-        ['Desil 3 (Hampir Miskin)', kelurahanMacroStats.desil3, 'KK', `${Math.round((kelurahanMacroStats.desil3 / (kelurahanMacroStats.totalKk || 1)) * 100)}% - PBI-JK & Bantuan Modal`],
-        ['Desil 4 (Rentan Miskin)', kelurahanMacroStats.desil4, 'KK', `${Math.round((kelurahanMacroStats.desil4 / (kelurahanMacroStats.totalKk || 1)) * 100)}% - BLT & Pelatihan Kerja`],
-        ['Desil 5 (Menengah Bawah)', kelurahanMacroStats.desil5, 'KK', `${Math.round((kelurahanMacroStats.desil5 / (kelurahanMacroStats.totalKk || 1)) * 100)}% - Fasilitasi UMKM`],
-        ['Desil 6-10 (Mampu / Non-Desil)', kelurahanMacroStats.desil6Plus, 'KK', `${Math.round((kelurahanMacroStats.desil6Plus / (kelurahanMacroStats.totalKk || 1)) * 100)}% - Mandiri`],
+        ['Desil 1', kelurahanMacroStats.desil1, 'KK', `${Math.round((kelurahanMacroStats.desil1 / (kelurahanMacroStats.totalKk || 1)) * 100)}% - Prioritas Utama PKH`],
+        ['Desil 2', kelurahanMacroStats.desil2, 'KK', `${Math.round((kelurahanMacroStats.desil2 / (kelurahanMacroStats.totalKk || 1)) * 100)}% - Bantuan Pangan BPNT`],
+        ['Desil 3', kelurahanMacroStats.desil3, 'KK', `${Math.round((kelurahanMacroStats.desil3 / (kelurahanMacroStats.totalKk || 1)) * 100)}% - PBI-JK & Bantuan Modal`],
+        ['Desil 4', kelurahanMacroStats.desil4, 'KK', `${Math.round((kelurahanMacroStats.desil4 / (kelurahanMacroStats.totalKk || 1)) * 100)}% - BLT & Pelatihan Kerja`],
+        ['Desil 5', kelurahanMacroStats.desil5, 'KK', `${Math.round((kelurahanMacroStats.desil5 / (kelurahanMacroStats.totalKk || 1)) * 100)}% - Fasilitasi UMKM`],
+        ['Desil 6-10', kelurahanMacroStats.desil6Plus, 'KK', `${Math.round((kelurahanMacroStats.desil6Plus / (kelurahanMacroStats.totalKk || 1)) * 100)}% - Mandiri`],
         [],
         ['PROGRAM BANTUAN SOSIAL TERDATA', '', '', ''],
         ['PKH Medan Makmur (Pemko Medan)', kelurahanMacroStats.pkhMedanMakmur, 'KK', 'Bantuan Unggulan Pemko Medan'],
@@ -592,7 +592,7 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
         ['PAJAK & RETRIBUSI KEBERSIHAN', '', '', ''],
         ['PBB Lunas', kelurahanMacroStats.pbbLunas, 'KK', `${Math.round((kelurahanMacroStats.pbbLunas / (kelurahanMacroStats.totalKk || 1)) * 100)}%`],
         ['PBB Belum Lunas', kelurahanMacroStats.pbbBelum, 'KK', '-'],
-        ['WRS (Wajib Retribusi Sampah) Aktif', kelurahanMacroStats.wrsAktif, 'KK', `${Math.round((kelurahanMacroStats.wrsAktif / (kelurahanMacroStats.totalKk || 1)) * 100)}% Kepatuhan`],
+        ['WRS (Wajib Retribusi Sampah) Aktif', kelurahanMacroStats.wrsAktif, 'Bangunan', `${Math.round((kelurahanMacroStats.wrsAktif / (kelurahanMacroStats.totalKk || 1)) * 100)}% Kepatuhan`],
       ];
       const ws1 = XLSX.utils.aoa_to_sheet(s1Data);
       XLSX.utils.book_append_sheet(wb, ws1, 'Rekap_Kelurahan');
@@ -629,7 +629,7 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
           'Risiko Stunting',
           'PBB Lunas (KK)',
           '% PBB Lunas',
-          'WRS Aktif (KK)',
+          'WRS Aktif (Bangunan)',
           '% WRS Aktif',
           'Total Ruas Jalan',
           'Jalan Rusak',
@@ -1375,7 +1375,7 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-xs font-bold text-slate-800">🗑️ Pembuangan Sampah &amp; Tangki Septik</span>
                     <span className="text-xs font-black text-emerald-800">
-                      {kelurahanMacroStats.sampahPetugasWrs} KK Petugas/WRS
+                      {kelurahanMacroStats.sampahPetugasWrs} Bangunan Petugas/WRS
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 text-[10px] mt-1.5">

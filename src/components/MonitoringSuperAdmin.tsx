@@ -1990,7 +1990,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                     <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
                       <span>{item.totalJiwa} Jiwa</span>
                       <span>•</span>
-                      <span>WRS: {item.wrsAktif} Aktif</span>
+                      <span>WRS: {item.wrsAktif} Bangunan</span>
                     </div>
                   </div>
 
@@ -2169,7 +2169,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                       </td>
                       <td className="py-3 px-3 text-center whitespace-nowrap">
                         <span className="font-bold text-amber-900">
-                          {item.wrsAktif} KK ({item.persenWrsAktif}%)
+                          {item.wrsAktif} Bangunan ({item.persenWrsAktif}%)
                         </span>
                         {item.potensiRetribusiWrs > 0 && (
                           <span className="text-[10px] text-emerald-700 block font-semibold">

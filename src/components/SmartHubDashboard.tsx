@@ -21,6 +21,7 @@ import {
   Clock,
   Plus,
   FileSpreadsheet,
+  Wrench,
 } from 'lucide-react';
 import { UserAccount, LaporanHarianItem, AbsenApelItem } from '../types';
 import { DeadlineNotifAlert } from './DeadlineNotifAlert';
@@ -39,7 +40,7 @@ interface SmartHubDashboardProps {
   activeAccount: UserAccount;
   reports: LaporanHarianItem[];
   attendanceList: AbsenApelItem[];
-  onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb') => void;
+  onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan') => void;
   onOpenAbsenApel: () => void;
   onOpenPPTModal: () => void;
   onOpenUpdateModal?: () => void;
@@ -307,6 +308,17 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
           badge: 'DATA KELUARGA',
           badgeColor: 'bg-blue-100 text-blue-900',
           action: () => onNavigate('database_keluarga')
+        },
+        {
+          id: 'realisasi_pembangunan',
+          title: 'Realisasi Pembangunan Infrastruktur',
+          desc: 'Monitoring realisasi perbaikan jalan, normalisasi drainase, perbaikan lampu LPJU, dan penambahan tiang LPJU baru.',
+          category: 'pemetaan',
+          icon: Wrench,
+          iconBg: 'bg-indigo-50 text-indigo-700',
+          badge: 'PEMBANGUNAN',
+          badgeColor: 'bg-indigo-100 text-indigo-900',
+          action: () => onNavigate('realisasi_pembangunan')
         },
         {
           id: 'kunjungan',

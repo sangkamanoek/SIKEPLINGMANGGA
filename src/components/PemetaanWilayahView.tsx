@@ -148,7 +148,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     }
   }, [initialLingkunganFilter]);
   const [filterTheme, setFilterTheme] = useState<
-    'ALL' | 'WRS' | 'PBB' | 'BANSOS' | 'JALAN' | 'HEATMAP' | 'FASUM' | 'IBADAH' | 'SEKOLAH' | 'FASKES' | 'SPBU' | 'USAHA'
+    'ALL' | 'WRS' | 'PBB' | 'BANSOS' | 'JALAN' | 'HEATMAP' | 'FASUM' | 'IBADAH' | 'SEKOLAH' | 'FASKES' | 'SPBU' | 'USAHA' | 'WNA'
   >('ALL');
   const [reports, setReports] = useState<any[]>([]);
   const [loadingReports, setLoadingReports] = useState<boolean>(false);
@@ -241,6 +241,8 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     nikKk: '',
     isKkMangga: true,
     asalKk: 'Kelurahan Mangga',
+    kewarganegaraan: 'WNI',
+    negaraAsalWna: '',
     lat: '' as number | string,
     lng: '' as number | string,
     jumlahJiwa: '' as number | string,
@@ -288,6 +290,8 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     nikKk: string;
     isKkMangga: boolean;
     asalKk: string;
+    kewarganegaraan: 'WNI' | 'WNA' | string;
+    negaraAsalWna: string;
     lat: number | string;
     lng: number | string;
     jumlahJiwa: number | string;
@@ -964,6 +968,9 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       if (filterTheme === 'USAHA') {
         if (cat !== 'PASAR_SARANA_EKONOMI' && cat !== 'RUMAH_USAHA' && !h.memilikiUsaha && !/pasar|bank|atm|toko|warung|minimarket|usah/i.test(nameLower)) return false;
       }
+      if (filterTheme === 'WNA') {
+        if (h.kewarganegaraan !== 'WNA' && !/wna|asing|paspor|foreign/i.test(h.asalKk || '') && !/wna|asing/i.test(h.catatan || '')) return false;
+      }
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         return (
@@ -1035,6 +1042,9 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       } else if (filterTheme === 'BANSOS') {
         markerColor = '#8b5cf6';
         iconSymbol = '🎁';
+      } else if (filterTheme === 'WNA' || h.kewarganegaraan === 'WNA') {
+        markerColor = '#7c3aed'; // Deep purple for WNA
+        iconSymbol = '🌐';
       } else {
         // Mode 'ALL'
         if (h.statusWrs === 'BELUM_MENOLAK') {
@@ -1098,6 +1108,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
             PBB: <span style="color: ${h.statusPbb === 'LUNAS' ? '#059669' : '#dc2626'}">${h.statusPbb || 'BELUM_LUNAS'}</span>
           </div>
           ${h.nopPbb ? `<div style="color: #475569; font-size: 10px; margin-top: 2px;">NOP: <b>${h.nopPbb}</b> (Rp ${(h.nominalPbb || 0).toLocaleString('id-ID')})</div>` : ''}
+          ${h.kewarganegaraan === 'WNA' ? `<div style="color: #7c3aed; font-size: 10px; font-weight: bold; margin-top: 2px;">🌐 WNA: ${h.negaraAsalWna || 'Warga Negara Asing'}</div>` : ''}
           ${h.penerimaBansos ? `<div style="color: #7c3aed; font-size: 10px; font-weight: bold; margin-top: 2px;">🎁 Bansos: ${h.jenisBansos?.join(', ') || 'Ya'}</div>` : ''}
         </div>
       `,
@@ -1147,7 +1158,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
     const wrsAktif = activeHouses.filter((h) => h.statusWrs === 'AKTIF').length;
     const wrsBelum = activeHouses.filter((h) => h.statusWrs === 'BELUM_MENOLAK').length;
-    const wrsPersen = totalKk > 0 ? Math.round((wrsAktif / totalKk) * 100) : 0;
+    const wrsPersen = activeHouses.length > 0 ? Math.round((wrsAktif / activeHouses.length) * 100) : 0;
 
     // PBB Statistics
     const pbbLunasKk = activeHouses.filter((h) => h.statusPbb === 'LUNAS').length;
@@ -1160,6 +1171,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     const pbbPersen = totalKk > 0 ? Math.round((pbbLunasKk / totalKk) * 100) : 0;
 
     const bansosKk = activeHouses.filter((h) => h.penerimaBansos).length;
+    const totalWna = activeHouses.filter((h) => h.kewarganegaraan === 'WNA' || /wna|asing|paspor/i.test(h.asalKk || '')).length;
 
     // Public Facilities & Infrastructure Breakdown
     let totalMasjid = 0;
@@ -1259,6 +1271,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       pbbNominalTarget,
       pbbPersen,
       bansosKk,
+      totalWna,
       totalFasilitasPublik,
       totalMasjid,
       totalGereja,
@@ -1538,6 +1551,8 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
         nikKk: isResidential ? houseForm.nikKk : undefined,
         isKkMangga: isResidential ? (houseForm.isKkMangga !== false) : false,
         asalKk: isResidential ? (houseForm.isKkMangga ? 'Kelurahan Mangga' : (houseForm.asalKk || 'Luar Kelurahan Mangga')) : 'Fasilitas Publik / Tempat Usaha',
+        kewarganegaraan: houseForm.kewarganegaraan || 'WNI',
+        negaraAsalWna: houseForm.kewarganegaraan === 'WNA' ? (houseForm.negaraAsalWna || 'Paspor/Asing') : undefined,
         lat: Number(houseForm.lat) || KELURAHAN_MANGGA_CENTER[0],
         lng: Number(houseForm.lng) || KELURAHAN_MANGGA_CENTER[1],
         jumlahJiwa: isResidential ? ((Number(houseForm.jumlahLakiLaki) || 0) + (Number(houseForm.jumlahPerempuan) || 0) || 1) : 0,
@@ -1547,10 +1562,10 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
         jumlahAnak: isResidential ? (Number(houseForm.jumlahAnak) || 0) : 0,
         pekerjaanKk: isResidential ? houseForm.pekerjaanKk : (houseForm.jenisFasilitas || 'Fasilitas / Usaha'),
         // Tingkat Kesejahteraan & Bansos (Data Utama)
-        desilKesejahteraan: isResidential ? houseForm.desilKesejahteraan : undefined,
-        desilBansos: isResidential ? (houseForm.desilKesejahteraan || houseForm.desilBansos) : undefined,
-        penerimaBansos: isResidential ? (houseForm.penerimaBansos || (!!houseForm.desilKesejahteraan && !houseForm.desilKesejahteraan.includes('Desil 6'))) : false,
-        jenisBansos: isResidential ? houseForm.jenisBansos : undefined,
+        desilKesejahteraan: isResidential && houseForm.kewarganegaraan !== 'WNA' ? houseForm.desilKesejahteraan : undefined,
+        desilBansos: isResidential && houseForm.kewarganegaraan !== 'WNA' ? (houseForm.desilKesejahteraan || houseForm.desilBansos) : undefined,
+        penerimaBansos: isResidential && houseForm.kewarganegaraan !== 'WNA' ? (houseForm.penerimaBansos || (!!houseForm.desilKesejahteraan && !houseForm.desilKesejahteraan.includes('Desil 6'))) : false,
+        jenisBansos: isResidential && houseForm.kewarganegaraan !== 'WNA' ? houseForm.jenisBansos : [],
         kategoriRentan: isResidential ? (houseForm.kategoriRentan || houseForm.statusStuntingRentan !== 'Bebas Risiko Stunting') : false,
         // Sanitasi & Kesehatan Lingkungan Keluarga
         jambanKeluarga: isResidential ? houseForm.jambanKeluarga : undefined,
@@ -1718,6 +1733,8 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       'Nama Jalan': h.namaJalan,
       'No. Rumah': h.nomorRumah,
       'Nama Kepala Keluarga': h.namaKepalaKeluarga,
+      Kewarganegaraan: h.kewarganegaraan || 'WNI',
+      'Negara Asal WNA': h.negaraAsalWna || '-',
       'Status KK': h.isKkMangga !== false ? 'KK Kelurahan Mangga' : 'Bukan KK Kelurahan Mangga',
       'Asal KK / Domisili': h.asalKk || (h.isKkMangga !== false ? 'Kelurahan Mangga' : 'Luar'),
       'NIK KK': h.nikKk || '-',
@@ -2098,7 +2115,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       ) : (
         <>
           {/* STATS ROLL-UP CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
         {/* KK */}
         <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between">
@@ -2129,7 +2146,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
             <span className="text-[10px] font-black uppercase text-emerald-700">WRS Aktif</span>
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
           </div>
-          <p className="text-lg font-black text-emerald-800 mt-1">{stats.wrsAktif} KK</p>
+          <p className="text-lg font-black text-emerald-800 mt-1">{stats.wrsAktif} Bangunan</p>
           <span className="text-[9px] text-emerald-600 font-bold">
             {stats.wrsPersen}% Kepatuhan WRS
           </span>
@@ -2157,7 +2174,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
           </div>
           <p className="text-lg font-black text-rose-800 mt-1">{stats.pbbBelumKk} PBB</p>
           <span className="text-[9px] text-rose-600 font-medium">
-            {stats.wrsBelum} Belum WRS
+            {stats.wrsBelum} Bangunan Belum WRS
           </span>
         </div>
 
@@ -2169,6 +2186,16 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
           </div>
           <p className="text-lg font-black text-purple-900 mt-1">{stats.bansosKk} KK</p>
           <span className="text-[9px] text-purple-600 font-medium">PKH / BPNT / BLT</span>
+        </div>
+
+        {/* WNA (Warga Negara Asing) */}
+        <div className="bg-white p-3 rounded-2xl border border-purple-300 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase text-purple-800">WNA</span>
+            <span className="text-xs">🌐</span>
+          </div>
+          <p className="text-lg font-black text-purple-900 mt-1">{stats.totalWna} Tempat</p>
+          <span className="text-[9px] text-purple-700 font-bold">Warga Negara Asing</span>
         </div>
 
         {/* Jalan */}
@@ -2412,6 +2439,17 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
             </button>
             <button
               type="button"
+              onClick={() => setFilterTheme('WNA')}
+              className={`px-2.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                filterTheme === 'WNA'
+                  ? 'bg-indigo-700 text-white shadow-xs ring-2 ring-indigo-400'
+                  : 'text-indigo-800 hover:bg-indigo-50'
+              }`}
+            >
+              🌐 Fokus WNA
+            </button>
+            <button
+              type="button"
               onClick={() => setFilterTheme('JALAN')}
               className={`px-2.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                 filterTheme === 'JALAN'
@@ -2650,18 +2688,29 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                     return (
                       <>
                         <div className="flex justify-between items-center bg-blue-50/70 p-2 rounded-xl border border-blue-100">
-                          <span className="text-slate-600 font-medium">Status KK:</span>
-                          <span
-                            className={`font-black px-2 py-0.5 rounded text-[10px] ${
-                              selectedHouse.isKkMangga !== false
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}
-                          >
-                            {selectedHouse.isKkMangga !== false
-                              ? '🏠 KK Kelurahan Mangga'
-                              : `🌐 Bukan KK Mangga ${selectedHouse.asalKk && selectedHouse.asalKk !== 'Luar Kelurahan Mangga' ? `(${selectedHouse.asalKk})` : ''}`}
-                          </span>
+                          <span className="text-slate-600 font-medium">Status KK & Kewarganegaraan:</span>
+                          <div className="flex items-center gap-1 flex-wrap justify-end">
+                            {selectedHouse.kewarganegaraan === 'WNA' ? (
+                              <span className="font-black px-2 py-0.5 rounded text-[10px] bg-purple-700 text-white shadow-2xs">
+                                🌐 WNA ({selectedHouse.negaraAsalWna || 'Warga Negara Asing'})
+                              </span>
+                            ) : (
+                              <span className="font-black px-2 py-0.5 rounded text-[10px] bg-blue-700 text-white">
+                                🇮🇩 WNI
+                              </span>
+                            )}
+                            <span
+                              className={`font-black px-2 py-0.5 rounded text-[10px] ${
+                                selectedHouse.isKkMangga !== false
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {selectedHouse.isKkMangga !== false
+                                ? '🏠 KK Kelurahan Mangga'
+                                : `🌐 Bukan KK Mangga ${selectedHouse.asalKk && selectedHouse.asalKk !== 'Luar Kelurahan Mangga' ? `(${selectedHouse.asalKk})` : ''}`}
+                            </span>
+                          </div>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">NIK KK:</span>
@@ -2926,6 +2975,8 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                       luasBangunanM2: selectedHouse.luasBangunanM2 !== undefined ? selectedHouse.luasBangunanM2 : '',
                       isKkMangga: selectedHouse.isKkMangga !== false,
                       asalKk: selectedHouse.asalKk || (selectedHouse.isKkMangga !== false ? 'Kelurahan Mangga' : 'Luar Kelurahan Mangga'),
+                      kewarganegaraan: selectedHouse.kewarganegaraan || 'WNI',
+                      negaraAsalWna: selectedHouse.negaraAsalWna || '',
                       kategoriBangunan: selectedHouse.kategoriBangunan || 'RUMAH_TINGGAL',
                       jenisFasilitas: selectedHouse.jenisFasilitas || '',
                     });
@@ -3576,10 +3627,11 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
               {/* STATUS KARTU KELUARGA (HANYA UNTUK RUMAH TINGGAL) */}
               {houseForm.kategoriBangunan === 'RUMAH_TINGGAL' ? (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl space-y-2">
-                  <label className="block font-black text-blue-950 text-xs">
-                    🪪 Domisili / Status Kartu Keluarga (KK):
-                  </label>
+                <>
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl space-y-2">
+                    <label className="block font-black text-blue-950 text-xs">
+                      🪪 Domisili / Status Kartu Keluarga (KK):
+                    </label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
@@ -3644,6 +3696,80 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                     </div>
                   )}
                 </div>
+
+                {/* STATUS KEWARGANEGARAAN (WNI / WNA) */}
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-2xl space-y-2">
+                  <label className="block font-black text-purple-950 text-xs">
+                    🌐 Status Kewarganegaraan:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setHouseForm((prev) => ({
+                          ...prev,
+                          kewarganegaraan: 'WNI',
+                          negaraAsalWna: '',
+                        }))
+                      }
+                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                        houseForm.kewarganegaraan !== 'WNA'
+                          ? 'bg-purple-800 text-white border-purple-800 shadow-sm'
+                          : 'bg-white text-purple-900 border-purple-200 hover:bg-purple-100'
+                      }`}
+                    >
+                      <span className="text-base">🇮🇩</span>
+                      <div>
+                        <div>WNI (Warga Negara Indonesia)</div>
+                        <div className={`text-[10px] font-normal ${houseForm.kewarganegaraan !== 'WNA' ? 'text-purple-100' : 'text-slate-500'}`}>
+                          Masyarakat Indonesia
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setHouseForm((prev) => ({
+                          ...prev,
+                          kewarganegaraan: 'WNA',
+                          desilKesejahteraan: '',
+                          desilBansos: '',
+                          penerimaBansos: false,
+                          jenisBansos: [],
+                        }))
+                      }
+                      className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                        houseForm.kewarganegaraan === 'WNA'
+                          ? 'bg-rose-700 text-white border-rose-800 shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="text-base">🌐</span>
+                      <div>
+                        <div>WNA (Warga Negara Asing)</div>
+                        <div className={`text-[10px] font-normal ${houseForm.kewarganegaraan === 'WNA' ? 'text-rose-100' : 'text-slate-500'}`}>
+                          Warga Asing / Paspor
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+
+                  {houseForm.kewarganegaraan === 'WNA' && (
+                    <div className="pt-2 border-t border-purple-200 animate-fade-in">
+                      <label className="block font-bold text-purple-950 mb-1 text-[11px]">
+                        Negara Asal / Paspor WNA:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="contoh: Malaysia, Singapura, China, India, USA, dll."
+                        value={houseForm.negaraAsalWna}
+                        onChange={(e) => setHouseForm((prev) => ({ ...prev, negaraAsalWna: e.target.value }))}
+                        className="w-full p-2.5 rounded-xl border border-purple-300 bg-white text-xs font-bold text-purple-950 focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              </>
               ) : (
                 <div className="p-2.5 bg-slate-100 border border-slate-300/80 rounded-2xl flex items-center gap-2 text-slate-700 text-[11px]">
                   <span className="text-base shrink-0">ℹ️</span>
@@ -3998,46 +4124,61 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                 </div>
 
                 {/* Desil Selector Buttons */}
-                <div>
-                  <label className="block font-bold text-xs text-purple-900 mb-1.5">
-                    Pilih Kategori Desil Kesejahteraan:
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                    {[
-                      { id: 'Desil 1 (Sangat Miskin)', label: 'Desil 1 (Sangat Miskin)', color: 'border-rose-300 hover:bg-rose-50' },
-                      { id: 'Desil 2 (Miskin)', label: 'Desil 2 (Miskin)', color: 'border-rose-300 hover:bg-rose-50' },
-                      { id: 'Desil 3 (Hampir Miskin)', label: 'Desil 3 (Hampir Miskin)', color: 'border-amber-300 hover:bg-amber-50' },
-                      { id: 'Desil 4 (Rentan Miskin)', label: 'Desil 4 (Rentan Miskin)', color: 'border-amber-300 hover:bg-amber-50' },
-                      { id: 'Desil 5 (Menengah Bawah)', label: 'Desil 5 (Menengah Bawah)', color: 'border-blue-300 hover:bg-blue-50' },
-                      { id: 'Desil 6-10 (Mampu / Non-Desil)', label: 'Desil 6-10 (Mampu)', color: 'border-slate-300 hover:bg-slate-100' },
-                    ].map((d) => {
-                      const isSelected = houseForm.desilKesejahteraan === d.id || (!houseForm.desilKesejahteraan && houseForm.desilBansos === d.id);
-                      return (
-                        <button
-                          key={d.id}
-                          type="button"
-                          onClick={() => {
-                            const isLowDesil = !d.id.includes('Desil 6');
-                            setHouseForm((prev) => ({
-                              ...prev,
-                              desilKesejahteraan: d.id,
-                              desilBansos: d.id,
-                              penerimaBansos: isLowDesil ? true : prev.penerimaBansos,
-                            }));
-                          }}
-                          className={`p-2 rounded-xl border text-xs font-bold text-left transition-all cursor-pointer flex items-center justify-between gap-1 ${
-                            isSelected
-                              ? 'bg-purple-800 text-white border-purple-800 shadow-xs scale-[1.01]'
-                              : `bg-white text-slate-700 ${d.color}`
-                          }`}
-                        >
-                          <span className="truncate">{d.label}</span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-purple-200 shrink-0" />}
-                        </button>
-                      );
-                    })}
+                {houseForm.kewarganegaraan === 'WNA' ? (
+                  <div className="p-3 bg-purple-100/80 border border-purple-300 rounded-2xl flex items-center gap-2.5 text-purple-950 text-xs">
+                    <span className="text-lg shrink-0">🌐</span>
+                    <div>
+                      <div className="font-bold">Status Kewarganegaraan WNA</div>
+                      <div className="text-[11px] text-purple-800">
+                        Otomatis tidak diminta status Desil Kesejahteraan &amp; Bantuan Sosial.
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <label className="block font-bold text-xs text-purple-900 mb-1.5">
+                      Pilih Kategori Desil Kesejahteraan:
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                      {[
+                        { id: 'Desil 1', label: 'Desil 1', color: 'border-rose-300 hover:bg-rose-50' },
+                        { id: 'Desil 2', label: 'Desil 2', color: 'border-rose-300 hover:bg-rose-50' },
+                        { id: 'Desil 3', label: 'Desil 3', color: 'border-amber-300 hover:bg-amber-50' },
+                        { id: 'Desil 4', label: 'Desil 4', color: 'border-amber-300 hover:bg-amber-50' },
+                        { id: 'Desil 5', label: 'Desil 5', color: 'border-blue-300 hover:bg-blue-50' },
+                        { id: 'Desil 6-10', label: 'Desil 6-10', color: 'border-slate-300 hover:bg-slate-100' },
+                      ].map((d) => {
+                        const isSelected =
+                          houseForm.desilKesejahteraan === d.id ||
+                          (!houseForm.desilKesejahteraan && houseForm.desilBansos === d.id) ||
+                          (!!houseForm.desilKesejahteraan && houseForm.desilKesejahteraan.startsWith(d.id));
+                        return (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => {
+                              const isLowDesil = !d.id.includes('Desil 6');
+                              setHouseForm((prev) => ({
+                                ...prev,
+                                desilKesejahteraan: d.id,
+                                desilBansos: d.id,
+                                penerimaBansos: isLowDesil ? true : prev.penerimaBansos,
+                              }));
+                            }}
+                            className={`p-2 rounded-xl border text-xs font-bold text-left transition-all cursor-pointer flex items-center justify-between gap-1 ${
+                              isSelected
+                                ? 'bg-purple-800 text-white border-purple-800 shadow-xs scale-[1.01]'
+                                : `bg-white text-slate-700 ${d.color}`
+                            }`}
+                          >
+                            <span className="truncate">{d.label}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-purple-200 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Conditional Pilihan Bantuan yang Diterima (Desil 1 s/d 5 otomatis muncul) */}
                 {(houseForm.penerimaBansos || (houseForm.desilKesejahteraan && !houseForm.desilKesejahteraan.includes('Desil 6'))) && (

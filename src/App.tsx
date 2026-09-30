@@ -12,9 +12,11 @@ import {
   UserCheck,
   Users,
   Compass,
+  Wrench,
 } from 'lucide-react';
 import ViewImagesPage from './components/ViewImagesPage';
 import { KunjunganHarianView } from './components/KunjunganHarianView';
+import { RealisasiPembangunanView } from './components/RealisasiPembangunanView';
 import { GoogleUser, SheetMetadata, LaporanHarianItem, UserAccount, TargetsCapaianMap, isKelurahanAdmin } from './types';
 import { safeSetLocalStorage, safeSetSessionStorage } from './lib/safeStorage';
 import {
@@ -165,9 +167,9 @@ export default function App() {
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
 
-  // Active view tab: hub | form | capaian | monitoring | capaian_admin | riwayat | kunjungan | dashboard_kasi | kegiatan_khusus | pemetaan | rekap_pbb | database_keluarga
+  // Active view tab: hub | form | capaian | monitoring | capaian_admin | riwayat | kunjungan | dashboard_kasi | kegiatan_khusus | pemetaan | rekap_pbb | database_keluarga | realisasi_pembangunan
   const [activeTab, setActiveTab] = useState<
-    'hub' | 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb' | 'database_keluarga'
+    'hub' | 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan'
   >('hub');
 
   // Sub-mode untuk tab 'form' bagi Super Admin: 'rangkuman' (default) atau 'formulir' (asistensi)
@@ -1040,6 +1042,24 @@ export default function App() {
                   </span>
                 </button>
 
+                {/* Kepling Tab Realisasi Pembangunan */}
+                <button
+                  id="tab-pembangunan-kepling"
+                  type="button"
+                  onClick={() => setActiveTab('realisasi_pembangunan')}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                    activeTab === 'realisasi_pembangunan'
+                      ? 'bg-blue-700 text-white shadow-md shadow-blue-700/10 scale-[1.02] font-black'
+                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                  }`}
+                >
+                  <Wrench className={`w-4 h-4 ${activeTab === 'realisasi_pembangunan' ? 'text-white' : 'text-blue-700'}`} />
+                  <span>Realisasi Pembangunan</span>
+                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'realisasi_pembangunan' ? 'bg-blue-800 text-blue-100' : 'bg-blue-100 text-blue-900'}`}>
+                    INFRA
+                  </span>
+                </button>
+
                 {/* Kepling Tab 2: Dashboard Capaian Saya */}
                 <button
                   id="tab-capaian-kepling"
@@ -1159,6 +1179,25 @@ export default function App() {
                   </button>
                 )}
 
+                {activeAccount.role === 'kasi_pembangunan' && (
+                  <button
+                    id="tab-pembangunan-kasi"
+                    type="button"
+                    onClick={() => setActiveTab('realisasi_pembangunan')}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                      activeTab === 'realisasi_pembangunan'
+                        ? 'bg-blue-700 text-white shadow-md shadow-blue-700/10 scale-[1.02] font-black'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                    }`}
+                  >
+                    <Wrench className={`w-4 h-4 ${activeTab === 'realisasi_pembangunan' ? 'text-white' : 'text-blue-700'}`} />
+                    <span>Realisasi Pembangunan</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'realisasi_pembangunan' ? 'bg-blue-800 text-blue-100' : 'bg-blue-100 text-blue-900'}`}>
+                      INFRA
+                    </span>
+                  </button>
+                )}
+
                 {activeAccount.role === 'super_admin' && (
                   <>
                     {/* Super Admin Tab 1: Monitoring 24 Kepling */}
@@ -1253,6 +1292,24 @@ export default function App() {
                       <span>WebGIS &amp; WRS</span>
                       <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'pemetaan' ? 'bg-emerald-700 text-emerald-100' : 'bg-amber-400 text-slate-950 shadow-3xs'}`}>
                         PETA 24
+                      </span>
+                    </button>
+
+                    {/* Super Admin Tab Realisasi Pembangunan */}
+                    <button
+                      id="tab-pembangunan-admin"
+                      type="button"
+                      onClick={() => setActiveTab('realisasi_pembangunan')}
+                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                        activeTab === 'realisasi_pembangunan'
+                          ? 'bg-blue-700 text-white shadow-md shadow-blue-700/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                      }`}
+                    >
+                      <Wrench className={`w-4 h-4 ${activeTab === 'realisasi_pembangunan' ? 'text-white' : 'text-blue-700'}`} />
+                      <span>Realisasi Pembangunan</span>
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'realisasi_pembangunan' ? 'bg-blue-800 text-blue-100' : 'bg-blue-100 text-blue-900'}`}>
+                        INFRA
                       </span>
                     </button>
 
@@ -1433,10 +1490,14 @@ export default function App() {
               <DashboardTrantibumKasi
                 reports={reports}
                 currentUser={activeAccount}
-                onSelectKeplingRiwayat={(keplingName) => {
-                  setRiwayatFilterPetugas(keplingName);
-                  setActiveTab('riwayat');
-                }}
+                onSelectKeplingRiwayat={
+                  activeAccount.role === 'super_admin'
+                    ? (keplingName) => {
+                        setRiwayatFilterPetugas(keplingName);
+                        setActiveTab('riwayat');
+                      }
+                    : undefined
+                }
               />
             )}
           </ErrorBoundary>
@@ -1690,6 +1751,13 @@ export default function App() {
                 setActiveTab('pemetaan');
               }}
             />
+          </ErrorBoundary>
+        )}
+
+        {/* Tab Realisasi Pembangunan */}
+        {activeTab === 'realisasi_pembangunan' && (
+          <ErrorBoundary fallbackTitle="Gagal Memuat Realisasi Pembangunan">
+            <RealisasiPembangunanView currentUser={activeAccount} />
           </ErrorBoundary>
         )}
       </main>
