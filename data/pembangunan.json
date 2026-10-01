@@ -1,28 +1,5 @@
 [
   {
-    "id": "pemb_2_paving",
-    "lingkunganId": "kepling_2",
-    "lingkunganNomor": 2,
-    "jenisPembangunan": "PEMASANGAN_PAVING_BLOK",
-    "namaProyek": "Pemasangan Paving Blok",
-    "lokasiDetail": "Jl. Irigasi Lk II",
-    "sumberDana": "Dinas SDABMBK Kota Medan",
-    "statusRealisasi": "SELESAI_100%",
-    "volumeRealisasi": "50 Meter",
-    "biayaEstimasiRp": 25000000,
-    "tanggalMulai": "2026-08-20",
-    "tanggalSelesai": "2026-08-24",
-    "fotoSebelumUrl": "https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?w=600&auto=format&fit=crop&q=80",
-    "fotoProsesUrl": "/src/assets/images/proses_paving_block_1790846485222.jpg",
-    "fotoProsesList": [
-      "/src/assets/images/proses_paving_block_1790846485222.jpg"
-    ],
-    "fotoSesudahUrl": "https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=600&auto=format&fit=crop&q=80",
-    "keterangan": "Pemasangan paving block rapi dan kokoh di jalan lingkungan warga.",
-    "createdAt": "2026-08-24T11:08:38.000Z",
-    "createdByName": "Zulkarnaen Tarigan (Zulkarnaen Tarigan)"
-  },
-  {
     "id": "pemb_1",
     "lingkunganId": "kepling_1",
     "lingkunganNomor": 1,
@@ -36,22 +13,72 @@
     "tanggalMulai": "2026-08-10",
     "tanggalSelesai": "2026-08-25",
     "pelaksanaTeknis": "Dinas SDABMBK & Pokmas Lingk. I",
-    "fotoSebelumUrl": "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&auto=format&fit=crop&q=80",
-    "fotoProsesUrl": "/src/assets/images/proses_aspal_jalan_1790846460460.jpg",
-    "fotoProsesList": [
-      "/src/assets/images/proses_aspal_jalan_1790846460460.jpg"
+    "fotoSebelumUrl": "/src/assets/images/awal_rusak_jalan_1790856694359.jpg",
+    "fotoSebelumList": [
+      "/src/assets/images/awal_rusak_jalan_1790856694359.jpg",
+      "/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg",
+      "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=1600&auto=format&fit=crop&q=90"
     ],
-    "fotoSesudahUrl": "https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=600&auto=format&fit=crop&q=80",
+    "fotoProsesUrl": "/src/assets/images/proses_hotmix_roller_1790856748105.jpg",
+    "fotoProsesList": [
+      "/src/assets/images/proses_hotmix_roller_1790856748105.jpg",
+      "/src/assets/images/proses_aspal_jalan_1790846460460.jpg",
+      "/src/assets/images/proses_galian_uditch_1790856763018.jpg",
+      "/src/assets/images/proses_susun_paving_1790856780731.jpg"
+    ],
+    "fotoSesudahUrl": "/src/assets/images/selesai_aspal_mulus_1790856816426.jpg",
+    "fotoSesudahList": [
+      "/src/assets/images/selesai_aspal_mulus_1790856816426.jpg",
+      "https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=1600&auto=format&fit=crop&q=90",
+      "https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=1600&auto=format&fit=crop&q=90"
+    ],
     "keterangan": "Akses jalan utama Lingkungan I sudah mulus dan lancar dilalui kendaraan warga.",
     "createdAt": "2026-08-26T10:00:00.000Z",
     "createdByName": "M. Syafi’i (Kepling I)"
+  },
+  {
+    "id": "pemb_2_paving",
+    "lingkunganId": "kepling_2",
+    "lingkunganNomor": 2,
+    "jenisPembangunan": "PEMASANGAN_PAVING_BLOK",
+    "namaProyek": "Pemasangan Paving Blok Jl. Irigasi Gang Warga",
+    "lokasiDetail": "Jl. Irigasi Lk II Gang Damai",
+    "sumberDana": "Dinas SDABMBK Kota Medan",
+    "statusRealisasi": "SELESAI_100%",
+    "volumeRealisasi": "120 Meter",
+    "biayaEstimasiRp": 45000000,
+    "tanggalMulai": "2026-08-20",
+    "tanggalSelesai": "2026-08-24",
+    "pelaksanaTeknis": "Pokmas Lingkungan II",
+    "fotoSebelumUrl": "/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg",
+    "fotoSebelumList": [
+      "/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg",
+      "/src/assets/images/awal_rusak_jalan_1790856694359.jpg",
+      "https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?w=1600&auto=format&fit=crop&q=90"
+    ],
+    "fotoProsesUrl": "/src/assets/images/proses_susun_paving_1790856780731.jpg",
+    "fotoProsesList": [
+      "/src/assets/images/proses_susun_paving_1790856780731.jpg",
+      "/src/assets/images/proses_paving_block_1790846485222.jpg",
+      "/src/assets/images/proses_hotmix_roller_1790856748105.jpg",
+      "/src/assets/images/proses_galian_uditch_1790856763018.jpg"
+    ],
+    "fotoSesudahUrl": "/src/assets/images/selesai_paving_cantik_1790856850675.jpg",
+    "fotoSesudahList": [
+      "/src/assets/images/selesai_paving_cantik_1790856850675.jpg",
+      "https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=1600&auto=format&fit=crop&q=90",
+      "https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=1600&auto=format&fit=crop&q=90"
+    ],
+    "keterangan": "Pemasangan paving block rapi dan kokoh di jalan lingkungan warga.",
+    "createdAt": "2026-08-24T11:08:38.000Z",
+    "createdByName": "Zulkarnaen Tarigan (Kepling II)"
   },
   {
     "id": "pemb_2",
     "lingkunganId": "kepling_3",
     "lingkunganNomor": 3,
     "jenisPembangunan": "PERBAIKAN_DRAINASE",
-    "namaProyek": "Normalisasi Parit & Pemasangan U-Ditch Beton",
+    "namaProyek": "Normalisasi Parit & Pemasangan U-Ditch Beton Precast",
     "lokasiDetail": "Jl. Bunga Mawar Gg. Sejahtera Lingkungan III",
     "sumberDana": "APBD Kota Medan",
     "statusRealisasi": "SELESAI_100%",
@@ -60,12 +87,25 @@
     "tanggalMulai": "2026-07-01",
     "tanggalSelesai": "2026-07-20",
     "pelaksanaTeknis": "Dinas SDABMBK",
-    "fotoSebelumUrl": "https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?w=600&auto=format&fit=crop&q=80",
-    "fotoProsesUrl": "/src/assets/images/proses_drainase_uditch_1790846472119.jpg",
-    "fotoProsesList": [
-      "/src/assets/images/proses_drainase_uditch_1790846472119.jpg"
+    "fotoSebelumUrl": "/src/assets/images/awal_parit_tersumbat_1790856713835.jpg",
+    "fotoSebelumList": [
+      "/src/assets/images/awal_parit_tersumbat_1790856713835.jpg",
+      "/src/assets/images/awal_rusak_jalan_1790856694359.jpg",
+      "https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?w=1600&auto=format&fit=crop&q=90"
     ],
-    "fotoSesudahUrl": "https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=600&auto=format&fit=crop&q=80",
+    "fotoProsesUrl": "/src/assets/images/proses_galian_uditch_1790856763018.jpg",
+    "fotoProsesList": [
+      "/src/assets/images/proses_galian_uditch_1790856763018.jpg",
+      "/src/assets/images/proses_drainase_uditch_1790846472119.jpg",
+      "/src/assets/images/proses_hotmix_roller_1790856748105.jpg",
+      "/src/assets/images/proses_susun_paving_1790856780731.jpg"
+    ],
+    "fotoSesudahUrl": "/src/assets/images/selesai_drainase_rapi_1790856831691.jpg",
+    "fotoSesudahList": [
+      "/src/assets/images/selesai_drainase_rapi_1790856831691.jpg",
+      "https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=1600&auto=format&fit=crop&q=90",
+      "https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=1600&auto=format&fit=crop&q=90"
+    ],
     "keterangan": "Saluran drainase bebas genangan air saat hujan deras tiba.",
     "createdAt": "2026-07-21T09:00:00.000Z",
     "createdByName": "Rahmat Hidayat (Kepling III)"
@@ -83,38 +123,29 @@
     "biayaEstimasiRp": 42000000,
     "tanggalMulai": "2026-09-01",
     "tanggalSelesai": "2026-09-08",
-    "fotoSebelumUrl": "https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=600&auto=format&fit=crop&q=80",
-    "fotoProsesUrl": "/src/assets/images/proses_lampu_lpju_1790846499280.jpg",
-    "fotoProsesList": [
-      "/src/assets/images/proses_lampu_lpju_1790846499280.jpg"
+    "pelaksanaTeknis": "Dinas Perkim & Dishub",
+    "fotoSebelumUrl": "https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=1600&auto=format&fit=crop&q=90",
+    "fotoSebelumList": [
+      "https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=1600&auto=format&fit=crop&q=90",
+      "/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg",
+      "/src/assets/images/awal_rusak_jalan_1790856694359.jpg"
     ],
-    "fotoSesudahUrl": "https://images.unsplash.com/photo-1517685352821-92cf88aee5a5?w=600&auto=format&fit=crop&q=80",
+    "fotoProsesUrl": "/src/assets/images/proses_instalasi_lpju_1790856798909.jpg",
+    "fotoProsesList": [
+      "/src/assets/images/proses_instalasi_lpju_1790856798909.jpg",
+      "/src/assets/images/proses_lampu_lpju_1790846499280.jpg",
+      "/src/assets/images/proses_hotmix_roller_1790856748105.jpg",
+      "/src/assets/images/proses_galian_uditch_1790856763018.jpg"
+    ],
+    "fotoSesudahUrl": "https://images.unsplash.com/photo-1517685352821-92cf88aee5a5?w=1600&auto=format&fit=crop&q=90",
+    "fotoSesudahList": [
+      "https://images.unsplash.com/photo-1517685352821-92cf88aee5a5?w=1600&auto=format&fit=crop&q=90",
+      "https://images.unsplash.com/photo-1508873696983-2df515122519?w=1600&auto=format&fit=crop&q=90",
+      "/src/assets/images/selesai_aspal_mulus_1790856816426.jpg"
+    ],
     "keterangan": "Jalanan lingkungan terang benderang pada malam hari, meningkatkan keamanan warga.",
     "createdAt": "2026-09-09T08:30:00.000Z",
     "createdByName": "Bambang S. (Kepling V)"
-  },
-  {
-    "id": "pemb_4",
-    "lingkunganId": "kepling_8",
-    "lingkunganNomor": 8,
-    "jenisPembangunan": "PERBAIKAN_LAMPU_LPJU",
-    "namaProyek": "Perbaikan Lampu LPJU Mati & Penggantian Kabel Network",
-    "lokasiDetail": "Simpang Gg. Kantil s.d. Mushola Lingkungan VIII",
-    "sumberDana": "Dinas Perhubungan (Dishub)",
-    "statusRealisasi": "SELESAI_100%",
-    "volumeRealisasi": "12 Titik Lampu",
-    "biayaEstimasiRp": 18500000,
-    "tanggalMulai": "2026-09-15",
-    "tanggalSelesai": "2026-09-17",
-    "fotoSebelumUrl": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80",
-    "fotoProsesUrl": "/src/assets/images/proses_lampu_lpju_1790846499280.jpg",
-    "fotoProsesList": [
-      "/src/assets/images/proses_lampu_lpju_1790846499280.jpg"
-    ],
-    "fotoSesudahUrl": "https://images.unsplash.com/photo-1508873696983-2df515122519?w=600&auto=format&fit=crop&q=80",
-    "keterangan": "12 titik lampu LPJU yang padam telah menyala kembali 100%.",
-    "createdAt": "2026-09-18T11:00:00.000Z",
-    "createdByName": "Suryadi (Kepling VIII)"
   },
   {
     "id": "pemb_5",
@@ -129,57 +160,23 @@
     "biayaEstimasiRp": 65000000,
     "tanggalMulai": "2026-09-20",
     "pelaksanaTeknis": "Gotong Royong Warga Lingkungan XII",
-    "fotoSebelumUrl": "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&auto=format&fit=crop&q=80",
-    "fotoProsesUrl": "/src/assets/images/proses_aspal_jalan_1790846460460.jpg",
+    "fotoSebelumUrl": "/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg",
+    "fotoSebelumList": [
+      "/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg",
+      "/src/assets/images/awal_rusak_jalan_1790856694359.jpg",
+      "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=1600&auto=format&fit=crop&q=90"
+    ],
+    "fotoProsesUrl": "/src/assets/images/proses_hotmix_roller_1790856748105.jpg",
     "fotoProsesList": [
+      "/src/assets/images/proses_hotmix_roller_1790856748105.jpg",
       "/src/assets/images/proses_aspal_jalan_1790846460460.jpg",
-      "/src/assets/images/proses_paving_block_1790846485222.jpg"
+      "/src/assets/images/proses_susun_paving_1790856780731.jpg",
+      "/src/assets/images/proses_galian_uditch_1790856763018.jpg"
     ],
     "fotoSesudahUrl": "",
+    "fotoSesudahList": [],
     "keterangan": "Pengerjaan rabat beton telah mencapai progres 65%.",
     "createdAt": "2026-09-21T14:00:00.000Z",
     "createdByName": "Herman (Kepling XII)"
-  },
-  {
-    "id": "pemb_6",
-    "lingkunganId": "kepling_18",
-    "lingkunganNomor": 18,
-    "jenisPembangunan": "PENAMBAHAN_TIANG_LPJU",
-    "namaProyek": "Usulan Penambahan 4 Tiang LPJU Baru Jalur Utama Lingkungan",
-    "lokasiDetail": "Jl. Bunga Sakura Belakang Pasar Lingkungan XVIII",
-    "sumberDana": "Usulan Musrenbang / Dinas Perkim",
-    "statusRealisasi": "USULAN",
-    "volumeRealisasi": "4 Unit Tiang Baru",
-    "biayaEstimasiRp": 28000000,
-    "pelaksanaTeknis": "Dinas Perkim Kota Medan",
-    "fotoSebelumUrl": "https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=600&auto=format&fit=crop&q=80",
-    "fotoProsesUrl": "",
-    "fotoProsesList": [],
-    "keterangan": "Telah diajukan melalui Musrenbang Kelurahan Mangga untuk penetapan anggaran.",
-    "createdAt": "2026-09-22T09:15:00.000Z",
-    "createdByName": "Junaidi (Kepling XVIII)"
-  },
-  {
-    "id": "pemb_7",
-    "lingkunganId": "kepling_10",
-    "lingkunganNomor": 10,
-    "jenisPembangunan": "PEMASANGAN_PAVING_BLOK",
-    "namaProyek": "Pemasangan Paving Blok Halaman Posyandu & Gang Pemukiman",
-    "lokasiDetail": "Gg. Bunga Cempaka Lingkungan X",
-    "sumberDana": "Dana Kelurahan Mangga",
-    "statusRealisasi": "SELESAI_100%",
-    "volumeRealisasi": "180 Meter Persegi",
-    "biayaEstimasiRp": 52000000,
-    "tanggalMulai": "2026-09-12",
-    "tanggalSelesai": "2026-09-24",
-    "fotoSebelumUrl": "https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?w=600&auto=format&fit=crop&q=80",
-    "fotoProsesUrl": "/src/assets/images/proses_paving_block_1790846485222.jpg",
-    "fotoProsesList": [
-      "/src/assets/images/proses_paving_block_1790846485222.jpg"
-    ],
-    "fotoSesudahUrl": "https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=600&auto=format&fit=crop&q=80",
-    "keterangan": "Pemasangan paving block K-300 rapi dan kokoh, mempermudah akses warga.",
-    "createdAt": "2026-09-25T11:00:00.000Z",
-    "createdByName": "Syahril (Kepling X)"
   }
 ]
