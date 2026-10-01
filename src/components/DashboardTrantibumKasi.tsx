@@ -43,7 +43,7 @@ interface DashboardTrantibumKasiProps {
   onSelectKeplingRiwayat?: (namaKepling: string) => void;
 }
 
-type PeriodFilter = 'all' | 'today' | '7days' | 'month';
+type PeriodFilter = 'all' | 'today' | '7days' | 'month' | 'specific_date';
 
 type TrantibSubView =
   | 'ringkasan'
@@ -61,6 +61,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
   onSelectKeplingRiwayat,
 }) => {
   const [period, setPeriod] = useState<PeriodFilter>('all');
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [subView, setSubView] = useState<TrantibSubView>('poskamling');
   const [searchQuery, setSearchQuery] = useState('');
   const [poskamlingDisplayMode, setPoskamlingDisplayMode] = useState<'gallery' | 'table' | 'unduh_mingguan'>('gallery');
@@ -88,6 +89,10 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
 
       if (period === 'today') {
         return reportDate === todayStr;
+      }
+
+      if (period === 'specific_date' && selectedDate) {
+        return reportDate === selectedDate;
       }
 
       if (period === '7days') {
@@ -471,41 +476,61 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
               <ListChecks className="w-4 h-4 text-amber-300" />
               Pilih Bidang Pengawasan Trantibum (7 Bidang):
             </span>
-            <div className="flex items-center gap-1 bg-amber-950/80 p-1 rounded-xl border border-amber-700/60 text-xs">
-              <button
-                type="button"
-                onClick={() => setPeriod('all')}
-                className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
-                  period === 'all'
-                    ? 'bg-white text-amber-950 shadow-xs'
-                    : 'text-amber-100 hover:text-white hover:bg-white/10 font-bold'
-                }`}
-              >
-                Semua Periode
-              </button>
-              <button
-                type="button"
-                onClick={() => setPeriod('today')}
-                className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
-                  period === 'today'
-                    ? 'bg-white text-amber-950 shadow-xs'
-                    : 'text-amber-100 hover:text-white hover:bg-white/10 font-bold'
-                }`}
-              >
-                Hari Ini
-              </button>
-              <button
-                type="button"
-                onClick={() => setPeriod('7days')}
-                className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
-                  period === '7days'
-                    ? 'bg-white text-amber-950 shadow-xs'
-                    : 'text-amber-100 hover:text-white hover:bg-white/10 font-bold'
-                }`}
-              >
-                7 Hari
-              </button>
-            </div>
+              <div className="flex items-center gap-1 bg-amber-950/80 p-1 rounded-xl border border-amber-700/60 text-xs flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setPeriod('all')}
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                    period === 'all'
+                      ? 'bg-white text-amber-950 shadow-xs'
+                      : 'text-amber-100 hover:text-white hover:bg-white/10 font-bold'
+                  }`}
+                >
+                  Semua
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriod('today')}
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                    period === 'today'
+                      ? 'bg-white text-amber-950 shadow-xs'
+                      : 'text-amber-100 hover:text-white hover:bg-white/10 font-bold'
+                  }`}
+                >
+                  Hari Ini
+                </button>
+                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-amber-700/40 bg-amber-950/50">
+                   <button
+                    type="button"
+                    onClick={() => setPeriod('specific_date')}
+                    className={`flex items-center gap-1.5 transition-all cursor-pointer ${
+                      period === 'specific_date' ? 'text-amber-300' : 'text-amber-100/60'
+                    }`}
+                  >
+                    <Calendar className="w-3 h-3" />
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => {
+                        setSelectedDate(e.target.value);
+                        setPeriod('specific_date');
+                      }}
+                      className="bg-transparent text-white outline-none border-none text-[10px] font-bold cursor-pointer"
+                    />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPeriod('7days')}
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                    period === '7days'
+                      ? 'bg-white text-amber-950 shadow-xs'
+                      : 'text-amber-100 hover:text-white hover:bg-white/10 font-bold'
+                  }`}
+                >
+                  7 Hari
+                </button>
+              </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 bg-amber-950/80 p-1.5 rounded-2xl border border-amber-700/60 overflow-x-auto">
@@ -883,16 +908,28 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                       "{item.poskamlingNote}"
                     </p>
 
-                    <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                      <span className="text-[10px] font-bold text-slate-400">
-                        {item.latestDate}
-                      </span>
+                    <div className="pt-2 flex items-center justify-between border-t border-slate-100 gap-2">
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <span className="text-[10px] font-bold text-slate-400">
+                          {item.latestDate}
+                        </span>
+                        {hasPhoto && (
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadImage(item.latestPoskamlingPhoto!.url, `POSKAMLING_${item.kepling.nama.replace(/\s+/g, '_')}_${item.latestDate}.jpg`)}
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer border border-slate-200"
+                            title="Unduh Dokumentasi"
+                          >
+                            <Download className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={() => setSelectedKeplingDetail(item)}
-                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[11px] transition-colors cursor-pointer border border-amber-200 inline-flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[11px] transition-colors cursor-pointer border border-amber-200 inline-flex items-center gap-1 shrink-0"
                       >
-                        <span>Rincian Trantib</span>
+                        <span>Rincian</span>
                         <ChevronRight className="w-3 h-3" />
                       </button>
                     </div>
@@ -983,13 +1020,25 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                       </p>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedKeplingDetail(item)}
-                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-200"
-                      >
-                        Rincian Trantib
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {item.latestPoskamlingPhoto?.url && (
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadImage(item.latestPoskamlingPhoto!.url, `POSKAMLING_${item.kepling.nama.replace(/\s+/g, '_')}_${item.latestDate}.jpg`)}
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer border border-slate-200"
+                            title="Unduh Dokumentasi"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedKeplingDetail(item)}
+                          className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-200"
+                        >
+                          Rincian
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1490,15 +1539,25 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                   <Calendar className="w-3.5 h-3.5 text-amber-400" />
                   <span>Tanggal Pelaporan: {previewImage.date || '-'}</span>
                 </span>
-                <a
-                  href={previewImage.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition-colors shadow-2xs"
-                >
-                  <span>Buka Ukuran Penuh</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={previewImage.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition-colors shadow-2xs border border-slate-700"
+                  >
+                    <span>Ukuran Penuh</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadImage(previewImage.url, `POSKAMLING_${previewImage.kepling?.replace(/\s+/g, '_') || 'FOTO'}_${previewImage.date || 'TGL'}.jpg`)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Unduh Gambar</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
