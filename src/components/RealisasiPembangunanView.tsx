@@ -27,16 +27,26 @@ import {
   Image as ImageIcon,
   Link2,
   Loader2,
+  Database,
+  RefreshCw,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { UserAccount, RealisasiPembangunan, JenisPembangunanType, StatusRealisasiType } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import {
+  savePembangunanToServer,
+  deletePembangunanFromServer,
+  fetchPembangunanAll,
+  subscribeToPembangunan,
+  batchSyncPembangunan,
+  PEMBANGUNAN_STORAGE_KEY,
+} from '../lib/pembangunanService';
 
 interface RealisasiPembangunanViewProps {
   currentUser: UserAccount;
 }
 
-const STORAGE_KEY = 'mangga_realisasi_pembangunan_v2';
+const STORAGE_KEY = PEMBANGUNAN_STORAGE_KEY;
 
 // Helper function to compress image files from phone camera / gallery
 const compressImageFile = (file: File): Promise<string> => {
@@ -237,6 +247,81 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     }
   }, [items]);
 
+  const [isCloudSynced, setIsCloudSynced] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Sync with Firestore & Server API on mount
+  useEffect(() => {
+    let isMounted = true;
+    setIsSyncing(true);
+
+    fetchPembangunanAll()
+      .then((cloudItems) => {
+        if (!isMounted) return;
+        setIsSyncing(false);
+        if (Array.isArray(cloudItems) && cloudItems.length > 0) {
+          setItems((prev) => {
+            const map = new Map<string, RealisasiPembangunan>();
+            cloudItems.forEach((c) => map.set(c.id, c));
+            prev.forEach((p) => {
+              if (!map.has(p.id)) map.set(p.id, p);
+            });
+            return Array.from(map.values());
+          });
+          setIsCloudSynced(true);
+        } else if (items.length > 0) {
+          // If central database is empty, automatically seed existing local data into central DB
+          batchSyncPembangunan(items).catch((err) => {
+            console.warn('Initial central sync notice:', err);
+          });
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setIsSyncing(false);
+        console.warn('Initial fetch pembangunan notice:', err);
+      });
+
+    // Realtime Firestore subscriber
+    const unsubscribe = subscribeToPembangunan((fsItems) => {
+      if (!isMounted) return;
+      if (Array.isArray(fsItems) && fsItems.length > 0) {
+        setItems((prev) => {
+          const map = new Map<string, RealisasiPembangunan>();
+          fsItems.forEach((c) => map.set(c.id, c));
+          prev.forEach((p) => {
+            if (!map.has(p.id)) map.set(p.id, p);
+          });
+          return Array.from(map.values());
+        });
+        setIsCloudSynced(true);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  // Manual Trigger to re-sync all current data to database
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      const ok = await batchSyncPembangunan(items);
+      const latest = await fetchPembangunanAll();
+      if (Array.isArray(latest) && latest.length > 0) {
+        setItems(latest);
+      }
+      setIsCloudSynced(true);
+      showToast(ok ? 'Sinkronisasi Database Firestore & Server Berhasil!' : 'Sinkronisasi selesai.');
+    } catch {
+      showToast('Gagal melakukan sinkronisasi database.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [filterJenis, setFilterJenis] = useState<string>('all');
@@ -271,8 +356,11 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     const targetId = itemToDelete.id;
     const targetName = itemToDelete.namaProyek;
     setItems((prev) => prev.filter((i) => i.id !== targetId));
+    deletePembangunanFromServer(targetId).catch((err) => {
+      console.warn('Delete pembangunan from server notice:', err);
+    });
     setItemToDelete(null);
-    showToast(`Laporan "${targetName.slice(0, 30)}..." berhasil dihapus.`);
+    showToast(`Laporan "${targetName.slice(0, 30)}..." berhasil dihapus dari database.`);
   };
 
   const confirmClearAll = () => {
@@ -472,6 +560,10 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         updatedAt: new Date().toISOString(),
       };
       setItems((prev) => prev.map((i) => (i.id === editingItem.id ? updated : i)));
+      savePembangunanToServer(updated).catch((err) => {
+        console.warn('Save updated pembangunan to server notice:', err);
+      });
+      showToast(`Pembaruan proyek "${updated.namaProyek}" berhasil disimpan ke database!`);
     } else {
       // Create new
       const newItem: RealisasiPembangunan = {
@@ -494,6 +586,10 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         createdByName: `${currentUser.nama} (${keplingName})`,
       };
       setItems((prev) => [newItem, ...prev]);
+      savePembangunanToServer(newItem).catch((err) => {
+        console.warn('Save new pembangunan to server notice:', err);
+      });
+      showToast(`Laporan infrastruktur "${newItem.namaProyek}" berhasil disimpan ke database!`);
     }
 
     setIsModalOpen(false);
@@ -616,9 +712,15 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold">
-              <Wrench className="w-4 h-4 text-blue-400" />
-              <span>Seksi Pembangunan &amp; Fasilitas Publik • Kelurahan Mangga</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold">
+                <Wrench className="w-4 h-4 text-blue-400" />
+                <span>Seksi Pembangunan &amp; Fasilitas Publik • Kelurahan Mangga</span>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-semibold">
+                <Database className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Database Terhubung (Firestore &amp; Server Buffer)</span>
+              </div>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
               Realisasi Pembangunan Infrastruktur Wilayah
@@ -636,6 +738,16 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
             >
               <Plus className="w-4 h-4" />
               <span>+ Input Realisasi Baru</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className="px-3.5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs backdrop-blur-md border border-white/20 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+              title="Sinkronkan seluruh data ke database Firestore dan server"
+            >
+              <RefreshCw className={`w-4 h-4 text-cyan-300 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan DB'}</span>
             </button>
             <button
               type="button"

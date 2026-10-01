@@ -105,6 +105,18 @@ service cloud.firestore {
       allow read, write: if pbbCollection.matches('^pbb_sppt_.*');
     }
 
+    // Realisasi Pembangunan & Laporan Pemantauan Kondisi Infrastruktur
+    match /realisasi_pembangunan/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'namaProyek'])
+                            && isValidString(request.resource.data.id, 1, 100);
+      allow delete: if true;
+    }
+
+    match /laporan_infrastruktur/{docId} {
+      allow read, write: if true;
+    }
+
     // Default Fallback Match
     match /{document=**} {
       allow read: if true;

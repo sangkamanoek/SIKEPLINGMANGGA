@@ -17,6 +17,7 @@ import {
 import ViewImagesPage from './components/ViewImagesPage';
 import { KunjunganHarianView } from './components/KunjunganHarianView';
 import { RealisasiPembangunanView } from './components/RealisasiPembangunanView';
+import { syncInfraReportToPembangunan } from './lib/pembangunanService';
 import { GoogleUser, SheetMetadata, LaporanHarianItem, UserAccount, TargetsCapaianMap, isKelurahanAdmin } from './types';
 import { safeSetLocalStorage, safeSetSessionStorage } from './lib/safeStorage';
 import {
@@ -665,6 +666,13 @@ export default function App() {
         } catch (syncErr) {
           console.warn('Auto sync attendance notice:', syncErr);
         }
+      }
+
+      // 3c. Sync infrastructure finding to Realisasi Pembangunan database
+      if (reportToSave.kinerja?.infrastrukturAdaGiat || reportToSave.kinerja?.infrastrukturSubjek) {
+        syncInfraReportToPembangunan(reportToSave).catch((err) => {
+          console.warn('Auto sync infra report to pembangunan notice:', err);
+        });
       }
 
       // 4. If Google account is connected, sync to Google Sheets in background/parallel

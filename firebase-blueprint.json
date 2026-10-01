@@ -107,9 +107,39 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "nomorKk", "namaKepalaKeluarga", "lingkunganId", "namaJalan"]
+    },
+    "RealisasiPembangunan": {
+      "title": "Realisasi Pembangunan Infrastruktur",
+      "description": "Basis data monitoring realisasi proyek dan pemantauan kondisi fisik infrastruktur wilayah.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "lingkunganId": { "type": "string" },
+        "lingkunganNomor": { "type": "number" },
+        "jenisPembangunan": { "type": "string" },
+        "namaProyek": { "type": "string" },
+        "lokasiDetail": { "type": "string" },
+        "sumberDana": { "type": "string" },
+        "statusRealisasi": { "type": "string" },
+        "volumeRealisasi": { "type": "string" },
+        "biayaEstimasiRp": { "type": "number" },
+        "tanggalMulai": { "type": "string" },
+        "tanggalSelesai": { "type": "string" },
+        "fotoSebelumUrl": { "type": "string" },
+        "fotoSesudahUrl": { "type": "string" },
+        "keterangan": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "createdByName": { "type": "string" }
+      },
+      "required": ["id", "namaProyek", "lingkunganNomor"]
     }
   },
   "firestore": {
+    "realisasi_pembangunan/{docId}": {
+      "schema": "RealisasiPembangunan",
+      "description": "Koleksi proyek realisasi pembangunan dan pemantauan fisik infrastruktur."
+    },
     "data_keluarga/{keluargaId}": {
       "schema": "DataKeluarga",
       "description": "Koleksi basis data profil keluarga, desil, bansos, dan sanitasi per KK."

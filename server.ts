@@ -163,6 +163,32 @@ const saveStoredProfiles = (profiles: Record<string, any>) => {
 
 let profilesCache = loadStoredProfiles();
 
+// Pembangunan & Infrastruktur Data File
+const PEMBANGUNAN_FILE = path.join(DATA_DIR, 'pembangunan.json');
+
+const loadStoredPembangunan = (): any[] => {
+  try {
+    if (fs.existsSync(PEMBANGUNAN_FILE)) {
+      const content = fs.readFileSync(PEMBANGUNAN_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.error('Error reading pembangunan file:', err);
+  }
+  return [];
+};
+
+const saveStoredPembangunan = (items: any[]) => {
+  try {
+    fs.writeFileSync(PEMBANGUNAN_FILE, JSON.stringify(items, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving pembangunan file:', err);
+  }
+};
+
+let pembangunanCache = loadStoredPembangunan();
+
 // Attendance Data File (Presensi Apel Pagi Buffer)
 const ATTENDANCE_FILE = path.join(DATA_DIR, 'attendance.json');
 
@@ -888,8 +914,15 @@ app.post('/api/reports', (req, res) => {
     );
 
     if (existingIndex >= 0) {
-      // Update existing report
-      reportsCache[existingIndex] = { ...reportsCache[existingIndex], ...item };
+      // Update existing report with deep merge of kinerja to preserve infrastructure data
+      reportsCache[existingIndex] = {
+        ...reportsCache[existingIndex],
+        ...item,
+        kinerja: {
+          ...(reportsCache[existingIndex].kinerja || {}),
+          ...(item.kinerja || {}),
+        },
+      };
     } else {
       // Add new report at the beginning
       reportsCache = [item, ...reportsCache];
@@ -957,6 +990,114 @@ app.post('/api/reports/reset', (_req, res) => {
   reportsCache = [];
   saveStoredReports([]);
   res.json({ success: true, total: 0, message: 'Semua data laporan berhasil direset' });
+});
+
+// ==========================================
+// REALISASI PEMBANGUNAN & INFRASTRUKTUR API
+// ==========================================
+
+// GET all pembangunan items
+app.get('/api/pembangunan', (_req, res) => {
+  res.json({ success: true, count: pembangunanCache.length, data: pembangunanCache });
+});
+
+// POST create or upsert single pembangunan item
+app.post('/api/pembangunan', (req, res) => {
+  try {
+    const item = req.body;
+    if (!item || !item.namaProyek) {
+      return res.status(400).json({ success: false, message: 'Data pembangunan tidak lengkap (namaProyek wajib)' });
+    }
+
+    if (!item.id) {
+      item.id = 'pemb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    }
+    if (!item.createdAt) {
+      item.createdAt = new Date().toISOString();
+    }
+    item.updatedAt = new Date().toISOString();
+
+    const existingIndex = pembangunanCache.findIndex((p) => p.id === item.id);
+    if (existingIndex >= 0) {
+      pembangunanCache[existingIndex] = { ...pembangunanCache[existingIndex], ...item };
+    } else {
+      pembangunanCache = [item, ...pembangunanCache];
+    }
+
+    saveStoredPembangunan(pembangunanCache);
+    return res.json({ success: true, data: item, total: pembangunanCache.length });
+  } catch (err: any) {
+    console.error('Error saving pembangunan item:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT update single pembangunan item
+app.put('/api/pembangunan/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const item = req.body;
+    const existingIndex = pembangunanCache.findIndex((p) => p.id === id);
+    if (existingIndex >= 0) {
+      pembangunanCache[existingIndex] = {
+        ...pembangunanCache[existingIndex],
+        ...item,
+        id,
+        updatedAt: new Date().toISOString(),
+      };
+      saveStoredPembangunan(pembangunanCache);
+      return res.json({ success: true, data: pembangunanCache[existingIndex] });
+    } else {
+      const newItem = {
+        ...item,
+        id,
+        createdAt: item.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      pembangunanCache = [newItem, ...pembangunanCache];
+      saveStoredPembangunan(pembangunanCache);
+      return res.json({ success: true, data: newItem });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE single pembangunan item
+app.delete('/api/pembangunan/:id', (req, res) => {
+  const { id } = req.params;
+  if (id) {
+    pembangunanCache = pembangunanCache.filter((p) => p.id !== id);
+    saveStoredPembangunan(pembangunanCache);
+  }
+  res.json({ success: true, total: pembangunanCache.length });
+});
+
+// POST batch sync for pembangunan
+app.post('/api/pembangunan/batch', (req, res) => {
+  try {
+    const items = req.body?.items;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ success: false, message: 'Invalid items array' });
+    }
+
+    let addedCount = 0;
+    for (const item of items) {
+      if (!item || !item.id) continue;
+      const idx = pembangunanCache.findIndex((p) => p.id === item.id);
+      if (idx >= 0) {
+        pembangunanCache[idx] = { ...pembangunanCache[idx], ...item };
+      } else {
+        pembangunanCache.push(item);
+        addedCount++;
+      }
+    }
+
+    saveStoredPembangunan(pembangunanCache);
+    return res.json({ success: true, addedCount, total: pembangunanCache.length, data: pembangunanCache });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // POST seed initial reports for 24 Kepling

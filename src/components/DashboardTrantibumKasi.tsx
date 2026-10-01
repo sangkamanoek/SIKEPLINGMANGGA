@@ -31,6 +31,7 @@ import {
   X,
   Download,
   Info,
+  ZoomIn,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { LaporanHarianItem, UserAccount } from '../types';
@@ -280,11 +281,56 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
         const k = r.kinerja;
         return Boolean(k?.infrastrukturAdaGiat || k?.infrastrukturSubjek || k?.infrastrukturLokasi);
       });
+      const hasRealInfra = infraReports.length > 0;
       const latestInfra = infraReports[0] || keplingReports[0];
-      const infraSubjek = latestInfra?.kinerja?.infrastrukturSubjek || (allText.includes('drainase') ? 'Pemantauan Drainase' : allText.includes('jalan') ? 'Pemantauan Jalan' : 'Pemantauan Fasum Lingkungan');
-      const infraLokasi = latestInfra?.kinerja?.infrastrukturLokasi || `Kawasan ${kepling.lingkungan}`;
-      const infraMapsLink = latestInfra?.kinerja?.infrastrukturTitikKoordinat || '';
-      const infraNote = latestInfra?.uraianTugas || 'Kondisi fisik infrastruktur wilayah terpantau baik';
+
+      // Extract all photos related to infrastructure
+      const infraPhotos: { url: string; date: string; category?: string; name?: string }[] = [];
+      infraReports.forEach((r) => {
+        (r.dokumentasiFoto || []).forEach((f) => {
+          const cat = (f.kategori || '').toLowerCase();
+          const n = (f.namaFile || '').toLowerCase();
+          if (
+            cat.includes('infra') ||
+            n.includes('infra') ||
+            cat.includes('jalan') ||
+            cat.includes('drainase') ||
+            cat.includes('lampu') ||
+            cat.includes('parit')
+          ) {
+            infraPhotos.push({
+              url: f.url,
+              date: r.tanggal,
+              category: f.kategori,
+              name: f.namaFile,
+            });
+          }
+        });
+      });
+      // Fallback: use first report's photos if specific tag not found
+      if (infraPhotos.length === 0 && infraReports[0]?.dokumentasiFoto) {
+        infraReports[0].dokumentasiFoto.forEach((f) => {
+          infraPhotos.push({
+            url: f.url,
+            date: infraReports[0].tanggal,
+            category: f.kategori,
+            name: f.namaFile,
+          });
+        });
+      }
+
+      const infraSubjek = hasRealInfra
+        ? (latestInfra?.kinerja?.infrastrukturSubjek || 'Pemantauan Kondisi Fisik Infrastruktur')
+        : 'Nihil / Belum Ada Temuan Kerusakan';
+      const infraLokasi = hasRealInfra
+        ? (latestInfra?.kinerja?.infrastrukturLokasi || `Kawasan ${kepling.lingkungan}`)
+        : `Kawasan ${kepling.lingkungan}`;
+      const infraMapsLink = hasRealInfra ? (latestInfra?.kinerja?.infrastrukturTitikKoordinat || '') : '';
+      const infraNote = hasRealInfra
+        ? (latestInfra?.kinerja?.infrastrukturSubjek
+            ? `Subjek: ${latestInfra.kinerja.infrastrukturSubjek}. Lokasi: ${latestInfra.kinerja.infrastrukturLokasi || '-'}`
+            : (latestInfra?.uraianTugas || 'Kondisi fisik infrastruktur wilayah terpantau'))
+        : 'Kondisi fisik infrastruktur terpantau aman dan belum ada laporan kerusakan.';
 
       // --- 3. Mediasi Warga ---
       const mediasiReports = keplingReports.filter((r) => {
@@ -346,6 +392,9 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
         infraMapsLink,
         infraNote,
         infraCount: infraReports.length,
+        hasRealInfra,
+        infraPhotos,
+        latestInfraPhoto: infraPhotos[0] || null,
         mediasiStatus,
         mediasiNote,
         mediasiCount,
@@ -476,61 +525,70 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
               <ListChecks className="w-4 h-4 text-amber-300" />
               Pilih Bidang Pengawasan Trantibum (7 Bidang):
             </span>
-              <div className="flex items-center gap-1 bg-amber-950/80 p-1 rounded-xl border border-amber-700/60 text-xs flex-wrap">
+          <div className="flex flex-wrap items-center gap-3 bg-amber-950/80 p-2 rounded-2xl border border-amber-700/60 shadow-inner">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-900/50 border border-amber-500/30">
+              <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest flex items-center gap-1">
+                <Search className="w-3 h-3" />
+                Cari Per Tanggal:
+              </span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    setPeriod('specific_date');
+                  }}
+                  className="bg-amber-800/40 text-white outline-none border border-amber-600/50 rounded-lg px-2 py-1 text-xs font-black cursor-pointer hover:bg-amber-700/60 transition-colors"
+                />
+                {period === 'specific_date' && (
+                  <button
+                    onClick={() => setPeriod('all')}
+                    className="p-1 rounded-md bg-amber-500 text-amber-950 hover:bg-amber-400 transition-colors cursor-pointer"
+                    title="Reset Filter Tanggal"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-amber-900/30">
                 <button
                   type="button"
                   onClick={() => setPeriod('all')}
-                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer text-xs ${
                     period === 'all'
-                      ? 'bg-white text-amber-950 shadow-xs'
-                      : 'text-amber-100 hover:text-white hover:bg-white/10 font-bold'
+                      ? 'bg-white text-amber-950 shadow-md'
+                      : 'text-amber-100 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  Semua
+                  Semua Waktu
                 </button>
                 <button
                   type="button"
                   onClick={() => setPeriod('today')}
-                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer text-xs ${
                     period === 'today'
-                      ? 'bg-white text-amber-950 shadow-xs'
-                      : 'text-amber-100 hover:text-white hover:bg-white/10 font-bold'
+                      ? 'bg-white text-amber-950 shadow-md'
+                      : 'text-amber-100 hover:text-white hover:bg-white/10'
                   }`}
                 >
                   Hari Ini
                 </button>
-                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-amber-700/40 bg-amber-950/50">
-                   <button
-                    type="button"
-                    onClick={() => setPeriod('specific_date')}
-                    className={`flex items-center gap-1.5 transition-all cursor-pointer ${
-                      period === 'specific_date' ? 'text-amber-300' : 'text-amber-100/60'
-                    }`}
-                  >
-                    <Calendar className="w-3 h-3" />
-                    <input
-                      type="date"
-                      value={selectedDate}
-                      onChange={(e) => {
-                        setSelectedDate(e.target.value);
-                        setPeriod('specific_date');
-                      }}
-                      className="bg-transparent text-white outline-none border-none text-[10px] font-bold cursor-pointer"
-                    />
-                  </button>
-                </div>
                 <button
                   type="button"
                   onClick={() => setPeriod('7days')}
-                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg font-black transition-all cursor-pointer text-xs ${
                     period === '7days'
-                      ? 'bg-white text-amber-950 shadow-xs'
-                      : 'text-amber-100 hover:text-white hover:bg-white/10 font-bold'
+                      ? 'bg-white text-amber-950 shadow-md'
+                      : 'text-amber-100 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  7 Hari
+                  7 Hari Terakhir
                 </button>
-              </div>
+            </div>
+          </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 bg-amber-950/80 p-1.5 rounded-2xl border border-amber-700/60 overflow-x-auto">
@@ -1119,6 +1177,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                   <th className="py-3 px-4 bg-orange-50/60 text-orange-950 font-black">Subjek Pelaporan Infrastruktur</th>
                   <th className="py-3 px-4">Lokasi Wilayah</th>
                   <th className="py-3 px-4 text-center">Titik Koordinat GPS</th>
+                  <th className="py-3 px-4 text-center">Foto Bukti Fisik</th>
                   <th className="py-3 px-4 max-w-xs">Catatan Kondisi Fisik</th>
                   <th className="py-3 px-4 text-right">Aksi</th>
                 </tr>
@@ -1132,7 +1191,10 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                       <div className="text-[11px] text-slate-500 font-medium">{item.kepling.lingkungan}</div>
                     </td>
                     <td className="py-3 px-4 bg-orange-50/30">
-                      <div className="font-black text-orange-900">{item.infraSubjek}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${item.hasRealInfra ? 'bg-orange-500' : 'bg-slate-300'}`} />
+                        <span className="font-black text-orange-900">{item.infraSubjek}</span>
+                      </div>
                     </td>
                     <td className="py-3 px-4 font-semibold text-slate-800">{item.infraLokasi}</td>
                     <td className="py-3 px-4 text-center">
@@ -1149,6 +1211,47 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                         </a>
                       ) : (
                         <span className="text-slate-400 font-medium">Terpantau di Lk</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {item.latestInfraPhoto ? (
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPreviewImage({
+                                url: item.latestInfraPhoto!.url,
+                                title: `Foto Kerusakan Fisik: ${item.infraSubjek}`,
+                                kepling: item.kepling.nama,
+                                location: item.infraLokasi,
+                                date: item.latestInfraPhoto!.date,
+                                notes: item.infraNote,
+                              });
+                            }}
+                            className="relative group w-10 h-10 rounded-lg overflow-hidden border border-slate-200 shadow-2xs hover:opacity-90 transition-all cursor-pointer"
+                            title="Klik untuk perbesar foto"
+                          >
+                            <img
+                              src={item.latestInfraPhoto.url}
+                              alt="Foto Infrastruktur"
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <ZoomIn className="w-3.5 h-3.5 text-white" />
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadImage(item.latestInfraPhoto!.url, `INFRA_${item.kepling.nama.replace(/\s+/g, '_')}_${item.latestInfraPhoto!.date}.jpg`)}
+                            className="p-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-800 border border-orange-200 transition-colors cursor-pointer"
+                            title="Unduh foto infrastruktur"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 italic">Nihil Foto</span>
                       )}
                     </td>
                     <td className="py-3 px-4 max-w-xs">
@@ -1591,36 +1694,41 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
               </button>
             </div>
 
-            <div className="p-6 space-y-5 text-xs text-slate-800">
-              {/* Bidang 1: Poskamling & Siskamling */}
-              <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-amber-950 flex items-center gap-2 text-xs">
-                    <ShieldAlert className="w-4 h-4 text-amber-700" />
-                    1. Operasional Poskamling &amp; Siskamling
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-amber-600 text-white font-bold text-[10px]">
-                    {selectedKeplingDetail.poskamlingStatus}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-700">
-                  <div>📍 Lokasi: <b>{selectedKeplingDetail.poskamlingLokasi}</b></div>
-                  <div>👥 Petugas: <b>{selectedKeplingDetail.poskamlingPetugas}</b> ({selectedKeplingDetail.poskamlingJumlahPetugas || '4'} Orang)</div>
-                  <div>⏰ Jam Operasional: <b>{selectedKeplingDetail.poskamlingJamOperasional || '21.00 - 04.00 WIB'}</b></div>
-                  <div>📆 Laporan Terakhir: <b>{selectedKeplingDetail.latestDate}</b></div>
-                </div>
-                <div className="bg-white p-2.5 rounded-xl border border-amber-200 text-slate-700 italic">
-                  "{selectedKeplingDetail.poskamlingNote}"
-                </div>
+            <div className="p-5 sm:p-6 space-y-6 text-xs text-slate-800">
+              {/* GALERI FOTO LANGSUNG TAMPAK DI ATAS (Permintaan User) */}
+              {selectedKeplingDetail.poskamlingPhotos.length > 0 && (
+                <div className="p-5 bg-slate-900 rounded-3xl border-2 border-amber-500/30 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-amber-500 text-slate-950 shadow-lg">
+                        <Camera className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-sm text-white uppercase tracking-tight">Dokumentasi Foto Lapangan</h4>
+                        <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">{selectedKeplingDetail.poskamlingPhotos.length} Dokumentasi Terlampir</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Download all photos in this Kepling's detail
+                        selectedKeplingDetail.poskamlingPhotos.forEach((foto, fIdx) => {
+                          setTimeout(() => {
+                            handleDownloadImage(foto.url, `DETAIL_${selectedKeplingDetail.kepling.nama.replace(/\s+/g, '_')}_${foto.date}.jpg`);
+                          }, fIdx * 400);
+                        });
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] transition-all flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Unduh Semua Foto</span>
+                    </button>
+                  </div>
 
-                {/* Photos for Poskamling */}
-                {selectedKeplingDetail.poskamlingPhotos.length > 0 && (
-                  <div className="pt-2">
-                    <span className="font-bold text-amber-900 block mb-1.5">📷 Foto Dokumentasi Ronda Malam ({selectedKeplingDetail.poskamlingPhotos.length}):</span>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {selectedKeplingDetail.poskamlingPhotos.slice(0, 6).map((foto, idx) => (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {selectedKeplingDetail.poskamlingPhotos.map((foto, idx) => (
+                      <div key={idx} className="group relative">
                         <button
-                          key={idx}
                           type="button"
                           onClick={() =>
                             setPreviewImage({
@@ -1633,17 +1741,62 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                               notes: selectedKeplingDetail.poskamlingNote,
                             })
                           }
-                          className="group relative h-24 rounded-xl overflow-hidden border border-amber-300 bg-slate-100 cursor-pointer"
+                          className="w-full h-32 sm:h-40 rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-800 cursor-pointer shadow-lg group-hover:border-amber-500/50 transition-all"
                         >
-                          <img src={foto.url} alt={foto.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
-                            <Eye className="w-4 h-4" />
+                          <img src={foto.url} alt={foto.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5 backdrop-blur-3xs">
+                            <Eye className="w-4 h-4 text-amber-400" />
+                            <span>Perbesar</span>
+                          </div>
+                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 text-white text-[9px] font-bold backdrop-blur-xs flex items-center gap-1 border border-white/10">
+                            <Calendar className="w-3 h-3 text-amber-400" />
+                            {foto.date}
                           </div>
                         </button>
-                      ))}
-                    </div>
+                        
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadImage(foto.url, `POSKAMLING_${selectedKeplingDetail.kepling.nama.replace(/\s+/g, '_')}_${foto.date}.jpg`);
+                          }}
+                          className="absolute bottom-2 right-2 p-2 rounded-xl bg-amber-500 text-slate-950 shadow-lg hover:bg-amber-400 transition-all active:scale-90 cursor-pointer z-10 border border-white/20"
+                          title="Unduh Gambar Ini"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                )}
+                  
+                  <div className="bg-amber-950/50 p-3 rounded-2xl border border-amber-800/40 text-[11px] text-amber-100/80 italic flex items-start gap-2">
+                    <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <span>Klik pada gambar untuk memperbesar tampilan dan melihat detail catatan kamtibmas. Gunakan tombol unduh pada setiap gambar untuk menyimpan dokumentasi ke perangkat Anda.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Bidang 1: Poskamling & Siskamling */}
+              <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-amber-950 flex items-center gap-2 text-xs uppercase tracking-tight">
+                    <ShieldAlert className="w-4 h-4 text-amber-700" />
+                    1. Operasional Poskamling &amp; Siskamling
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-600 text-white font-bold text-[10px] shadow-sm">
+                    {selectedKeplingDetail.poskamlingStatus}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-700 pt-1">
+                  <div>📍 Lokasi: <b>{selectedKeplingDetail.poskamlingLokasi}</b></div>
+                  <div>👥 Petugas: <b>{selectedKeplingDetail.poskamlingPetugas}</b> ({selectedKeplingDetail.poskamlingJumlahPetugas || '4'} Orang)</div>
+                  <div>⏰ Jam Operasional: <b>{selectedKeplingDetail.poskamlingJamOperasional || '21.00 - 04.00 WIB'}</b></div>
+                  <div>📆 Laporan Terakhir: <b>{selectedKeplingDetail.latestDate}</b></div>
+                </div>
+                <div className="bg-white p-2.5 rounded-xl border border-amber-200 text-slate-700 italic">
+                  "{selectedKeplingDetail.poskamlingNote}"
+                </div>
               </div>
 
               {/* Bidang 2: Posko Trantibum */}
@@ -1679,20 +1832,101 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
               </div>
 
               {/* Bidang 4: Infrastruktur & Patam / Faktor Trantib */}
-              <div className="p-4 bg-orange-50/70 border border-orange-200 rounded-2xl space-y-2">
+              <div className="p-4 bg-orange-50/70 border border-orange-200 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-black text-orange-950 flex items-center gap-2 text-xs">
                     <Wrench className="w-4 h-4 text-orange-700" />
                     4. Infrastruktur Wilayah &amp; Patroli Malam (Patam)
                   </span>
-                  <span className="px-2 py-0.5 rounded-full bg-orange-600 text-white font-bold text-[10px]">
+                  <span className={`px-2 py-0.5 rounded-full text-white font-bold text-[10px] ${selectedKeplingDetail.hasRealInfra ? 'bg-orange-600' : 'bg-slate-500'}`}>
                     {selectedKeplingDetail.infraSubjek}
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-700 space-y-1">
-                  <div>📍 Lokasi: <b>{selectedKeplingDetail.infraLokasi}</b></div>
-                  <div className="bg-white p-2.5 rounded-xl border border-orange-200">{selectedKeplingDetail.infraNote}</div>
+                <div className="text-[11px] text-slate-700 space-y-1.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>📍 Lokasi: <b>{selectedKeplingDetail.infraLokasi}</b></div>
+                    {selectedKeplingDetail.infraMapsLink && (
+                      <a
+                        href={selectedKeplingDetail.infraMapsLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200"
+                      >
+                        <MapPin className="w-3 h-3 text-blue-600" />
+                        <span>Titik Koordinat Maps</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+                  </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-orange-200 text-slate-700 font-medium">
+                    {selectedKeplingDetail.infraNote}
+                  </div>
                 </div>
+
+                {/* Foto Dokumentasi Pemantauan Fisik Infrastruktur */}
+                {selectedKeplingDetail.infraPhotos && selectedKeplingDetail.infraPhotos.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-orange-200/60">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold text-orange-950 flex items-center gap-1.5">
+                        <Camera className="w-3.5 h-3.5 text-orange-700" />
+                        Foto Bukti Temuan Kondisi Fisik ({selectedKeplingDetail.infraPhotos.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          selectedKeplingDetail.infraPhotos.forEach((foto, fIdx) => {
+                            setTimeout(() => {
+                              handleDownloadImage(foto.url, `INFRA_${selectedKeplingDetail.kepling.nama.replace(/\s+/g, '_')}_${fIdx + 1}.jpg`);
+                            }, fIdx * 300);
+                          });
+                        }}
+                        className="text-[10px] font-bold text-orange-800 hover:text-orange-950 bg-white px-2 py-0.5 rounded-md border border-orange-300 flex items-center gap-1 shadow-2xs cursor-pointer"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Unduh Semua Foto</span>
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {selectedKeplingDetail.infraPhotos.map((foto, idx) => (
+                        <div key={idx} className="relative group rounded-xl overflow-hidden border border-orange-300/80 shadow-xs bg-slate-900 aspect-video">
+                          <img
+                            src={foto.url}
+                            alt={`Dokumentasi Infra ${idx + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPreviewImage({
+                                  url: foto.url,
+                                  title: `Dokumentasi Fisik Infrastruktur ${selectedKeplingDetail.kepling.lingkungan}`,
+                                  kepling: selectedKeplingDetail.kepling.nama,
+                                  location: selectedKeplingDetail.infraLokasi,
+                                  date: foto.date,
+                                  notes: selectedKeplingDetail.infraNote,
+                                });
+                              }}
+                              className="p-1 rounded bg-white/20 hover:bg-white/40 text-white transition-colors cursor-pointer"
+                              title="Perbesar Foto"
+                            >
+                              <ZoomIn className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadImage(foto.url, `INFRA_${selectedKeplingDetail.kepling.nama.replace(/\s+/g, '_')}_${idx + 1}.jpg`)}
+                              className="p-1 rounded bg-orange-600 hover:bg-orange-500 text-white transition-colors cursor-pointer"
+                              title="Unduh Gambar Ini"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

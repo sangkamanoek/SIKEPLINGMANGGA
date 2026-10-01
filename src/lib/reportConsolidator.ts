@@ -48,9 +48,38 @@ export function consolidateDailyReport(
     poskamlingStatus: iKin.poskamlingStatus || eKin.poskamlingStatus,
     poskamlingLokasi: iKin.poskamlingLokasi || eKin.poskamlingLokasi,
     poskamlingPetugas: iKin.poskamlingPetugas || eKin.poskamlingPetugas,
+    poskamlingJumlahPetugas: iKin.poskamlingJumlahPetugas || eKin.poskamlingJumlahPetugas,
+    poskamlingJamOperasional: iKin.poskamlingJamOperasional || eKin.poskamlingJamOperasional,
     poskamlingKeterangan: combineTextNotes(eKin.poskamlingKeterangan, iKin.poskamlingKeterangan),
 
+    // Tugas Tambahan POSYANDU & Layanan Kesehatan Warga
+    posyanduAdaGiat: Boolean(iKin.posyanduAdaGiat || eKin.posyanduAdaGiat),
+    posyanduNama: iKin.posyanduNama || eKin.posyanduNama,
+    posyanduLokasi: iKin.posyanduLokasi || eKin.posyanduLokasi,
+    posyanduJumlahPetugasKader: iKin.posyanduJumlahPetugasKader || eKin.posyanduJumlahPetugasKader,
+    posyanduJumlahWargaTotal: (parseNumber(iKin.posyanduJumlahWargaTotal) > 0 ? iKin.posyanduJumlahWargaTotal : eKin.posyanduJumlahWargaTotal) || '0',
+    posyanduBayi02Tahun: (parseNumber(iKin.posyanduBayi02Tahun) > 0 ? iKin.posyanduBayi02Tahun : eKin.posyanduBayi02Tahun) || '0',
+    posyanduBalita25Tahun: (parseNumber(iKin.posyanduBalita25Tahun) > 0 ? iKin.posyanduBalita25Tahun : eKin.posyanduBalita25Tahun) || '0',
+    posyanduAnak612Tahun: (parseNumber(iKin.posyanduAnak612Tahun) > 0 ? iKin.posyanduAnak612Tahun : eKin.posyanduAnak612Tahun) || '0',
+    posyanduRemaja1318Tahun: (parseNumber(iKin.posyanduRemaja1318Tahun) > 0 ? iKin.posyanduRemaja1318Tahun : eKin.posyanduRemaja1318Tahun) || '0',
+    posyanduDewasaIbuHamil1959Tahun: (parseNumber(iKin.posyanduDewasaIbuHamil1959Tahun) > 0 ? iKin.posyanduDewasaIbuHamil1959Tahun : eKin.posyanduDewasaIbuHamil1959Tahun) || '0',
+    posyanduLansia60TahunKeatas: (parseNumber(iKin.posyanduLansia60TahunKeatas) > 0 ? iKin.posyanduLansia60TahunKeatas : eKin.posyanduLansia60TahunKeatas) || '0',
+    posyanduJenisLayanan: Array.from(new Set([...(eKin.posyanduJenisLayanan || []), ...(iKin.posyanduJenisLayanan || [])])),
+    posyanduKeterangan: combineTextNotes(eKin.posyanduKeterangan, iKin.posyanduKeterangan),
+
     kegiatanLainnya: combineTextNotes(eKin.kegiatanLainnya, iKin.kegiatanLainnya),
+
+    // Poin 6: Kegiatan Pemantauan Kondisi Infrastruktur Wilayah
+    infrastrukturAdaGiat: Boolean(iKin.infrastrukturAdaGiat || eKin.infrastrukturAdaGiat),
+    infrastrukturSubjek: iKin.infrastrukturSubjek && eKin.infrastrukturSubjek && iKin.infrastrukturSubjek !== eKin.infrastrukturSubjek
+      ? `${eKin.infrastrukturSubjek}; ${iKin.infrastrukturSubjek}`
+      : (iKin.infrastrukturSubjek || eKin.infrastrukturSubjek || ''),
+    infrastrukturLokasi: iKin.infrastrukturLokasi && eKin.infrastrukturLokasi && iKin.infrastrukturLokasi !== eKin.infrastrukturLokasi
+      ? `${eKin.infrastrukturLokasi} & ${iKin.infrastrukturLokasi}`
+      : (iKin.infrastrukturLokasi || eKin.infrastrukturLokasi || ''),
+    infrastrukturTitikKoordinat: iKin.infrastrukturTitikKoordinat || eKin.infrastrukturTitikKoordinat || '',
+    infrastrukturTanggalPelaporan: iKin.infrastrukturTanggalPelaporan || eKin.infrastrukturTanggalPelaporan || incoming.tanggal || existing.tanggal || '',
+    infrastrukturPelapor: iKin.infrastrukturPelapor || eKin.infrastrukturPelapor || incoming.namaKepling || existing.namaKepling || '',
   };
 
   // Merge Documentation Photos deduplicated by ID or URL
