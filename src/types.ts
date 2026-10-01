@@ -360,7 +360,11 @@ export interface RealisasiPembangunan {
   tanggalMulai?: string;
   tanggalSelesai?: string;
   fotoSebelumUrl?: string;
+  fotoProsesUrl?: string;
+  fotoProsesList?: string[];
   fotoSesudahUrl?: string;
+  fotoSebelumList?: string[];
+  fotoSesudahList?: string[];
   titikKoordinat?: {
     lat: number;
     lng: number;

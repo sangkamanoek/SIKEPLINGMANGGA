@@ -126,6 +126,8 @@
         "tanggalMulai": { "type": "string" },
         "tanggalSelesai": { "type": "string" },
         "fotoSebelumUrl": { "type": "string" },
+        "fotoProsesUrl": { "type": "string" },
+        "fotoProsesList": { "type": "array" },
         "fotoSesudahUrl": { "type": "string" },
         "keterangan": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },

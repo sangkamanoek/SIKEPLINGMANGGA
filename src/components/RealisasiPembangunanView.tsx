@@ -87,8 +87,59 @@ const compressImageFile = (file: File): Promise<string> => {
   });
 };
 
+// Preset realistic project process photos generated for Medan Kelurahan Mangga
+export const CONTOH_FOTO_PROSES_LIST = [
+  {
+    nama: 'Pengaspalan Hotmix Jalan Lingkungan',
+    kategori: 'Pekerjaan Jalan',
+    deskripsi: 'Pekerja proyek meratakan aspal hotmix dan pemadatan slender/roller',
+    url: '/src/assets/images/proses_aspal_jalan_1790846460460.jpg',
+  },
+  {
+    nama: 'Pemasangan U-Ditch Drainase Beton',
+    kategori: 'Pekerjaan Drainase',
+    deskripsi: 'Pemasangan saluran drainase beton pra-cetak U-ditch di pinggir jalan',
+    url: '/src/assets/images/proses_drainase_uditch_1790846472119.jpg',
+  },
+  {
+    nama: 'Pemasangan Paving Blok Gang Warga',
+    kategori: 'Pekerjaan Paving',
+    deskripsi: 'Pemasangan paving block abu-abu K-300 di pemukiman warga',
+    url: '/src/assets/images/proses_paving_block_1790846485222.jpg',
+  },
+  {
+    nama: 'Pemasangan & Perbaikan Lampu LPJU',
+    kategori: 'Penerangan Jalan',
+    deskripsi: 'Teknisi memasang tiang dan lampu penerangan jalan umum LED',
+    url: '/src/assets/images/proses_lampu_lpju_1790846499280.jpg',
+  },
+];
+
 // Initial realistic seed data for Kelurahan Mangga (24 Lingkungan)
 const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
+  {
+    id: 'pemb_2_paving',
+    lingkunganId: 'kepling_2',
+    lingkunganNomor: 2,
+    jenisPembangunan: 'PEMASANGAN_PAVING_BLOK',
+    namaProyek: 'Pemasangan Paving Blok',
+    lokasiDetail: 'Jl. Irigasi Lk II',
+    sumberDana: 'Dinas SDABMBK Kota Medan',
+    statusRealisasi: 'SELESAI_100%',
+    volumeRealisasi: '50 Meter',
+    biayaEstimasiRp: 25000000,
+    tanggalMulai: '2026-08-20',
+    tanggalSelesai: '2026-08-24',
+    fotoSebelumUrl: 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?w=600&auto=format&fit=crop&q=80',
+    fotoProsesUrl: '/src/assets/images/proses_paving_block_1790846485222.jpg',
+    fotoProsesList: [
+      '/src/assets/images/proses_paving_block_1790846485222.jpg',
+    ],
+    fotoSesudahUrl: 'https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=600&auto=format&fit=crop&q=80',
+    keterangan: 'Pemasangan paving block rapi dan kokoh di jalan lingkungan warga.',
+    createdAt: '2026-08-24T11:08:38.000Z',
+    createdByName: 'Zulkarnaen Tarigan (Zulkarnaen Tarigan)',
+  },
   {
     id: 'pemb_1',
     lingkunganId: 'kepling_1',
@@ -104,6 +155,10 @@ const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
     tanggalSelesai: '2026-08-25',
     pelaksanaTeknis: 'Dinas SDABMBK & Pokmas Lingk. I',
     fotoSebelumUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&auto=format&fit=crop&q=80',
+    fotoProsesUrl: '/src/assets/images/proses_aspal_jalan_1790846460460.jpg',
+    fotoProsesList: [
+      '/src/assets/images/proses_aspal_jalan_1790846460460.jpg',
+    ],
     fotoSesudahUrl: 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=600&auto=format&fit=crop&q=80',
     keterangan: 'Akses jalan utama Lingkungan I sudah mulus dan lancar dilalui kendaraan warga.',
     createdAt: '2026-08-26T10:00:00.000Z',
@@ -124,6 +179,10 @@ const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
     tanggalSelesai: '2026-07-20',
     pelaksanaTeknis: 'Dinas SDABMBK',
     fotoSebelumUrl: 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?w=600&auto=format&fit=crop&q=80',
+    fotoProsesUrl: '/src/assets/images/proses_drainase_uditch_1790846472119.jpg',
+    fotoProsesList: [
+      '/src/assets/images/proses_drainase_uditch_1790846472119.jpg',
+    ],
     fotoSesudahUrl: 'https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=600&auto=format&fit=crop&q=80',
     keterangan: 'Saluran drainase bebas genangan air saat hujan deras tiba.',
     createdAt: '2026-07-21T09:00:00.000Z',
@@ -143,6 +202,10 @@ const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
     tanggalMulai: '2026-09-01',
     tanggalSelesai: '2026-09-08',
     fotoSebelumUrl: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=600&auto=format&fit=crop&q=80',
+    fotoProsesUrl: '/src/assets/images/proses_lampu_lpju_1790846499280.jpg',
+    fotoProsesList: [
+      '/src/assets/images/proses_lampu_lpju_1790846499280.jpg',
+    ],
     fotoSesudahUrl: 'https://images.unsplash.com/photo-1517685352821-92cf88aee5a5?w=600&auto=format&fit=crop&q=80',
     keterangan: 'Jalanan lingkungan terang benderang pada malam hari, meningkatkan keamanan warga.',
     createdAt: '2026-09-09T08:30:00.000Z',
@@ -162,6 +225,10 @@ const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
     tanggalMulai: '2026-09-15',
     tanggalSelesai: '2026-09-17',
     fotoSebelumUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80',
+    fotoProsesUrl: '/src/assets/images/proses_lampu_lpju_1790846499280.jpg',
+    fotoProsesList: [
+      '/src/assets/images/proses_lampu_lpju_1790846499280.jpg',
+    ],
     fotoSesudahUrl: 'https://images.unsplash.com/photo-1508873696983-2df515122519?w=600&auto=format&fit=crop&q=80',
     keterangan: '12 titik lampu LPJU yang padam telah menyala kembali 100%.',
     createdAt: '2026-09-18T11:00:00.000Z',
@@ -181,6 +248,11 @@ const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
     tanggalMulai: '2026-09-20',
     pelaksanaTeknis: 'Gotong Royong Warga Lingkungan XII',
     fotoSebelumUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&auto=format&fit=crop&q=80',
+    fotoProsesUrl: '/src/assets/images/proses_aspal_jalan_1790846460460.jpg',
+    fotoProsesList: [
+      '/src/assets/images/proses_aspal_jalan_1790846460460.jpg',
+      '/src/assets/images/proses_paving_block_1790846485222.jpg',
+    ],
     fotoSesudahUrl: '',
     keterangan: 'Pengerjaan rabat beton telah mencapai progres 65%.',
     createdAt: '2026-09-21T14:00:00.000Z',
@@ -199,6 +271,8 @@ const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
     biayaEstimasiRp: 28000000,
     pelaksanaTeknis: 'Dinas Perkim Kota Medan',
     fotoSebelumUrl: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=600&auto=format&fit=crop&q=80',
+    fotoProsesUrl: '',
+    fotoProsesList: [],
     keterangan: 'Telah diajukan melalui Musrenbang Kelurahan Mangga untuk penetapan anggaran.',
     createdAt: '2026-09-22T09:15:00.000Z',
     createdByName: 'Junaidi (Kepling XVIII)',
@@ -217,6 +291,10 @@ const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
     tanggalMulai: '2026-09-12',
     tanggalSelesai: '2026-09-24',
     fotoSebelumUrl: 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?w=600&auto=format&fit=crop&q=80',
+    fotoProsesUrl: '/src/assets/images/proses_paving_block_1790846485222.jpg',
+    fotoProsesList: [
+      '/src/assets/images/proses_paving_block_1790846485222.jpg',
+    ],
     fotoSesudahUrl: 'https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=600&auto=format&fit=crop&q=80',
     keterangan: 'Pemasangan paving block K-300 rapi dan kokoh, mempermudah akses warga.',
     createdAt: '2026-09-25T11:00:00.000Z',
@@ -388,41 +466,72 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
   const [formTglMulai, setFormTglMulai] = useState('');
   const [formTglSelesai, setFormTglSelesai] = useState('');
   const [formFotoSebelum, setFormFotoSebelum] = useState('');
+  const [formFotoProses, setFormFotoProses] = useState('');
+  const [formFotoProsesList, setFormFotoProsesList] = useState<string[]>([]);
   const [formFotoSesudah, setFormFotoSesudah] = useState('');
   const [formKeterangan, setFormKeterangan] = useState('');
 
   // Photo Upload States & Refs for Mobile Camera / Gallery
   const [isProcessingBefore, setIsProcessingBefore] = useState(false);
+  const [isProcessingProses, setIsProcessingProses] = useState(false);
   const [isProcessingAfter, setIsProcessingAfter] = useState(false);
   const [showUrlInputBefore, setShowUrlInputBefore] = useState(false);
+  const [showUrlInputProses, setShowUrlInputProses] = useState(false);
   const [showUrlInputAfter, setShowUrlInputAfter] = useState(false);
+  const [customProsesUrl, setCustomProsesUrl] = useState('');
 
   const fileBeforeCameraRef = useRef<HTMLInputElement>(null);
   const fileBeforeGalleryRef = useRef<HTMLInputElement>(null);
+  const fileProsesCameraRef = useRef<HTMLInputElement>(null);
+  const fileProsesGalleryRef = useRef<HTMLInputElement>(null);
   const fileAfterCameraRef = useRef<HTMLInputElement>(null);
   const fileAfterGalleryRef = useRef<HTMLInputElement>(null);
 
   const handleProcessImage = async (
-    file: File,
-    type: 'sebelum' | 'sesudah'
+    files: File | FileList | File[],
+    type: 'sebelum' | 'proses' | 'sesudah'
   ) => {
     if (type === 'sebelum') setIsProcessingBefore(true);
+    else if (type === 'proses') setIsProcessingProses(true);
     else setIsProcessingAfter(true);
 
     try {
-      const compressedDataUrl = await compressImageFile(file);
-      if (type === 'sebelum') {
-        setFormFotoSebelum(compressedDataUrl);
-      } else {
-        setFormFotoSesudah(compressedDataUrl);
+      const fileArr = files instanceof FileList ? Array.from(files) : Array.isArray(files) ? files : [files];
+      for (const file of fileArr) {
+        const compressedDataUrl = await compressImageFile(file);
+        if (type === 'sebelum') {
+          setFormFotoSebelum(compressedDataUrl);
+        } else if (type === 'proses') {
+          setFormFotoProsesList((prev) => [...prev, compressedDataUrl]);
+          setFormFotoProses(compressedDataUrl);
+        } else {
+          setFormFotoSesudah(compressedDataUrl);
+        }
       }
     } catch (err) {
       console.error('Gagal memproses gambar:', err);
       alert('Gagal memproses file foto. Pastikan format file adalah gambar valid.');
     } finally {
       if (type === 'sebelum') setIsProcessingBefore(false);
+      else if (type === 'proses') setIsProcessingProses(false);
       else setIsProcessingAfter(false);
     }
+  };
+
+  const removeProsesPhoto = (idx: number) => {
+    setFormFotoProsesList((prev) => {
+      const updated = prev.filter((_, i) => i !== idx);
+      setFormFotoProses(updated[0] || '');
+      return updated;
+    });
+  };
+
+  const addProsesPhotoUrl = () => {
+    if (!customProsesUrl.trim()) return;
+    setFormFotoProsesList((prev) => [...prev, customProsesUrl.trim()]);
+    setFormFotoProses(customProsesUrl.trim());
+    setCustomProsesUrl('');
+    setShowUrlInputProses(false);
   };
 
   // Lock lingkungan if user is Kepling
@@ -499,10 +608,14 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     setFormTglMulai(new Date().toISOString().split('T')[0]);
     setFormTglSelesai(new Date().toISOString().split('T')[0]);
     setFormFotoSebelum('');
+    setFormFotoProses('');
+    setFormFotoProsesList([]);
     setFormFotoSesudah('');
     setFormKeterangan('');
     setShowUrlInputBefore(false);
+    setShowUrlInputProses(false);
     setShowUrlInputAfter(false);
+    setCustomProsesUrl('');
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -520,10 +633,20 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     setFormTglMulai(item.tanggalMulai || '');
     setFormTglSelesai(item.tanggalSelesai || '');
     setFormFotoSebelum(item.fotoSebelumUrl || '');
+    setFormFotoProses(item.fotoProsesUrl || (item.fotoProsesList && item.fotoProsesList[0]) || '');
+    setFormFotoProsesList(
+      item.fotoProsesList && item.fotoProsesList.length > 0
+        ? item.fotoProsesList
+        : item.fotoProsesUrl
+        ? [item.fotoProsesUrl]
+        : []
+    );
     setFormFotoSesudah(item.fotoSesudahUrl || '');
     setFormKeterangan(item.keterangan || '');
     setShowUrlInputBefore(Boolean(item.fotoSebelumUrl && !item.fotoSebelumUrl.startsWith('data:')));
+    setShowUrlInputProses(false);
     setShowUrlInputAfter(Boolean(item.fotoSesudahUrl && !item.fotoSesudahUrl.startsWith('data:')));
+    setCustomProsesUrl('');
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -555,6 +678,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         tanggalMulai: formTglMulai || undefined,
         tanggalSelesai: formTglSelesai || undefined,
         fotoSebelumUrl: formFotoSebelum.trim() || undefined,
+        fotoProsesUrl: formFotoProsesList[0] || formFotoProses.trim() || undefined,
+        fotoProsesList: formFotoProsesList.length > 0 ? formFotoProsesList : (formFotoProses ? [formFotoProses] : undefined),
         fotoSesudahUrl: formFotoSesudah.trim() || undefined,
         keterangan: formKeterangan.trim(),
         updatedAt: new Date().toISOString(),
@@ -580,6 +705,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         tanggalMulai: formTglMulai || undefined,
         tanggalSelesai: formTglSelesai || undefined,
         fotoSebelumUrl: formFotoSebelum.trim() || undefined,
+        fotoProsesUrl: formFotoProsesList[0] || formFotoProses.trim() || undefined,
+        fotoProsesList: formFotoProsesList.length > 0 ? formFotoProsesList : (formFotoProses ? [formFotoProses] : undefined),
         fotoSesudahUrl: formFotoSesudah.trim() || undefined,
         keterangan: formKeterangan.trim(),
         createdAt: new Date().toISOString(),
@@ -1021,72 +1148,113 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                     )}
                   </div>
 
-                  {/* Photo Before vs After Comparison */}
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div>
-                      <span className="block text-[10px] font-extrabold text-slate-500 uppercase mb-1">
-                        📷 Foto Sebelum (Before)
-                      </span>
-                      {item.fotoSebelumUrl ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPreviewPhoto({
-                              title: `Sebelum: ${item.namaProyek}`,
-                              url: item.fotoSebelumUrl!,
-                              category: 'sebelum',
-                            })
-                          }
-                          className="w-full h-28 rounded-xl overflow-hidden border border-slate-200 relative group cursor-pointer"
-                        >
-                          <img
-                            src={item.fotoSebelumUrl}
-                            alt="Sebelum"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          />
-                          <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center text-white text-[10px] font-bold">
-                            <Eye className="w-4 h-4" />
-                          </div>
-                        </button>
-                      ) : (
-                        <div className="w-full h-28 rounded-xl bg-slate-100 border border-slate-200 border-dashed flex flex-col items-center justify-center text-slate-400 text-[10px]">
-                          <span>Belum ada foto</span>
-                        </div>
-                      )}
-                    </div>
+                  {/* Photo Gallery: Dinamis & Responsif (Sebelum, Proses, Sesudah) */}
+                  {(() => {
+                    const photos: Array<{
+                      key: 'sebelum' | 'proses' | 'sesudah';
+                      label: string;
+                      title: string;
+                      url: string;
+                      textColor: string;
+                      borderColor: string;
+                      count?: number;
+                    }> = [];
 
-                    <div>
-                      <span className="block text-[10px] font-extrabold text-emerald-700 uppercase mb-1">
-                        ✨ Foto Sesudah (After 100%)
-                      </span>
-                      {item.fotoSesudahUrl ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPreviewPhoto({
-                              title: `Sesudah: ${item.namaProyek}`,
-                              url: item.fotoSesudahUrl!,
-                              category: 'sesudah',
-                            })
-                          }
-                          className="w-full h-28 rounded-xl overflow-hidden border border-emerald-300 relative group cursor-pointer"
-                        >
-                          <img
-                            src={item.fotoSesudahUrl}
-                            alt="Sesudah"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          />
-                          <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center text-white text-[10px] font-bold">
-                            <Eye className="w-4 h-4" />
-                          </div>
-                        </button>
-                      ) : (
-                        <div className="w-full h-28 rounded-xl bg-amber-50/50 border border-amber-200 border-dashed flex flex-col items-center justify-center text-amber-700 text-[10px] font-semibold">
-                          <span>Proses pengerjaan</span>
+                    if (item.fotoSebelumUrl) {
+                      photos.push({
+                        key: 'sebelum',
+                        label: '📷 FOTO SEBELUM (0%)',
+                        title: `Foto Sebelum (0%): ${item.namaProyek}`,
+                        url: item.fotoSebelumUrl,
+                        textColor: 'text-amber-700',
+                        borderColor: 'border-amber-300/80',
+                      });
+                    }
+
+                    if (item.fotoProsesUrl || (item.fotoProsesList && item.fotoProsesList.length > 0)) {
+                      const pUrl = item.fotoProsesUrl || item.fotoProsesList![0];
+                      photos.push({
+                        key: 'proses',
+                        label: '🔨 FOTO PROSES (PENGERJAAN)',
+                        title: `Foto Proses: ${item.namaProyek}`,
+                        url: pUrl,
+                        textColor: 'text-blue-700',
+                        borderColor: 'border-blue-300',
+                        count: item.fotoProsesList?.length || 1,
+                      });
+                    }
+
+                    if (item.fotoSesudahUrl) {
+                      photos.push({
+                        key: 'sesudah',
+                        label: '✨ FOTO SESUDAH (100%)',
+                        title: `Foto Sesudah (100%): ${item.namaProyek}`,
+                        url: item.fotoSesudahUrl,
+                        textColor: 'text-emerald-700',
+                        borderColor: 'border-emerald-300',
+                      });
+                    }
+
+                    if (photos.length === 0) {
+                      return (
+                        <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center text-slate-400 text-xs font-semibold">
+                          <span>Belum ada foto dokumentasi diunggah</span>
                         </div>
-                      )}
-                    </div>
-                  </div>
+                      );
+                    }
+
+                    const gridColsClass =
+                      photos.length === 3
+                        ? 'grid-cols-3'
+                        : photos.length === 2
+                        ? 'grid-cols-2'
+                        : 'grid-cols-1 sm:grid-cols-2';
+
+                    const imgHeightClass =
+                      photos.length === 3
+                        ? 'h-24 sm:h-32'
+                        : 'h-32 sm:h-40';
+
+                    return (
+                      <div className={`grid ${gridColsClass} gap-2 pt-1`}>
+                        {photos.map((photo) => (
+                          <div key={photo.key} className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className={`block text-[9px] sm:text-[10px] font-black uppercase tracking-tight truncate ${photo.textColor}`}>
+                                {photo.label}
+                              </span>
+                              {photo.count && photo.count > 1 && (
+                                <span className="text-[8px] font-extrabold px-1 py-0.2 bg-blue-100 text-blue-800 rounded">
+                                  {photo.count} Foto
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPreviewPhoto({
+                                  title: photo.title,
+                                  url: photo.url,
+                                  category: photo.key,
+                                })
+                              }
+                              className={`w-full ${imgHeightClass} rounded-xl overflow-hidden border ${photo.borderColor} relative group cursor-pointer bg-slate-900 block shadow-2xs`}
+                            >
+                              <img
+                                src={photo.url}
+                                alt={photo.label}
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center text-white text-[10px] font-bold">
+                                <Eye className="w-4 h-4" />
+                              </div>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1130,6 +1298,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   <th className="p-3">Volume</th>
                   <th className="p-3">Pelaksana Kegiatan</th>
                   <th className="p-3 text-center">Status</th>
+                  <th className="p-3 text-center">Dokumentasi Foto</th>
                   <th className="p-3 text-center w-20">Aksi</th>
                 </tr>
               </thead>
@@ -1146,6 +1315,61 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                     <td className="p-3 font-extrabold text-slate-900 whitespace-nowrap">{item.volumeRealisasi}</td>
                     <td className="p-3 text-slate-700 whitespace-nowrap">{item.sumberDana}</td>
                     <td className="p-3 text-center whitespace-nowrap">{getStatusBadge(item.statusRealisasi)}</td>
+                    <td className="p-3 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1">
+                        {item.fotoSebelumUrl && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewPhoto({
+                                title: `Sebelum (0%): ${item.namaProyek}`,
+                                url: item.fotoSebelumUrl!,
+                                category: 'sebelum',
+                              })
+                            }
+                            className="px-1.5 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-200 cursor-pointer"
+                            title="Lihat Foto Sebelum"
+                          >
+                            0%
+                          </button>
+                        )}
+                        {(item.fotoProsesUrl || (item.fotoProsesList && item.fotoProsesList.length > 0)) && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewPhoto({
+                                title: `Proses Pengerjaan: ${item.namaProyek}`,
+                                url: item.fotoProsesUrl || item.fotoProsesList![0],
+                                category: 'proses',
+                              })
+                            }
+                            className="px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-800 text-[10px] font-bold border border-blue-200 cursor-pointer"
+                            title="Lihat Foto Proses"
+                          >
+                            Proses{item.fotoProsesList && item.fotoProsesList.length > 1 ? ` (${item.fotoProsesList.length})` : ''}
+                          </button>
+                        )}
+                        {item.fotoSesudahUrl && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewPhoto({
+                                title: `Sesudah (100%): ${item.namaProyek}`,
+                                url: item.fotoSesudahUrl!,
+                                category: 'sesudah',
+                              })
+                            }
+                            className="px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 cursor-pointer"
+                            title="Lihat Foto Sesudah"
+                          >
+                            100%
+                          </button>
+                        )}
+                        {!item.fotoSebelumUrl && !item.fotoProsesUrl && (!item.fotoProsesList || item.fotoProsesList.length === 0) && !item.fotoSesudahUrl && (
+                          <span className="text-[10px] text-slate-400 italic">Nihil</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="p-3 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1">
                         <button
@@ -1393,6 +1617,32 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   className="hidden"
                 />
 
+                {/* Hidden File Inputs for Foto Proses (Camera & Multi-Gallery) */}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  ref={fileProsesCameraRef}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleProcessImage(file, 'proses');
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  ref={fileProsesGalleryRef}
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    if (files && files.length > 0) handleProcessImage(files, 'proses');
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+
                 <input
                   type="file"
                   accept="image/*"
@@ -1417,13 +1667,13 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   className="hidden"
                 />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   {/* Foto Sebelum (Before) */}
                   <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2.5 shadow-3xs">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
-                        Foto Sebelum (Before)
+                        Foto Sebelum (0%)
                       </label>
                       {formFotoSebelum && (
                         <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
@@ -1438,6 +1688,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                           <img
                             src={formFotoSebelum}
                             alt="Foto Sebelum"
+                            referrerPolicy="no-referrer"
                             className="w-full h-full object-cover"
                           />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
@@ -1445,7 +1696,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                               type="button"
                               onClick={() =>
                                 setPreviewPhoto({
-                                  title: 'Foto Sebelum (Before)',
+                                  title: 'Foto Sebelum (0%)',
                                   url: formFotoSebelum,
                                   category: 'sebelum',
                                 })
@@ -1471,7 +1722,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                             type="button"
                             onClick={() =>
                               setPreviewPhoto({
-                                title: 'Foto Sebelum (Before)',
+                                title: 'Foto Sebelum (0%)',
                                 url: formFotoSebelum,
                                 category: 'sebelum',
                               })
@@ -1563,6 +1814,237 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                     )}
                   </div>
 
+                  {/* Foto Proses Pengerjaan (Sedang Dikerjakan / On-Progress) */}
+                  <div className="bg-white p-3.5 rounded-xl border border-blue-200 space-y-2.5 shadow-3xs">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-blue-600 inline-block" />
+                        Foto Proses (Sedang Dikerjakan)
+                      </label>
+                      {(formFotoProses || formFotoProsesList.length > 0) && (
+                        <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                          ✓ {formFotoProsesList.length || 1} Foto Siap
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Optional Quick Preset Links */}
+                    <div className="flex items-center justify-between text-[10px] text-blue-800 bg-blue-50/60 px-2.5 py-1.5 rounded-lg border border-blue-100">
+                      <span className="font-bold">Contoh Foto Lapangan:</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {CONTOH_FOTO_PROSES_LIST.map((cth, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              if (!formFotoProsesList.includes(cth.url)) {
+                                setFormFotoProsesList((prev) => [...prev, cth.url]);
+                              }
+                              setFormFotoProses(cth.url);
+                              showToast(`Foto proses "${cth.nama}" dipilih`);
+                            }}
+                            className="text-[9px] font-bold text-blue-700 hover:text-blue-900 bg-white px-1.5 py-0.5 rounded border border-blue-200 cursor-pointer shadow-3xs hover:bg-blue-50"
+                          >
+                            + {cth.nama.split(' ')[0]} {cth.nama.split(' ')[1]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {formFotoProses || formFotoProsesList.length > 0 ? (
+                      <div className="space-y-2">
+                        {/* Main Featured Photo */}
+                        <div className="relative rounded-xl overflow-hidden border border-blue-300 group bg-slate-900 h-36">
+                          <img
+                            src={formFotoProses || formFotoProsesList[0]}
+                            alt="Foto Proses"
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPreviewPhoto({
+                                  title: 'Foto Proses (Sedang Dikerjakan)',
+                                  url: formFotoProses || formFotoProsesList[0],
+                                  category: 'proses',
+                                })
+                              }
+                              className="px-2.5 py-1.5 rounded-lg bg-white/90 hover:bg-white text-slate-800 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Lihat</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentUrl = formFotoProses || formFotoProsesList[0];
+                                const updatedList = formFotoProsesList.filter((u) => u !== currentUrl);
+                                setFormFotoProsesList(updatedList);
+                                setFormFotoProses(updatedList[0] || '');
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Hapus</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Multi-Photo Thumbnails */}
+                        {formFotoProsesList.length > 1 && (
+                          <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                            {formFotoProsesList.map((pUrl, pIdx) => (
+                              <div
+                                key={pIdx}
+                                className={`relative w-12 h-12 rounded-lg overflow-hidden border shrink-0 cursor-pointer ${
+                                  formFotoProses === pUrl ? 'border-blue-600 ring-2 ring-blue-400' : 'border-slate-200 opacity-80 hover:opacity-100'
+                                }`}
+                                onClick={() => setFormFotoProses(pUrl)}
+                              >
+                                <img src={pUrl} alt={`Foto ${pIdx + 1}`} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const updated = formFotoProsesList.filter((_, i) => i !== pIdx);
+                                    setFormFotoProsesList(updated);
+                                    if (formFotoProses === pUrl) setFormFotoProses(updated[0] || '');
+                                  }}
+                                  className="absolute top-0.5 right-0.5 p-0.5 bg-black/60 hover:bg-rose-600 text-white rounded-full text-[8px]"
+                                  title="Hapus foto ini"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPreviewPhoto({
+                                title: 'Foto Proses (Sedang Dikerjakan)',
+                                url: formFotoProses || formFotoProsesList[0],
+                                category: 'proses',
+                              })
+                            }
+                            className="text-[10px] text-blue-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Perbesar Foto</span>
+                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => fileProsesGalleryRef.current?.click()}
+                              className="text-[10px] text-blue-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>+ Tambah Foto</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormFotoProses('');
+                                setFormFotoProsesList([]);
+                              }}
+                              className="text-[10px] text-rose-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Reset</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {isProcessingProses ? (
+                          <div className="h-28 rounded-xl bg-blue-50 border border-blue-200 border-dashed flex flex-col items-center justify-center gap-2 text-blue-700">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span className="text-[11px] font-bold">Memproses foto dari HP...</span>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => fileProsesCameraRef.current?.click()}
+                              className="h-24 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 flex flex-col items-center justify-center gap-1.5 p-2 transition-all cursor-pointer group active:scale-95 shadow-3xs"
+                            >
+                              <div className="p-2 rounded-full bg-blue-600 text-white group-hover:scale-110 transition-transform">
+                                <Camera className="w-4 h-4" />
+                              </div>
+                              <span className="text-[11px] font-black leading-tight text-center">
+                                Kamera HP
+                              </span>
+                              <span className="text-[9px] text-blue-700 font-medium">Jepret Langsung</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => fileProsesGalleryRef.current?.click()}
+                              className="h-24 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-900 border border-slate-200 flex flex-col items-center justify-center gap-1.5 p-2 transition-all cursor-pointer group active:scale-95 shadow-3xs"
+                            >
+                              <div className="p-2 rounded-full bg-slate-700 text-white group-hover:scale-110 transition-transform">
+                                <ImageIcon className="w-4 h-4" />
+                              </div>
+                              <span className="text-[11px] font-black leading-tight text-center">
+                                Galeri HP
+                              </span>
+                              <span className="text-[9px] text-slate-500 font-medium">Bisa Banyak Foto</span>
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="pt-1">
+                          {showUrlInputProses ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="url"
+                                placeholder="Paste link URL gambar proses..."
+                                value={customProsesUrl}
+                                onChange={(e) => setCustomProsesUrl(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 font-mono text-[10px]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (customProsesUrl.trim()) {
+                                    setFormFotoProses(customProsesUrl.trim());
+                                    setFormFotoProsesList((prev) => [...prev, customProsesUrl.trim()]);
+                                    setCustomProsesUrl('');
+                                    setShowUrlInputProses(false);
+                                  }
+                                }}
+                                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg cursor-pointer shrink-0"
+                              >
+                                Pasang
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowUrlInputProses(false)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setShowUrlInputProses(true)}
+                              className="text-[10px] text-blue-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Link2 className="w-3 h-3" />
+                              <span>Atau masukkan link URL foto proses</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Foto Sesudah (After 100%) */}
                   <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2.5 shadow-3xs">
                     <div className="flex items-center justify-between">
@@ -1583,6 +2065,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                           <img
                             src={formFotoSesudah}
                             alt="Foto Sesudah"
+                            referrerPolicy="no-referrer"
                             className="w-full h-full object-cover"
                           />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
@@ -1761,7 +2244,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
             </div>
 
             <div className="rounded-2xl overflow-hidden max-h-96 bg-black flex items-center justify-center">
-              <img src={previewPhoto.url} alt={previewPhoto.title} className="w-full h-full object-contain" />
+              <img src={previewPhoto.url} alt={previewPhoto.title} referrerPolicy="no-referrer" className="w-full h-full object-contain" />
             </div>
 
             <div className="flex justify-end">

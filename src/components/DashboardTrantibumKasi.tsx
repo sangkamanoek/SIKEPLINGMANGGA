@@ -1234,6 +1234,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                             <img
                               src={item.latestInfraPhoto.url}
                               alt="Foto Infrastruktur"
+                              referrerPolicy="no-referrer"
                               className="w-full h-full object-cover"
                               loading="lazy"
                             />
