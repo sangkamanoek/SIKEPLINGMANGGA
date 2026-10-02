@@ -33,6 +33,7 @@ import {
   Info,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, AbsenApelItem } from '../types';
+import { KopSuratResmi } from './KopSuratResmi';
 import {
   formatTanggalIndonesia,
   generateReportPdfFileName,
@@ -1110,39 +1111,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               <div className="bg-slate-200 p-2 sm:p-4 rounded-xl overflow-x-auto flex flex-col items-center gap-4">
                 <div className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300">
                   {/* Kop Surat Pemko Medan */}
-                  <div className="flex items-center gap-3.5 pt-1 pb-2 border-b-[3px] border-black mb-2.5">
-                    <img
-                      src="/logo_pemko_medan.png"
-                      alt="Logo Pemko Medan"
-                      crossOrigin="anonymous"
-                      className="shrink-0 ml-1"
-                      style={{
-                        width: '74px',
-                        height: '89px',
-                        minWidth: '74px',
-                        maxWidth: '74px',
-                        objectFit: 'contain',
-                        display: 'block',
-                      }}
-                    />
-                    <div className="text-center flex-1 pr-[74px]">
-                      <div className="text-[12.5pt] uppercase font-sans text-black leading-tight font-bold tracking-[0.04em] mb-0.5">
-                        PEMERINTAH KOTA MEDAN
-                      </div>
-                      <div className="text-[12.5pt] uppercase font-sans text-black leading-tight font-bold tracking-[0.04em] mb-1">
-                        KECAMATAN MEDAN TUNTUNGAN
-                      </div>
-                      <div className="text-[16.5pt] font-black uppercase font-sans text-black leading-tight tracking-[0.05em] mb-1">
-                        KELURAHAN MANGGA
-                      </div>
-                      <div className="text-[8.5pt] text-black font-sans leading-snug mb-0.5">
-                        Jalan Tembakau Raya No. 35 A P. Simalingkar - Medan
-                      </div>
-                      <div className="text-[8pt] text-slate-800 font-sans leading-snug">
-                        Laman kel.mangga@pemkomedan.go.id
-                      </div>
-                    </div>
-                  </div>
+                  <KopSuratResmi />
 
                   {/* Judul Laporan */}
                   <div className="text-center my-2.5">
@@ -2725,7 +2694,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         <img
                           src={foto.url}
                           alt={foto.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                         {/* Delete Button (Trash Icon) */}
                         <button
@@ -2968,65 +2937,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         <div className="page-print-single" style={{ minHeight: 'auto', display: 'flex', flexDirection: 'column' }}>
           <div>
             {/* KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
-            <div
-              className="flex items-center gap-3.5 pb-2 border-b-[3px] border-black mb-2.5"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                borderBottom: '3px solid #000000',
-                paddingTop: '2px',
-                paddingBottom: '8px',
-                marginBottom: '10px',
-              }}
-            >
-              <img
-                src="/logo_pemko_medan.png"
-                alt="Logo Pemko Medan"
-                crossOrigin="anonymous"
-                className="shrink-0"
-                style={{
-                  width: '74px',
-                  height: '89px',
-                  minWidth: '74px',
-                  maxWidth: '74px',
-                  objectFit: 'contain',
-                  display: 'block',
-                }}
-              />
-              <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '74px' }}>
-                <div
-                  className="text-[12.5pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
-                  style={{ fontSize: '12.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.25', marginBottom: '2px' }}
-                >
-                  PEMERINTAH KOTA MEDAN
-                </div>
-                <div
-                  className="text-[12.5pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
-                  style={{ fontSize: '12.5pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.25', marginBottom: '3px' }}
-                >
-                  KECAMATAN MEDAN TUNTUNGAN
-                </div>
-                <div
-                  className="text-[16.5pt] font-black uppercase font-sans text-black tracking-[0.05em]"
-                  style={{ fontSize: '16.5pt', fontWeight: '900', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2', marginBottom: '4px' }}
-                >
-                  KELURAHAN MANGGA
-                </div>
-                <div
-                  className="text-[8.5pt] text-black font-sans"
-                  style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.35', marginBottom: '1.5px' }}
-                >
-                  Jalan Tembakau Raya No. 35 A P. Simalingkar - Medan
-                </div>
-                <div
-                  className="text-[8pt] text-slate-800 font-sans"
-                  style={{ fontSize: '8pt', fontFamily: 'sans-serif', color: '#1e293b', lineHeight: '1.35' }}
-                >
-                  Laman kel.mangga@pemkomedan.go.id
-                </div>
-              </div>
-            </div>
+            <KopSuratResmi />
 
             {/* JUDUL LAPORAN */}
             <div className="text-center my-2.5" style={{ textAlign: 'center', margin: '8px 0' }}>

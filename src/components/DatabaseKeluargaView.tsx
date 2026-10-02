@@ -53,6 +53,7 @@ import {
   exportDataKeluargaToExcel,
   downloadImportTemplateExcel,
   parseDataKeluargaFile,
+  parseDataKeluargaText,
   batchSaveDataKeluarga,
   ImportParsedResult,
 } from '../lib/dataKeluargaService';
@@ -99,6 +100,8 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
   // Import State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<'file' | 'paste'>('file');
+  const [rawPasteText, setRawPasteText] = useState<string>('');
   const [isParsingImport, setIsParsingImport] = useState<boolean>(false);
   const [parseResult, setParseResult] = useState<ImportParsedResult | null>(null);
   const [isImporting, setIsImporting] = useState<boolean>(false);
@@ -350,6 +353,32 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     } catch (err: any) {
       console.error('Error parsing import file:', err);
       if (onShowToast) onShowToast('Gagal membaca berkas: ' + (err.message || err), 'error');
+    } finally {
+      setIsParsingImport(false);
+    }
+  };
+
+  // Handle Text Paste Parsing
+  const handleTextParse = async () => {
+    if (!rawPasteText.trim()) {
+      if (onShowToast) onShowToast('Silakan tempelkan data teks terlebih dahulu.', 'error');
+      return;
+    }
+    setIsParsingImport(true);
+    setParseResult(null);
+    try {
+      const result = await parseDataKeluargaText(rawPasteText);
+      setParseResult(result);
+      if (onShowToast) {
+        if (result.validCount > 0) {
+          onShowToast(`Berhasil membaca ${result.validCount} KK dari teks yang ditempel.`, 'success');
+        } else {
+          onShowToast('Tidak ada data KK valid yang terdeteksi dari teks.', 'error');
+        }
+      }
+    } catch (err: any) {
+      console.error('Error parsing paste text:', err);
+      if (onShowToast) onShowToast('Gagal membaca teks: ' + (err.message || err), 'error');
     } finally {
       setIsParsingImport(false);
     }
@@ -1062,48 +1091,129 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
             </div>
           </div>
 
-          {/* File Upload Zone */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept=".xlsx, .xls, .csv"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  handleFileSelect(e.target.files[0]);
-                }
+          {/* Mode Selector: File Upload vs Text Paste */}
+          <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200">
+            <button
+              type="button"
+              onClick={() => {
+                setImportMode('file');
+                setParseResult(null);
               }}
-            />
-
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/20 rounded-3xl p-8 sm:p-12 text-center cursor-pointer transition-all group"
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                importMode === 'file'
+                  ? 'bg-white text-emerald-900 shadow-sm border border-emerald-200'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
-              <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                <FileUp className="w-8 h-8" />
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Unggah Berkas Excel / CSV</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setImportMode('paste');
+                setParseResult(null);
+              }}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                importMode === 'paste'
+                  ? 'bg-white text-emerald-900 shadow-sm border border-emerald-200'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileUp className="w-4 h-4 text-emerald-600" />
+              <span>Salin-Tempel Teks (Paste Data KK)</span>
+            </button>
+          </div>
+
+          {/* Import Content Area */}
+          {importMode === 'file' ? (
+            /* File Upload Zone */
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".xlsx, .xls, .csv"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleFileSelect(e.target.files[0]);
+                  }
+                }}
+              />
+
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/20 rounded-3xl p-8 sm:p-12 text-center cursor-pointer transition-all group"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                  <FileUp className="w-8 h-8" />
+                </div>
+                <h4 className="text-base font-black text-slate-900">
+                  Pilih Berkas Excel / CSV Data Keluarga
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Klik di sini untuk memilih berkas (.xlsx, .xls, .csv) dari komputer Anda
+                </p>
+                {importFile && (
+                  <div className="mt-4 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-100 text-emerald-950 text-xs font-black border border-emerald-300">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                    <span>{importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                )}
               </div>
-              <h4 className="text-base font-black text-slate-900">
-                Pilih Berkas Excel / CSV Data Keluarga
-              </h4>
-              <p className="text-xs text-slate-500 mt-1">
-                Klik di sini untuk memilih berkas (.xlsx, .xls, .csv) dari komputer Anda
-              </p>
-              {importFile && (
-                <div className="mt-4 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-100 text-emerald-950 text-xs font-black border border-emerald-300">
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
-                  <span>{importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)</span>
+
+              {isParsingImport && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl text-center text-xs font-bold text-blue-900 flex items-center justify-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                  <span>Membaca dan memvalidasi struktur berkas Excel...</span>
                 </div>
               )}
             </div>
-
-            {isParsingImport && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl text-center text-xs font-bold text-blue-900 flex items-center justify-center gap-2">
-                <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                <span>Membaca dan memvalidasi struktur berkas Excel...</span>
+          ) : (
+            /* Text Paste Zone */
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div className="space-y-1">
+                <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <span>Tempel Teks (Copy-Paste) Data Keluarga</span>
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Salin teks dari Excel/Notepad/WhatsApp (dipisahkan Tab atau Koma) dan tempelkan di kotak bawah ini. Contoh: <code className="bg-slate-100 px-2 py-0.5 rounded text-slate-800 font-bold">BASMI KABAN	1271072412650002	GG. BERAS MUNTE NO.22 LK-II MEDAN	LINGKUNGAN 2</code>
+                </p>
               </div>
-            )}
-          </div>
+
+              <textarea
+                rows={6}
+                value={rawPasteText}
+                onChange={(e) => setRawPasteText(e.target.value)}
+                placeholder={`Contoh:\nBASMI KABAN\t1271072412650002\tGG. BERAS MUNTE NO.22 LK-II MEDAN\tLINGKUNGAN 2\nSUPRIADI\t1271071508820001\tJL. BUNGA NCOLE NO.15\tLINGKUNGAN 1`}
+                className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-300 font-mono text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRawPasteText('')}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                >
+                  Bersihkan Teks
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTextParse}
+                  disabled={isParsingImport || !rawPasteText.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isParsingImport ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4" />
+                  )}
+                  <span>Proses Teks & Validasi Data</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Parsed Result & Validation Summary */}
           {parseResult && (

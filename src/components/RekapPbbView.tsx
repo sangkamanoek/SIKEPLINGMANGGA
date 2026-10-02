@@ -2612,6 +2612,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                               🏷️ DISKON
                             </span>
                           )}
+                          {item.jumlahBayar !== undefined && item.jumlahBayar !== null && item.jumlahBayar > item.pbbTerutang && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-100 text-purple-900 border border-purple-300 flex items-center gap-1 whitespace-nowrap" title={`Termasuk Denda Keterlambatan Pembayaran PBB (+${formatRupiah(item.jumlahBayar - item.pbbTerutang)})`}>
+                              ⚡ +DENDA
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-2.5 px-3 text-slate-600 text-xs">{item.alamatOp}</td>
@@ -2633,11 +2638,18 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                             ? item.jumlahBayar
                             : item.pbbTerutang;
                           const pct = item.pbbTerutang > 0 ? (paid / item.pbbTerutang) * 100 : 100;
-                          if (pct < 100) {
+                          if (pct < 99.95) {
                             return (
                               <div className="flex flex-col items-center leading-none gap-0.5">
-                                <span className="text-amber-600 font-extrabold">{pct.toFixed(0)}%</span>
+                                <span className="text-amber-600 font-extrabold">{Math.round(pct)}%</span>
                                 <span className="text-[8px] font-black px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded border border-amber-200 uppercase tracking-tight scale-90">Potong</span>
+                              </div>
+                            );
+                          } else if (pct > 100.05) {
+                            return (
+                              <div className="flex flex-col items-center leading-none gap-0.5">
+                                <span className="text-purple-700 font-black">{Math.round(pct)}%</span>
+                                <span className="text-[8px] font-black px-1.5 py-0.5 bg-purple-100 text-purple-900 rounded border border-purple-300 uppercase tracking-tight scale-90">+Denda</span>
                               </div>
                             );
                           }
@@ -3340,12 +3352,18 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                         if (paidVal < originalVal) {
                           return (
                             <span className="text-amber-600 font-black">
-                              ⚠️ Terpotong: -{formatRupiah(originalVal - paidVal)}
+                              ⚠️ Terpotong: -{formatRupiah(originalVal - paidVal)} ({((paidVal / originalVal) * 100).toFixed(1)}%)
+                            </span>
+                          );
+                        } else if (paidVal > originalVal) {
+                          return (
+                            <span className="text-purple-700 font-black">
+                              ⚡ Termasuk Denda: +{formatRupiah(paidVal - originalVal)} ({((paidVal / originalVal) * 100).toFixed(1)}%)
                             </span>
                           );
                         }
                         return (
-                          <span className="text-emerald-700">
+                          <span className="text-emerald-700 font-bold">
                             Bayar Penuh (100%)
                           </span>
                         );
@@ -3353,7 +3371,35 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                     </div>
 
                     <div className="pt-2 border-t border-emerald-200/60 mt-2 flex flex-wrap items-center gap-1.5">
-                      <span className="text-[10px] font-extrabold text-emerald-900 uppercase">Preset Stimulus Diskon PBB:</span>
+                      <span className="text-[10px] font-extrabold text-slate-700 uppercase">Preset Denda / Diskon:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
+                          if (base > 0) {
+                            setFormJumlahBayar(String(Math.round(base * 1.02)));
+                            setFormKeterangan((prev) => prev || 'Termasuk Denda Keterlambatan PBB 2% (1 Bulan)');
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-900 text-[10px] font-extrabold cursor-pointer border border-purple-300"
+                        title="Denda 2% keterlambatan lewat 30 September"
+                      >
+                        ⚡ Denda 2% (1 bln)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
+                          if (base > 0) {
+                            setFormJumlahBayar(String(Math.round(base * 1.04)));
+                            setFormKeterangan((prev) => prev || 'Termasuk Denda Keterlambatan PBB 4% (2 Bulan)');
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-900 text-[10px] font-extrabold cursor-pointer border border-purple-300"
+                        title="Denda 4% keterlambatan 2 bulan"
+                      >
+                        ⚡ Denda 4% (2 bln)
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -3366,32 +3412,6 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                         className="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-extrabold cursor-pointer border border-emerald-300"
                       >
                         🏷️ Diskon 10%
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
-                          if (base > 0) {
-                            setFormJumlahBayar(String(Math.round(base * 0.8)));
-                            setFormKeterangan((prev) => prev || 'Mendapat Diskon Stimulus PBB 20% Bapenda Pemko Medan');
-                          }
-                        }}
-                        className="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-extrabold cursor-pointer border border-emerald-300"
-                      >
-                        🏷️ Diskon 20%
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
-                          if (base > 0) {
-                            setFormJumlahBayar(String(Math.round(base * 0.5)));
-                            setFormKeterangan((prev) => prev || 'Mendapat Diskon Keringanan PBB 50%');
-                          }
-                        }}
-                        className="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-extrabold cursor-pointer border border-emerald-300"
-                      >
-                        🏷️ Diskon 50%
                       </button>
                       <button
                         type="button"

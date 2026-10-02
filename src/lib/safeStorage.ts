@@ -94,6 +94,14 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
                 };
               });
             }
+            // Strip heavy base64 photo lists for realisasi pembangunan if quota hit
+            const stripHeavyStr = (url?: string) => (typeof url === 'string' && url.startsWith('data:') && url.length > 500 ? '' : url);
+            if (copy.fotoSebelumUrl) copy.fotoSebelumUrl = stripHeavyStr(copy.fotoSebelumUrl);
+            if (copy.fotoProsesUrl) copy.fotoProsesUrl = stripHeavyStr(copy.fotoProsesUrl);
+            if (copy.fotoSesudahUrl) copy.fotoSesudahUrl = stripHeavyStr(copy.fotoSesudahUrl);
+            if (Array.isArray(copy.fotoSebelumList)) copy.fotoSebelumList = copy.fotoSebelumList.map(stripHeavyStr).filter(Boolean);
+            if (Array.isArray(copy.fotoProsesList)) copy.fotoProsesList = copy.fotoProsesList.map(stripHeavyStr).filter(Boolean);
+            if (Array.isArray(copy.fotoSesudahList)) copy.fotoSesudahList = copy.fotoSesudahList.map(stripHeavyStr).filter(Boolean);
             if (copy.absenApel && typeof copy.absenApel === 'object') {
               copy.absenApel = {
                 ...copy.absenApel,

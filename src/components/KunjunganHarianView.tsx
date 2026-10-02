@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { printOfficialDocument } from '../utils/printHelper';
+import { KopSuratResmi } from './KopSuratResmi';
 import {
   Users,
   Calendar,
@@ -359,19 +360,10 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
 
   return (
     <div id="lembar-cetak-kunjungan-harian" className="space-y-5">
-      {/* Kop Surat Resmi Pemko Medan (Hanya Tampak Saat Cetak PDF/Printer) */}
-      <div className="hidden print:block border-b-2 border-black pb-3 mb-4 text-center">
-        <div className="flex items-center justify-between">
-          <img src="/logo_pemko_medan.svg" alt="Logo Pemko Medan" className="w-16 h-16 object-contain" />
-          <div className="text-center flex-1 px-4">
-            <h3 className="font-extrabold text-sm uppercase tracking-wide">PEMERINTAH KOTA MEDAN</h3>
-            <h2 className="font-black text-base uppercase tracking-wider">KECAMATAN MEDAN TUNTUNGAN</h2>
-            <h1 className="font-black text-lg uppercase tracking-wider">KELURAHAN MANGGA</h1>
-            <p className="text-[10px] font-medium text-slate-700">Jl. Keuangan No. 1, Medan Tuntungan, Kota Medan, Sumatera Utara</p>
-          </div>
-          <div className="w-16 h-16" />
-        </div>
-        <div className="mt-2 pt-1 border-t border-black text-center">
+      {/* Kop Surat Resmi Pemko Medan (Gambar 1 - Hanya Tampak Saat Cetak PDF/Printer) */}
+      <div className="hidden print:block mb-4">
+        <KopSuratResmi />
+        <div className="mt-1 pt-1 text-center">
           <h4 className="font-black text-sm uppercase tracking-wider text-slate-900">
             BUKU REKAPITULASI KUNJUNGAN HARIAN LAPANGAN (DOOR-TO-DOOR)
           </h4>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { RealisasiPembangunan, UserAccount } from '../types';
 import { Printer, Download, X, CheckCircle2, MapPin, Calendar, Building, Sparkles, FileText, Layers } from 'lucide-react';
 import { downloadProjectPhotosAsZip, downloadImage, getHighResImageUrl } from '../lib/imageDownloader';
+import { KopSuratResmi } from './KopSuratResmi';
 
 interface CetakLaporanPembangunanModalProps {
   isOpen: boolean;
@@ -120,12 +121,24 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
             break-after: auto !important;
           }
           .photo-thumb-box {
-            height: 58px !important;
-            max-height: 58px !important;
+            height: 100px !important;
+            max-height: 120px !important;
           }
-          .photo-thumb-box-sm {
-            height: 52px !important;
-            max-height: 52px !important;
+          .photo-box-1 {
+            height: 160px !important;
+            max-height: 180px !important;
+          }
+          .photo-box-2 {
+            height: 130px !important;
+            max-height: 150px !important;
+          }
+          .photo-box-3 {
+            height: 110px !important;
+            max-height: 125px !important;
+          }
+          .photo-box-4 {
+            height: 90px !important;
+            max-height: 105px !important;
           }
         }
       `}</style>
@@ -255,34 +268,8 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
                 >
                   {/* TOP CONTAINER: KOP + METADATA + FOTO */}
                   <div className="space-y-1.5">
-                    {/* 1. KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
-                    <div className="border-b-2 border-slate-950 pb-1.5 text-center">
-                      <div className="flex items-center justify-center gap-3">
-                        <div className="w-11 h-11 shrink-0 flex items-center justify-center">
-                          <img
-                            src="https://upload.wikimedia.org/wikipedia/commons/e/eb/Lambang_Kota_Medan.png"
-                            alt="Logo Pemko Medan"
-                            referrerPolicy="no-referrer"
-                            crossOrigin="anonymous"
-                            className="w-11 h-11 object-contain"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                        </div>
-                        <div className="text-center">
-                          <h3 className="text-[10px] font-bold tracking-wider text-slate-800 uppercase leading-tight">
-                            PEMERINTAH KOTA MEDAN • KECAMATAN MEDAN TUNTUNGAN
-                          </h3>
-                          <h1 className="text-sm font-black text-blue-950 tracking-tight uppercase leading-tight">
-                            KELURAHAN MANGGA
-                          </h1>
-                          <p className="text-[8px] text-slate-600 font-medium leading-tight">
-                            Jl. Bunga Ncole No. 5, Kelurahan Mangga, Kec. Medan Tuntungan, Kota Medan 20135
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                    {/* 1. KOP SURAT RESMI PEMERINTAH KOTA MEDAN (GAMBAR 1) */}
+                    <KopSuratResmi />
 
                     {/* 2. JUDUL LEMBAR LAPORAN */}
                     <div className="text-center space-y-0.5 pt-0.5">
@@ -369,7 +356,7 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
                         </span>
                       </div>
 
-                      {/* TAHAP 1: KONDISI AWAL (0%) - 3 FOTO */}
+                      {/* TAHAP 1: KONDISI AWAL (0%) */}
                       <div className="space-y-0.5">
                         <div className="flex items-center justify-between text-[7.5px] font-black text-rose-950 uppercase leading-none">
                           <span className="flex items-center gap-1">
@@ -378,27 +365,36 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
                           </span>
                           <span className="text-slate-500">{sebelumList.length} Foto</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-1">
-                          {sebelumList.slice(0, 3).map((photoUrl, pIdx) => (
-                            <div key={pIdx} className="space-y-0.5">
-                              <div className="photo-thumb-box rounded border border-slate-300 overflow-hidden h-15 sm:h-16 bg-slate-100">
-                                <img
-                                  src={getHighResImageUrl(photoUrl)}
-                                  alt={`Awal ${pIdx + 1}`}
-                                  referrerPolicy="no-referrer"
-                                  crossOrigin="anonymous"
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <span className="block text-[7px] text-center font-bold text-slate-600 truncate">
-                                Foto 1.{pIdx + 1}: Titik 0% Awal
-                              </span>
+                        {(() => {
+                          const display = sebelumList.slice(0, 3);
+                          const c = display.length;
+                          if (c === 0) return null;
+                          const gridCls = c === 1 ? 'grid-cols-1 max-w-md mx-auto' : c === 2 ? 'grid-cols-2 max-w-lg mx-auto justify-center' : 'grid-cols-3';
+                          const hCls = c === 1 ? 'h-44 sm:h-52 photo-box-1' : c === 2 ? 'h-36 sm:h-44 photo-box-2' : 'h-30 sm:h-36 photo-box-3';
+                          return (
+                            <div className={`grid ${gridCls} gap-2`}>
+                              {display.map((photoUrl, pIdx) => (
+                                <div key={pIdx} className="space-y-0.5">
+                                  <div className={`rounded-xl border border-slate-300 overflow-hidden ${hCls} bg-slate-900/5 shadow-2xs flex items-center justify-center`}>
+                                    <img
+                                      src={getHighResImageUrl(photoUrl)}
+                                      alt={`Awal ${pIdx + 1}`}
+                                      referrerPolicy="no-referrer"
+                                      crossOrigin="anonymous"
+                                      className="w-full h-full object-contain"
+                                    />
+                                  </div>
+                                  <span className="block text-[7.5px] text-center font-bold text-slate-700 truncate">
+                                    Foto 1.{pIdx + 1}: Titik 0% Awal
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })()}
                       </div>
 
-                      {/* TAHAP 2: PROSES PENGERJAAN (50%) - 4 FOTO */}
+                      {/* TAHAP 2: PROSES PENGERJAAN (50%) */}
                       <div className="space-y-0.5">
                         <div className="flex items-center justify-between text-[7.5px] font-black text-blue-950 uppercase leading-none">
                           <span className="flex items-center gap-1">
@@ -407,27 +403,42 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
                           </span>
                           <span className="text-slate-500">{prosesList.length} Foto</span>
                         </div>
-                        <div className="grid grid-cols-4 gap-1">
-                          {prosesList.slice(0, 4).map((photoUrl, pIdx) => (
-                            <div key={pIdx} className="space-y-0.5">
-                              <div className="photo-thumb-box-sm rounded border border-slate-300 overflow-hidden h-14 sm:h-15 bg-slate-100">
-                                <img
-                                  src={getHighResImageUrl(photoUrl)}
-                                  alt={`Proses ${pIdx + 1}`}
-                                  referrerPolicy="no-referrer"
-                                  crossOrigin="anonymous"
-                                  className="w-full h-full object-cover"
-                                />
+                        {(() => {
+                          const display = prosesList.slice(0, 4);
+                          const c = display.length;
+                          if (c === 0) {
+                            return (
+                              <div className="p-1.5 bg-slate-50 border border-dashed border-slate-300 rounded text-center text-[7.5px] text-slate-500 font-medium">
+                                Belum ada foto proses pengerjaan
                               </div>
-                              <span className="block text-[7px] text-center font-bold text-slate-600 truncate">
-                                Foto 2.{pIdx + 1}: Progres Fisik
-                              </span>
+                            );
+                          }
+                          const gridCls = c === 1 ? 'grid-cols-1 max-w-md mx-auto' : c === 2 ? 'grid-cols-2 max-w-lg mx-auto justify-center' : c === 3 ? 'grid-cols-3' : 'grid-cols-4';
+                          const hCls = c === 1 ? 'h-44 sm:h-52 photo-box-1' : c === 2 ? 'h-36 sm:h-44 photo-box-2' : c === 3 ? 'h-30 sm:h-36 photo-box-3' : 'h-24 sm:h-30 photo-box-4';
+                          return (
+                            <div className={`grid ${gridCls} gap-2`}>
+                              {display.map((photoUrl, pIdx) => (
+                                <div key={pIdx} className="space-y-0.5">
+                                  <div className={`rounded-xl border border-slate-300 overflow-hidden ${hCls} bg-slate-900/5 shadow-2xs flex items-center justify-center`}>
+                                    <img
+                                      src={getHighResImageUrl(photoUrl)}
+                                      alt={`Proses ${pIdx + 1}`}
+                                      referrerPolicy="no-referrer"
+                                      crossOrigin="anonymous"
+                                      className="w-full h-full object-contain"
+                                    />
+                                  </div>
+                                  <span className="block text-[7.5px] text-center font-bold text-slate-700 truncate">
+                                    Foto 2.{pIdx + 1}: Progres Fisik
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })()}
                       </div>
 
-                      {/* TAHAP 3: KONDISI SELESAI (100%) - 3 FOTO */}
+                      {/* TAHAP 3: KONDISI SELESAI (100%) */}
                       <div className="space-y-0.5">
                         <div className="flex items-center justify-between text-[7.5px] font-black text-emerald-950 uppercase leading-none">
                           <span className="flex items-center gap-1">
@@ -436,32 +447,41 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
                           </span>
                           <span className="text-slate-500">{sesudahList.length} Foto</span>
                         </div>
-                        {sesudahList.length > 0 ? (
-                          <div className="grid grid-cols-3 gap-1">
-                            {sesudahList.slice(0, 3).map((photoUrl, pIdx) => (
-                              <div key={pIdx} className="space-y-0.5">
-                                <div className="photo-thumb-box rounded border border-slate-300 overflow-hidden h-15 sm:h-16 bg-slate-100">
-                                  <img
-                                    src={getHighResImageUrl(photoUrl)}
-                                    alt={`Selesai ${pIdx + 1}`}
-                                    referrerPolicy="no-referrer"
-                                    crossOrigin="anonymous"
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                                <span className="block text-[7px] text-center font-bold text-slate-600 truncate">
-                                  Foto 3.{pIdx + 1}: Hasil Akhir 100%
-                                </span>
+                        {(() => {
+                          const display = sesudahList.slice(0, 3);
+                          const c = display.length;
+                          if (c === 0) {
+                            return (
+                              <div className="p-1.5 bg-slate-50 border border-dashed border-slate-300 rounded text-center text-[7.5px] text-slate-500 font-medium">
+                                {item.statusRealisasi === 'PROSES_PENGERJAAN'
+                                  ? 'Proyek sedang berjalan di lapangan (foto 100% diunggah saat tuntas)'
+                                  : 'Belum ada foto tuntas'}
                               </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="p-1.5 bg-slate-50 border border-dashed border-slate-300 rounded text-center text-[7.5px] text-slate-500 font-medium">
-                            {item.statusRealisasi === 'PROSES_PENGERJAAN'
-                              ? 'Proyek sedang berjalan di lapangan (foto 100% diunggah saat tuntas)'
-                              : 'Belum ada foto tuntas'}
-                          </div>
-                        )}
+                            );
+                          }
+                          const gridCls = c === 1 ? 'grid-cols-1 max-w-md mx-auto' : c === 2 ? 'grid-cols-2 max-w-lg mx-auto justify-center' : 'grid-cols-3';
+                          const hCls = c === 1 ? 'h-44 sm:h-52 photo-box-1' : c === 2 ? 'h-36 sm:h-44 photo-box-2' : 'h-30 sm:h-36 photo-box-3';
+                          return (
+                            <div className={`grid ${gridCls} gap-2`}>
+                              {display.map((photoUrl, pIdx) => (
+                                <div key={pIdx} className="space-y-0.5">
+                                  <div className={`rounded-xl border border-slate-300 overflow-hidden ${hCls} bg-slate-900/5 shadow-2xs flex items-center justify-center`}>
+                                    <img
+                                      src={getHighResImageUrl(photoUrl)}
+                                      alt={`Selesai ${pIdx + 1}`}
+                                      referrerPolicy="no-referrer"
+                                      crossOrigin="anonymous"
+                                      className="w-full h-full object-contain"
+                                    />
+                                  </div>
+                                  <span className="block text-[7.5px] text-center font-bold text-slate-700 truncate">
+                                    Foto 3.{pIdx + 1}: Hasil Akhir 100%
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -482,9 +502,8 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
 
                     <div className="grid grid-cols-2 gap-6 text-center pt-0.5">
                       <div>
-                        <p className="font-bold text-slate-900 text-[8px]">
-                          Mengetahui / Menyetujui,<br />
-                          <strong>LURAH KELURAHAN MANGGA</strong>
+                        <p className="font-bold text-slate-900 text-[8.5px]">
+                          Mengetahui / Menyetujui,
                         </p>
                         <div className="h-10 sm:h-12 flex items-center justify-center">
                           {/* Signature space */}
@@ -500,16 +519,15 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
                       </div>
 
                       <div>
-                        <p className="font-bold text-slate-900 text-[8px]">
-                          Petugas Lapangan / Verifikator,<br />
-                          <strong>KASI TRANTIBUM / KEPALA LINGKUNGAN {item.lingkunganNomor}</strong>
+                        <p className="font-bold text-slate-900 text-[8.5px]">
+                          Petugas Lapangan / Verifikator,
                         </p>
                         <div className="h-10 sm:h-12 flex items-center justify-center">
                           {/* Signature space */}
                         </div>
                         <div className="space-y-0.2">
                           <p className="font-black text-slate-950 underline uppercase text-[8.5px]">
-                            {item.createdByName || currentUser.nama || 'KEPALA LINGKUNGAN'}
+                            {item.createdByName || currentUser.nama || 'PETUGAS LAPANGAN'}
                           </p>
                           <p className="text-[7px] text-slate-600">
                             Kelurahan Mangga - Kec. Medan Tuntungan
@@ -534,23 +552,8 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
             style={{ minHeight: '265mm', maxHeight: '280mm' }}
           >
             <div className="space-y-2.5">
-              {/* Kop Surat */}
-              <div className="border-b-2 border-slate-950 pb-1.5 text-center">
-                <div className="flex items-center justify-center gap-3">
-                  <img
-                    src="https://upload.wikimedia.org/wikipedia/commons/e/eb/Lambang_Kota_Medan.png"
-                    alt="Logo Pemko Medan"
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    className="w-11 h-11 object-contain"
-                  />
-                  <div className="text-center">
-                    <h3 className="text-[10px] font-bold text-slate-800 uppercase">PEMERINTAH KOTA MEDAN • KECAMATAN MEDAN TUNTUNGAN</h3>
-                    <h1 className="text-sm font-black text-blue-950 uppercase">KELURAHAN MANGGA</h1>
-                    <p className="text-[8px] text-slate-600">Jl. Bunga Ncole No. 5, Kelurahan Mangga, Kec. Medan Tuntungan, Kota Medan 20135</p>
-                  </div>
-                </div>
-              </div>
+              {/* Kop Surat (Gambar 1) */}
+              <KopSuratResmi />
 
               {/* Title */}
               <div className="text-center space-y-0.5">
@@ -638,9 +641,8 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
               </div>
               <div className="grid grid-cols-2 gap-6 text-center pt-0.5">
                 <div>
-                  <p className="font-bold text-slate-900 text-[8px]">
-                    Mengetahui / Menyetujui,<br />
-                    <strong>LURAH KELURAHAN MANGGA</strong>
+                  <p className="font-bold text-slate-900 text-[8.5px]">
+                    Mengetahui / Menyetujui,
                   </p>
                   <div className="h-10 sm:h-12 flex items-center justify-center"></div>
                   <div className="space-y-0.2">
@@ -654,9 +656,8 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
                 </div>
 
                 <div>
-                  <p className="font-bold text-slate-900 text-[8px]">
-                    Petugas Verifikator Lapangan,<br />
-                    <strong>KASI TRANTIBUM &amp; PEMBANGUNAN</strong>
+                  <p className="font-bold text-slate-900 text-[8.5px]">
+                    Petugas Verifikator Lapangan,
                   </p>
                   <div className="h-10 sm:h-12 flex items-center justify-center"></div>
                   <div className="space-y-0.2">

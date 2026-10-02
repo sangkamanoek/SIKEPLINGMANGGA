@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Wrench,
   Plus,
@@ -43,6 +44,7 @@ import {
 } from '../lib/pembangunanService';
 import { CetakLaporanPembangunanModal } from './CetakLaporanPembangunanModal';
 import { downloadImage, downloadProjectPhotosAsZip, getHighResImageUrl } from '../lib/imageDownloader';
+import { safeSetLocalStorage, safeGetLocalStorage } from '../lib/safeStorage';
 
 interface RealisasiPembangunanViewProps {
   currentUser: UserAccount;
@@ -50,7 +52,7 @@ interface RealisasiPembangunanViewProps {
 
 const STORAGE_KEY = PEMBANGUNAN_STORAGE_KEY;
 
-// Helper function to compress image files from phone camera / gallery with crisp HD quality
+// Helper function to compress image files from phone camera / gallery with crisp HD quality & storage-friendly size
 const compressImageFile = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -58,7 +60,7 @@ const compressImageFile = (file: File): Promise<string> => {
       const img = new window.Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const maxDim = 1920; // Full HD quality
+        const maxDim = 1200; // Optimal HD resolution (1200px max)
         let width = img.width;
         let height = img.height;
         if (width > maxDim || height > maxDim) {
@@ -78,7 +80,7 @@ const compressImageFile = (file: File): Promise<string> => {
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
         resolve(dataUrl);
       };
       img.onerror = () => reject(new Error('Gagal memuat gambar'));
@@ -346,24 +348,11 @@ const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
 export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> = ({ currentUser }) => {
   // Persistence state
   const [items, setItems] = useState<RealisasiPembangunan[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved !== null) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {
-      console.warn('Failed to load realisasi pembangunan from storage', e);
-    }
-    return INITIAL_REALISASI_DATA;
+    return safeGetLocalStorage<RealisasiPembangunan[]>(STORAGE_KEY, INITIAL_REALISASI_DATA);
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    } catch (e) {
-      console.error('Failed to save realisasi pembangunan to storage', e);
-    }
+    safeSetLocalStorage(STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
   const [isCloudSynced, setIsCloudSynced] = useState(true);
@@ -956,33 +945,41 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
       {/* HEADER BANNER */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white shadow-xl relative overflow-hidden border border-blue-800/40">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold">
-                <Wrench className="w-4 h-4 text-blue-400" />
-                <span>Seksi Pembangunan &amp; Fasilitas Publik • Kelurahan Mangga</span>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-semibold">
-                <Database className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Database Terhubung (Firestore &amp; Server Buffer)</span>
-              </div>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Realisasi Pembangunan Infrastruktur Wilayah
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl font-normal leading-relaxed">
-              Monitoring realisasi perbaikan jalan, normalisasi drainase, perbaikan lampu LPJU, dan penambahan tiang LPJU baru secara akuntabel di 24 Lingkungan.
-            </p>
+      <div className="p-6 sm:p-7 rounded-2xl bg-slate-900 text-white shadow-md relative overflow-hidden border border-slate-800 space-y-5">
+        <div className="absolute -top-24 -right-24 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+        
+        {/* Top Metadata & Title */}
+        <div className="space-y-2 relative z-10">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 font-medium">
+            <span className="flex items-center gap-1.5 text-blue-300">
+              <Wrench className="w-3.5 h-3.5 text-blue-400" />
+              <span>Seksi Pembangunan &amp; Fasilitas Publik</span>
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>Kelurahan Mangga</span>
+            <span aria-hidden="true">·</span>
+            <span className="flex items-center gap-1 text-emerald-400">
+              <Database className="w-3.5 h-3.5" />
+              <span>Database Terhubung</span>
+            </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug">
+            Realisasi Pembangunan Infrastruktur Wilayah
+          </h1>
+
+          <p className="text-xs sm:text-sm text-slate-300 max-w-3xl font-normal leading-relaxed">
+            Monitoring realisasi perbaikan jalan, normalisasi drainase, perbaikan lampu LPJU, dan penambahan tiang LPJU baru secara akuntabel di 24 Lingkungan.
+          </p>
+        </div>
+
+        {/* Action Toolbar */}
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
               onClick={openAddModal}
-              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg transition-all flex items-center gap-2 cursor-pointer scale-102 hover:scale-105 active:scale-98"
+              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>+ Input Realisasi Baru</span>
@@ -991,41 +988,42 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               type="button"
               onClick={handleManualSync}
               disabled={isSyncing}
-              className="px-3.5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs backdrop-blur-md border border-white/20 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
               title="Sinkronkan seluruh data ke database Firestore dan server"
             >
-              <RefreshCw className={`w-4 h-4 text-cyan-300 ${isSyncing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isSyncing ? 'animate-spin' : ''}`} />
               <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan DB'}</span>
             </button>
             <button
               type="button"
               onClick={handleExportExcel}
-              className="px-3.5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs backdrop-blur-md border border-white/20 transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
               <span>Ekspor Excel</span>
             </button>
             <button
               type="button"
               onClick={() => setIsCetakModalOpen(true)}
-              className="px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-black text-xs shadow-lg transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title="Buka Lembar Cetak Resmi Standar Kedinasan Pemko Medan & Dokumentasi Foto Lengkap"
+              className="px-3.5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="Buka Lembar Cetak Resmi Standar Kedinasan Pemko Medan &amp; Dokumentasi Foto Lengkap"
             >
-              <Printer className="w-4 h-4 text-white" />
+              <Printer className="w-3.5 h-3.5 text-white" />
               <span>Cetak Laporan Resmi</span>
             </button>
-            {items.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setIsClearAllModalOpen(true)}
-                className="px-3.5 py-2.5 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 font-bold text-xs backdrop-blur-md transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="Hapus Semua Contoh Data Laporan"
-              >
-                <Trash2 className="w-4 h-4 text-rose-300" />
-                <span>Bersihkan Contoh Data</span>
-              </button>
-            )}
           </div>
+
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsClearAllModalOpen(true)}
+              className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Hapus Semua Contoh Data Laporan"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Bersihkan Contoh Data</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1323,7 +1321,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                                   src={sebelumPhotos[0]}
                                   alt="Foto Sebelum"
                                   referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                                 />
                                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center text-white text-[10px] font-bold">
                                   <Eye className="w-4 h-4" />
@@ -1367,7 +1365,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                                   src={prosesPhotos[0]}
                                   alt="Foto Proses"
                                   referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                                 />
                                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center text-white text-[10px] font-bold">
                                   <Eye className="w-4 h-4" />
@@ -1411,7 +1409,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                                   src={sesudahPhotos[0]}
                                   alt="Foto Sesudah"
                                   referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                                 />
                                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center text-white text-[10px] font-bold">
                                   <Eye className="w-4 h-4" />
@@ -2645,7 +2643,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       />
 
       {/* IN-APP CONFIRM DELETE MODAL (MOBILE & IFRAME COMPATIBLE) */}
-      {itemToDelete && (
+      {itemToDelete && createPortal(
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4 animate-scale-up">
             <div className="flex items-center gap-3">
@@ -2701,11 +2699,12 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* CLEAR ALL SAMPLES MODAL */}
-      {isClearAllModalOpen && (
+      {isClearAllModalOpen && createPortal(
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4 animate-scale-up">
             <div className="flex items-center gap-3">
@@ -2744,7 +2743,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* TOAST NOTIFICATION */}
