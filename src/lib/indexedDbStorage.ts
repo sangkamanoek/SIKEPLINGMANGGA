@@ -2,10 +2,12 @@ import { LaporanHarianItem, DataKeluarga } from '../types';
 import { SpptPbbItem } from '../data/pbbSampleData';
 
 const DB_NAME = 'sikepling_offline_db';
-const DB_VERSION = 3; // Incremented version to add PBB store
+const DB_VERSION = 4; // Incremented version to add new stores
 const STORE_REPORTS = 'reports_store';
 const STORE_KELUARGA = 'family_store';
 const STORE_PBB = 'pbb_store';
+const STORE_VISITS = 'visits_store';
+const STORE_HISTORY = 'history_store';
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -25,6 +27,12 @@ function openDatabase(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_PBB)) {
         db.createObjectStore(STORE_PBB, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_VISITS)) {
+        db.createObjectStore(STORE_VISITS, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_HISTORY)) {
+        db.createObjectStore(STORE_HISTORY, { keyPath: 'id' });
       }
     };
 
@@ -145,6 +153,112 @@ export async function getPbbFromIndexedDB(): Promise<SpptPbbItem[] | null> {
     });
   } catch (err) {
     console.warn('[IndexedDB] Error getting PBB data:', err);
+    return null;
+  }
+}
+
+/**
+ * Save all visits to IndexedDB
+ */
+export async function saveVisitsToIndexedDB(data: any[]): Promise<boolean> {
+  if (!Array.isArray(data)) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_VISITS, 'readwrite');
+      const store = tx.objectStore(STORE_VISITS);
+
+      store.clear();
+      if (data.length > 0) {
+        data.forEach((item) => {
+          if (item && item.id) {
+            store.put(item);
+          }
+        });
+      }
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error saving visits:', err);
+    return false;
+  }
+}
+
+/**
+ * Read all visits from IndexedDB
+ */
+export async function getVisitsFromIndexedDB(): Promise<any[] | null> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_VISITS, 'readonly');
+      const store = tx.objectStore(STORE_VISITS);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const result = request.result;
+        resolve(Array.isArray(result) && result.length > 0 ? result : null);
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error getting visits:', err);
+    return null;
+  }
+}
+
+/**
+ * Save all history reports to IndexedDB
+ */
+export async function saveHistoryToIndexedDB(data: LaporanHarianItem[]): Promise<boolean> {
+  if (!Array.isArray(data)) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_HISTORY, 'readwrite');
+      const store = tx.objectStore(STORE_HISTORY);
+
+      store.clear();
+      if (data.length > 0) {
+        data.forEach((item) => {
+          if (item && item.id) {
+            store.put(item);
+          }
+        });
+      }
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error saving history:', err);
+    return false;
+  }
+}
+
+/**
+ * Read all history reports from IndexedDB
+ */
+export async function getHistoryFromIndexedDB(): Promise<LaporanHarianItem[] | null> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_HISTORY, 'readonly');
+      const store = tx.objectStore(STORE_HISTORY);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const result = request.result;
+        resolve(Array.isArray(result) && result.length > 0 ? result : null);
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error getting history:', err);
     return null;
   }
 }

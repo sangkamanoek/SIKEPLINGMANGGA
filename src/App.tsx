@@ -90,7 +90,14 @@ import {
   isReportDeleted,
   seedInitialReports,
 } from './lib/reportsApi';
-import { getReportsFromIndexedDB, clearIndexedDBReports, getKeluargaFromIndexedDB, getPbbFromIndexedDB } from './lib/indexedDbStorage';
+import {
+  getReportsFromIndexedDB,
+  clearIndexedDBReports,
+  getKeluargaFromIndexedDB,
+  getPbbFromIndexedDB,
+  getVisitsFromIndexedDB,
+  getHistoryFromIndexedDB,
+} from './lib/indexedDbStorage';
 import { KNOWN_STORAGE_KEYS } from './lib/reportsApi';
 import { purgeAllClientCache } from './lib/purgeCache';
 
@@ -388,10 +395,21 @@ export default function App() {
     // Load PBB database from IndexedDB to ensure no quota crashes
     getPbbFromIndexedDB().then((data) => {
       if (data && data.length > 0) {
-        // We can't easily guess the year key here, but we can populate the most common ones
-        // or just the one that was recently saved. For now, populate the memory cache
-        // for the default year 2026.
         populateMemoryCache('sikepling_sppt_pbb_records_2026_v3', JSON.stringify(data));
+      }
+    });
+
+    // Load visits database from IndexedDB
+    getVisitsFromIndexedDB().then((data) => {
+      if (data && data.length > 0) {
+        populateMemoryCache('sikepling_kunjungan_harian_list_v1', JSON.stringify(data));
+      }
+    });
+
+    // Load history database from IndexedDB
+    getHistoryFromIndexedDB().then((data) => {
+      if (data && data.length > 0) {
+        populateMemoryCache('kepling_local_laporan_history_v2', JSON.stringify(data));
       }
     });
 
