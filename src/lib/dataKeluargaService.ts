@@ -11,7 +11,7 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
-import { DataKeluarga, AnggotaKeluarga, TitikRumahBangunan } from '../types';
+import { DataKeluarga, AnggotaKeluarga, TitikRumahBangunan, AgamaType, HubunganKeluargaType } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { cleanFirestoreData } from './firestoreService';
 import { safeSetLocalStorage, safeGetLocalStorage } from './safeStorage';
@@ -22,6 +22,22 @@ import { shareOrDownloadBlob } from './excelExport';
 
 const COLLECTION_NAME = 'data_keluarga';
 const STORAGE_KEY_DATA_KELUARGA = 'sikepling_database_keluarga_v1';
+
+// ==========================================
+// PRIVACY & MASKING HELPERS
+// ==========================================
+
+/**
+ * Formats NIK or KK number with privacy masking (last 5 digits replaced with *****)
+ * Example: 1271190811740002 -> 12711908117*****
+ */
+export function maskNik(nik: string | undefined | null): string {
+  if (!nik) return '-';
+  const str = String(nik).trim();
+  if (str.length === 0) return '-';
+  if (str.length <= 5) return '*****';
+  return str.slice(0, str.length - 5) + '*****';
+}
 
 // ==========================================
 // LOCAL STORAGE CACHE HELPERS
@@ -150,11 +166,67 @@ export async function saveDataKeluargaToFirestore(
   syncWithWebgisHouse: boolean = true
 ): Promise<boolean> {
   const current = getLocalDataKeluarga();
-  const index = current.findIndex((k) => k.id === keluarga.id || k.nomorKk === keluarga.nomorKk);
+  const index = current.findIndex(
+    (k) =>
+      k.id === keluarga.id ||
+      (k.nomorKk && keluarga.nomorKk && k.nomorKk === keluarga.nomorKk) ||
+      (k.nikKepalaKeluarga && keluarga.nikKepalaKeluarga && k.nikKepalaKeluarga === keluarga.nikKepalaKeluarga)
+  );
+
   let updatedList: DataKeluarga[];
+  let mergedKeluarga: DataKeluarga = { ...keluarga };
+
   if (index >= 0) {
+    const existing = current[index];
+    // Smart Member Merge:
+    // If existing family already has members and incoming keluarga has members, merge them by NIK/Name
+    const existingMembers = existing.anggotaKeluarga || [];
+    const incomingMembers = keluarga.anggotaKeluarga || [];
+
+    const mergedMembers: AnggotaKeluarga[] = [...existingMembers];
+    for (const inc of incomingMembers) {
+      const mIdx = mergedMembers.findIndex(
+        (m) =>
+          (m.nik && inc.nik && m.nik === inc.nik) ||
+          (m.nama && inc.nama && m.nama.toLowerCase().trim() === inc.nama.toLowerCase().trim())
+      );
+      if (mIdx >= 0) {
+        // Update member fields
+        mergedMembers[mIdx] = { ...mergedMembers[mIdx], ...inc };
+      } else {
+        // Append new family member
+        mergedMembers.push(inc);
+      }
+    }
+
+    mergedKeluarga = {
+      ...existing,
+      ...keluarga,
+      id: existing.id || keluarga.id,
+      nomorKk: keluarga.nomorKk || existing.nomorKk,
+      nikKepalaKeluarga: keluarga.nikKepalaKeluarga || existing.nikKepalaKeluarga,
+      namaKepalaKeluarga: keluarga.namaKepalaKeluarga || existing.namaKepalaKeluarga,
+      // Preserve existing verified survey fields if incoming is empty
+      desilKesejahteraan: keluarga.desilKesejahteraan || existing.desilKesejahteraan || '',
+      jambanKeluarga: keluarga.jambanKeluarga || existing.jambanKeluarga || '',
+      sumberAirMinum: keluarga.sumberAirMinum || existing.sumberAirMinum || '',
+      sumberAirBersih: keluarga.sumberAirBersih || existing.sumberAirBersih || '',
+      pembuanganSampahRumah: keluarga.pembuanganSampahRumah || existing.pembuanganSampahRumah || '',
+      statusStuntingRentan: keluarga.statusStuntingRentan || existing.statusStuntingRentan || '',
+      penerimaBansos: keluarga.penerimaBansos || existing.penerimaBansos,
+      bantuanDiterima:
+        keluarga.bantuanDiterima && keluarga.bantuanDiterima.length > 0
+          ? keluarga.bantuanDiterima
+          : existing.bantuanDiterima,
+      anggotaKeluarga: mergedMembers,
+      jumlahAnggotaKeluarga: mergedMembers.length,
+      jumlahLakiLaki: mergedMembers.filter((m) => m.jenisKelamin === 'L').length,
+      jumlahPerempuan: mergedMembers.filter((m) => m.jenisKelamin === 'P').length,
+      updatedAt: new Date().toISOString(),
+    };
+
     updatedList = [...current];
-    updatedList[index] = keluarga;
+    updatedList[index] = mergedKeluarga;
   } else {
     updatedList = [keluarga, ...current];
   }
@@ -162,48 +234,48 @@ export async function saveDataKeluargaToFirestore(
 
   // Firestore Write
   try {
-    const docId = keluarga.id || `kk_${keluarga.nomorKk || Date.now()}`;
+    const docId = mergedKeluarga.id || `kk_${mergedKeluarga.nomorKk || Date.now()}`;
     const docRef = doc(db, COLLECTION_NAME, docId);
-    const cleaned = cleanFirestoreData({ ...keluarga, id: docId });
+    const cleaned = cleanFirestoreData({ ...mergedKeluarga, id: docId });
     await setDoc(docRef, cleaned, { merge: true });
 
     // Sinkronisasi otomatis ke Titik Bangunan WebGIS jika koordinat tersedia
-    if (syncWithWebgisHouse && keluarga.titikKoordinat?.lat && keluarga.titikKoordinat?.lng) {
-      const houseId = keluarga.housePointId || `house_kk_${keluarga.id}`;
+    if (syncWithWebgisHouse && mergedKeluarga.titikKoordinat?.lat && mergedKeluarga.titikKoordinat?.lng) {
+      const houseId = mergedKeluarga.housePointId || `house_kk_${mergedKeluarga.id}`;
       const webgisItem: TitikRumahBangunan = {
         id: houseId,
-        lingkunganId: keluarga.lingkunganId,
-        lingkunganNomor: keluarga.lingkunganNomor,
-        namaJalan: keluarga.namaJalan,
-        nomorRumah: keluarga.nomorRumah || '',
-        namaKepalaKeluarga: keluarga.namaKepalaKeluarga,
-        nikKk: keluarga.nikKepalaKeluarga,
-        isKkMangga: keluarga.statusDomisili.includes('Mangga'),
-        lat: keluarga.titikKoordinat.lat,
-        lng: keluarga.titikKoordinat.lng,
-        jumlahJiwa: keluarga.jumlahAnggotaKeluarga,
-        jumlahLakiLaki: keluarga.jumlahLakiLaki,
-        jumlahPerempuan: keluarga.jumlahPerempuan,
-        jumlahLansia: keluarga.jumlahLansia,
-        jumlahAnak: keluarga.jumlahBalita + keluarga.jumlahUsiaSekolah,
-        pekerjaanKk: keluarga.pekerjaanUtamaKepalaKeluarga || 'Wiraswasta',
-        desilKesejahteraan: keluarga.desilKesejahteraan,
-        penerimaBansos: keluarga.penerimaBansos,
-        jenisBansos: keluarga.bantuanDiterima,
-        kategoriRentan: keluarga.kategoriRentan && keluarga.kategoriRentan.length > 0,
-        jambanKeluarga: keluarga.jambanKeluarga,
-        tempatAkhirTinja: keluarga.tempatAkhirTinja,
-        sumberAirMinum: keluarga.sumberAirMinum,
-        sumberAirBersih: keluarga.sumberAirBersih,
-        pembuanganSampahRumah: keluarga.pembuanganSampahRumah,
-        statusStuntingRentan: keluarga.statusStuntingRentan,
-        statusWrs: keluarga.statusWrs || 'AKTIF',
-        nopPbb: keluarga.nopPbb,
-        statusPbb: keluarga.statusPbb,
+        lingkunganId: mergedKeluarga.lingkunganId,
+        lingkunganNomor: mergedKeluarga.lingkunganNomor,
+        namaJalan: mergedKeluarga.namaJalan,
+        nomorRumah: mergedKeluarga.nomorRumah || '',
+        namaKepalaKeluarga: mergedKeluarga.namaKepalaKeluarga,
+        nikKk: mergedKeluarga.nikKepalaKeluarga,
+        isKkMangga: mergedKeluarga.statusDomisili.includes('Mangga'),
+        lat: mergedKeluarga.titikKoordinat.lat,
+        lng: mergedKeluarga.titikKoordinat.lng,
+        jumlahJiwa: mergedKeluarga.jumlahAnggotaKeluarga,
+        jumlahLakiLaki: mergedKeluarga.jumlahLakiLaki,
+        jumlahPerempuan: mergedKeluarga.jumlahPerempuan,
+        jumlahLansia: mergedKeluarga.jumlahLansia,
+        jumlahAnak: mergedKeluarga.jumlahBalita + mergedKeluarga.jumlahUsiaSekolah,
+        pekerjaanKk: mergedKeluarga.pekerjaanUtamaKepalaKeluarga || 'Wiraswasta',
+        desilKesejahteraan: mergedKeluarga.desilKesejahteraan,
+        penerimaBansos: mergedKeluarga.penerimaBansos,
+        jenisBansos: mergedKeluarga.bantuanDiterima,
+        kategoriRentan: mergedKeluarga.kategoriRentan && mergedKeluarga.kategoriRentan.length > 0,
+        jambanKeluarga: mergedKeluarga.jambanKeluarga,
+        tempatAkhirTinja: mergedKeluarga.tempatAkhirTinja,
+        sumberAirMinum: mergedKeluarga.sumberAirMinum,
+        sumberAirBersih: mergedKeluarga.sumberAirBersih,
+        pembuanganSampahRumah: mergedKeluarga.pembuanganSampahRumah,
+        statusStuntingRentan: mergedKeluarga.statusStuntingRentan,
+        statusWrs: mergedKeluarga.statusWrs || 'AKTIF',
+        nopPbb: mergedKeluarga.nopPbb,
+        statusPbb: mergedKeluarga.statusPbb,
         kategoriBangunan: 'RUMAH_TINGGAL',
-        createdAt: keluarga.createdAt || new Date().toISOString(),
+        createdAt: mergedKeluarga.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        createdByName: keluarga.createdByName || 'Database Keluarga',
+        createdByName: mergedKeluarga.createdByName || 'Database Keluarga',
       };
       await saveHouseToFirestore(webgisItem).catch((e) => console.warn('Sync house error:', e));
     }
@@ -283,10 +355,11 @@ export async function exportDataKeluargaToExcel(
     'NOMOR KK (16 DIGIT)',
     'NIK KEPALA KELUARGA',
     'NAMA KEPALA KELUARGA',
+    'AGAMA',
     'NO. TELEPON / WA',
     'LINGKUNGAN',
     'NAMA JALAN / GANG',
-    'NO. RUMAH / RT-RW',
+    'NO. RUMAH',
     'STATUS DOMISILI',
     'JUMLAH JIWA',
     'L',
@@ -351,10 +424,11 @@ export async function exportDataKeluargaToExcel(
       item.nomorKk,
       item.nikKepalaKeluarga,
       item.namaKepalaKeluarga,
+      item.agama || (item.anggotaKeluarga?.[0]?.agama) || 'Islam',
       item.telepon || '-',
       item.lingkunganNama,
       item.namaJalan,
-      `${item.nomorRumah || '-'} / RT ${item.rt || '00'}-RW ${item.rw || '00'}`,
+      item.nomorRumah || '-',
       item.statusDomisili,
       item.jumlahAnggotaKeluarga,
       item.jumlahLakiLaki,
@@ -540,27 +614,26 @@ export async function downloadImportTemplateExcel(): Promise<void> {
     'NOMOR_KK',                     // 1 (16 digit)
     'NIK_KEPALA_KELUARGA',         // 2 (16 digit)
     'NAMA_KEPALA_KELUARGA',        // 3
-    'TELEPON_WA',                  // 4
-    'LINGKUNGAN_NOMOR',            // 5 (1 - 24)
-    'NAMA_JALAN',                  // 6
-    'NOMOR_RUMAH',                 // 7
-    'RT',                          // 8
-    'RW',                          // 9
-    'STATUS_DOMISILI',             // 10
-    'DESIL_KESEJAHTERAAN',         // 11
-    'BANTUAN_DITERIMA',            // 12 (koma pisah, misal: PKH Medan Makmur, BPNT, PBI-JK)
-    'JAMBAN_KELUARGA',             // 13
-    'SUMBER_AIR_MINUM',            // 14
-    'SUMBER_AIR_BERSIH',           // 15
-    'PEMBUANGAN_SAMPAH',           // 16
-    'STATUS_STUNTING',             // 17
-    'NOP_PBB',                     // 18
-    'STATUS_PBB',                  // 19 (LUNAS / BELUM_LUNAS)
-    'JUMLAH_JIWA',                 // 20
-    'JUMLAH_LAKI_LAKI',            // 21
-    'JUMLAH_PEREMPUAN',            // 22
-    'JUMLAH_LANSIA',               // 23
-    'JUMLAH_BALITA',               // 24
+    'AGAMA',                       // 4 (Islam / Kristen Protestan / Katolik / Hindu / Buddha / Konghucu)
+    'TELEPON_WA',                  // 5
+    'LINGKUNGAN_NOMOR',            // 6 (1 - 24)
+    'NAMA_JALAN',                  // 7
+    'NOMOR_RUMAH',                 // 8
+    'STATUS_DOMISILI',             // 9
+    'DESIL_KESEJAHTERAAN',         // 10
+    'BANTUAN_DITERIMA',            // 11 (koma pisah, misal: PKH Medan Makmur, BPNT, PBI-JK)
+    'JAMBAN_KELUARGA',             // 12
+    'SUMBER_AIR_MINUM',            // 13
+    'SUMBER_AIR_BERSIH',           // 14
+    'PEMBUANGAN_SAMPAH',           // 15
+    'STATUS_STUNTING',             // 16
+    'NOP_PBB',                     // 17
+    'STATUS_PBB',                  // 18 (LUNAS / BELUM_LUNAS)
+    'JUMLAH_JIWA',                 // 19
+    'JUMLAH_LAKI_LAKI',            // 20
+    'JUMLAH_PEREMPUAN',            // 21
+    'JUMLAH_LANSIA',               // 22
+    'JUMLAH_BALITA',               // 23
   ]);
 
   headerRow.height = 28;
@@ -575,12 +648,11 @@ export async function downloadImportTemplateExcel(): Promise<void> {
     '1271010115080001',
     '1271011005820001',
     'Budi Santoso',
+    'Islam',
     '081260012345',
     '1',
     'Jl. Bunga Ncole No. 45',
     '45',
-    '001',
-    '002',
     'KK Kelurahan Mangga (KTP/KK Setempat)',
     'Desil 1 (Sangat Miskin)',
     'PKH Medan Makmur, BPNT / Sembako, PBI-JK (BPJS Gratis)',
@@ -655,18 +727,22 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
     throw new Error('Berkas Excel / CSV kosong.');
   }
 
-  // Find header row (usually contains NOMOR_KK, KK, NIK, or NAMA)
+  // Find header row (usually contains NOMOR_KK, KK, NIK, or NAMA, and must NOT contain actual 16-digit NIK/KK)
   let headerIndex = -1;
   for (let i = 0; i < Math.min(10, rows.length); i++) {
     const rowStr = (rows[i] || []).map((c: any) => String(c).toUpperCase().trim()).join(' ');
+    // If the row contains actual 16-digit numbers, it is data, not a header!
+    if (/\b\d{16}\b/.test(rowStr)) {
+      continue;
+    }
     if (
       rowStr.includes('NOMOR_KK') ||
       rowStr.includes('NOMOR KK') ||
       rowStr.includes('NO KK') ||
       rowStr.includes('NO. KK') ||
-      rowStr.includes('KEPALA KELUARGA') ||
       rowStr.includes('NIK_KEPALA') ||
-      rowStr.includes('NAMA_KEPALA')
+      rowStr.includes('NAMA_KEPALA') ||
+      rowStr.includes('NAMA LENGKAP')
     ) {
       headerIndex = i;
       break;
@@ -683,14 +759,13 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
   };
 
   const idxKk = getColIdx(['NOMOR_KK', 'NOMOR KK', 'NO KK', 'NO. KK', 'NO_KK']);
-  const idxNik = getColIdx(['NIK_KEPALA', 'NIK KEPALA', 'NIK']);
-  const idxNama = getColIdx(['NAMA_KEPALA', 'NAMA KEPALA', 'NAMA']);
-  const idxHp = getColIdx(['TELEPON', 'WA', 'HP', 'NO. TELP']);
-  const idxLk = getColIdx(['LINGKUNGAN_NOMOR', 'LINGKUNGAN', 'LK']);
+  const idxNik = getColIdx(['NIK_KEPALA', 'NIK KEPALA', 'NIK', 'NIK_WARGA', 'NO_NIK']);
+  const idxNama = getColIdx(['NAMA_KEPALA', 'NAMA KEPALA', 'NAMA', 'NAMA_LENGKAP', 'WARGA']);
+  const idxHp = getColIdx(['TELEPON', 'WA', 'HP', 'NO. TELP', 'NO_HP']);
+  const idxLk = getColIdx(['LINGKUNGAN_NOMOR', 'LINGKUNGAN', 'LK', 'KEPLING']);
   const idxJalan = getColIdx(['NAMA_JALAN', 'JALAN', 'ALAMAT']);
   const idxNoRumah = getColIdx(['NOMOR_RUMAH', 'NO. RUMAH', 'RUMAH']);
-  const idxRt = getColIdx(['RT']);
-  const idxRw = getColIdx(['RW']);
+  const idxAgama = getColIdx(['AGAMA', 'AGAMA_KEPALA', 'AGAMA KEPALA', 'AGAMA_KK', 'RELIGION']);
   const idxDomisili = getColIdx(['STATUS_DOMISILI', 'DOMISILI']);
   const idxDesil = getColIdx(['DESIL', 'KESEJAHTERAAN']);
   const idxBansos = getColIdx(['BANTUAN', 'BANSOS']);
@@ -707,7 +782,10 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
   const idxLansia = getColIdx(['LANSIA']);
   const idxBalita = getColIdx(['BALITA']);
 
-  const parsedItems: DataKeluarga[] = [];
+  const idxHubungan = getColIdx(['HUBUNGAN_KELUARGA', 'HUBUNGAN', 'STATUS_HUBUNGAN', 'SHDK']);
+  const idxKelamin = getColIdx(['JENIS_KELAMIN', 'KELAMIN', 'JK', 'SEX']);
+
+  const familyMap = new Map<string, DataKeluarga>();
   const errors: { row: number; nomorKk?: string; message: string }[] = [];
 
   for (let i = headerIndex + 1; i < rows.length; i++) {
@@ -719,33 +797,154 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
     let rawNama = idxNama !== -1 ? String(row[idxNama] || '').trim() : '';
     let rawAlamat = idxJalan !== -1 ? String(row[idxJalan] || '').trim() : '';
     let rawLk = idxLk !== -1 ? String(row[idxLk] || '').trim() : '';
+    let rawAgama = idxAgama !== -1 ? String(row[idxAgama] || '').trim() : '';
+    let rawHubungan: HubunganKeluargaType = 'Kepala Keluarga';
+    let hasExplicitHubungan = false;
+    let rawGender: 'L' | 'P' = 'L';
+    let hasExplicitGender = false;
 
-    // Smart Cell Auto-Detection for headerless or custom columns (e.g. BASMI KABAN | 1271072412650002 | GG. BERAS MUNTE NO.22 LK-II MEDAN | LINGKUNGAN 2)
+    // 1. Detect all 16-digit numbers in row (in order of appearance)
+    const digits16List: string[] = [];
+    for (const cell of row) {
+      const val = String(cell || '').trim();
+      const matches = val.match(/\b\d{16}\b/g);
+      if (matches) {
+        for (const m of matches) {
+          if (!digits16List.includes(m)) digits16List.push(m);
+        }
+      }
+    }
+
+    // Two 16-digit numbers: 1st is No. KK, 2nd is NIK (as standard Disdukcapil / user requirement)
+    if (digits16List.length >= 2) {
+      if (!rawKk) rawKk = digits16List[0];
+      if (!rawNik) rawNik = digits16List[1];
+    } else if (digits16List.length === 1) {
+      if (!rawKk && !rawNik) {
+        rawKk = digits16List[0];
+        rawNik = digits16List[0];
+      } else if (!rawKk) {
+        rawKk = rawNik || digits16List[0];
+      } else if (!rawNik) {
+        rawNik = rawKk || digits16List[0];
+      }
+    }
+
+    // 2. Detect Hubungan Keluarga from cell or column
+    if (idxHubungan !== -1 && row[idxHubungan]) {
+      const hStr = String(row[idxHubungan]).trim().toLowerCase();
+      if (/kepala/i.test(hStr)) {
+        rawHubungan = 'Kepala Keluarga';
+        hasExplicitHubungan = true;
+      } else if (/istri/i.test(hStr)) {
+        rawHubungan = 'Istri';
+        hasExplicitHubungan = true;
+      } else if (/anak/i.test(hStr)) {
+        rawHubungan = 'Anak';
+        hasExplicitHubungan = true;
+      } else if (/orang\s*tua|ayah|ibu/i.test(hStr)) {
+        rawHubungan = 'Orang Tua';
+        hasExplicitHubungan = true;
+      } else if (/mertua/i.test(hStr)) {
+        rawHubungan = 'Mertua';
+        hasExplicitHubungan = true;
+      } else if (/famili|cucu|menantu|lainnya/i.test(hStr)) {
+        rawHubungan = 'Famili Lain';
+        hasExplicitHubungan = true;
+      }
+    }
+
+    // 3. Smart Scan Across Row Cells for Lingkungan, Agama, Alamat, Hubungan, Gender, & Name
     for (const cell of row) {
       const val = String(cell || '').trim();
       if (!val) continue;
 
-      const cleanDigits = val.replace(/[\s-]/g, '');
-      // Check 16-digit NIK/KK
-      if (/^\d{16}$/.test(cleanDigits)) {
-        if (!rawNik) rawNik = cleanDigits;
-        if (!rawKk) rawKk = cleanDigits;
+      // Hubungan Keluarga detection in cell
+      if (!hasExplicitHubungan) {
+        if (/kepala\s*keluarga/i.test(val)) {
+          rawHubungan = 'Kepala Keluarga';
+          hasExplicitHubungan = true;
+        } else if (/^istri$/i.test(val) || /\bistri\b/i.test(val)) {
+          rawHubungan = 'Istri';
+          hasExplicitHubungan = true;
+        } else if (/^suami$/i.test(val) || /\bsuami\b/i.test(val)) {
+          rawHubungan = 'Kepala Keluarga';
+          hasExplicitHubungan = true;
+        } else if (/^anak$/i.test(val) || /\banak\b/i.test(val)) {
+          rawHubungan = 'Anak';
+          hasExplicitHubungan = true;
+        } else if (/orang\s*tua|^ayah$|^ibu$/i.test(val)) {
+          rawHubungan = 'Orang Tua';
+          hasExplicitHubungan = true;
+        } else if (/mertua/i.test(val)) {
+          rawHubungan = 'Mertua';
+          hasExplicitHubungan = true;
+        } else if (/famili|cucu|menantu|lainnya/i.test(val)) {
+          rawHubungan = 'Famili Lain';
+          hasExplicitHubungan = true;
+        }
       }
-      // Check Lingkungan label
-      else if (/lingkungan|lk[-_\s]*\d+/i.test(val)) {
-        if (!rawLk) rawLk = val;
+
+      // Gender detection in cell
+      if (!hasExplicitGender) {
+        if (/^p$|^perempuan$/i.test(val)) {
+          rawGender = 'P';
+          hasExplicitGender = true;
+        } else if (/^l$|^laki-laki$|^pria$/i.test(val)) {
+          rawGender = 'L';
+          hasExplicitGender = true;
+        }
       }
-      // Check Alamat/Jalan string
-      else if (/\b(gg|jalan|jl|gang|no|lk|medan)\b/i.test(val) && val.length > 5) {
-        if (!rawAlamat) rawAlamat = val;
+
+      // Lingkungan label (Kota Medan: Lingkungan 1-24, Kepling, tanpa RT/RW)
+      if (!rawLk && /lingkungan|kepling|lk[-_\s]*\d+/i.test(val)) {
+        rawLk = val;
       }
-      // Check Person Name (letters only, no long numbers)
-      else if (/^[a-zA-Z\s'.,]+$/.test(val) && val.length >= 3 && !rawNama) {
+
+      // Agama
+      if (!rawAgama && /^(islam|kristen|katolik|hindu|buddha|budha|konghucu)/i.test(val)) {
+        if (/katolik/i.test(val)) rawAgama = 'Katolik';
+        else if (/kristen/i.test(val)) rawAgama = 'Kristen Protestan';
+        else if (/hindu/i.test(val)) rawAgama = 'Hindu';
+        else if (/buddh?a/i.test(val)) rawAgama = 'Buddha';
+        else if (/konghucu/i.test(val)) rawAgama = 'Konghucu';
+        else rawAgama = 'Islam';
+      }
+
+      // Alamat / Jalan
+      if (!rawAlamat && /\b(gg|jalan|jl|gang|no|lk|medan|tembakau|ncole)\b/i.test(val) && val.length > 5) {
+        rawAlamat = val;
+      }
+
+      // Person Name (letters only, no long numbers, not keywords)
+      if (
+        !rawNama &&
+        val.length >= 3 &&
+        /^[a-zA-Z\s'.,]+$/.test(val) &&
+        !/^(islam|kristen|katolik|hindu|buddha|konghucu|kepala\s*keluarga|istri|anak|suami|orang\s*tua|mertua|famili|famili\s*lain|laki-laki|perempuan|l|p)$/i.test(
+          val
+        ) &&
+        !/\b(jl|jalan|gang|gg)\b/i.test(val)
+      ) {
         rawNama = val;
       }
     }
 
-    // Fallbacks to ensure valid records
+    // Gender deduction from NIK if not explicitly stated
+    if (!hasExplicitGender) {
+      if (rawHubungan === 'Istri') {
+        rawGender = 'P';
+      } else if (rawNik && rawNik.length === 16) {
+        const birthDay = parseInt(rawNik.substring(6, 8), 10);
+        if (!isNaN(birthDay) && birthDay > 40 && birthDay <= 71) {
+          rawGender = 'P';
+        } else {
+          rawGender = 'L';
+        }
+      }
+    }
+
+    // Fallbacks
     if (!rawKk && rawNik) rawKk = rawNik;
     if (!rawNik && rawKk) rawNik = rawKk;
     if (!rawKk && rawNama) rawKk = `127107${Date.now().toString().slice(-10)}`;
@@ -755,11 +954,15 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
     }
 
     if (!rawNama) {
-      errors.push({ row: i + 1, nomorKk: rawKk, message: 'Nama Kepala Keluarga wajib diisi.' });
-      continue;
+      if (rawNik) {
+        rawNama = `Warga (${maskNik(rawNik)})`;
+      } else {
+        errors.push({ row: i + 1, nomorKk: rawKk, message: 'Nama Anggota / Kepala Keluarga wajib diisi.' });
+        continue;
+      }
     }
 
-    // Resolve Lingkungan
+    // Resolve Lingkungan (Kota Medan: Lingkungan 1 s/d 24 tanpa RT/RW)
     let lkNum = 1;
     const lkMatch = (rawLk || (idxLk !== -1 ? String(row[idxLk] || '') : '')).match(/\d+/);
     if (lkMatch) {
@@ -772,72 +975,121 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
       ? rawBansosStr.split(/[,;/]/).map((s) => s.trim()).filter(Boolean)
       : [];
 
-    const item: DataKeluarga = {
-      id: `kk_${rawKk}`,
-      nomorKk: rawKk,
-      nikKepalaKeluarga: rawNik || `${rawKk}0001`,
-      namaKepalaKeluarga: rawNama,
-      telepon: idxHp !== -1 ? String(row[idxHp] || '').trim() : '',
-      lingkunganId: kepling.id,
-      lingkunganNomor: lkNum,
-      lingkunganNama: kepling.lingkungan,
-      namaJalan: rawAlamat || (idxJalan !== -1 && String(row[idxJalan]).trim() ? String(row[idxJalan]).trim() : 'Jl. Bunga Ncole'),
-      nomorRumah: idxNoRumah !== -1 ? String(row[idxNoRumah] || '').trim() : '',
-      rt: idxRt !== -1 ? String(row[idxRt] || '001').trim() : '001',
-      rw: idxRw !== -1 ? String(row[idxRw] || '001').trim() : '001',
-      alamatLengkap: rawAlamat ? `${rawAlamat}, ${kepling.lingkungan}, Kelurahan Mangga` : `${idxJalan !== -1 && row[idxJalan] ? row[idxJalan] : 'Jl. Bunga Ncole'}, ${kepling.lingkungan}, Kelurahan Mangga`,
-      statusDomisili: idxDomisili !== -1 ? String(row[idxDomisili] || '').trim() || 'KK Kelurahan Mangga (KTP/KK Setempat)' : 'KK Kelurahan Mangga (KTP/KK Setempat)',
-      jumlahAnggotaKeluarga: idxJiwa !== -1 && Number(row[idxJiwa]) ? Number(row[idxJiwa]) : 4,
-      jumlahLakiLaki: idxL !== -1 && Number(row[idxL]) ? Number(row[idxL]) : 2,
-      jumlahPerempuan: idxP !== -1 && Number(row[idxP]) ? Number(row[idxP]) : 2,
-      jumlahBalita: idxBalita !== -1 && Number(row[idxBalita]) ? Number(row[idxBalita]) : 0,
-      jumlahUsiaSekolah: 1,
-      jumlahUsiaProduktif: 2,
-      jumlahLansia: idxLansia !== -1 && Number(row[idxLansia]) ? Number(row[idxLansia]) : 0,
-      pekerjaanUtamaKepalaKeluarga: 'Wiraswasta / Pekerja Mandiri',
-      penghasilanRataRata: '2.5 - 5 Juta',
-      desilKesejahteraan: idxDesil !== -1 ? String(row[idxDesil] || '').trim() || 'Desil 6-10 (Mampu / Non-Desil)' : 'Desil 6-10 (Mampu / Non-Desil)',
-      penerimaBansos: bansosList.length > 0,
-      bantuanDiterima: bansosList,
-      kategoriRentan: bansosList.length > 0 ? ['Keluarga Rentan'] : [],
-      jambanKeluarga: idxJamban !== -1 ? String(row[idxJamban] || '').trim() || 'Jamban Sendiri (Leher Angsa / Septik SNI)' : 'Jamban Sendiri (Leher Angsa / Septik SNI)',
-      tempatAkhirTinja: 'Tangki Septik / SPALD',
-      sumberAirMinum: idxAirMinum !== -1 ? String(row[idxAirMinum] || '').trim() || 'PDAM / Air Perpipaan' : 'PDAM / Air Perpipaan',
-      sumberAirBersih: idxAirBersih !== -1 ? String(row[idxAirBersih] || '').trim() || 'PDAM Tirtanadi' : 'PDAM Tirtanadi',
-      pembuanganSampahRumah: idxSampah !== -1 ? String(row[idxSampah] || '').trim() || 'Diangkut Petugas / WRS' : 'Diangkut Petugas / WRS',
-      statusStuntingRentan: idxStunting !== -1 ? String(row[idxStunting] || '').trim() || 'Bebas Risiko Stunting' : 'Bebas Risiko Stunting',
-      statusKepemilikanRumah: 'Milik Sendiri',
-      dayaListrik: 'PLN 900 VA',
-      nopPbb: idxNop !== -1 ? String(row[idxNop] || '').trim() : '',
-      statusPbb: idxPbb !== -1 ? (String(row[idxPbb]).toUpperCase().includes('LUNAS') ? 'LUNAS' : 'BELUM_LUNAS') : 'LUNAS',
-      statusWrs: 'AKTIF',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdByName: 'Import Excel User',
-      anggotaKeluarga: [
-        {
-          id: `ang_${rawKk}_1`,
-          nik: rawNik || `${rawKk}0001`,
-          nama: rawNama,
-          hubunganKeluarga: 'Kepala Keluarga',
-          jenisKelamin: 'L',
-          tempatLahir: 'Medan',
-          tanggalLahir: '1985-01-01',
-          usia: 41,
-          agama: 'Islam',
-          pendidikanTerakhir: 'SMA/SMK/Sederajat',
-          pekerjaan: 'Wiraswasta',
-          statusPerkawinan: 'Kawin',
-          memilikiKtpIkd: true,
-          memilikiAktaKelahiran: true,
-          statusBpjsKesehatan: bansosList.length > 0 ? 'PBI-JK (Bansos APBD/APBN)' : 'Mandiri (Bayar Sendiri)',
-          terdaftarBpjsKetenagakerjaan: true,
-        }
-      ]
+    let finalAgama = rawAgama || (idxAgama !== -1 && row[idxAgama] ? String(row[idxAgama]).trim() : 'Islam');
+    if (/katolik/i.test(finalAgama)) finalAgama = 'Katolik';
+    else if (/kristen/i.test(finalAgama)) finalAgama = 'Kristen Protestan';
+    else if (/hindu/i.test(finalAgama)) finalAgama = 'Hindu';
+    else if (/buddh?a/i.test(finalAgama)) finalAgama = 'Buddha';
+    else if (/konghucu/i.test(finalAgama)) finalAgama = 'Konghucu';
+    else finalAgama = 'Islam';
+
+    // Construct Member Record
+    const member: AnggotaKeluarga = {
+      id: `ang_${rawNik || rawKk}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      nik: rawNik || `${rawKk}0001`,
+      nama: rawNama,
+      hubunganKeluarga: rawHubungan,
+      jenisKelamin: rawGender,
+      tempatLahir: 'Medan',
+      tanggalLahir: '1985-01-01',
+      usia: rawGender === 'P' ? 38 : 42,
+      agama: finalAgama as AgamaType,
+      pendidikanTerakhir: 'SMA/SMK/Sederajat',
+      pekerjaan:
+        rawHubungan === 'Kepala Keluarga'
+          ? 'Wiraswasta'
+          : rawHubungan === 'Istri'
+          ? 'Mengurus Rumah Tangga'
+          : 'Pelajar/Mahasiswa',
+      statusPerkawinan: rawHubungan === 'Kepala Keluarga' || rawHubungan === 'Istri' ? 'Kawin' : 'Belum Kawin',
+      memilikiKtpIkd: true,
+      memilikiAktaKelahiran: true,
+      statusBpjsKesehatan: bansosList.length > 0 ? 'PBI-JK (Bansos APBD/APBN)' : 'Mandiri (Bayar Sendiri)',
+      terdaftarBpjsKetenagakerjaan: rawHubungan === 'Kepala Keluarga',
     };
 
-    parsedItems.push(item);
+    // Check if this No. KK is already in our grouped map
+    const existingFamily = familyMap.get(rawKk);
+
+    if (!existingFamily) {
+      // First person encountered for this No. KK
+      const item: DataKeluarga = {
+        id: `kk_${rawKk}`,
+        nomorKk: rawKk,
+        nikKepalaKeluarga: rawHubungan === 'Kepala Keluarga' || !hasExplicitHubungan ? rawNik : rawNik,
+        namaKepalaKeluarga: rawNama,
+        telepon: idxHp !== -1 ? String(row[idxHp] || '').trim() : '',
+        lingkunganId: kepling.id,
+        lingkunganNomor: lkNum,
+        lingkunganNama: kepling.lingkungan,
+        namaJalan: rawAlamat || (idxJalan !== -1 && String(row[idxJalan]).trim() ? String(row[idxJalan]).trim() : 'Jl. Bunga Ncole'),
+        nomorRumah: idxNoRumah !== -1 ? String(row[idxNoRumah] || '').trim() : '',
+        agama: finalAgama,
+        alamatLengkap: rawAlamat
+          ? `${rawAlamat}, ${kepling.lingkungan}, Kelurahan Mangga`
+          : `${idxJalan !== -1 && row[idxJalan] ? row[idxJalan] : 'Jl. Bunga Ncole'}, ${kepling.lingkungan}, Kelurahan Mangga`,
+        statusDomisili:
+          idxDomisili !== -1
+            ? String(row[idxDomisili] || '').trim() || 'KK Kelurahan Mangga (KTP/KK Setempat)'
+            : 'KK Kelurahan Mangga (KTP/KK Setempat)',
+        jumlahAnggotaKeluarga: 1,
+        jumlahLakiLaki: rawGender === 'L' ? 1 : 0,
+        jumlahPerempuan: rawGender === 'P' ? 1 : 0,
+        jumlahBalita: 0,
+        jumlahUsiaSekolah: 0,
+        jumlahUsiaProduktif: 1,
+        jumlahLansia: 0,
+        pekerjaanUtamaKepalaKeluarga: rawHubungan === 'Kepala Keluarga' ? 'Wiraswasta' : '',
+        penghasilanRataRata: '',
+        desilKesejahteraan: idxDesil !== -1 ? String(row[idxDesil] || '').trim() : '',
+        penerimaBansos: bansosList.length > 0,
+        bantuanDiterima: bansosList,
+        kategoriRentan: bansosList.length > 0 ? ['Keluarga Rentan'] : [],
+        jambanKeluarga: idxJamban !== -1 ? String(row[idxJamban] || '').trim() : '',
+        tempatAkhirTinja: '',
+        sumberAirMinum: idxAirMinum !== -1 ? String(row[idxAirMinum] || '').trim() : '',
+        sumberAirBersih: idxAirBersih !== -1 ? String(row[idxAirBersih] || '').trim() : '',
+        pembuanganSampahRumah: idxSampah !== -1 ? String(row[idxSampah] || '').trim() : '',
+        statusStuntingRentan: idxStunting !== -1 ? String(row[idxStunting] || '').trim() : '',
+        statusKepemilikanRumah: '',
+        dayaListrik: '',
+        nopPbb: idxNop !== -1 ? String(row[idxNop] || '').trim() : '',
+        statusPbb:
+          idxPbb !== -1 ? (String(row[idxPbb]).toUpperCase().includes('LUNAS') ? 'LUNAS' : 'BELUM_LUNAS') : 'LUNAS',
+        statusWrs: 'AKTIF',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdByName: 'Import Excel / Teks',
+        anggotaKeluarga: [member],
+      };
+      familyMap.set(rawKk, item);
+    } else {
+      // Family card already exists in this import batch! Add this person as a member!
+      const alreadyInList = existingFamily.anggotaKeluarga.some(
+        (m) =>
+          (m.nik && member.nik && m.nik === member.nik) ||
+          (m.nama && member.nama && m.nama.toLowerCase().trim() === member.nama.toLowerCase().trim())
+      );
+      if (!alreadyInList) {
+        existingFamily.anggotaKeluarga.push(member);
+        existingFamily.jumlahAnggotaKeluarga = existingFamily.anggotaKeluarga.length;
+        if (member.jenisKelamin === 'L') existingFamily.jumlahLakiLaki += 1;
+        if (member.jenisKelamin === 'P') existingFamily.jumlahPerempuan += 1;
+      }
+      // If this row is explicitly KEPALA KELUARGA, set family head info
+      if (rawHubungan === 'Kepala Keluarga') {
+        existingFamily.namaKepalaKeluarga = rawNama;
+        existingFamily.nikKepalaKeluarga = rawNik;
+      }
+      // Update street address if currently default
+      if (rawAlamat && (!existingFamily.namaJalan || existingFamily.namaJalan === 'Jl. Bunga Ncole')) {
+        existingFamily.namaJalan = rawAlamat;
+        existingFamily.alamatLengkap = `${rawAlamat}, ${existingFamily.lingkunganNama}, Kelurahan Mangga`;
+      }
+    }
   }
+
+  const parsedItems = Array.from(familyMap.values());
 
   return {
     items: parsedItems,
@@ -849,16 +1101,204 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
 }
 
 /**
- * Parses raw text lines (e.g. pasted tab-separated or comma-separated rows) into DataKeluarga records
+ * Parses raw text lines (e.g. pasted tab-separated, comma-separated, pipe-separated, or document blocks) into DataKeluarga records
  */
 export async function parseDataKeluargaText(rawText: string): Promise<ImportParsedResult> {
-  const lines = rawText.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length === 0) {
+  const trimmed = rawText.trim();
+  if (!trimmed) {
     throw new Error('Teks yang dimasukkan kosong.');
   }
 
+  // Check if text is formatted as Key-Value pairs or freeform document blocks
+  const isKeyValueOrDocument =
+    /(?:nik|nama|alamat|lingkungan|agama|kk|kepling)[\s]*[:=]/i.test(trimmed) ||
+    /DATA\s*BASE\s*KELUARGA/i.test(trimmed);
+
+  if (isKeyValueOrDocument) {
+    // Intelligent Multi-Block Parser
+    let blocks = trimmed.split(/\n\s*\n+/).filter((b) => b.trim().length > 0);
+    const allNikMatches = [...trimmed.matchAll(/\b(\d{16})\b/g)];
+
+    // If there are multiple 16-digit NIKs but only 1 block, split by lines containing 16-digit NIK
+    if (blocks.length === 1 && allNikMatches.length > 1) {
+      const subLines = trimmed.split(/\r?\n/);
+      const reconstructed: string[] = [];
+      let currentChunk: string[] = [];
+      for (const line of subLines) {
+        if (/\b\d{16}\b/.test(line) && currentChunk.length > 0) {
+          reconstructed.push(currentChunk.join('\n'));
+          currentChunk = [line];
+        } else {
+          currentChunk.push(line);
+        }
+      }
+      if (currentChunk.length > 0) reconstructed.push(currentChunk.join('\n'));
+      blocks = reconstructed;
+    }
+
+    const parsedItems: DataKeluarga[] = [];
+    const errors: { row: number; nomorKk?: string; message: string }[] = [];
+
+    blocks.forEach((block, idx) => {
+      // 1. Extract 16-digit NIK
+      const nikMatch = block.match(/\b(\d{16})\b/);
+      const rawNik = nikMatch ? nikMatch[1] : '';
+
+      // 2. Extract Nama
+      let rawNama = '';
+      const namaMatch = block.match(/(?:nama|nama\s*kepala|kepala\s*keluarga)[\s]*[:=]\s*([^\n\r,;]+)/i);
+      if (namaMatch) {
+        rawNama = namaMatch[1].trim();
+      } else {
+        const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        for (const line of lines) {
+          if (/DATA\s*BASE|KELURAHAN|MANGGA|REPUBLIK|PEMERINTAH|KARTU/i.test(line)) continue;
+          if (/\b\d{16}\b/.test(line)) {
+            // Check if there is a name next to the NIK
+            const clean = line.replace(/\b\d{16}\b/, '').replace(/[^\w\s'.,]/g, '').trim();
+            if (clean.length >= 3 && !/yang saya entri|adalah nik|bukan no/i.test(clean)) {
+              rawNama = clean;
+              break;
+            }
+            continue;
+          }
+          if (/^[a-zA-Z\s'.,]{3,50}$/.test(line) && !/^(islam|kristen|katolik|hindu|buddha|konghucu)$/i.test(line)) {
+            rawNama = line;
+            break;
+          }
+        }
+      }
+
+      if (!rawNama && rawNik) {
+        rawNama = `Kepala Keluarga (${maskNik(rawNik)})`;
+      }
+
+      // 3. Extract Lingkungan (Kota Medan: 1–24 tanpa RT/RW)
+      let lkNum = 1;
+      const lkMatch =
+        block.match(/(?:lingkungan|lk|kepling)[\s.:_-]*(\d+)/i) ||
+        block.match(/\b(?:lingkungan|lk)\s*([IVXLCDM\d]+)/i);
+      if (lkMatch) {
+        const num = parseInt(lkMatch[1], 10);
+        if (!isNaN(num)) {
+          lkNum = Math.min(24, Math.max(1, num));
+        }
+      }
+      const kepling = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === lkNum) || KEPLING_ACCOUNTS[0];
+
+      // 4. Extract Alamat
+      let rawAlamat = '';
+      const alamatMatch = block.match(/(?:alamat|jalan|jl|gang|gg)[\s]*[:=]\s*([^\n\r]+)/i);
+      if (alamatMatch) {
+        rawAlamat = alamatMatch[1].trim();
+      } else {
+        const addrLine = block.split(/\r?\n/).find((l) => /\b(jl|jalan|gg|gang|komplek|no\.)\b/i.test(l));
+        if (addrLine) rawAlamat = addrLine.trim();
+      }
+
+      // 5. Extract Agama
+      let rawAgama: AgamaType = 'Islam';
+      const agamaMatch = block.match(/(?:agama)[\s]*[:=]\s*([^\n\r,;]+)/i);
+      const testAgamaStr = agamaMatch ? agamaMatch[1] : block;
+      if (/katolik/i.test(testAgamaStr)) rawAgama = 'Katolik';
+      else if (/kristen/i.test(testAgamaStr)) rawAgama = 'Kristen Protestan';
+      else if (/hindu/i.test(testAgamaStr)) rawAgama = 'Hindu';
+      else if (/buddh?a/i.test(testAgamaStr)) rawAgama = 'Buddha';
+      else if (/konghucu/i.test(testAgamaStr)) rawAgama = 'Konghucu';
+      else if (/islam/i.test(testAgamaStr)) rawAgama = 'Islam';
+
+      if (!rawNik && !rawNama) {
+        errors.push({ row: idx + 1, message: 'Tidak ditemukan NIK 16 digit atau Nama pada blok data.' });
+        return;
+      }
+
+      const effectiveNik = rawNik || `127107${Date.now().toString().slice(-10)}`;
+      const effectiveKk = effectiveNik;
+
+      const item: DataKeluarga = {
+        id: `kk_${effectiveKk}`,
+        nomorKk: effectiveKk,
+        nikKepalaKeluarga: effectiveNik,
+        namaKepalaKeluarga: rawNama || 'Warga Kelurahan Mangga',
+        telepon: '',
+        lingkunganId: kepling.id,
+        lingkunganNomor: lkNum,
+        lingkunganNama: kepling.lingkungan,
+        namaJalan: rawAlamat || 'Jl. Bunga Ncole',
+        nomorRumah: '',
+        agama: rawAgama,
+        alamatLengkap: rawAlamat
+          ? `${rawAlamat}, ${kepling.lingkungan}, Kelurahan Mangga`
+          : `Jl. Bunga Ncole, ${kepling.lingkungan}, Kelurahan Mangga`,
+        statusDomisili: 'KK Kelurahan Mangga (KTP/KK Setempat)',
+        jumlahAnggotaKeluarga: 4,
+        jumlahLakiLaki: 2,
+        jumlahPerempuan: 2,
+        jumlahBalita: 0,
+        jumlahUsiaSekolah: 1,
+        jumlahUsiaProduktif: 2,
+        jumlahLansia: 0,
+        pekerjaanUtamaKepalaKeluarga: '',
+        penghasilanRataRata: '',
+        desilKesejahteraan: '',
+        penerimaBansos: false,
+        bantuanDiterima: [],
+        kategoriRentan: [],
+        jambanKeluarga: '',
+        tempatAkhirTinja: '',
+        sumberAirMinum: '',
+        sumberAirBersih: '',
+        pembuanganSampahRumah: '',
+        statusStuntingRentan: '',
+        statusKepemilikanRumah: '',
+        dayaListrik: '',
+        nopPbb: '',
+        statusPbb: 'LUNAS',
+        statusWrs: 'AKTIF',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdByName: 'Smart Text Parser',
+        anggotaKeluarga: [
+          {
+            id: `ang_${effectiveKk}_1`,
+            nik: effectiveNik,
+            nama: rawNama || 'Warga Kelurahan Mangga',
+            hubunganKeluarga: 'Kepala Keluarga',
+            jenisKelamin: 'L',
+            tempatLahir: 'Medan',
+            tanggalLahir: '1985-01-01',
+            usia: 41,
+            agama: rawAgama,
+            pendidikanTerakhir: 'SMA/SMK/Sederajat',
+            pekerjaan: 'Wiraswasta',
+            statusPerkawinan: 'Kawin',
+            memilikiKtpIkd: true,
+            memilikiAktaKelahiran: true,
+            statusBpjsKesehatan: 'Mandiri (Bayar Sendiri)',
+            terdaftarBpjsKetenagakerjaan: true,
+          }
+        ]
+      };
+
+      parsedItems.push(item);
+    });
+
+    if (parsedItems.length > 0) {
+      return {
+        items: parsedItems,
+        totalRows: blocks.length,
+        validCount: parsedItems.length,
+        invalidCount: errors.length,
+        errors,
+      };
+    }
+  }
+
+  // Standard line-based parsing (Tab, Semicolon, Comma, Pipe)
+  const lines = trimmed.split(/\r?\n/).filter((l) => l.trim().length > 0);
   const rows: string[][] = lines.map((line) => {
     if (line.includes('\t')) return line.split('\t');
+    if (line.includes('|')) return line.split('|');
     if (line.includes(';')) return line.split(';');
     if (line.includes(',')) return line.split(',');
     return [line];
@@ -917,8 +1357,7 @@ export function getInitialSeedDataKeluarga(): DataKeluarga[] {
       lingkunganNama: 'Lingkungan I',
       namaJalan: 'Jl. Bunga Raya Gg. Melati',
       nomorRumah: 'No. 12',
-      rt: '001',
-      rw: '001',
+      agama: 'Islam',
       alamatLengkap: 'Jl. Bunga Raya Gg. Melati No. 12, Lingkungan I, Kelurahan Mangga',
       statusDomisili: 'KK Kelurahan Mangga (KTP/KK Setempat)',
       titikKoordinat: { lat: 3.52841, lng: 98.64152 },
@@ -1038,8 +1477,7 @@ export function getInitialSeedDataKeluarga(): DataKeluarga[] {
       lingkunganNama: 'Lingkungan II',
       namaJalan: 'Jl. Flamboyan Raya Gg. Kenanga',
       nomorRumah: 'No. 05',
-      rt: '002',
-      rw: '001',
+      agama: 'Kristen Protestan',
       alamatLengkap: 'Jl. Flamboyan Raya Gg. Kenanga No. 05, Lingkungan II, Kelurahan Mangga',
       statusDomisili: 'KK Kelurahan Mangga (KTP/KK Setempat)',
       titikKoordinat: { lat: 3.52615, lng: 98.63875 },
@@ -1122,8 +1560,7 @@ export function getInitialSeedDataKeluarga(): DataKeluarga[] {
       lingkunganNama: 'Lingkungan III',
       namaJalan: 'Jl. Sakura Raya No. 44',
       nomorRumah: 'No. 44',
-      rt: '001',
-      rw: '002',
+      agama: 'Islam',
       alamatLengkap: 'Jl. Sakura Raya No. 44, Lingkungan III, Kelurahan Mangga',
       statusDomisili: 'KK Kelurahan Mangga (KTP/KK Setempat)',
       titikKoordinat: { lat: 3.52410, lng: 98.63610 },
@@ -1261,8 +1698,7 @@ export function getInitialSeedDataKeluarga(): DataKeluarga[] {
       lingkunganNama: 'Lingkungan IV',
       namaJalan: 'Jl. Bunga Ncole Gg. Sejahtera',
       nomorRumah: 'No. 08',
-      rt: '003',
-      rw: '001',
+      agama: 'Kristen Protestan',
       alamatLengkap: 'Jl. Bunga Ncole Gg. Sejahtera No. 08, Lingkungan IV, Kelurahan Mangga',
       statusDomisili: 'KK Kelurahan Mangga (KTP/KK Setempat)',
       titikKoordinat: { lat: 3.52180, lng: 98.63420 },
@@ -1407,8 +1843,7 @@ export function getInitialSeedDataKeluarga(): DataKeluarga[] {
       lingkunganNama: kepling.lingkungan,
       namaJalan: street,
       nomorRumah: `No. ${lk + 2}`,
-      rt: '001',
-      rw: '001',
+      agama: lk % 2 === 0 ? 'Kristen Protestan' : 'Islam',
       alamatLengkap: `${street} No. ${lk + 2}, ${kepling.lingkungan}, Kelurahan Mangga`,
       statusDomisili: 'KK Kelurahan Mangga (KTP/KK Setempat)',
       titikKoordinat: { lat: latOffset, lng: lngOffset },

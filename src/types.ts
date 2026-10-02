@@ -456,8 +456,7 @@ export interface DataKeluarga {
   lingkunganNama: string; // "Lingkungan I" ... "Lingkungan XXIV"
   namaJalan: string; // e.g. "Jl. Bunga Raya Gg. Melati"
   nomorRumah?: string; // e.g. "No. 14A"
-  rt?: string; // e.g. "001"
-  rw?: string; // e.g. "002"
+  agama?: AgamaType | string; // e.g. "Islam", "Kristen Protestan", dll.
   alamatLengkap: string;
   statusDomisili: 'KK Kelurahan Mangga (KTP/KK Setempat)' | 'Bukan KK Mangga (Domisili Luar/Kontrak)' | string;
   kewarganegaraan?: 'WNI' | 'WNA' | string;

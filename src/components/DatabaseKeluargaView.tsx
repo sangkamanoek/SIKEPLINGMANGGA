@@ -8,6 +8,7 @@ import {
   Edit3,
   Trash2,
   Eye,
+  EyeOff,
   CheckCircle2,
   AlertTriangle,
   HeartHandshake,
@@ -35,6 +36,7 @@ import {
   Table,
   ArrowRight,
   CheckCircle,
+  Sparkles,
 } from 'lucide-react';
 import {
   DataKeluarga,
@@ -55,6 +57,7 @@ import {
   parseDataKeluargaFile,
   parseDataKeluargaText,
   batchSaveDataKeluarga,
+  maskNik,
   ImportParsedResult,
 } from '../lib/dataKeluargaService';
 import { printOfficialDocument } from '../utils/printHelper';
@@ -91,6 +94,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
 
   // Modals
   const [selectedDetailKk, setSelectedDetailKk] = useState<DataKeluarga | null>(null);
+  const [showFullNik, setShowFullNik] = useState<boolean>(false);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [editingKk, setEditingKk] = useState<DataKeluarga | null>(null);
 
@@ -706,9 +710,8 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                       <td className="py-3 px-4 text-center font-bold text-slate-400">{index + 1}</td>
 
                       <td className="py-3 px-4">
-                        <div className="font-mono font-bold text-slate-900 tracking-tight">{item.nomorKk}</div>
-                        <div className="text-[11px] text-slate-500">
-                          NIK: <span className="font-mono">{item.nikKepalaKeluarga || '-'}</span>
+                        <div className="font-mono font-bold text-slate-900 tracking-tight">
+                          NIK: {maskNik(item.nikKepalaKeluarga || item.nomorKk)}
                         </div>
                       </td>
 
@@ -724,9 +727,9 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
 
                       <td className="py-3 px-4 max-w-xs">
                         <div className="font-semibold text-slate-800">{item.lingkunganNama}</div>
-                        <div className="text-[11px] text-slate-600 truncate font-medium">{item.namaJalan}</div>
-                        <div className="text-[10px] text-slate-400">
-                          {item.nomorRumah ? `No. ${item.nomorRumah}` : ''} RT {item.rt || '00'}/RW {item.rw || '00'}
+                        <div className="text-[11px] text-slate-600 truncate font-medium">📍 {item.namaJalan} {item.nomorRumah ? `No. ${item.nomorRumah}` : ''}</div>
+                        <div className="text-[10px] text-slate-500 font-medium">
+                          Agama: <span className="font-bold text-slate-700">{item.agama || item.anggotaKeluarga?.[0]?.agama || 'Islam'}</span>
                         </div>
                       </td>
 
@@ -782,10 +785,10 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
 
                       <td className="py-3 px-4 max-w-xs">
                         <div className="text-[11px] text-slate-700 font-medium">
-                          🚽 {item.jambanKeluarga ? item.jambanKeluarga.split('(')[0] : 'Jamban Sendiri'}
+                          🚽 {item.jambanKeluarga ? item.jambanKeluarga.split('(')[0] : 'Belum Terdata'}
                         </div>
                         <div className="text-[10.5px] text-slate-500 font-medium">
-                          💧 Minum: {item.sumberAirMinum || 'PDAM'}
+                          💧 Minum: {item.sumberAirMinum || 'Belum Terdata'}
                         </div>
                         {item.statusStuntingRentan?.includes('Stunting') && (
                           <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[9px] font-black">
@@ -1174,43 +1177,88 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
             /* Text Paste Zone */
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
               <div className="space-y-1">
-                <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <span>Tempel Teks (Copy-Paste) Data Keluarga</span>
-                </h4>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <span>Susun Otomatis Data Keluarga (Salin-Tempel Bebas)</span>
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRawPasteText(
+                          `DAMENI MENDROFA\t1201030605090043\t1201035908730001\tKEPALA KELUARGA\tJL. TEMBAKAU RAYA NO.35\nROSMAWATI ZEBUA\t1201030605090043\t1201036009750002\tISTRI\tJL. TEMBAKAU RAYA NO.35\nJOSUA MENDROFA\t1201030605090043\t1201030101050003\tANAK\tJL. TEMBAKAU RAYA NO.35`
+                        );
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-indigo-50 text-indigo-900 hover:bg-indigo-100 transition-colors border border-indigo-200 cursor-pointer"
+                    >
+                      👥 Contoh 1 KK Lengkap (KK + NIK + Hubungan)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRawPasteText(
+                          `DATA BASE KELUARGA\nKELURAHAN MANGGA\n\nNIK: 1271190811740002\nNama Kepala Keluarga: BASMI KABAN\nLingkungan: 2\nAlamat: GG. BERAS MUNTE NO.22\nAgama: Islam\n\nNIK: 1271071508820001\nNama Kepala Keluarga: SUPRIADI\nLingkungan: 1\nAlamat: JL. BUNGA NCOLE NO.15\nAgama: Islam`
+                        );
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-blue-50 text-blue-800 hover:bg-blue-100 transition-colors border border-blue-200 cursor-pointer"
+                    >
+                      💡 Contoh Format Dokumen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRawPasteText(
+                          `1271190811740002\tBASMI KABAN\tGG. BERAS MUNTE NO.22 LK-II MEDAN\tLINGKUNGAN 2\tIslam\n1271071508820001\tSUPRIADI\tJL. BUNGA NCOLE NO.15\tLINGKUNGAN 1\tIslam`
+                        );
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors border border-emerald-200 cursor-pointer"
+                    >
+                      📋 Contoh Baris Tab / Excel
+                    </button>
+                  </div>
+                </div>
                 <p className="text-xs text-slate-500">
-                  Salin teks dari Excel/Notepad/WhatsApp (dipisahkan Tab atau Koma) dan tempelkan di kotak bawah ini. Contoh: <code className="bg-slate-100 px-2 py-0.5 rounded text-slate-800 font-bold">BASMI KABAN	1271072412650002	GG. BERAS MUNTE NO.22 LK-II MEDAN	LINGKUNGAN 2</code>
+                  Sistem otomatis mendeteksi: <strong>16 angka pertama = No. Kartu Keluarga (KK)</strong>, <strong>16 angka kedua = NIK Anggota</strong>, Status Hubungan (Kepala Keluarga, Istri, Anak), Lingkungan (Kota Medan tanpa RT/RW), dan Agama. Jika Anda sebelumnya sudah mengimpor data Kepala Keluarga, mengimpor data lengkap ini akan <strong>otomatis menggabungkan dan melengkapi anggota ke dalam keluarga yang sama</strong> tanpa membuat data ganda!
                 </p>
               </div>
 
               <textarea
-                rows={6}
+                rows={7}
                 value={rawPasteText}
                 onChange={(e) => setRawPasteText(e.target.value)}
-                placeholder={`Contoh:\nBASMI KABAN\t1271072412650002\tGG. BERAS MUNTE NO.22 LK-II MEDAN\tLINGKUNGAN 2\nSUPRIADI\t1271071508820001\tJL. BUNGA NCOLE NO.15\tLINGKUNGAN 1`}
+                placeholder={`Contoh Format Lengkap (Nama - No. KK - NIK - Hubungan - Alamat):\nDAMENI MENDROFA\t1201030605090043\t1201035908730001\tKEPALA KELUARGA\tJL. TEMBAKAU RAYA NO.35\nROSMAWATI ZEBUA\t1201030605090043\t1201036009750002\tISTRI\tJL. TEMBAKAU RAYA NO.35\nJOSUA MENDROFA\t1201030605090043\t1201030101050003\tANAK\tJL. TEMBAKAU RAYA NO.35`}
                 className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-300 font-mono text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
 
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRawPasteText('')}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
-                >
-                  Bersihkan Teks
-                </button>
-                <button
-                  type="button"
-                  onClick={handleTextParse}
-                  disabled={isParsingImport || !rawPasteText.trim()}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md transition-all cursor-pointer disabled:opacity-50"
-                >
-                  {isParsingImport ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle className="w-4 h-4" />
-                  )}
-                  <span>Proses Teks & Validasi Data</span>
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="text-[11px] text-slate-500 flex items-center gap-1.5 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>Otomatis mendeteksi: NIK 16 digit, Lingkungan 1–24 Kota Medan, Info Agama, & Alamat</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRawPasteText('')}
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Bersihkan Teks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTextParse}
+                    disabled={isParsingImport || !rawPasteText.trim()}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isParsingImport ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4" />
+                    )}
+                    <span>⚡ Susun Langsung Otomatis & Validasi</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1319,8 +1367,8 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                     <thead>
                       <tr className="bg-slate-100 text-[10px] font-black text-slate-600 uppercase tracking-wider border-b border-slate-200">
                         <th className="py-2.5 px-3 text-center">No</th>
-                        <th className="py-2.5 px-3">Nomor KK</th>
-                        <th className="py-2.5 px-3">Kepala Keluarga</th>
+                        <th className="py-2.5 px-3">NIK Kepala Keluarga</th>
+                        <th className="py-2.5 px-3">Nama Kepala Keluarga</th>
                         <th className="py-2.5 px-3">Lingkungan</th>
                         <th className="py-2.5 px-3">Kesejahteraan</th>
                         <th className="py-2.5 px-3">Bansos Diterima</th>
@@ -1332,7 +1380,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                       {parseResult.items.slice(0, 10).map((kk, index) => (
                         <tr key={index} className="hover:bg-slate-50">
                           <td className="py-2 px-3 text-center font-bold text-slate-400">{index + 1}</td>
-                          <td className="py-2 px-3 font-mono font-bold text-slate-900">{kk.nomorKk}</td>
+                          <td className="py-2 px-3 font-mono font-bold text-slate-900">{maskNik(kk.nikKepalaKeluarga || kk.nomorKk)}</td>
                           <td className="py-2 px-3 font-bold text-slate-800">{kk.namaKepalaKeluarga}</td>
                           <td className="py-2 px-3 font-semibold text-slate-700">{kk.lingkunganNama}</td>
                           <td className="py-2 px-3 font-medium text-slate-700">{kk.desilKesejahteraan}</td>
@@ -1362,16 +1410,31 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
               <X className="w-5 h-5" />
             </button>
 
-            {/* Header Resmi Kartu Keluarga */}
+            {/* Header Resmi Database Keluarga */}
             <div className="border-b-2 border-slate-900 pb-4 text-center space-y-1">
               <div className="text-xs font-bold tracking-widest text-slate-500 uppercase">
                 REPUBLIK INDONESIA • PEMERINTAH KOTA MEDAN
               </div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                KARTU KELUARGA
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
+                DATABASE KELUARGA
               </h2>
-              <div className="text-base sm:text-lg font-mono font-black text-blue-900 tracking-wider">
-                No. {selectedDetailKk.nomorKk}
+              <div className="text-sm sm:text-base font-black text-slate-800 tracking-wider uppercase">
+                KELURAHAN MANGGA
+              </div>
+              <div className="flex items-center justify-center gap-2 pt-1">
+                <span className="text-base sm:text-lg font-mono font-black text-blue-900 tracking-wider">
+                  NIK: {showFullNik
+                    ? (selectedDetailKk.nikKepalaKeluarga || selectedDetailKk.nomorKk)
+                    : maskNik(selectedDetailKk.nikKepalaKeluarga || selectedDetailKk.nomorKk)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowFullNik(!showFullNik)}
+                  title={showFullNik ? 'Samarkan NIK (5 digit akhir *****)' : 'Tampilkan NIK Lengkap'}
+                  className="p-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 transition-colors cursor-pointer border border-blue-200"
+                >
+                  {showFullNik ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -1384,15 +1447,15 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500 font-medium">NIK Kepala Keluarga:</span>
-                  <span className="font-mono font-bold text-slate-900">{selectedDetailKk.nikKepalaKeluarga || '-'}</span>
+                  <span className="font-mono font-bold text-slate-900">{maskNik(selectedDetailKk.nikKepalaKeluarga)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500 font-medium">Alamat:</span>
                   <span className="font-semibold text-slate-800 text-right">{selectedDetailKk.namaJalan} {selectedDetailKk.nomorRumah ? `No. ${selectedDetailKk.nomorRumah}` : ''}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">RT / RW:</span>
-                  <span className="font-semibold text-slate-800">{selectedDetailKk.rt || '001'} / {selectedDetailKk.rw || '001'}</span>
+                  <span className="text-slate-500 font-medium">Agama:</span>
+                  <span className="font-bold text-slate-900">{selectedDetailKk.agama || selectedDetailKk.anggotaKeluarga?.[0]?.agama || 'Islam'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500 font-medium">Status Domisili:</span>
@@ -1443,6 +1506,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                       <th className="py-2.5 px-3">Hubungan</th>
                       <th className="py-2.5 px-3 text-center">JK</th>
                       <th className="py-2.5 px-3 text-center">Usia</th>
+                      <th className="py-2.5 px-3">Agama</th>
                       <th className="py-2.5 px-3">Pendidikan</th>
                       <th className="py-2.5 px-3">Pekerjaan</th>
                       <th className="py-2.5 px-3">BPJS Kesehatan</th>
@@ -1455,10 +1519,11 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                         <tr key={ang.id || ai} className="hover:bg-slate-50">
                           <td className="py-2 px-3 text-center font-bold text-slate-400">{ai + 1}</td>
                           <td className="py-2 px-3 font-bold text-slate-900">{ang.nama}</td>
-                          <td className="py-2 px-3 font-mono text-slate-700">{ang.nik}</td>
+                          <td className="py-2 px-3 font-mono text-slate-700">{maskNik(ang.nik)}</td>
                           <td className="py-2 px-3 font-semibold text-slate-800">{ang.hubunganKeluarga}</td>
                           <td className="py-2 px-3 text-center font-bold text-slate-700">{ang.jenisKelamin}</td>
                           <td className="py-2 px-3 text-center">{ang.usia} Th</td>
+                          <td className="py-2 px-3 text-slate-800 font-medium">{ang.agama || selectedDetailKk.agama || 'Islam'}</td>
                           <td className="py-2 px-3">{ang.pendidikanTerakhir}</td>
                           <td className="py-2 px-3">{ang.pekerjaan}</td>
                           <td className="py-2 px-3">
@@ -1525,23 +1590,23 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600 font-medium">Jamban Keluarga:</span>
-                  <span className="font-bold text-slate-900">{selectedDetailKk.jambanKeluarga}</span>
+                  <span className="font-bold text-slate-900">{selectedDetailKk.jambanKeluarga || 'Belum Terdata (Perlu Verifikasi Kepling)'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600 font-medium">Sumber Air Minum:</span>
-                  <span className="font-bold text-slate-900">{selectedDetailKk.sumberAirMinum}</span>
+                  <span className="font-bold text-slate-900">{selectedDetailKk.sumberAirMinum || 'Belum Terdata'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600 font-medium">Sumber Air Bersih:</span>
-                  <span className="font-bold text-slate-900">{selectedDetailKk.sumberAirBersih}</span>
+                  <span className="font-bold text-slate-900">{selectedDetailKk.sumberAirBersih || 'Belum Terdata'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600 font-medium">Pembuangan Sampah:</span>
-                  <span className="font-bold text-slate-900">{selectedDetailKk.pembuanganSampahRumah}</span>
+                  <span className="font-bold text-slate-900">{selectedDetailKk.pembuanganSampahRumah || 'Belum Terdata'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600 font-medium">Risiko Stunting:</span>
-                  <span className="font-bold text-amber-800">{selectedDetailKk.statusStuntingRentan}</span>
+                  <span className="font-bold text-amber-800">{selectedDetailKk.statusStuntingRentan || 'Belum Terdata'}</span>
                 </div>
               </div>
             </div>
@@ -1649,35 +1714,30 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
   const [lingkunganId, setLingkunganId] = useState<string>(initialData?.lingkunganId || defaultLingkunganId);
   const [namaJalan, setNamaJalan] = useState<string>(initialData?.namaJalan || '');
   const [nomorRumah, setNomorRumah] = useState<string>(initialData?.nomorRumah || '');
-  const [rt, setRt] = useState<string>(initialData?.rt || '001');
-  const [rw, setRw] = useState<string>(initialData?.rw || '001');
+  const [agama, setAgama] = useState<string>(initialData?.agama || initialData?.anggotaKeluarga?.[0]?.agama || 'Islam');
   const [statusDomisili, setStatusDomisili] = useState<string>(
     initialData?.statusDomisili || 'KK Kelurahan Mangga (KTP/KK Setempat)'
   );
   const [kewarganegaraan, setKewarganegaraan] = useState<string>(initialData?.kewarganegaraan || 'WNI');
   const [negaraAsalWna, setNegaraAsalWna] = useState<string>(initialData?.negaraAsalWna || '');
-  const [pekerjaanKk, setPekerjaanKk] = useState<string>(initialData?.pekerjaanUtamaKepalaKeluarga || 'Wiraswasta');
+  const [pekerjaanKk, setPekerjaanKk] = useState<string>(initialData?.pekerjaanUtamaKepalaKeluarga || '');
 
   // Anggota Keluarga List
   const [anggotaList, setAnggotaList] = useState<AnggotaKeluarga[]>(initialData?.anggotaKeluarga || []);
 
   // Kesejahteraan & Bansos
-  const [desil, setDesil] = useState<string>(initialData?.desilKesejahteraan || 'Desil 3 (Hampir Miskin)');
+  const [desil, setDesil] = useState<string>(initialData?.desilKesejahteraan || '');
   const [bantuanDiterima, setBantuanDiterima] = useState<string[]>(
-    initialData?.bantuanDiterima || ['PKH Medan Makmur', 'BPNT / Sembako']
+    initialData?.bantuanDiterima || []
   );
 
   // Sanitasi & Kesehatan
-  const [jamban, setJamban] = useState<string>(
-    initialData?.jambanKeluarga || 'Jamban Sendiri (Leher Angsa / Septik SNI)'
-  );
-  const [tempatTinja, setTempatTinja] = useState<string>(
-    initialData?.tempatAkhirTinja || 'Tangki Septik / SPALD'
-  );
-  const [airMinum, setAirMinum] = useState<string>(initialData?.sumberAirMinum || 'PDAM / Air Perpipaan');
-  const [airBersih, setAirBersih] = useState<string>(initialData?.sumberAirBersih || 'PDAM Tirtanadi');
-  const [sampah, setSampah] = useState<string>(initialData?.pembuanganSampahRumah || 'Diangkut Petugas / WRS');
-  const [stunting, setStunting] = useState<string>(initialData?.statusStuntingRentan || 'Bebas Risiko Stunting');
+  const [jamban, setJamban] = useState<string>(initialData?.jambanKeluarga || '');
+  const [tempatTinja, setTempatTinja] = useState<string>(initialData?.tempatAkhirTinja || '');
+  const [airMinum, setAirMinum] = useState<string>(initialData?.sumberAirMinum || '');
+  const [airBersih, setAirBersih] = useState<string>(initialData?.sumberAirBersih || '');
+  const [sampah, setSampah] = useState<string>(initialData?.pembuanganSampahRumah || '');
+  const [stunting, setStunting] = useState<string>(initialData?.statusStuntingRentan || '');
 
   // Temporary State for Adding Anggota
   const [tempAnggotaNama, setTempAnggotaNama] = useState<string>('');
@@ -1685,6 +1745,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
   const [tempAnggotaHub, setTempAnggotaHub] = useState<HubunganKeluargaType>('Anak');
   const [tempAnggotaJk, setTempAnggotaJk] = useState<'L' | 'P'>('L');
   const [tempAnggotaUsia, setTempAnggotaUsia] = useState<number>(10);
+  const [tempAnggotaAgama, setTempAnggotaAgama] = useState<AgamaType>('Islam');
   const [tempAnggotaPekerjaan, setTempAnggotaPekerjaan] = useState<string>('Pelajar');
 
   const addAnggota = () => {
@@ -1699,7 +1760,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
       hubunganKeluarga: tempAnggotaHub,
       jenisKelamin: tempAnggotaJk,
       usia: Number(tempAnggotaUsia) || 0,
-      agama: 'Islam',
+      agama: tempAnggotaAgama || (agama as AgamaType) || 'Islam',
       pendidikanTerakhir: 'SMA/SMK/Sederajat',
       pekerjaan: tempAnggotaPekerjaan.trim() || 'Pelajar',
       statusPerkawinan: tempAnggotaHub === 'Kepala Keluarga' || tempAnggotaHub === 'Istri' ? 'Kawin' : 'Belum Kawin',
@@ -1729,8 +1790,9 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nomorKk.trim()) {
-      alert('Nomor Kartu Keluarga (KK) wajib diisi.');
+    const primaryNik = (nikKk || nomorKk).trim();
+    if (!primaryNik) {
+      alert('NIK Kepala Keluarga (16 Digit) wajib diisi.');
       return;
     }
     if (!namaKk.trim()) {
@@ -1754,9 +1816,9 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
     const totalProduktif = anggotaList.filter((a) => a.usia >= 19 && a.usia <= 59).length;
 
     const newKeluargaData: DataKeluarga = {
-      id: initialData?.id || `kk_${nomorKk.replace(/[^0-9]/g, '') || Date.now()}`,
-      nomorKk: nomorKk.trim(),
-      nikKepalaKeluarga: nikKk.trim(),
+      id: initialData?.id || `kk_${primaryNik.replace(/[^0-9]/g, '') || Date.now()}`,
+      nomorKk: (nomorKk || primaryNik).trim(),
+      nikKepalaKeluarga: primaryNik,
       namaKepalaKeluarga: namaKk.trim(),
       telepon: telepon.trim(),
       lingkunganId: targetKepling.id,
@@ -1764,8 +1826,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
       lingkunganNama: targetKepling.lingkungan,
       namaJalan: namaJalan.trim(),
       nomorRumah: nomorRumah.trim(),
-      rt: rt.trim() || '001',
-      rw: rw.trim() || '001',
+      agama: agama,
       alamatLengkap: `${namaJalan.trim()} ${nomorRumah.trim() ? `No. ${nomorRumah.trim()}` : ''}, ${targetKepling.lingkungan}, Kelurahan Mangga`,
       statusDomisili,
       jumlahAnggotaKeluarga: totalJiwa,
@@ -1870,27 +1931,36 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-black text-slate-700 mb-1">
-                    Nomor Kartu Keluarga (KK 16 Digit) *
+                    NIK Kepala Keluarga (16 Digit) *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: 1271010101230001"
-                    value={nomorKk}
-                    onChange={(e) => setNomorKk(e.target.value)}
+                    placeholder="Contoh: 1271190811740002"
+                    value={nikKk || nomorKk}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNikKk(val);
+                      if (!nomorKk || nomorKk === nikKk) {
+                        setNomorKk(val);
+                      }
+                    }}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                   />
+                  <span className="text-[10px] text-slate-400">
+                    5 digit terakhir otomatis disamarkan (*****) pada tampilan cetak & daftar publik demi privasi.
+                  </span>
                 </div>
 
                 <div>
                   <label className="block text-xs font-black text-slate-700 mb-1">
-                    NIK Kepala Keluarga (16 Digit)
+                    Nomor Kartu Keluarga (KK / Opsional)
                   </label>
                   <input
                     type="text"
-                    placeholder="Contoh: 1271011504780001"
-                    value={nikKk}
-                    onChange={(e) => setNikKk(e.target.value)}
+                    placeholder="Contoh: 1271010101230001 (opsional)"
+                    value={nomorKk}
+                    onChange={(e) => setNomorKk(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                   />
                 </div>
@@ -2040,17 +2110,37 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-black text-slate-700 mb-1">
-                  Pekerjaan Utama Kepala Keluarga
-                </label>
-                <input
-                  type="text"
-                  placeholder="Contoh: Buruh Harian Lepas, Wiraswasta, Karyawan Swasta, Supir"
-                  value={pekerjaanKk}
-                  onChange={(e) => setPekerjaanKk(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-700 mb-1">
+                    Agama Kepala Keluarga *
+                  </label>
+                  <select
+                    value={agama}
+                    onChange={(e) => setAgama(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Islam">Islam</option>
+                    <option value="Kristen Protestan">Kristen Protestan</option>
+                    <option value="Katolik">Katolik</option>
+                    <option value="Hindu">Hindu</option>
+                    <option value="Buddha">Buddha</option>
+                    <option value="Konghucu">Konghucu</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-700 mb-1">
+                    Pekerjaan Utama Kepala Keluarga
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Buruh Harian Lepas, Wiraswasta, Karyawan Swasta, Supir"
+                    value={pekerjaanKk}
+                    onChange={(e) => setPekerjaanKk(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -2074,7 +2164,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                             {ang.nama} <span className="text-[11px] text-blue-700 font-normal">({ang.hubunganKeluarga})</span>
                           </div>
                           <div className="text-[10px] text-slate-500 font-mono">
-                            NIK: {ang.nik} • {ang.jenisKelamin === 'L' ? 'Laki-Laki' : 'Perempuan'} • {ang.usia} Tahun • {ang.pekerjaan}
+                            NIK: {maskNik(ang.nik)} • {ang.jenisKelamin === 'L' ? 'Laki-Laki' : 'Perempuan'} • {ang.usia} Tahun • Agama: {ang.agama || 'Islam'} • {ang.pekerjaan}
                           </div>
                         </div>
                         <button
@@ -2126,7 +2216,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                   </select>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                   <select
                     value={tempAnggotaJk}
                     onChange={(e) => setTempAnggotaJk(e.target.value as 'L' | 'P')}
@@ -2142,6 +2232,18 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                     onChange={(e) => setTempAnggotaUsia(parseInt(e.target.value, 10) || 0)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium"
                   />
+                  <select
+                    value={tempAnggotaAgama}
+                    onChange={(e) => setTempAnggotaAgama(e.target.value as AgamaType)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium"
+                  >
+                    <option value="Islam">Islam</option>
+                    <option value="Kristen Protestan">Kristen Protestan</option>
+                    <option value="Katolik">Katolik</option>
+                    <option value="Hindu">Hindu</option>
+                    <option value="Buddha">Buddha</option>
+                    <option value="Konghucu">Konghucu</option>
+                  </select>
                   <input
                     type="text"
                     placeholder="Pekerjaan"
@@ -2186,12 +2288,13 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                       onChange={(e) => setDesil(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-rose-200 text-xs font-black text-rose-950 focus:outline-none focus:ring-2 focus:ring-rose-500"
                     >
-                      <option value="Desil 1">Desil 1</option>
-                      <option value="Desil 2">Desil 2</option>
-                      <option value="Desil 3">Desil 3</option>
-                      <option value="Desil 4">Desil 4</option>
-                      <option value="Desil 5">Desil 5</option>
-                      <option value="Desil 6-10">Desil 6-10</option>
+                      <option value="">-- Belum Terdata (Pilih Sesuai Data Asli Lapangan) --</option>
+                      <option value="Desil 1">Desil 1 (Sangat Miskin)</option>
+                      <option value="Desil 2">Desil 2 (Miskin)</option>
+                      <option value="Desil 3">Desil 3 (Hampir Miskin)</option>
+                      <option value="Desil 4">Desil 4 (Rentan Miskin)</option>
+                      <option value="Desil 5">Desil 5 (Menengah Bawah)</option>
+                      <option value="Desil 6-10">Desil 6-10 (Mampu / Non-Desil)</option>
                     </select>
                     <p className="text-[11px] text-slate-500 font-medium">
                       Sesuai ketentuan, keluarga dengan kategori Desil 1 s/d 5 diprioritaskan menerima program jaminan sosial dan bantuan pemerintah.
@@ -2253,6 +2356,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                     onChange={(e) => setJamban(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                    <option value="">-- Belum Terdata (Pilih Sesuai Data Asli Lapangan) --</option>
                     <option value="Jamban Sendiri (Leher Angsa / Septik SNI)">
                       Jamban Sendiri (Leher Angsa / Septik SNI)
                     </option>
@@ -2271,6 +2375,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                     onChange={(e) => setTempatTinja(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                    <option value="">-- Belum Terdata --</option>
                     <option value="Tangki Septik / SPALD">Tangki Septik / SPALD</option>
                     <option value="Saluran Terbuka / Parit">Saluran Terbuka / Parit</option>
                     <option value="Lubang Tanah / Lainnya">Lubang Tanah / Lainnya</option>
@@ -2288,6 +2393,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                     onChange={(e) => setAirMinum(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                    <option value="">-- Belum Terdata --</option>
                     <option value="PDAM / Air Perpipaan">PDAM / Air Perpipaan</option>
                     <option value="Depot Isi Ulang">Depot Air Minum Isi Ulang</option>
                     <option value="Air Kemasan Bermerek">Air Kemasan Bermerek</option>
@@ -2306,6 +2412,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                     onChange={(e) => setAirBersih(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                    <option value="">-- Belum Terdata --</option>
                     <option value="PDAM Tirtanadi">PDAM Tirtanadi</option>
                     <option value="Sumur Bor Listrik">Sumur Bor Listrik</option>
                     <option value="Sumur Gali">Sumur Gali</option>
@@ -2324,6 +2431,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                     onChange={(e) => setSampah(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                    <option value="">-- Belum Terdata --</option>
                     <option value="Diangkut Petugas / WRS">Diangkut Petugas / WRS (Wajib Retribusi Sampah)</option>
                     <option value="Bank Sampah / Daur Ulang">Bank Sampah / Daur Ulang Mandiri</option>
                     <option value="Dibakar / Ditimbun Mandiri">Dibakar / Ditimbun Mandiri</option>
@@ -2340,6 +2448,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                     onChange={(e) => setStunting(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                    <option value="">-- Belum Terdata / Perlu Verifikasi --</option>
                     <option value="Bebas Risiko Stunting">Bebas Risiko Stunting</option>
                     <option value="Ada Balita / Baduta Berisiko Stunting">
                       Ada Balita / Baduta Berisiko Stunting
