@@ -19,7 +19,7 @@ import { KunjunganHarianView } from './components/KunjunganHarianView';
 import { RealisasiPembangunanView } from './components/RealisasiPembangunanView';
 import { syncInfraReportToPembangunan } from './lib/pembangunanService';
 import { GoogleUser, SheetMetadata, LaporanHarianItem, UserAccount, TargetsCapaianMap, isKelurahanAdmin } from './types';
-import { safeSetLocalStorage, safeSetSessionStorage } from './lib/safeStorage';
+import { safeSetLocalStorage, safeSetSessionStorage, populateMemoryCache } from './lib/safeStorage';
 import {
   initAuth,
   googleSignIn,
@@ -90,7 +90,7 @@ import {
   isReportDeleted,
   seedInitialReports,
 } from './lib/reportsApi';
-import { getReportsFromIndexedDB, clearIndexedDBReports } from './lib/indexedDbStorage';
+import { getReportsFromIndexedDB, clearIndexedDBReports, getKeluargaFromIndexedDB, getPbbFromIndexedDB } from './lib/indexedDbStorage';
 import { KNOWN_STORAGE_KEYS } from './lib/reportsApi';
 import { purgeAllClientCache } from './lib/purgeCache';
 
@@ -378,14 +378,37 @@ export default function App() {
     // Instantly load cached local reports to populate the UI in 10ms (Buttery-smooth startup)
     loadLocalReports();
 
-    syncPasswordsWithServer();
-    syncProfilesWithServer();
-    syncAccountsWithServer();
-    refreshAllReports(false);
-    loadAllAttendance().then((items) => setAttendanceList(items));
-    fetchTargetsCapaian().then((data) => {
-      if (data) setTargetsMap(data);
+    // Load family database from high-capacity IndexedDB into memory map for fast lookup
+    getKeluargaFromIndexedDB().then((data) => {
+      if (data && data.length > 0) {
+        populateMemoryCache('sikepling_database_keluarga_v1', JSON.stringify(data));
+      }
     });
+
+    // Load PBB database from IndexedDB to ensure no quota crashes
+    getPbbFromIndexedDB().then((data) => {
+      if (data && data.length > 0) {
+        // We can't easily guess the year key here, but we can populate the most common ones
+        // or just the one that was recently saved. For now, populate the memory cache
+        // for the default year 2026.
+        populateMemoryCache('sikepling_sppt_pbb_records_2026_v3', JSON.stringify(data));
+      }
+    });
+
+    // Stagger secondary background syncs to ensure first UI frame paints at 60fps
+    const timer1 = setTimeout(() => {
+      syncPasswordsWithServer();
+      syncProfilesWithServer();
+      syncAccountsWithServer();
+    }, 150);
+
+    const timer2 = setTimeout(() => {
+      refreshAllReports(false);
+      loadAllAttendance().then((items) => setAttendanceList(items));
+      fetchTargetsCapaian().then((data) => {
+        if (data) setTargetsMap(data);
+      });
+    }, 300);
 
     // Subscribe to real-time targets & capaian directly from Firebase Firestore
     const unsubscribeTargets = subscribeTargetsFromFirestore((data) => {
@@ -420,8 +443,6 @@ export default function App() {
               reportMap.set(r.id, r);
             }
           });
-          
-          console.log(`[App State Sync] Merged ${reportMap.size} reports from Firestore subscription.`);
 
           // 2. Retain any freshly saved reports from local memory that may not have arrived in Firestore yet
           prev.forEach((r) => {
@@ -439,7 +460,7 @@ export default function App() {
             return timeB - timeA;
           });
 
-          // Cache merged reports to LocalStorage for offline speed on next reload
+          // Cache merged reports to LocalStorage/IndexedDB for offline speed on next reload
           try {
             safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(merged));
           } catch {}

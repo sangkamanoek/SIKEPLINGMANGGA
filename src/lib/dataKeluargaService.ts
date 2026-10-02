@@ -44,18 +44,7 @@ export function maskNik(nik: string | undefined | null): string {
 // ==========================================
 
 export function getLocalDataKeluarga(): DataKeluarga[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_DATA_KELUARGA);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.warn('Gagal membaca cache Data Keluarga lokal:', e);
-  }
-  return [];
+  return safeGetLocalStorage<DataKeluarga[]>(STORAGE_KEY_DATA_KELUARGA, []);
 }
 
 export function saveLocalDataKeluarga(list: DataKeluarga[]): void {

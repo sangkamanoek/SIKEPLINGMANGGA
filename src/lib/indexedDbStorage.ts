@@ -1,8 +1,11 @@
-import { LaporanHarianItem } from '../types';
+import { LaporanHarianItem, DataKeluarga } from '../types';
+import { SpptPbbItem } from '../data/pbbSampleData';
 
 const DB_NAME = 'sikepling_offline_db';
-const DB_VERSION = 1;
+const DB_VERSION = 3; // Incremented version to add PBB store
 const STORE_REPORTS = 'reports_store';
+const STORE_KELUARGA = 'family_store';
+const STORE_PBB = 'pbb_store';
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -17,11 +20,133 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_REPORTS)) {
         db.createObjectStore(STORE_REPORTS, { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains(STORE_KELUARGA)) {
+        db.createObjectStore(STORE_KELUARGA, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_PBB)) {
+        db.createObjectStore(STORE_PBB, { keyPath: 'id' });
+      }
     };
 
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+/**
+ * Save all family data to IndexedDB
+ */
+export async function saveKeluargaToIndexedDB(data: DataKeluarga[]): Promise<boolean> {
+  if (!Array.isArray(data)) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_KELUARGA, 'readwrite');
+      const store = tx.objectStore(STORE_KELUARGA);
+
+      store.clear();
+      if (data.length > 0) {
+        data.forEach((item) => {
+          if (item && item.id) {
+            store.put(item);
+          }
+        });
+      }
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error saving keluarga data:', err);
+    return false;
+  }
+}
+
+/**
+ * Read all family data from IndexedDB
+ */
+export async function getKeluargaFromIndexedDB(): Promise<DataKeluarga[] | null> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_KELUARGA, 'readonly');
+      const store = tx.objectStore(STORE_KELUARGA);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const result = request.result;
+        if (Array.isArray(result) && result.length > 0) {
+          resolve(result as DataKeluarga[]);
+        } else {
+          resolve(null);
+        }
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error getting keluarga data:', err);
+    return null;
+  }
+}
+
+/**
+ * Save all PBB data to IndexedDB
+ */
+export async function savePbbToIndexedDB(data: SpptPbbItem[]): Promise<boolean> {
+  if (!Array.isArray(data)) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PBB, 'readwrite');
+      const store = tx.objectStore(STORE_PBB);
+
+      store.clear();
+      if (data.length > 0) {
+        data.forEach((item) => {
+          if (item && item.id) {
+            store.put(item);
+          }
+        });
+      }
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error saving PBB data:', err);
+    return false;
+  }
+}
+
+/**
+ * Read all PBB data from IndexedDB
+ */
+export async function getPbbFromIndexedDB(): Promise<SpptPbbItem[] | null> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PBB, 'readonly');
+      const store = tx.objectStore(STORE_PBB);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const result = request.result;
+        if (Array.isArray(result) && result.length > 0) {
+          resolve(result as SpptPbbItem[]);
+        } else {
+          resolve(null);
+        }
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error getting PBB data:', err);
+    return null;
+  }
 }
 
 /**
