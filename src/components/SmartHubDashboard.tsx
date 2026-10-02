@@ -260,9 +260,10 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
     activeAccount.role === 'kasi_pemerintahan' ||
     activeAccount.role === 'petugas_bapenda';
 
-  // Define menu items for UIX filtering
-  const menuItems = isBapenda
-    ? [
+  // Define menu items for UIX filtering strictly tailored per role
+  const menuItems = useMemo(() => {
+    if (isBapenda) {
+      return [
         {
           id: 'pbb_lingkungan',
           title: `Rekapitulasi Realisasi PBB ${pbbYear}`,
@@ -274,132 +275,338 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
           badgeColor: 'bg-emerald-100 text-emerald-800',
           action: () => onNavigate('rekap_pbb'),
         },
-      ]
-    : [
+      ];
+    }
+
+    // Role Kasi Tata Pemerintahan
+    if (activeAccount.role === 'kasi_pemerintahan') {
+      return [
         {
-          id: 'pemetaan',
-          title: isKepling ? 'Pemetaan Wilayah & WRS' : 'Peta Wilayah & WebGIS 24 Lingkungan',
-          desc: 'Gambar poligon batas wilayah, tandai titik rumah warga, pantau Wajib Retribusi Sampah (WRS), bansos, & kondisi jalan.',
-          category: 'gis',
-          icon: '🗺️',
-          badge: 'WEBGIS SPASIAL',
-          badgeColor: 'bg-amber-400 text-slate-950',
-          bgGradient: 'bg-gradient-to-r from-emerald-950 to-slate-900 text-white border-emerald-600/60',
-          action: () => onNavigate('pemetaan')
+          id: 'dashboard_kasi',
+          title: 'Dashboard Kasi Tata Pemerintahan',
+          desc: 'Monitoring leaderboard penerimaan Opsir PBB, capaian IKD, dan presensi apel pagi 24 Kepling.',
+          category: 'capaian',
+          icon: Award,
+          iconBg: 'bg-teal-50 text-teal-700',
+          badge: 'UTAMA PEMERINTAHAN',
+          badgeColor: 'bg-teal-100 text-teal-900',
+          bgGradient: 'bg-linear-to-r from-teal-950 via-emerald-950 to-slate-900 text-white border-teal-600/60',
+          action: () => onNavigate('dashboard_kasi'),
         },
         {
-          id: 'form',
-          title: 'Formulir Laporan Harian',
-          desc: 'Input kegiatan harian Kepala Lingkungan: trantib, infrastruktur, kebersihan, PBB, & kemasyarakatan.',
-          category: 'laporan',
-          icon: FileText,
-          iconBg: 'bg-emerald-50 text-emerald-600',
-          badge: 'UTAMA',
-          badgeColor: 'bg-red-100 text-red-800',
-          action: () => onNavigate('form')
+          id: 'rekap_pbb',
+          title: `Rekapitulasi Realisasi PBB-P2 ${pbbYear}`,
+          desc: 'Monitoring data SPPT Wajib Pajak per lingkungan, status bayar lunas, dan ekspor lembar rekapitulasi PBB.',
+          category: 'capaian',
+          icon: FileSpreadsheet,
+          iconBg: 'bg-emerald-50 text-emerald-700',
+          badge: `PBB-P2 ${pbbYear}`,
+          badgeColor: 'bg-emerald-100 text-emerald-800',
+          action: () => onNavigate('rekap_pbb'),
         },
         {
           id: 'database_keluarga',
-          title: 'Database Data Keluarga (KK)',
-          desc: 'Pusat data terpadu kependudukan, anggota keluarga (NIK), tingkat kesejahteraan (Desil 1–5), bansos PKH Medan Makmur, dan sanitasi.',
+          title: 'Database Master Data Keluarga (KK & NIK)',
+          desc: 'Pencarian NIK/KK, struktur anggota keluarga, buku register kependudukan, dan verifikasi data warga.',
           category: 'laporan',
           icon: Users,
           iconBg: 'bg-blue-50 text-blue-700',
-          badge: 'DATA KELUARGA',
+          badge: 'KEPENDUDUKAN',
           badgeColor: 'bg-blue-100 text-blue-900',
-          action: () => onNavigate('database_keluarga')
+          action: () => onNavigate('database_keluarga'),
+        },
+        {
+          id: 'kegiatan_khusus',
+          title: 'Presensi Apel & Disiplin Kepling',
+          desc: 'Verifikasi foto selfie kehadiran, koordinat GPS apel, dan rekapitulasi kehadiran 24 Kepala Lingkungan.',
+          category: 'absen',
+          icon: UserCheck,
+          iconBg: 'bg-teal-50 text-teal-700',
+          badge: 'PRESENSI APEL',
+          badgeColor: 'bg-teal-100 text-teal-800',
+          action: () => onNavigate('kegiatan_khusus'),
+        },
+        {
+          id: 'riwayat',
+          title: 'Riwayat Laporan Pemerintahan',
+          desc: 'Pusat arsip laporan kegiatan harian Kepling terkait administrasi kependudukan, IKD, dan pelayanan warga.',
+          category: 'laporan',
+          icon: History,
+          iconBg: 'bg-slate-100 text-slate-700',
+          badge: 'ARSIP LAPORAN',
+          badgeColor: 'bg-slate-200 text-slate-800',
+          action: () => onNavigate('riwayat'),
+        },
+      ];
+    }
+
+    // Role Kasi Pembangunan & Kesos
+    if (activeAccount.role === 'kasi_pembangunan') {
+      return [
+        {
+          id: 'dashboard_kasi',
+          title: 'Dashboard Kasi Pembangunan & Kesos',
+          desc: 'Monitoring realisasi pendataan 429 KK Perlinsos/DTKS, Posyandu, stunting, dan kepesertaan BPJS Ketenagakerjaan.',
+          category: 'capaian',
+          icon: Award,
+          iconBg: 'bg-blue-50 text-blue-700',
+          badge: 'UTAMA PEMBANGUNAN',
+          badgeColor: 'bg-blue-100 text-blue-900',
+          bgGradient: 'bg-linear-to-r from-blue-950 via-indigo-950 to-slate-900 text-white border-blue-600/60',
+          action: () => onNavigate('dashboard_kasi'),
         },
         {
           id: 'realisasi_pembangunan',
           title: 'Realisasi Pembangunan Infrastruktur',
-          desc: 'Monitoring realisasi perbaikan jalan, drainase, pemasangan paving blok, lampu LPJU, dan penambahan tiang baru.',
-          category: 'pemetaan',
+          desc: 'Monitoring kondisi jalan rusak, perbaikan drainase/parit, paving block, lampu LPJU, dan Bedah Rumah RTLH.',
+          category: 'laporan',
           icon: Wrench,
           iconBg: 'bg-indigo-50 text-indigo-700',
-          badge: 'PEMBANGUNAN',
+          badge: 'INFRASTRUKTUR & MUSRENBANG',
           badgeColor: 'bg-indigo-100 text-indigo-900',
-          action: () => onNavigate('realisasi_pembangunan')
+          action: () => onNavigate('realisasi_pembangunan'),
+        },
+        {
+          id: 'database_keluarga',
+          title: 'Database Data Keluarga (KK Rentan / DTKS)',
+          desc: 'Pusat data terpadu kependudukan, desil kesejahteraan 1-5, bansos PKH, BPNT, dan sanitasi keluarga.',
+          category: 'laporan',
+          icon: Users,
+          iconBg: 'bg-blue-50 text-blue-700',
+          badge: 'DATA PERLINSOS',
+          badgeColor: 'bg-blue-100 text-blue-900',
+          action: () => onNavigate('database_keluarga'),
         },
         {
           id: 'kunjungan',
-          title: 'Kunjungan Harian Warga',
-          desc: 'Log & rekam interaksi sambang, silaturahmi, serta sosialisasi langsung ke rumah warga lingkungan.',
+          title: 'Kunjungan Harian Warga & Posyandu',
+          desc: 'Log & rekam interaksi sambang silaturahmi, verifikasi bansos door-to-door, dan kegiatan sosial kemasyarakatan.',
           category: 'laporan',
           icon: Users,
           iconBg: 'bg-emerald-50 text-emerald-600',
-          badge: 'SOSIAL',
+          badge: 'KESEJAHTERAAN SOSIAL',
           badgeColor: 'bg-emerald-100 text-emerald-800',
-          action: () => onNavigate('kunjungan')
+          action: () => onNavigate('kunjungan'),
         },
-        {
-          id: 'riwayat',
-          title: isKepling ? 'Riwayat Laporan Saya' : 'Database Riwayat Laporan',
-          desc: 'Pusat arsip pencarian, filter, edit, verifikasi, dan ekspor laporan harian seluruh lingkungan.',
-          category: 'laporan',
-          icon: History,
-          iconBg: 'bg-slate-100 text-slate-700',
-          badge: 'ARSIP',
-          badgeColor: 'bg-slate-200 text-slate-800',
-          action: () => onNavigate('riwayat')
-        },
-        {
-          id: 'capaian',
-          title: isKepling ? 'Dashboard Capaian Saya' : 'Kelola Target & Capaian 24 Kepling',
-          desc: 'Grafik real-time realisasi target PBB, Perlinsos (DTKS), dan Trantibum secara transparan.',
-          category: 'capaian',
-          icon: Trophy,
-          iconBg: 'bg-amber-50 text-amber-600',
-          badge: 'TARGET',
-          badgeColor: 'bg-amber-100 text-amber-800',
-          action: () => onNavigate(isKepling ? 'capaian' : 'capaian_admin')
-        },
-        ...(isPbbAllowed ? [{
-          id: 'pbb_lingkungan',
-          title: isKepling ? `Data PBB Lingkungan ${activeAccount.nomorLingkungan || ''}` : `Rekapitulasi Realisasi PBB ${pbbYear}`,
-          desc: isKepling
-            ? `Pantau target nominal PBB, daftar SPPT Wajib Pajak Lingkungan ${activeAccount.nomorLingkungan || ''}, dan tandai WP lunas.`
-            : `Rekapitulasi target dan realisasi penerimaan PBB-P2 Tahun ${pbbYear} di 24 Lingkungan Kelurahan Mangga.`,
-          category: 'capaian',
-          icon: FileSpreadsheet,
-          iconBg: 'bg-emerald-50 text-emerald-700',
-          badge: isKepling ? 'PBB LINGKUNGAN' : `PBB ${pbbYear}`,
-          badgeColor: 'bg-emerald-100 text-emerald-800',
-          action: () => onNavigate('rekap_pbb')
-        }] : []),
         {
           id: 'kegiatan_khusus',
-          title: 'Absensi Kegiatan Khusus',
-          desc: 'Absensi check-in kegiatan kelurahan dengan validasi koordinat GPS dan foto selfie kehadiran.',
+          title: 'Absensi Kegiatan Kelurahan',
+          desc: 'Absensi check-in kegiatan sosial, penimbangan stunting posyandu, dan gotong royong warga.',
           category: 'absen',
           icon: UserCheck,
           iconBg: 'bg-emerald-50 text-emerald-600',
           badge: 'GPS ABSEN',
           badgeColor: 'bg-teal-100 text-teal-800',
-          action: () => onNavigate('kegiatan_khusus')
+          action: () => onNavigate('kegiatan_khusus'),
         },
-        ...(isAdmin ? [{
-          id: 'monitoring',
-          title: 'Monitoring 24 Kepling',
-          desc: 'Pantau status keaktifan laporan harian, rekapitulasi apel pagi, dan peta interaktif kelurahan.',
-          category: 'capaian',
-          icon: ShieldCheck,
-          iconBg: 'bg-amber-50 text-amber-600',
-          badge: 'ADMIN',
-          badgeColor: 'bg-rose-100 text-rose-800',
-          action: () => onNavigate('monitoring')
-        }] : []),
-        ...(isKasi ? [{
+        {
+          id: 'riwayat',
+          title: 'Riwayat Laporan Pembangunan & Kesos',
+          desc: 'Pusat arsip laporan harian Kepling khusus bidang pembangunan fisik, posyandu, dan sosial kemasyarakatan.',
+          category: 'laporan',
+          icon: History,
+          iconBg: 'bg-slate-100 text-slate-700',
+          badge: 'ARSIP LAPORAN',
+          badgeColor: 'bg-slate-200 text-slate-800',
+          action: () => onNavigate('riwayat'),
+        },
+      ];
+    }
+
+    // Role Kasi Trantibum & Linmas
+    if (activeAccount.role === 'kasi_trantibum') {
+      return [
+        {
           id: 'dashboard_kasi',
-          title: 'Dashboard Bidang Sektoral',
-          desc: 'Halaman khusus rekapitulasi data sektoral Anda (PBB / DTKS / Trantib) dengan akses verifikasi.',
+          title: 'Dashboard Kasi Trantibum & Linmas',
+          desc: 'Monitoring 7 Bidang Trantibum: Poskamling, Infra Publik, Mediasi Warga, Posko Trantib, Bersemi, Sampah Liar, Faktor 74.',
           category: 'capaian',
           icon: Award,
-          iconBg: 'bg-teal-50 text-teal-600',
-          badge: 'KASI',
+          iconBg: 'bg-amber-50 text-amber-700',
+          badge: '7 BIDANG TRANTIBUM',
+          badgeColor: 'bg-amber-100 text-amber-900',
+          bgGradient: 'bg-linear-to-r from-amber-950 via-orange-950 to-slate-900 text-white border-amber-600/60',
+          action: () => onNavigate('dashboard_kasi'),
+        },
+        {
+          id: 'pemetaan',
+          title: 'Peta Spasial Poskamling & Keamanan',
+          desc: 'Pemetaan titik lokasi pos ronda malam di 24 Lingkungan, kontak regu jaga, dan rute patroli ketertiban.',
+          category: 'gis',
+          icon: '🛡️',
+          badge: 'WEBGIS POSKAMLING',
+          badgeColor: 'bg-amber-400 text-slate-950',
+          bgGradient: 'bg-linear-to-r from-amber-950 to-slate-900 text-white border-amber-600/60',
+          action: () => onNavigate('pemetaan'),
+        },
+        {
+          id: 'kegiatan_khusus',
+          title: 'Absensi Kegiatan Kelurahan & Linmas',
+          desc: 'Absensi check-in patroli gabungan Tiga Pilar, penertiban sampah liar, dan apel siaga trantibum.',
+          category: 'absen',
+          icon: UserCheck,
+          iconBg: 'bg-emerald-50 text-emerald-600',
+          badge: 'GPS ABSEN',
           badgeColor: 'bg-teal-100 text-teal-800',
-          action: () => onNavigate('dashboard_kasi')
-        }] : [])
+          action: () => onNavigate('kegiatan_khusus'),
+        },
+        {
+          id: 'riwayat',
+          title: 'Riwayat Laporan Ketentraman & Trantib',
+          desc: 'Pusat arsip laporan giat ronda malam, penertiban sampah liar, mediasi perselisihan, dan penanganan gangguan kamtibmas.',
+          category: 'laporan',
+          icon: History,
+          iconBg: 'bg-slate-100 text-slate-700',
+          badge: 'ARSIP LAPORAN',
+          badgeColor: 'bg-slate-200 text-slate-800',
+          action: () => onNavigate('riwayat'),
+        },
       ];
+    }
+
+    // Default: Super Admin or Kepling
+    return [
+      {
+        id: 'pemetaan',
+        title: isKepling ? 'Pemetaan Wilayah & WRS' : 'Peta Wilayah & WebGIS 24 Lingkungan',
+        desc: 'Gambar poligon batas wilayah, tandai titik rumah warga, pantau Wajib Retribusi Sampah (WRS), bansos, & kondisi jalan.',
+        category: 'gis',
+        icon: '🗺️',
+        badge: 'WEBGIS SPASIAL',
+        badgeColor: 'bg-amber-400 text-slate-950',
+        bgGradient: 'bg-gradient-to-r from-emerald-950 to-slate-900 text-white border-emerald-600/60',
+        action: () => onNavigate('pemetaan'),
+      },
+      ...(isKepling
+        ? [
+            {
+              id: 'form',
+              title: 'Formulir Laporan Harian',
+              desc: 'Input kegiatan harian Kepala Lingkungan: trantib, infrastruktur, kebersihan, PBB, & kemasyarakatan.',
+              category: 'laporan',
+              icon: FileText,
+              iconBg: 'bg-emerald-50 text-emerald-600',
+              badge: 'UTAMA',
+              badgeColor: 'bg-red-100 text-red-800',
+              action: () => onNavigate('form'),
+            },
+          ]
+        : []),
+      {
+        id: 'database_keluarga',
+        title: 'Database Data Keluarga (KK)',
+        desc: 'Pusat data terpadu kependudukan, anggota keluarga (NIK), tingkat kesejahteraan (Desil 1–5), bansos PKH Medan Makmur, dan sanitasi.',
+        category: 'laporan',
+        icon: Users,
+        iconBg: 'bg-blue-50 text-blue-700',
+        badge: 'DATA KELUARGA',
+        badgeColor: 'bg-blue-100 text-blue-900',
+        action: () => onNavigate('database_keluarga'),
+      },
+      ...(isAdmin
+        ? [
+            {
+              id: 'realisasi_pembangunan',
+              title: 'Realisasi Pembangunan Infrastruktur',
+              desc: 'Monitoring realisasi perbaikan jalan, drainase, pemasangan paving blok, lampu LPJU, dan penambahan tiang baru.',
+              category: 'laporan',
+              icon: Wrench,
+              iconBg: 'bg-indigo-50 text-indigo-700',
+              badge: 'PEMBANGUNAN',
+              badgeColor: 'bg-indigo-100 text-indigo-900',
+              action: () => onNavigate('realisasi_pembangunan'),
+            },
+          ]
+        : []),
+      {
+        id: 'kunjungan',
+        title: 'Kunjungan Harian Warga',
+        desc: 'Log & rekam interaksi sambang, silaturahmi, serta sosialisasi langsung ke rumah warga lingkungan.',
+        category: 'laporan',
+        icon: Users,
+        iconBg: 'bg-emerald-50 text-emerald-600',
+        badge: 'SOSIAL',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        action: () => onNavigate('kunjungan'),
+      },
+      {
+        id: 'riwayat',
+        title: isKepling ? 'Riwayat Laporan Saya' : 'Database Riwayat Laporan',
+        desc: 'Pusat arsip pencarian, filter, edit, verifikasi, dan ekspor laporan harian seluruh lingkungan.',
+        category: 'laporan',
+        icon: History,
+        iconBg: 'bg-slate-100 text-slate-700',
+        badge: 'ARSIP',
+        badgeColor: 'bg-slate-200 text-slate-800',
+        action: () => onNavigate('riwayat'),
+      },
+      {
+        id: 'capaian',
+        title: isKepling ? 'Dashboard Capaian Saya' : 'Kelola Target & Capaian 24 Kepling',
+        desc: 'Grafik real-time realisasi target PBB, Perlinsos (DTKS), dan Trantibum secara transparan.',
+        category: 'capaian',
+        icon: Trophy,
+        iconBg: 'bg-amber-50 text-amber-600',
+        badge: 'TARGET',
+        badgeColor: 'bg-amber-100 text-amber-800',
+        action: () => onNavigate(isKepling ? 'capaian' : 'capaian_admin'),
+      },
+      ...(isPbbAllowed
+        ? [
+            {
+              id: 'pbb_lingkungan',
+              title: isKepling ? `Data PBB Lingkungan ${activeAccount.nomorLingkungan || ''}` : `Rekapitulasi Realisasi PBB ${pbbYear}`,
+              desc: isKepling
+                ? `Pantau target nominal PBB, daftar SPPT Wajib Pajak Lingkungan ${activeAccount.nomorLingkungan || ''}, dan tandai WP lunas.`
+                : `Rekapitulasi target dan realisasi penerimaan PBB-P2 Tahun ${pbbYear} di 24 Lingkungan Kelurahan Mangga.`,
+              category: 'capaian',
+              icon: FileSpreadsheet,
+              iconBg: 'bg-emerald-50 text-emerald-700',
+              badge: isKepling ? 'PBB LINGKUNGAN' : `PBB ${pbbYear}`,
+              badgeColor: 'bg-emerald-100 text-emerald-800',
+              action: () => onNavigate('rekap_pbb'),
+            },
+          ]
+        : []),
+      {
+        id: 'kegiatan_khusus',
+        title: 'Absensi Kegiatan Khusus',
+        desc: 'Absensi check-in kegiatan kelurahan dengan validasi koordinat GPS dan foto selfie kehadiran.',
+        category: 'absen',
+        icon: UserCheck,
+        iconBg: 'bg-emerald-50 text-emerald-600',
+        badge: 'GPS ABSEN',
+        badgeColor: 'bg-teal-100 text-teal-800',
+        action: () => onNavigate('kegiatan_khusus'),
+      },
+      ...(isAdmin
+        ? [
+            {
+              id: 'monitoring',
+              title: 'Monitoring 24 Kepling',
+              desc: 'Pantau status keaktifan laporan harian, rekapitulasi apel pagi, dan peta interaktif kelurahan.',
+              category: 'capaian',
+              icon: ShieldCheck,
+              iconBg: 'bg-amber-50 text-amber-600',
+              badge: 'ADMIN',
+              badgeColor: 'bg-rose-100 text-rose-800',
+              action: () => onNavigate('monitoring'),
+            },
+            {
+              id: 'dashboard_kasi',
+              title: 'Dashboard Bidang Sektoral 3 Kasi',
+              desc: 'Monitoring sektoral terpadu: PBB/IKD/Apel (Pemerintahan), Perlinsos/Posyandu (Pembangunan), dan Poskamling (Trantibum).',
+              category: 'capaian',
+              icon: Award,
+              iconBg: 'bg-teal-50 text-teal-600',
+              badge: '3 SEKTORAL',
+              badgeColor: 'bg-teal-100 text-teal-800',
+              action: () => onNavigate('dashboard_kasi'),
+            },
+          ]
+        : []),
+    ];
+  }, [isBapenda, activeAccount.role, isKepling, isAdmin, isPbbAllowed, pbbYear, onNavigate]);
 
   const filteredMenus = menuItems.filter((item) => {
     const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -505,121 +712,400 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
           {/* Quick Stats Bento Row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            {/* Bento Card 1: Radar Spasial WebGIS & Heatmap (Kiri / Utama) */}
-            <div 
-              onClick={() => onNavigate('pemetaan')}
-              className="md:col-span-1 bg-slate-900 border border-slate-800 hover:border-emerald-500/80 p-5 rounded-2xl text-white shadow-md transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[220px]"
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl -mr-8 -mt-8" />
-              
-              <div className="space-y-1.5 z-10">
-                <span className="text-[9px] uppercase font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  🗺️ WebGIS Spasial
-                </span>
-                <h3 className="text-lg font-black tracking-tight mt-2 flex items-center gap-1.5 text-slate-100">
-                  <span>Peta Batas 24 Lingkungan</span>
-                </h3>
-                <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-                  Peta spasial interaktif batas wilayah, pelacakan WRS Sampah, klasifikasi data Bansos, dan peta kondisi jalan.
-                </p>
-              </div>
-
-              {/* Interactive preview indicators */}
-              <div className="grid grid-cols-2 gap-2 mt-4 z-10">
-                <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Status Peta</p>
-                  <p className="text-xs sm:text-sm font-black text-emerald-400 mt-1">24 Terpetakan</p>
-                </div>
-                <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                  <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Fitur Baru</p>
-                  <p className="text-xs sm:text-sm font-black text-rose-400 mt-1 flex items-center gap-1">
-                    <span>🔥 Heatmap</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-800/80 mt-4 flex items-center justify-between text-xs font-black text-emerald-400 group-hover:text-emerald-300">
-                <span>Buka WebGIS Kelurahan →</span>
-              </div>
-            </div>
-
-            {/* Bento Card 2: Capaian & Target Realisasi PBB (Kanan Bawah-style) */}
-            {isPbbAllowed && (
-              <div 
-                onClick={() => onNavigate('rekap_pbb')}
-                className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
-              >
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] uppercase font-black tracking-widest text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                      📊 Realisasi PBB-P2 {isKepling && activeAccount.nomorLingkungan ? `(Lingk. ${activeAccount.nomorLingkungan})` : `(${pbbYear})`}
+            {/* 1. SEKSI TATA PEMERINTAHAN BENTO ROW */}
+            {activeAccount.role === 'kasi_pemerintahan' && (
+              <>
+                <div 
+                  onClick={() => onNavigate('dashboard_kasi')}
+                  className="bg-slate-900 border border-slate-800 hover:border-teal-500/80 p-5 rounded-2xl text-white shadow-md transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[220px]"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/10 rounded-full blur-2xl -mr-8 -mt-8" />
+                  <div className="space-y-1.5 z-10">
+                    <span className="text-[9px] uppercase font-black tracking-widest text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20">
+                      🏛️ Tata Pemerintahan
                     </span>
-                    <span className="text-[10px] text-slate-400 font-bold">
-                      {spptList.length > 0 ? 'Live Database' : 'Siap Input'}
-                    </span>
+                    <h3 className="text-lg font-black tracking-tight mt-2 flex items-center gap-1.5 text-slate-100">
+                      <span>Dashboard Leaderboard PBB & IKD</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                      Monitoring peringkat capaian Opsir PBB, IKD, dan kedisiplinan apel pagi di 24 Lingkungan.
+                    </p>
                   </div>
-                  <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
-                    Capaian Penerimaan PBB
-                  </h3>
-                  
-                  {/* Custom bar chart representation */}
-                  <div className="pt-2 space-y-2">
-                    <div className="flex items-end justify-between text-xs font-black">
-                      <span className="text-slate-500">Kolektivitas PBB</span>
-                      <span className="text-indigo-600 text-sm">{pbbSummary.percent.toFixed(1)}%</span>
+                  <div className="grid grid-cols-2 gap-2 mt-4 z-10">
+                    <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Status Wilayah</p>
+                      <p className="text-xs sm:text-sm font-black text-teal-400 mt-1">24 Lingkungan</p>
                     </div>
-                    <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                      <div 
-                        className="h-full bg-indigo-600 rounded-full transition-all duration-1000 group-hover:bg-indigo-500"
-                        style={{ width: `${Math.min(100, pbbSummary.percent)}%` }}
-                      />
+                    <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Presensi Apel</p>
+                      <p className="text-xs sm:text-sm font-black text-emerald-400 mt-1">{todayApelCount} Hadir</p>
                     </div>
-                    <div className="flex justify-between text-[10px] text-slate-600 font-bold pt-1 leading-none">
-                      <span className="text-emerald-700">Lunas: {pbbSummary.lunasCount.toLocaleString('id-ID')} WP</span>
-                      <span className="text-slate-500">Target: {pbbSummary.totalCount.toLocaleString('id-ID')} WP</span>
-                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-800/80 mt-4 flex items-center justify-between text-xs font-black text-teal-400 group-hover:text-teal-300">
+                    <span>Buka Dashboard Pemerintahan →</span>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-indigo-600 group-hover:text-indigo-500">
-                  <span>Kelola SPPT PBB-P2 →</span>
+                <div 
+                  onClick={() => onNavigate('rekap_pbb')}
+                  className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                        📊 Realisasi PBB-P2 2026
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold">SPPT Master</span>
+                    </div>
+                    <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
+                      Kolektibilitas Pajak PBB
+                    </h3>
+                    <div className="pt-2 space-y-2">
+                      <div className="flex items-end justify-between text-xs font-black">
+                        <span className="text-slate-500">Realisasi Penerimaan</span>
+                        <span className="text-emerald-700 text-sm">{pbbSummary.percent.toFixed(1)}%</span>
+                      </div>
+                      <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                        <div 
+                          className="h-full bg-emerald-600 rounded-full transition-all duration-1000 group-hover:bg-emerald-500"
+                          style={{ width: `${Math.min(100, pbbSummary.percent)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-slate-600 font-bold pt-1 leading-none">
+                        <span className="text-emerald-700">Lunas: {pbbSummary.lunasCount.toLocaleString('id-ID')} WP</span>
+                        <span className="text-slate-500">Target: {pbbSummary.totalCount.toLocaleString('id-ID')} WP</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-emerald-700 group-hover:text-emerald-600">
+                    <span>Kelola Lembar SPPT PBB →</span>
+                  </div>
                 </div>
-              </div>
+
+                <div 
+                  onClick={() => onNavigate('database_keluarga')}
+                  className="bg-white border border-slate-200 hover:border-blue-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
+                >
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] uppercase font-black tracking-widest text-blue-800 bg-blue-100 px-2 py-0.5 rounded border border-blue-200">
+                      👥 Kependudukan & Administrasi
+                    </span>
+                    <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
+                      Master Data Keluarga & KK
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
+                      Pencarian NIK, struktur keluarga, register domisili, dan verifikasi kependudukan 24 Lingkungan.
+                    </p>
+                    <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-100 mt-2">
+                      <p className="text-[10px] text-blue-700 font-bold">Register Kependudukan Online</p>
+                      <p className="text-xs font-black text-blue-900 mt-0.5">Siap Verifikasi & Validasi</p>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-blue-700 group-hover:text-blue-600">
+                    <span>Buka Database Keluarga →</span>
+                  </div>
+                </div>
+              </>
             )}
 
-            {/* Bento Card 3: Radar Kepatuhan Harian & Presensi (Kanan Atas-style) */}
-            <div 
-              onClick={() => onNavigate('monitoring')}
-              className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
-            >
-              <div className="space-y-1.5">
-                <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
-                  👤 Presensi &amp; Agenda
-                </span>
-                <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
-                  Radar Tugas &amp; Kehadiran
-                </h3>
-                <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
-                  Pantau kepatuhan pengiriman laporan harian dan kehadiran apel pagi 24 Kepala Lingkungan secara langsung.
-                </p>
-
-                <div className="flex items-center gap-3 mt-3">
-                  <div className="flex -space-x-2">
-                    <span className="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-2xs">✓</span>
-                    <span className="w-7 h-7 rounded-full bg-emerald-400 border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-2xs">✓</span>
-                    <span className="w-7 h-7 rounded-full bg-emerald-300 border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-2xs">✓</span>
+            {/* 2. SEKSI PEMBANGUNAN & KESOS BENTO ROW */}
+            {activeAccount.role === 'kasi_pembangunan' && (
+              <>
+                <div 
+                  onClick={() => onNavigate('dashboard_kasi')}
+                  className="bg-slate-900 border border-slate-800 hover:border-blue-500/80 p-5 rounded-2xl text-white shadow-md transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[220px]"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-8 -mt-8" />
+                  <div className="space-y-1.5 z-10">
+                    <span className="text-[9px] uppercase font-black tracking-widest text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                      🏗️ Pembangunan & Kesos
+                    </span>
+                    <h3 className="text-lg font-black tracking-tight mt-2 flex items-center gap-1.5 text-slate-100">
+                      <span>Dashboard Perlinsos & Stunting</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                      Monitoring pendataan 429 KK Perlinsos/DTKS, penimbangan stunting posyandu, dan BPJS.
+                    </p>
                   </div>
-                  <div>
-                    <p className="text-xs font-black text-slate-800">{todayApelCount} Kepling Hadir Apel</p>
-                    <p className="text-[10px] text-slate-400 font-semibold">Tersinkronisasi Real-Time</p>
+                  <div className="grid grid-cols-2 gap-2 mt-4 z-10">
+                    <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Target Perlinsos</p>
+                      <p className="text-xs sm:text-sm font-black text-blue-400 mt-1">429 KK Mangga</p>
+                    </div>
+                    <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Layanan Posyandu</p>
+                      <p className="text-xs sm:text-sm font-black text-emerald-400 mt-1">ILP Terpadu</p>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-800/80 mt-4 flex items-center justify-between text-xs font-black text-blue-400 group-hover:text-blue-300">
+                    <span>Buka Dashboard Pembangunan →</span>
                   </div>
                 </div>
-              </div>
 
-              <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-emerald-700 group-hover:text-emerald-600">
-                <span>Monitoring Kepling →</span>
-              </div>
-            </div>
+                <div 
+                  onClick={() => onNavigate('realisasi_pembangunan')}
+                  className="bg-white border border-slate-200 hover:border-indigo-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] uppercase font-black tracking-widest text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded border border-indigo-200">
+                        🛣️ Sarpras & Infrastruktur
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold">Fisik</span>
+                    </div>
+                    <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
+                      Realisasi Pembangunan Fisik
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
+                      Monitoring perbaikan jalan berlubang, drainase/parit, penerangan LPJU, paving blok, & bedah rumah.
+                    </p>
+                    <div className="bg-indigo-50/60 p-2.5 rounded-xl border border-indigo-100 mt-2">
+                      <p className="text-[10px] text-indigo-700 font-bold">Musrenbang & Usulan Sarpras</p>
+                      <p className="text-xs font-black text-indigo-900 mt-0.5">Monitoring Status Progres Fisik</p>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-indigo-700 group-hover:text-indigo-600">
+                    <span>Kelola Pembangunan Fisik →</span>
+                  </div>
+                </div>
+
+                <div 
+                  onClick={() => onNavigate('kunjungan')}
+                  className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
+                >
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                      🤝 Kesejahteraan Sosial
+                    </span>
+                    <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
+                      Kunjungan Warga Rentan
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
+                      Log interaksi door-to-door sambang warga rentan, lansia, disabilitas, dan penerima bansos PKH/BPNT.
+                    </p>
+                    <div className="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100 mt-2">
+                      <p className="text-[10px] text-emerald-700 font-bold">Verifikasi Door-to-Door</p>
+                      <p className="text-xs font-black text-emerald-900 mt-0.5">Desil 1–5 Terpantau</p>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-emerald-700 group-hover:text-emerald-600">
+                    <span>Lihat Kunjungan Warga →</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 3. SEKSI TRANTIBUM & LINMAS BENTO ROW */}
+            {activeAccount.role === 'kasi_trantibum' && (
+              <>
+                <div 
+                  onClick={() => onNavigate('dashboard_kasi')}
+                  className="bg-slate-900 border border-slate-800 hover:border-amber-500/80 p-5 rounded-2xl text-white shadow-md transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[220px]"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl -mr-8 -mt-8" />
+                  <div className="space-y-1.5 z-10">
+                    <span className="text-[9px] uppercase font-black tracking-widest text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      🛡️ Trantibum & Linmas
+                    </span>
+                    <h3 className="text-lg font-black tracking-tight mt-2 flex items-center gap-1.5 text-slate-100">
+                      <span>Dashboard 7 Bidang Trantibum</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                      Monitoring Pos Ronda, Fasum, Mediasi Sengketa Warga, Posko Trantib, Sampah Liar & Faktor 74.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-4 z-10">
+                    <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Poskamling</p>
+                      <p className="text-xs sm:text-sm font-black text-amber-400 mt-1">24 Lingkungan</p>
+                    </div>
+                    <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Situasi Kamtibmas</p>
+                      <p className="text-xs sm:text-sm font-black text-emerald-400 mt-1">Kondusif</p>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-800/80 mt-4 flex items-center justify-between text-xs font-black text-amber-400 group-hover:text-amber-300">
+                    <span>Buka Dashboard Trantibum →</span>
+                  </div>
+                </div>
+
+                <div 
+                  onClick={() => onNavigate('pemetaan')}
+                  className="bg-white border border-slate-200 hover:border-amber-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] uppercase font-black tracking-widest text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                        🗺️ WebGIS Pos Ronda
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold">Spasial</span>
+                    </div>
+                    <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
+                      Peta Spasial Poskamling & Keamanan
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
+                      Sebaran koordinat GPS poskamling, kontak regu ronda malam, dan rute patroli kamtibmas kelurahan.
+                    </p>
+                    <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100 mt-2">
+                      <p className="text-[10px] text-amber-800 font-bold">Pemetaan Titik Rawan & Pos Ronda</p>
+                      <p className="text-xs font-black text-amber-950 mt-0.5">Peta Digital Linmas Aktif</p>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-amber-700 group-hover:text-amber-600">
+                    <span>Buka Peta Poskamling →</span>
+                  </div>
+                </div>
+
+                <div 
+                  onClick={() => onNavigate('riwayat')}
+                  className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
+                >
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                      📜 Arsip Laporan
+                    </span>
+                    <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
+                      Laporan Giat Ketertiban & Mediasi
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
+                      Pusat arsip laporan ronda malam, penertiban sampah liar, mediasi perselisihan, dan tanggap darurat bencana.
+                    </p>
+                    <div className="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100 mt-2">
+                      <p className="text-[10px] text-emerald-700 font-bold">Laporan Disaring Khusus</p>
+                      <p className="text-xs font-black text-emerald-900 mt-0.5">Bidang Trantibum & Linmas</p>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-emerald-700 group-hover:text-emerald-600">
+                    <span>Lihat Riwayat Trantibum →</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 4. SUPER ADMIN & KEPLING BENTO ROW (DEFAULT) */}
+            {activeAccount.role !== 'kasi_pemerintahan' &&
+             activeAccount.role !== 'kasi_pembangunan' &&
+             activeAccount.role !== 'kasi_trantibum' && (
+              <>
+                {/* Bento Card 1: Radar Spasial WebGIS & Heatmap (Kiri / Utama) */}
+                <div 
+                  onClick={() => onNavigate('pemetaan')}
+                  className="md:col-span-1 bg-slate-900 border border-slate-800 hover:border-emerald-500/80 p-5 rounded-2xl text-white shadow-md transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[220px]"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl -mr-8 -mt-8" />
+                  
+                  <div className="space-y-1.5 z-10">
+                    <span className="text-[9px] uppercase font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                      🗺️ WebGIS Spasial
+                    </span>
+                    <h3 className="text-lg font-black tracking-tight mt-2 flex items-center gap-1.5 text-slate-100">
+                      <span>Peta Batas 24 Lingkungan</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                      Peta spasial interaktif batas wilayah, pelacakan WRS Sampah, klasifikasi data Bansos, dan peta kondisi jalan.
+                    </p>
+                  </div>
+
+                  {/* Interactive preview indicators */}
+                  <div className="grid grid-cols-2 gap-2 mt-4 z-10">
+                    <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Status Peta</p>
+                      <p className="text-xs sm:text-sm font-black text-emerald-400 mt-1">24 Terpetakan</p>
+                    </div>
+                    <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Fitur Baru</p>
+                      <p className="text-xs sm:text-sm font-black text-rose-400 mt-1 flex items-center gap-1">
+                        <span>🔥 Heatmap</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-800/80 mt-4 flex items-center justify-between text-xs font-black text-emerald-400 group-hover:text-emerald-300">
+                    <span>Buka WebGIS Kelurahan →</span>
+                  </div>
+                </div>
+
+                {/* Bento Card 2: Capaian & Target Realisasi PBB (Kanan Bawah-style) */}
+                {isPbbAllowed && (
+                  <div 
+                    onClick={() => onNavigate('rekap_pbb')}
+                    className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] uppercase font-black tracking-widest text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                          📊 Realisasi PBB-P2 {isKepling && activeAccount.nomorLingkungan ? `(Lingk. ${activeAccount.nomorLingkungan})` : `(${pbbYear})`}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-bold">
+                          {spptList.length > 0 ? 'Live Database' : 'Siap Input'}
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
+                        Capaian Penerimaan PBB
+                      </h3>
+                      
+                      {/* Custom bar chart representation */}
+                      <div className="pt-2 space-y-2">
+                        <div className="flex items-end justify-between text-xs font-black">
+                          <span className="text-slate-500">Kolektivitas PBB</span>
+                          <span className="text-indigo-600 text-sm">{pbbSummary.percent.toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                          <div 
+                            className="h-full bg-indigo-600 rounded-full transition-all duration-1000 group-hover:bg-indigo-500"
+                            style={{ width: `${Math.min(100, pbbSummary.percent)}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] text-slate-600 font-bold pt-1 leading-none">
+                          <span className="text-emerald-700">Lunas: {pbbSummary.lunasCount.toLocaleString('id-ID')} WP</span>
+                          <span className="text-slate-500">Target: {pbbSummary.totalCount.toLocaleString('id-ID')} WP</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-indigo-600 group-hover:text-indigo-500">
+                      <span>Kelola SPPT PBB-P2 →</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Bento Card 3: Radar Kepatuhan Harian & Presensi (Kanan Atas-style) */}
+                <div 
+                  onClick={() => onNavigate(isAdmin ? 'monitoring' : 'riwayat')}
+                  className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
+                >
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                      👤 Presensi &amp; Agenda
+                    </span>
+                    <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
+                      {isAdmin ? 'Radar Tugas & Kehadiran' : 'Riwayat Laporan Saya'}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
+                      {isAdmin 
+                        ? 'Pantau kepatuhan pengiriman laporan harian dan kehadiran apel pagi 24 Kepala Lingkungan secara langsung.'
+                        : 'Lihat status pengiriman laporan kinerja harian dan verifikasi dokumentasi kegiatan.'}
+                    </p>
+
+                    <div className="flex items-center gap-3 mt-3">
+                      <div className="flex -space-x-2">
+                        <span className="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-2xs">✓</span>
+                        <span className="w-7 h-7 rounded-full bg-emerald-400 border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-2xs">✓</span>
+                        <span className="w-7 h-7 rounded-full bg-emerald-300 border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-2xs">✓</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-slate-800">{todayApelCount} Kepling Hadir Apel</p>
+                        <p className="text-[10px] text-slate-400 font-semibold">Tersinkronisasi Real-Time</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-emerald-700 group-hover:text-emerald-600">
+                    <span>{isAdmin ? 'Monitoring Kepling →' : 'Buka Riwayat Laporan →'}</span>
+                  </div>
+                </div>
+              </>
+            )}
 
           </div>
 

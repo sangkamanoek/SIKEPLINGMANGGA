@@ -7,6 +7,7 @@ import {
   fetchProfilesFromFirestore,
   saveProfileToFirestore,
 } from '../lib/firestoreService';
+import { getKasiProfileByRole } from './kasiTupoksiData';
 
 export const SUPER_ADMIN_ACCOUNT: UserAccount = {
   id: 'super_admin',
@@ -479,11 +480,32 @@ export const getEffectiveAccount = (account: UserAccount): UserAccount => {
   if (!account) return account;
   const profiles = getCustomProfiles();
   const custom = profiles[account.id];
-  if (!custom) return account;
+
+  let res = { ...account };
+
+  // If this is a Kepala Seksi account, dynamically enrich with official Kasi profile data
+  if (
+    account.role === 'kasi_pemerintahan' ||
+    account.role === 'kasi_pembangunan' ||
+    account.role === 'kasi_trantibum'
+  ) {
+    const kasiProf = getKasiProfileByRole(account.role);
+    if (kasiProf) {
+      res = {
+        ...res,
+        nama: kasiProf.namaPejabat || res.nama,
+        telepon: kasiProf.telepon || res.telepon,
+        jabatan: kasiProf.singkatan || res.jabatan,
+        nip: kasiProf.nip || res.nip,
+      };
+    }
+  }
+
+  if (!custom) return res;
   return {
-    ...account,
-    nama: custom.nama && custom.nama.trim() ? custom.nama.trim() : account.nama,
-    telepon: custom.telepon !== undefined ? custom.telepon : account.telepon,
+    ...res,
+    nama: custom.nama && custom.nama.trim() ? custom.nama.trim() : res.nama,
+    telepon: custom.telepon !== undefined ? custom.telepon : res.telepon,
   };
 };
 
@@ -692,6 +714,10 @@ export interface FixedAccountOption {
 }
 
 export const getFixedAccountsList = (): FixedAccountOption[] => {
+  const pem = getKasiProfileByRole('kasi_pemerintahan');
+  const bang = getKasiProfileByRole('kasi_pembangunan');
+  const trantib = getKasiProfileByRole('kasi_trantibum');
+
   return [
     {
       username: 'super_admin',
@@ -701,25 +727,25 @@ export const getFixedAccountsList = (): FixedAccountOption[] => {
       defaultPasswordHint: 'mangga2026',
     },
     {
-      username: 'kasi_pemerintahan',
-      nama: 'KASI TATA PEMERINTAHAN (PBB)',
+      username: pem.usernameUtama || 'kasi_pemerintahan',
+      nama: pem.namaPejabat ? `${pem.namaPejabat} (${pem.singkatan})` : 'KASI TATA PEMERINTAHAN (PBB & IKD)',
       lingkungan: 'Kantor Kelurahan Mangga',
       role: 'kasi_pemerintahan',
-      defaultPasswordHint: 'pem_mangga2026',
+      defaultPasswordHint: pem.passwordDefault || 'pem_mangga2026',
     },
     {
-      username: 'kasi_pembangunan',
-      nama: 'KASI PEMBANGUNAN (PERLINSOS)',
+      username: bang.usernameUtama || 'kasi_pembangunan',
+      nama: bang.namaPejabat ? `${bang.namaPejabat} (${bang.singkatan})` : 'KASI PEMBANGUNAN & KESOS (PERLINSOS)',
       lingkungan: 'Kantor Kelurahan Mangga',
       role: 'kasi_pembangunan',
-      defaultPasswordHint: 'bang_mangga2026',
+      defaultPasswordHint: bang.passwordDefault || 'bang_mangga2026',
     },
     {
-      username: 'kasi_trantibum',
-      nama: 'KASI TRANTIBUM (KETERTIBAN)',
+      username: trantib.usernameUtama || 'kasi_trantibum',
+      nama: trantib.namaPejabat ? `${trantib.namaPejabat} (${trantib.singkatan})` : 'KASI TRANTIBUM & LINMAS (POSKAMLING)',
       lingkungan: 'Kantor Kelurahan Mangga',
       role: 'kasi_trantibum',
-      defaultPasswordHint: 'trantib_mangga2026',
+      defaultPasswordHint: trantib.passwordDefault || 'trantib_mangga2026',
     },
     {
       username: 'petugas_bapenda',
@@ -752,21 +778,21 @@ export const FIXED_ACCOUNTS_LIST: FixedAccountOption[] = [
   },
   {
     username: 'kasi_pemerintahan',
-    nama: 'KASI TATA PEMERINTAHAN (PBB)',
+    nama: 'KASI TATA PEMERINTAHAN (PBB & IKD)',
     lingkungan: 'Kantor Kelurahan Mangga',
     role: 'kasi_pemerintahan',
     defaultPasswordHint: 'pem_mangga2026',
   },
   {
     username: 'kasi_pembangunan',
-    nama: 'KASI PEMBANGUNAN (PERLINSOS)',
+    nama: 'KASI PEMBANGUNAN & KESOS (PERLINSOS)',
     lingkungan: 'Kantor Kelurahan Mangga',
     role: 'kasi_pembangunan',
     defaultPasswordHint: 'bang_mangga2026',
   },
   {
     username: 'kasi_trantibum',
-    nama: 'KASI TRANTIBUM (KETERTIBAN)',
+    nama: 'KASI TRANTIBUM & LINMAS (POSKAMLING)',
     lingkungan: 'Kantor Kelurahan Mangga',
     role: 'kasi_trantibum',
     defaultPasswordHint: 'trantib_mangga2026',
@@ -860,51 +886,77 @@ export const findAccountByUsername = (input: string): UserAccount | undefined =>
     return SUPER_ADMIN_ACCOUNT;
   }
 
-  // 1b. Check Kasi Pemerintahan (PBB)
-  if (
-    norm === 'kasi_pemerintahan' ||
-    norm === 'kasipemerintahan' ||
-    norm === 'pemerintahan' ||
-    norm === 'kasi_pem' ||
-    norm === 'kasipem' ||
-    norm === 'pbb' ||
-    norm === 'admin_pbb' ||
-    norm === 'kasi_pbb' ||
-    norm === 'kasipbb'
-  ) {
-    return KASI_PEMERINTAHAN_ACCOUNT;
+  // 1b. Check Kasi Pemerintahan (PBB, IKD, Apel)
+  const kasiPem = getKasiProfileByRole('kasi_pemerintahan');
+  const pemAliases = Array.from(new Set([
+    (kasiPem.usernameUtama || '').toLowerCase(),
+    ...(kasiPem.usernameAliases || []).map((a) => normalizeUsername(a)),
+    'kasi_pemerintahan',
+    'kasipemerintahan',
+    'pemerintahan',
+    'kasi_pem',
+    'kasipem',
+    'pbb',
+    'admin_pbb',
+    'kasi_pbb',
+    'kasipbb',
+    'pem_mangga',
+    'pemerintahan_mangga',
+  ])).filter(Boolean);
+
+  if (pemAliases.includes(norm)) {
+    return getEffectiveAccount(KASI_PEMERINTAHAN_ACCOUNT);
   }
 
-  // 1c. Check Kasi Pembangunan (Perlinsos)
-  if (
-    norm === 'kasi_pembangunan' ||
-    norm === 'kasipembangunan' ||
-    norm === 'pembangunan' ||
-    norm === 'kasi_bang' ||
-    norm === 'kasibang' ||
-    norm === 'perlinsos' ||
-    norm === 'admin_perlinsos' ||
-    norm === 'kasi_perlinsos' ||
-    norm === 'kasiperlinsos' ||
-    norm === 'pmk' ||
-    norm === 'kasi_pmk'
-  ) {
-    return KASI_PEMBANGUNAN_ACCOUNT;
+  // 1c. Check Kasi Pembangunan (Perlinsos, Posyandu, Infrastruktur)
+  const kasiBang = getKasiProfileByRole('kasi_pembangunan');
+  const bangAliases = Array.from(new Set([
+    (kasiBang.usernameUtama || '').toLowerCase(),
+    ...(kasiBang.usernameAliases || []).map((a) => normalizeUsername(a)),
+    'kasi_pembangunan',
+    'kasipembangunan',
+    'pembangunan',
+    'kasi_bang',
+    'kasibang',
+    'perlinsos',
+    'admin_perlinsos',
+    'kasi_perlinsos',
+    'kasiperlinsos',
+    'kasi_kesos',
+    'kasikesos',
+    'pmk',
+    'kasi_pmk',
+    'pembangunan_mangga',
+    'kesos_mangga',
+  ])).filter(Boolean);
+
+  if (bangAliases.includes(norm)) {
+    return getEffectiveAccount(KASI_PEMBANGUNAN_ACCOUNT);
   }
 
-  // 1d. Check Kasi Trantibum (Ketertiban Umum / Poskamling)
-  if (
-    norm === 'kasi_trantibum' ||
-    norm === 'kasitrantibum' ||
-    norm === 'trantibum' ||
-    norm === 'trantib' ||
-    norm === 'kasi_trantib' ||
-    norm === 'kasitrantib' ||
-    norm === 'ketertiban' ||
-    norm === 'kamtibmas' ||
-    norm === 'poskamling'
-  ) {
-    return KASI_TRANTIBUM_ACCOUNT;
+  // 1d. Check Kasi Trantibum (Ketertiban Umum / Poskamling / Linmas)
+  const kasiTrantib = getKasiProfileByRole('kasi_trantibum');
+  const trantibAliases = Array.from(new Set([
+    (kasiTrantib.usernameUtama || '').toLowerCase(),
+    ...(kasiTrantib.usernameAliases || []).map((a) => normalizeUsername(a)),
+    'kasi_trantibum',
+    'kasitrantibum',
+    'trantibum',
+    'trantib',
+    'kasi_trantib',
+    'kasitrantib',
+    'ketertiban',
+    'kamtibmas',
+    'poskamling',
+    'linmas',
+    'kasi_linmas',
+    'kasilinmas',
+    'trantib_mangga',
+    'trantibum_mangga',
+  ])).filter(Boolean);
+
+  if (trantibAliases.includes(norm)) {
+    return getEffectiveAccount(KASI_TRANTIBUM_ACCOUNT);
   }
 
   // 2. Exact ID match (e.g. kepling_1, kepling_2, ...)

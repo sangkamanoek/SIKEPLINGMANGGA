@@ -60,6 +60,7 @@ import { DeadlineNotifAlert } from './components/DeadlineNotifAlert';
 import { RekapPbbView } from './components/RekapPbbView';
 import { PemetaanWilayahView } from './components/PemetaanWilayahView';
 import { DatabaseKeluargaView } from './components/DatabaseKeluargaView';
+import { fetchAllDataKeluarga } from './lib/dataKeluargaService';
 import { LoginPage } from './components/LoginPage';
 import { UbahPasswordModal } from './components/UbahPasswordModal';
 import { EditProfileModal } from './components/EditProfileModal';
@@ -194,17 +195,39 @@ export default function App() {
     setActiveTab('pemetaan');
   };
 
-  // Enforce Petugas Bapenda strict PBB-only tab
+  // Strict Role-Based Access Control (RBAC) per Kepala Seksi & Bapenda
   useEffect(() => {
+    // 1. Petugas Bapenda: Only rekap_pbb
     if (activeAccount.role === 'petugas_bapenda' && activeTab !== 'rekap_pbb') {
       setActiveTab('rekap_pbb');
+      return;
     }
-    if (
-      (activeAccount.role === 'kasi_trantibum' || activeAccount.role === 'kasi_pembangunan') &&
-      activeTab === 'rekap_pbb'
-    ) {
-      setActiveTab('dashboard_kasi');
-      showToast('Akses Dibatasi: Anda tidak memiliki izin untuk melihat Rekapitulasi PBB.', 'error');
+
+    // 2. Kasi Pemerintahan: Allowed tabs: hub, dashboard_kasi, rekap_pbb, database_keluarga, riwayat, kegiatan_khusus
+    if (activeAccount.role === 'kasi_pemerintahan') {
+      const allowed = ['hub', 'dashboard_kasi', 'rekap_pbb', 'database_keluarga', 'riwayat', 'kegiatan_khusus'];
+      if (!allowed.includes(activeTab)) {
+        setActiveTab('dashboard_kasi');
+        showToast('Akses Disesuaikan: Anda diarahkan ke bidang tugas Seksi Tata Pemerintahan.', 'info');
+      }
+    }
+
+    // 3. Kasi Pembangunan: Allowed tabs: hub, dashboard_kasi, realisasi_pembangunan, database_keluarga, kunjungan, riwayat, kegiatan_khusus
+    if (activeAccount.role === 'kasi_pembangunan') {
+      const allowed = ['hub', 'dashboard_kasi', 'realisasi_pembangunan', 'database_keluarga', 'kunjungan', 'riwayat', 'kegiatan_khusus'];
+      if (!allowed.includes(activeTab)) {
+        setActiveTab('dashboard_kasi');
+        showToast('Akses Disesuaikan: Anda diarahkan ke bidang tugas Seksi Pembangunan & Kesos.', 'info');
+      }
+    }
+
+    // 4. Kasi Trantibum: Allowed tabs: hub, dashboard_kasi, pemetaan, riwayat, kegiatan_khusus
+    if (activeAccount.role === 'kasi_trantibum') {
+      const allowed = ['hub', 'dashboard_kasi', 'pemetaan', 'riwayat', 'kegiatan_khusus'];
+      if (!allowed.includes(activeTab)) {
+        setActiveTab('dashboard_kasi');
+        showToast('Akses Disesuaikan: Anda diarahkan ke bidang tugas Seksi Trantibum & Linmas.', 'info');
+      }
     }
   }, [activeAccount.role, activeTab]);
 
@@ -236,9 +259,10 @@ export default function App() {
   const refreshAllReports = useCallback(async (showNotification = false) => {
     setIsRefreshingReports(true);
     try {
-      const [serverReports, freshAttendance] = await Promise.all([
+      const [serverReports, freshAttendance, freshDataKeluarga] = await Promise.all([
         fetchAllReports().catch(() => null),
         loadAllAttendance().catch(() => null),
+        fetchAllDataKeluarga().catch(() => null),
       ]);
       if (serverReports) {
         setReports(serverReports);
@@ -248,7 +272,7 @@ export default function App() {
       }
       if (showNotification) {
         showToast(
-          `Data berhasil diperbarui (${serverReports?.length || 0} laporan, ${freshAttendance?.length || 0} presensi apel)`,
+          `Sinkronisasi berhasil (${serverReports?.length || 0} laporan, ${freshAttendance?.length || 0} apel, ${freshDataKeluarga?.length || 0} KK)`,
           'success'
         );
       }
@@ -1159,15 +1183,17 @@ export default function App() {
                     <span>Dashboard Sektoral</span>
                     <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'dashboard_kasi' ? 'bg-teal-700 text-teal-100' : 'bg-teal-100 text-teal-800'}`}>
                       {activeAccount.role === 'kasi_pemerintahan'
-                        ? 'PBB'
+                        ? 'PBB & IKD'
                         : activeAccount.role === 'kasi_pembangunan'
                         ? 'PERLINSOS'
                         : activeAccount.role === 'kasi_trantibum'
-                        ? 'TRANTIB'
+                        ? 'TRANTIBUM'
                         : 'SEKTORAL'}
                     </span>
                   </button>
                 )}
+
+                {/* Kasi Pemerintahan & Super Admin: Realisasi PBB-P2 Tab */}
                 {(activeAccount.role === 'kasi_pemerintahan' || activeAccount.role === 'super_admin' || activeAccount.role === 'petugas_bapenda') && (
                   <button
                     id="tab-rekap-pbb-kasi"
@@ -1187,6 +1213,27 @@ export default function App() {
                   </button>
                 )}
 
+                {/* Kasi Pemerintahan & Kasi Pembangunan: Database Data Keluarga */}
+                {(activeAccount.role === 'kasi_pemerintahan' || activeAccount.role === 'kasi_pembangunan') && (
+                  <button
+                    id="tab-database-keluarga-kasi"
+                    type="button"
+                    onClick={() => setActiveTab('database_keluarga')}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                      activeTab === 'database_keluarga'
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10 scale-[1.02] font-black'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                    }`}
+                  >
+                    <Users className={`w-4 h-4 ${activeTab === 'database_keluarga' ? 'text-white' : 'text-blue-700'}`} />
+                    <span>Database Keluarga</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'database_keluarga' ? 'bg-blue-800 text-blue-100' : 'bg-blue-100 text-blue-900'}`}>
+                      KK
+                    </span>
+                  </button>
+                )}
+
+                {/* Kasi Pembangunan: Realisasi Pembangunan Tab */}
                 {activeAccount.role === 'kasi_pembangunan' && (
                   <button
                     id="tab-pembangunan-kasi"
@@ -1203,6 +1250,65 @@ export default function App() {
                     <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'realisasi_pembangunan' ? 'bg-blue-800 text-blue-100' : 'bg-blue-100 text-blue-900'}`}>
                       INFRA
                     </span>
+                  </button>
+                )}
+
+                {/* Kasi Pembangunan: Kunjungan Warga Tab */}
+                {activeAccount.role === 'kasi_pembangunan' && (
+                  <button
+                    id="tab-kunjungan-kasi"
+                    type="button"
+                    onClick={() => setActiveTab('kunjungan')}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                      activeTab === 'kunjungan'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                    }`}
+                  >
+                    <Users className={`w-4 h-4 ${activeTab === 'kunjungan' ? 'text-white' : 'text-emerald-700'}`} />
+                    <span>Kunjungan Warga</span>
+                  </button>
+                )}
+
+                {/* Kasi Trantibum: Pemetaan Poskamling Tab */}
+                {activeAccount.role === 'kasi_trantibum' && (
+                  <button
+                    id="tab-pemetaan-kasi"
+                    type="button"
+                    onClick={() => setActiveTab('pemetaan')}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                      activeTab === 'pemetaan'
+                        ? 'bg-amber-600 text-white shadow-md shadow-amber-600/10 scale-[1.02] font-black'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                    }`}
+                  >
+                    <Compass className={`w-4 h-4 ${activeTab === 'pemetaan' ? 'text-white' : 'text-amber-700'}`} />
+                    <span>Peta Poskamling</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'pemetaan' ? 'bg-amber-700 text-amber-100' : 'bg-amber-100 text-amber-900'}`}>
+                      GIS
+                    </span>
+                  </button>
+                )}
+
+                {/* Kasi Sektoral: Riwayat Laporan Tab */}
+                {(activeAccount.role === 'kasi_pemerintahan' ||
+                  activeAccount.role === 'kasi_pembangunan' ||
+                  activeAccount.role === 'kasi_trantibum') && (
+                  <button
+                    id="tab-riwayat-kasi"
+                    type="button"
+                    onClick={() => {
+                      setRiwayatFilterPetugas(undefined);
+                      setActiveTab('riwayat');
+                    }}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                      activeTab === 'riwayat'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                    }`}
+                  >
+                    <History className={`w-4 h-4 ${activeTab === 'riwayat' ? 'text-white' : 'text-emerald-700'}`} />
+                    <span>Riwayat Laporan</span>
                   </button>
                 )}
 
@@ -1707,6 +1813,7 @@ export default function App() {
               hasGoogleAuth={Boolean(token)}
               initialPetugasFilter={riwayatFilterPetugas}
               isAdmin={isKelurahanAdmin(activeAccount.role)}
+              activeAccount={activeAccount}
               onDeleteReport={handleDeleteReport}
             />
           </ErrorBoundary>

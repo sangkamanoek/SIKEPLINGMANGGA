@@ -15,6 +15,12 @@ import {
   RotateCcw,
   Sparkles,
   Presentation,
+  Building,
+  Landmark,
+  HeartHandshake,
+  ShieldAlert,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { UserAccount } from '../types';
 import {
@@ -27,6 +33,7 @@ import {
   syncPasswordsWithServer,
   ALL_ACCOUNTS,
 } from '../data/keplingList';
+import { getAllKasiProfiles } from '../data/kasiTupoksiData';
 
 interface LoginPageProps {
   onLoginSuccess: (account: UserAccount, remember: boolean) => void;
@@ -50,6 +57,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // Modals
   const [isForgotHelpOpen, setIsForgotHelpOpen] = useState<boolean>(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
+  const [isKasiGuideOpen, setIsKasiGuideOpen] = useState<boolean>(false);
+
+  // Kasi profiles for quick reference
+  const kasiProfiles = getAllKasiProfiles();
 
   // Change Password Form State
   const [changeUserSelect, setChangeUserSelect] = useState<string>('');
@@ -281,17 +292,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               >
                 <option value="">-- Pilih Username Akun Resmi --</option>
                 <optgroup label="Pimpinan & Administrator Kelurahan">
-                  <option value="super_admin">🔑 super_admin</option>
+                  <option value="super_admin">🔑 super_admin (Super Admin / Lurah)</option>
                 </optgroup>
                 <optgroup label="Kepala Seksi (Kasi) Kelurahan Mangga">
-                  <option value="kasi_pemerintahan">🏛️ kasi_pemerintahan</option>
-                  <option value="kasi_pembangunan">🏗️ kasi_pembangunan</option>
-                  <option value="kasi_trantibum">🛡️ kasi_trantibum</option>
+                  <option value="kasi_pemerintahan">🏛️ kasi_pemerintahan — Kasi Tata Pemerintahan (PBB, IKD & Apel)</option>
+                  <option value="kasi_pembangunan">🏗️ kasi_pembangunan — Kasi Pembangunan & Kesos (Perlinsos & Posyandu)</option>
+                  <option value="kasi_trantibum">🛡️ kasi_trantibum — Kasi Trantibum & Linmas (Poskamling & Trantib)</option>
+                </optgroup>
+                <optgroup label="Pengawas / Auditor Pajak Daerah">
+                  <option value="petugas_bapenda">📊 petugas_bapenda — Petugas Bapenda Kota Medan</option>
                 </optgroup>
                 <optgroup label="24 Kepala Lingkungan (kepling_1 s/d kepling_24)">
                   {FIXED_ACCOUNTS_LIST.filter((a) => a.role === 'kepling').map((acc) => (
                     <option key={acc.username} value={acc.username}>
-                      📍 {acc.username}
+                      📍 {acc.username} ({acc.nama} - {acc.lingkungan})
                     </option>
                   ))}
                 </optgroup>
@@ -420,6 +434,55 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <span>{isLoading ? 'Memverifikasi...' : 'Masuk ke Aplikasi'}</span>
             </button>
           </form>
+
+          {/* Quick Guide Card: 3 Kepala Seksi & Bidang Tugas */}
+          <div className="border-t border-slate-100 bg-slate-50/80 p-4">
+            <button
+              type="button"
+              onClick={() => setIsKasiGuideOpen(!isKasiGuideOpen)}
+              className="w-full flex items-center justify-between text-xs font-bold text-slate-700 hover:text-emerald-800 transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5">
+                <Building className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Daftar Username & Tugas 3 Kepala Seksi</span>
+              </span>
+              {isKasiGuideOpen ? (
+                <ChevronUp className="w-4 h-4 text-slate-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-slate-400" />
+              )}
+            </button>
+
+            {isKasiGuideOpen && (
+              <div className="mt-3 space-y-2 pt-2 border-t border-slate-200/70 text-[11px] text-slate-600 animate-in fade-in">
+                {kasiProfiles.map((k) => (
+                  <div
+                    key={k.role}
+                    onClick={() => handleSelectFixedUser(k.usernameUtama)}
+                    className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-emerald-500 transition-all cursor-pointer space-y-1 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between font-bold text-slate-900">
+                      <span className="flex items-center gap-1">
+                        {k.role === 'kasi_pemerintahan' && <Landmark className="w-3.5 h-3.5 text-teal-600" />}
+                        {k.role === 'kasi_pembangunan' && <HeartHandshake className="w-3.5 h-3.5 text-blue-600" />}
+                        {k.role === 'kasi_trantibum' && <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />}
+                        <span>{k.namaSeksi}</span>
+                      </span>
+                      <span className="font-mono text-[10px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        {k.usernameUtama}
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-500 leading-tight">
+                      <strong>Fokus Bidang:</strong> {k.singkatan}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Kata sandi bawaan: <code className="font-mono text-slate-600">{k.passwordDefault}</code>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

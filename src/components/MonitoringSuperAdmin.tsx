@@ -57,6 +57,7 @@ import {
   getAllEffectiveAccounts,
   syncAccountsWithServer 
 } from '../data/keplingList';
+import { KasiProfileManagerModal } from './KasiProfileManagerModal';
 import {
   formatTanggalIndonesia,
   getTodayLocalIso,
@@ -121,6 +122,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PBB_REALISASI' | 'PEMETAAN' | 'ACCOUNTS'>('LAPORAN');
 
   // Account management states
+  const [accountSubTab, setAccountSubTab] = useState<'KASI' | 'ALL'>('KASI');
   const [accountsList, setAccountsList] = useState<UserAccount[]>(() => getAllEffectiveAccounts());
   const [newUsername, setNewUsername] = useState('');
   const [newNama, setNewNama] = useState('');
@@ -2252,23 +2254,71 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
             </div>
           </div>
 
-          {/* Feedback Messages */}
-          {accountError && (
-            <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl flex items-center gap-2 text-xs">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{accountError}</span>
-            </div>
-          )}
-          {accountSuccess && (
-            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl flex items-center gap-2 text-xs">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-              <span>{accountSuccess}</span>
-            </div>
-          )}
+          {/* Sub-Tab Switcher inside ACCOUNTS */}
+          <div className="flex items-center gap-2 p-1.5 bg-slate-800/60 rounded-2xl border border-slate-700/60">
+            <button
+              type="button"
+              onClick={() => setAccountSubTab('KASI')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
+                accountSubTab === 'KASI'
+                  ? 'bg-indigo-600 text-white shadow-sm border border-indigo-500'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              <Building className="w-4 h-4" />
+              <span>Struktur Kepala Seksi & Bidang Tugas</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                accountSubTab === 'KASI' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-900'
+              }`}>
+                3 Seksi
+              </span>
+            </button>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* COLUMN 1: Form Tambah Akun */}
-            <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
+            <button
+              type="button"
+              onClick={() => setAccountSubTab('ALL')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
+                accountSubTab === 'ALL'
+                  ? 'bg-indigo-600 text-white shadow-sm border border-indigo-500'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Daftar Akun Kepling & Kustom</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                accountSubTab === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-700 text-slate-300'
+              }`}>
+                {accountsList.length} Akun
+              </span>
+            </button>
+          </div>
+
+          {accountSubTab === 'KASI' ? (
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+              <KasiProfileManagerModal
+                embedded={true}
+                onRefresh={() => setAccountsList(getAllEffectiveAccounts())}
+              />
+            </div>
+          ) : (
+            <>
+              {/* Feedback Messages */}
+              {accountError && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-900 rounded-xl flex items-center gap-2 text-xs">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{accountError}</span>
+                </div>
+              )}
+              {accountSuccess && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl flex items-center gap-2 text-xs">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{accountSuccess}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* COLUMN 1: Form Tambah Akun */}
+                <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
               <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
                 <PlusCircle className="w-5 h-5 text-indigo-600" />
                 <h4 className="font-bold text-slate-800 text-sm">Tambah Akun Login Baru</h4>
@@ -2636,8 +2686,10 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
               </div>
             </div>
           )}
-        </div>
+        </>
       )}
+    </div>
+  )}
 
       {/* Reset Confirmation Modal */}
       {isResetModalOpen && (

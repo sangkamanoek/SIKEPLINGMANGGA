@@ -152,6 +152,45 @@ export const isKelurahanAdmin = (role: UserRole | string): boolean => {
   );
 };
 
+export type KepalaSeksiRole = 'kasi_pemerintahan' | 'kasi_pembangunan' | 'kasi_trantibum';
+
+export interface KepalaSeksiBidangTugas {
+  judul: string;
+  deskripsi: string;
+  poinPenting: string[];
+}
+
+export interface KepalaSeksiIndikator {
+  label: string;
+  target: string;
+  satuan: string;
+}
+
+export interface KepalaSeksiFitur {
+  namaFitur: string;
+  kegunaan: string;
+}
+
+export interface KepalaSeksiProfile {
+  id: string; // 'kasi_pemerintahan' | 'kasi_pembangunan' | 'kasi_trantibum'
+  role: KepalaSeksiRole;
+  namaSeksi: string; // e.g. "Seksi Tata Pemerintahan"
+  singkatan: string; // e.g. "Kasi Tata Pemerintahan (PBB, IKD & Apel)"
+  namaPejabat: string; // e.g. "KASI TATA PEMERINTAHAN"
+  nip?: string;
+  telepon?: string;
+  usernameUtama: string; // 'kasi_pemerintahan'
+  usernameAliases: string[];
+  passwordDefault: string; // 'pem_mangga2026'
+  iconKey: 'pemerintahan' | 'pembangunan' | 'trantibum';
+  tupoksiRingkas: string;
+  bidangTugas: KepalaSeksiBidangTugas[];
+  indikatorKinerja: KepalaSeksiIndikator[];
+  fiturAplikasi: KepalaSeksiFitur[];
+  catatanOperasional?: string;
+  updatedAt?: string;
+}
+
 export interface UserAccount {
   id: string;
   role: UserRole;
@@ -163,6 +202,7 @@ export interface UserAccount {
   nomorLingkungan?: number; // 1 - 24, undefined for super admin
   password: string; // Password / PIN akun
   telepon?: string; // Optional contact number
+  nip?: string; // NIP Pejabat ASN
 }
 
 export interface UserProfileCustom {

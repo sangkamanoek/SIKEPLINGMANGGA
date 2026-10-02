@@ -13,8 +13,15 @@ import {
   Shield,
   Trash2,
   AlertTriangle,
+  Landmark,
+  HeartHandshake,
+  ShieldAlert,
+  Award,
+  Users,
+  Wrench,
+  UserCheck,
 } from 'lucide-react';
-import { LaporanHarianItem, SheetMetadata } from '../types';
+import { LaporanHarianItem, SheetMetadata, UserAccount, KinerjaHarian } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
 import { isReportMatchingKepling, isReportMatchingDate } from '../lib/formatter';
 
@@ -27,11 +34,76 @@ interface RiwayatLaporanProps {
   hasGoogleAuth: boolean;
   initialPetugasFilter?: string;
   isAdmin?: boolean;
+  activeAccount?: UserAccount;
   onDeleteReport?: (id: string) => Promise<void>;
 }
 
-type FilterKegiatanType = 'ALL' | 'PBB' | 'PERLINSOS' | 'IKD' | 'BPJS' | 'POSKAMLING' | 'LAINNYA';
+type FilterKegiatanType = 'ALL' | 'PBB' | 'PERLINSOS' | 'IKD' | 'BPJS' | 'POSKAMLING' | 'INFRASTRUKTUR' | 'POSYANDU' | 'LAINNYA';
 type FilterKategoriIsuType = 'ALL' | 'KEAMANAN' | 'KEBERSIHAN' | 'INFRASTRUKTUR' | 'PELAYANAN_SOSIAL' | 'PBB_PAJAK';
+
+// Helper domain validators
+export const isReportForPemerintahan = (item: LaporanHarianItem): boolean => {
+  const kin: Partial<KinerjaHarian> = item.kinerja || {};
+  const hasPbb = parseFloat(String(kin.opsirPbbWp || 0)) > 0 || Boolean(kin.opsirPbbKeterangan?.trim());
+  const hasIkd = parseFloat(String(kin.ikdOrang || 0)) > 0 || Boolean(kin.ikdKeterangan?.trim());
+  const hasApel = Boolean(item.absenApel?.status || item.absenApel?.jam);
+  
+  const allText = [
+    item.absenApel?.catatan,
+    kin.kegiatanLainnya,
+    kin.opsirPbbKeterangan,
+    kin.ikdKeterangan,
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  const hasKeywords = /\b(pbb|pajak|sppt|wp|ikd|kependudukan|identitas|ktp|kk|nik|domisili|apel|pemerintahan|pelayanan\s*surat|register|surat\s*keterangan|pemilu|tps|pilkada|bapenda|dukcapil)\b/i.test(allText);
+
+  return hasPbb || hasIkd || hasApel || hasKeywords;
+};
+
+export const isReportForPembangunan = (item: LaporanHarianItem): boolean => {
+  const kin: Partial<KinerjaHarian> = item.kinerja || {};
+  const hasPerlinsos = parseFloat(String(kin.perlinsosKk || 0)) > 0 || Boolean(kin.perlinsosKeterangan?.trim()) || Boolean(kin.perlinsosKategoriKegiatan);
+  const hasBpjs = parseFloat(String(kin.bpjsKetenagakerjaanOrang || 0)) > 0 || Boolean(kin.bpjsKetenagakerjaanKeterangan?.trim());
+  const hasInfra = Boolean(kin.infrastrukturAdaGiat || kin.infrastrukturSubjek?.trim() || kin.infrastrukturLokasi?.trim());
+  const hasPosyandu = Boolean(kin.posyanduAdaGiat || kin.posyanduNama?.trim());
+
+  const allText = [
+    item.absenApel?.catatan,
+    kin.kegiatanLainnya,
+    kin.perlinsosKeterangan,
+    kin.bpjsKetenagakerjaanKeterangan,
+    kin.infrastrukturSubjek,
+    kin.infrastrukturLokasi,
+    kin.posyanduNama,
+    kin.posyanduKeterangan,
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  const hasKeywords = /\b(perlinsos|dtks|bansos|pkh|bpnt|stunting|posyandu|balita|baduta|lansia|disabilitas|infrastruktur|jalan|drainase|parit|paving|lampu|lpju|bedah\s*rumah|rtlh|musrenbang|sosial|bantuan|sembako|dinas\s*sdabmbk|dinas\s*sosial|dinas\s*kesehatan|bpjs)\b/i.test(allText);
+
+  return hasPerlinsos || hasBpjs || hasInfra || hasPosyandu || hasKeywords;
+};
+
+export const isReportForTrantibum = (item: LaporanHarianItem): boolean => {
+  const kin: Partial<KinerjaHarian> = item.kinerja || {};
+  const hasPoskamling = Boolean(
+    (kin.poskamlingStatus && kin.poskamlingStatus !== 'Tidak Ada Giat') ||
+    kin.poskamlingAdaGiat ||
+    kin.poskamlingPetugas?.trim() ||
+    kin.poskamlingKeterangan?.trim()
+  );
+
+  const allText = [
+    item.absenApel?.catatan,
+    kin.kegiatanLainnya,
+    kin.poskamlingPetugas,
+    kin.poskamlingLokasi,
+    kin.poskamlingKeterangan,
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  const hasKeywords = /\b(poskamling|siskamling|pos\s*ronda|ronda|linmas|trantib|ketertiban|keamanan|patroli|kamtibmas|sengketa|mediasi|perselisihan|maling|pencurian|miras|judi|tawuran|pkl|spanduk|sampah\s*liar|gotong\s*royong|kebersihan|bencana|kebakaran|banjir|pohon\s*tumbang|posko|satpol\s*pp|babinsa|bhabinkamtibmas|tiga\s*pilar|faktor\s*74)\b/i.test(allText);
+
+  return hasPoskamling || hasKeywords;
+};
 
 export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   items,
@@ -42,6 +114,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   hasGoogleAuth,
   initialPetugasFilter,
   isAdmin = false,
+  activeAccount,
   onDeleteReport,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,6 +124,13 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   const [selectedDate, setSelectedDate] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  // Role detection
+  const isKasiPem = activeAccount?.role === 'kasi_pemerintahan';
+  const isKasiBang = activeAccount?.role === 'kasi_pembangunan';
+  const isKasiTrantib = activeAccount?.role === 'kasi_trantibum';
+  const isAnyKasi = isKasiPem || isKasiBang || isKasiTrantib;
+  const isSuperAdminOnly = activeAccount?.role === 'super_admin';
 
   const handleExecuteDelete = async (id: string) => {
     if (!onDeleteReport) return;
@@ -74,7 +154,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     }
   }, [initialPetugasFilter]);
 
-  // Extract officer names and lingukan labels for the filter dropdown
+  // Extract officer names and lingkungan labels for the filter dropdown
   const listPetugas = useMemo(() => {
     const list: { nama: string; label: string }[] = [];
     // Pre-populate with all 24 Kepling
@@ -94,9 +174,23 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     return list;
   }, [items]);
 
+  // Scoped items based on active role (Domain Partitioning)
+  const domainScopedItems = useMemo(() => {
+    if (isKasiPem) {
+      return items.filter(isReportForPemerintahan);
+    }
+    if (isKasiBang) {
+      return items.filter(isReportForPembangunan);
+    }
+    if (isKasiTrantib) {
+      return items.filter(isReportForTrantibum);
+    }
+    return items;
+  }, [items, isKasiPem, isKasiBang, isKasiTrantib]);
+
   // Comprehensive multi-criteria filtering
   const filtered = useMemo(() => {
-    return items.filter((item) => {
+    return domainScopedItems.filter((item) => {
       const term = searchTerm.toLowerCase();
       // 1. Keyword search (tanggal, hari, nama, jabatan, keterangan, catatan)
       const matchesKeyword =
@@ -136,7 +230,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
         }
       }
 
-      // 4. Filter by Jenis Kegiatan (4 Pilar)
+      // 4. Filter by Jenis Kegiatan
       if (selectedKegiatan === 'PBB') {
         const val = parseFloat(String(item.kinerja?.opsirPbbWp || 0));
         return !isNaN(val) && val > 0;
@@ -159,13 +253,19 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
           item.kinerja?.poskamlingAdaGiat
         );
       }
+      if (selectedKegiatan === 'INFRASTRUKTUR') {
+        return Boolean(item.kinerja?.infrastrukturAdaGiat || item.kinerja?.infrastrukturSubjek);
+      }
+      if (selectedKegiatan === 'POSYANDU') {
+        return Boolean(item.kinerja?.posyanduAdaGiat || item.kinerja?.posyanduNama);
+      }
       if (selectedKegiatan === 'LAINNYA') {
         return Boolean(item.kinerja?.kegiatanLainnya?.trim());
       }
 
-      // 5. Filter by Kategori Isu Bidang Spesifik (Keamanan, Kebersihan, Infrastruktur, Sosial, PBB)
+      // 5. Filter by Kategori Isu Bidang Spesifik
       if (selectedKategoriIsu !== 'ALL') {
-        const kin = item.kinerja || {};
+        const kin: Partial<KinerjaHarian> = item.kinerja || {};
         const allText = [
           kin.kegiatanLainnya,
           kin.infrastrukturSubjek,
@@ -174,7 +274,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
           kin.poskamlingKeterangan,
           kin.opsirPbbKeterangan,
           kin.perlinsosKeterangan,
-          item.catatan,
+          item.absenApel?.catatan,
         ]
           .filter(Boolean)
           .join(' ')
@@ -218,7 +318,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
 
       return true;
     });
-  }, [items, searchTerm, selectedPetugas, selectedDate, selectedKegiatan, selectedKategoriIsu]);
+  }, [domainScopedItems, searchTerm, selectedPetugas, selectedDate, selectedKegiatan, selectedKategoriIsu]);
 
   // Aggregate stats across the filtered view
   const stats = useMemo(() => {
@@ -227,6 +327,8 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     let totalIkdOrang = 0;
     let totalBpjsOrang = 0;
     let totalPoskamling = 0;
+    let totalInfra = 0;
+    let totalPosyandu = 0;
 
     filtered.forEach((i) => {
       totalPbbWp += parseFloat(String(i.kinerja?.opsirPbbWp || 0)) || 0;
@@ -236,9 +338,15 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
       if (i.kinerja?.poskamlingStatus && i.kinerja.poskamlingStatus !== 'Tidak Ada Giat') {
         totalPoskamling += 1;
       }
+      if (i.kinerja?.infrastrukturAdaGiat || i.kinerja?.infrastrukturSubjek) {
+        totalInfra += 1;
+      }
+      if (i.kinerja?.posyanduAdaGiat || i.kinerja?.posyanduNama) {
+        totalPosyandu += 1;
+      }
     });
 
-    return { totalPbbWp, totalPerlinsosKk, totalIkdOrang, totalBpjsOrang, totalPoskamling };
+    return { totalPbbWp, totalPerlinsosKk, totalIkdOrang, totalBpjsOrang, totalPoskamling, totalInfra, totalPosyandu };
   }, [filtered]);
 
   const handleResetFilters = () => {
@@ -258,6 +366,91 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Dedicated Duty Scope Banner for Kepala Seksi */}
+      {isKasiPem && (
+        <div className="bg-gradient-to-r from-teal-900 via-emerald-900 to-slate-900 text-white rounded-2xl p-5 border border-teal-600/60 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-400/30 flex items-center justify-center shrink-0 text-teal-300">
+              <Landmark className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-teal-400 text-teal-950 font-black text-[10px] uppercase tracking-wider">
+                  Pembagian Tugas: Seksi Tata Pemerintahan
+                </span>
+                <span className="text-xs text-teal-200 font-medium">Akses Bidang Terfokus</span>
+              </div>
+              <h3 className="text-sm font-bold text-white mt-1">
+                Laporan & Data Kinerja: PBB-P2, IKD, Register Kependudukan & Presensi Apel
+              </h3>
+              <p className="text-xs text-teal-100/80 mt-0.5">
+                Menampilkan arsip laporan yang berhubungan dengan tugas pokok dan fungsi Seksi Tata Pemerintahan Kelurahan Mangga.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 bg-teal-950/60 px-3 py-2 rounded-xl border border-teal-700/50 text-xs font-bold text-teal-200">
+            <UserCheck className="w-4 h-4 text-teal-400" />
+            <span>{filtered.length} Laporan Bidang Pemerintahan</span>
+          </div>
+        </div>
+      )}
+
+      {isKasiBang && (
+        <div className="bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 text-white rounded-2xl p-5 border border-blue-600/60 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 text-blue-300">
+              <HeartHandshake className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-blue-400 text-blue-950 font-black text-[10px] uppercase tracking-wider">
+                  Pembagian Tugas: Seksi Pembangunan & Kesos
+                </span>
+                <span className="text-xs text-blue-200 font-medium">Akses Bidang Terfokus</span>
+              </div>
+              <h3 className="text-sm font-bold text-white mt-1">
+                Laporan & Data Kinerja: Realisasi Infrastruktur, Perlinsos (DTKS), BPJS & Posyandu
+              </h3>
+              <p className="text-xs text-blue-100/80 mt-0.5">
+                Menampilkan arsip laporan yang berhubungan dengan sarana prasarana fisik, bansos warga rentan, dan kesejahteraan sosial.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 bg-blue-950/60 px-3 py-2 rounded-xl border border-blue-700/50 text-xs font-bold text-blue-200">
+            <Wrench className="w-4 h-4 text-blue-400" />
+            <span>{filtered.length} Laporan Bidang Pembangunan</span>
+          </div>
+        </div>
+      )}
+
+      {isKasiTrantib && (
+        <div className="bg-gradient-to-r from-amber-950 via-orange-950 to-slate-900 text-white rounded-2xl p-5 border border-amber-600/60 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center shrink-0 text-amber-300">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-amber-400 text-amber-950 font-black text-[10px] uppercase tracking-wider">
+                  Pembagian Tugas: Seksi Trantibum & Linmas
+                </span>
+                <span className="text-xs text-amber-200 font-medium">Akses Bidang Terfokus</span>
+              </div>
+              <h3 className="text-sm font-bold text-white mt-1">
+                Laporan & Data Kinerja: Poskamling, Linmas, Mediasi Sengketa, PKL & Kebersihan
+              </h3>
+              <p className="text-xs text-amber-100/80 mt-0.5">
+                Menampilkan arsip laporan ronda malam poskamling, patroli ketertiban umum, mediasi sengketa, dan tanggap darurat wilayah.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 bg-amber-950/60 px-3 py-2 rounded-xl border border-amber-700/50 text-xs font-bold text-amber-200">
+            <Shield className="w-4 h-4 text-amber-400" />
+            <span>{filtered.length} Laporan Bidang Trantibum</span>
+          </div>
+        </div>
+      )}
+
       {/* Top Header Card */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -591,12 +784,12 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                     <span>Buka / Edit</span>
                   </button>
 
-                  {isAdmin && onDeleteReport && (
+                  {isSuperAdminOnly && onDeleteReport && (
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteId(confirmDeleteId === item.id ? null : item.id)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                      title="Hapus laporan ini dari sistem (Akses Admin)"
+                      title="Hapus laporan ini dari sistem (Akses Super Admin)"
                     >
                       <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                       <span>Hapus</span>

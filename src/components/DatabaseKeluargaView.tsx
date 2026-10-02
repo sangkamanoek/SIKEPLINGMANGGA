@@ -1187,34 +1187,34 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                       type="button"
                       onClick={() => {
                         setRawPasteText(
-                          `DAMENI MENDROFA\t1201030605090043\t1201035908730001\tKEPALA KELUARGA\tJL. TEMBAKAU RAYA NO.35\nROSMAWATI ZEBUA\t1201030605090043\t1201036009750002\tISTRI\tJL. TEMBAKAU RAYA NO.35\nJOSUA MENDROFA\t1201030605090043\t1201030101050003\tANAK\tJL. TEMBAKAU RAYA NO.35`
+                          `JON MARIHOT SINAGA 1271190811740002 .JL. COKLAT X PERUM COKLAT PERMAI BLOK C-2 LINGKUNGAN 24`
+                        );
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-50 text-amber-900 hover:bg-amber-100 transition-colors border border-amber-200 cursor-pointer"
+                    >
+                      👤 Format 1 (Nama, NIK, Alamat, LK)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRawPasteText(
+                          `DAMENI MENDROFA 1201030605090043 1201035908730001 KEPALA KELUARGA JL. TEMBAKAU RAYA NO.35\nROSMAWATI ZEBUA 1201030605090043 1201036009750002 ISTRI JL. TEMBAKAU RAYA NO.35\nJOSUA MENDROFA 1201030605090043 1201030101050003 ANAK JL. TEMBAKAU RAYA NO.35`
                         );
                       }}
                       className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-indigo-50 text-indigo-900 hover:bg-indigo-100 transition-colors border border-indigo-200 cursor-pointer"
                     >
-                      👥 Contoh 1 KK Lengkap (KK + NIK + Hubungan)
+                      👥 Format 2 (Nama, No KK, NIK, Hubungan, Alamat)
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         setRawPasteText(
-                          `DATA BASE KELUARGA\nKELURAHAN MANGGA\n\nNIK: 1271190811740002\nNama Kepala Keluarga: BASMI KABAN\nLingkungan: 2\nAlamat: GG. BERAS MUNTE NO.22\nAgama: Islam\n\nNIK: 1271071508820001\nNama Kepala Keluarga: SUPRIADI\nLingkungan: 1\nAlamat: JL. BUNGA NCOLE NO.15\nAgama: Islam`
+                          `DATA BASE KELUARGA\nKELURAHAN MANGGA\n\nNIK: 1271190811740002\nNama Kepala Keluarga: BASMI KABAN\nLingkungan: 2\nAlamat: GG. BERAS MUNTE NO.22\nAgama: Islam`
                         );
                       }}
                       className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-blue-50 text-blue-800 hover:bg-blue-100 transition-colors border border-blue-200 cursor-pointer"
                     >
-                      💡 Contoh Format Dokumen
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRawPasteText(
-                          `1271190811740002\tBASMI KABAN\tGG. BERAS MUNTE NO.22 LK-II MEDAN\tLINGKUNGAN 2\tIslam\n1271071508820001\tSUPRIADI\tJL. BUNGA NCOLE NO.15\tLINGKUNGAN 1\tIslam`
-                        );
-                      }}
-                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors border border-emerald-200 cursor-pointer"
-                    >
-                      📋 Contoh Baris Tab / Excel
+                      💡 Format Dokumen
                     </button>
                   </div>
                 </div>

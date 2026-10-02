@@ -239,8 +239,25 @@ export async function saveDataKeluargaToFirestore(
     const cleaned = cleanFirestoreData({ ...mergedKeluarga, id: docId });
     await setDoc(docRef, cleaned, { merge: true });
 
-    // Sinkronisasi otomatis ke Titik Bangunan WebGIS jika koordinat tersedia
-    if (syncWithWebgisHouse && mergedKeluarga.titikKoordinat?.lat && mergedKeluarga.titikKoordinat?.lng) {
+    // Sinkronisasi otomatis ke Titik Bangunan WebGIS (Peta Spasial)
+    if (syncWithWebgisHouse) {
+      let lat = mergedKeluarga.titikKoordinat?.lat;
+      let lng = mergedKeluarga.titikKoordinat?.lng;
+
+      // Jika koordinat belum pernah ditentukan, buat koordinat estimasi realistis dalam wilayah Lingkungan
+      if (!lat || !lng) {
+        const lk = mergedKeluarga.lingkunganNomor || 1;
+        const seedStr = (mergedKeluarga.nomorKk || mergedKeluarga.nikKepalaKeluarga || mergedKeluarga.namaKepalaKeluarga || '');
+        let hash = 0;
+        for (let idx = 0; idx < seedStr.length; idx++) {
+          hash = (hash * 31 + seedStr.charCodeAt(idx)) & 0xffffffff;
+        }
+        const jitterLat = (((Math.abs(hash) % 1000) - 500) / 1000) * 0.0035;
+        const jitterLng = ((((Math.abs(hash) * 7) % 1000) - 500) / 1000) * 0.0035;
+        lat = 3.514234 + ((lk - 12) * 0.0008) + jitterLat;
+        lng = 98.633175 + (((lk % 6) - 3) * 0.0008) + jitterLng;
+      }
+
       const houseId = mergedKeluarga.housePointId || `house_kk_${mergedKeluarga.id}`;
       const webgisItem: TitikRumahBangunan = {
         id: houseId,
@@ -251,8 +268,8 @@ export async function saveDataKeluargaToFirestore(
         namaKepalaKeluarga: mergedKeluarga.namaKepalaKeluarga,
         nikKk: mergedKeluarga.nikKepalaKeluarga,
         isKkMangga: mergedKeluarga.statusDomisili.includes('Mangga'),
-        lat: mergedKeluarga.titikKoordinat.lat,
-        lng: mergedKeluarga.titikKoordinat.lng,
+        lat,
+        lng,
         jumlahJiwa: mergedKeluarga.jumlahAnggotaKeluarga,
         jumlahLakiLaki: mergedKeluarga.jumlahLakiLaki,
         jumlahPerempuan: mergedKeluarga.jumlahPerempuan,
@@ -1294,13 +1311,71 @@ export async function parseDataKeluargaText(rawText: string): Promise<ImportPars
     }
   }
 
-  // Standard line-based parsing (Tab, Semicolon, Comma, Pipe)
+  // Standard line-based parsing (Tab, Semicolon, Comma, Pipe, or Space-delimited NIK/KK lines)
   const lines = trimmed.split(/\r?\n/).filter((l) => l.trim().length > 0);
   const rows: string[][] = lines.map((line) => {
-    if (line.includes('\t')) return line.split('\t');
-    if (line.includes('|')) return line.split('|');
-    if (line.includes(';')) return line.split(';');
-    if (line.includes(',')) return line.split(',');
+    if (line.includes('\t')) return line.split('\t').map((c) => c.trim()).filter(Boolean);
+    if (line.includes('|')) return line.split('|').map((c) => c.trim()).filter(Boolean);
+    if (line.includes(';')) return line.split(';').map((c) => c.trim()).filter(Boolean);
+    if (line.includes(',')) return line.split(',').map((c) => c.trim()).filter(Boolean);
+
+    // Smart space-separated parser for lines containing 16-digit NIK / KK:
+    // Pattern 1: JON MARIHOT SINAGA 1271190811740002 .JL. COKLAT X PERUM COKLAT PERMAI BLOK C-2 LINGKUNGAN 24
+    // Pattern 2: DAMENI MENDROFA 1201030605090043 1201035908730001 KEPALA KELUARGA JL. TEMBAKAU RAYA NO.35
+    const matches16 = [...line.matchAll(/\b\d{16}\b/g)];
+    if (matches16.length >= 2) {
+      // 2 16-digit numbers (1st = No. KK, 2nd = NIK)
+      const firstMatch = matches16[0];
+      const secondMatch = matches16[1];
+      const name = line.substring(0, firstMatch.index).trim();
+      const kk = firstMatch[0];
+      const nik = secondMatch[0];
+      const afterNik = line.substring(secondMatch.index! + 16).trim();
+
+      // Check if Hubungan Keluarga is immediately after NIK
+      const hubMatch = afterNik.match(
+        /^(kepala\s*keluarga|istri|suami|anak|orang\s*tua|mertua|famili\s*lain|famili|cucu|menantu|lainnya)\b/i
+      );
+      let hubungan = '';
+      let rest = afterNik;
+      if (hubMatch) {
+        hubungan = hubMatch[0];
+        rest = afterNik.substring(hubMatch[0].length).trim();
+      }
+
+      // Check if Lingkungan is in rest
+      const lkMatch = rest.match(/(?:lingkungan|lk|kepling)[\s.:_-]*(\d+)/i);
+      let lkStr = '';
+      let alamat = rest;
+      if (lkMatch) {
+        lkStr = lkMatch[0];
+        alamat = rest.replace(lkMatch[0], '').trim();
+      }
+      // Clean leading dots or dashes from alamat (e.g. ".JL. COKLAT..." -> "JL. COKLAT...")
+      alamat = alamat.replace(/^[.\s\-_/]+/, '').trim();
+
+      return [name, kk, nik, hubungan || 'Kepala Keluarga', alamat, lkStr].filter(Boolean);
+    } else if (matches16.length === 1) {
+      // 1 16-digit number (NIK Kepala Keluarga)
+      const match = matches16[0];
+      const name = line.substring(0, match.index).trim();
+      const nik = match[0];
+      const after = line.substring(match.index! + 16).trim();
+
+      // Check if Lingkungan is in after
+      const lkMatch = after.match(/(?:lingkungan|lk|kepling)[\s.:_-]*(\d+)/i);
+      let lkStr = '';
+      let alamat = after;
+      if (lkMatch) {
+        lkStr = lkMatch[0];
+        alamat = after.replace(lkMatch[0], '').trim();
+      }
+      // Clean leading dots or dashes from alamat (e.g. ".JL. COKLAT..." -> "JL. COKLAT...")
+      alamat = alamat.replace(/^[.\s\-_/]+/, '').trim();
+
+      return [name, nik, alamat, lkStr].filter(Boolean);
+    }
+
     return [line];
   });
 
