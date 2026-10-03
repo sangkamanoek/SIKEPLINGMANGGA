@@ -139,7 +139,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
   const [tableTargetLkId, setTableTargetLkId] = useState<string>('kepling_23');
 
   // Tab 4: Sub-Mode & Comprehensive Move State
-  const [moveSubMode, setMoveSubMode] = useState<'by_street' | 'by_source_lk' | 'by_pbb_sync'>('by_street');
+  const [moveSubMode, setMoveSubMode] = useState<'by_pbb_sync' | 'by_source_lk' | 'by_street' | 'by_paste_list'>('by_pbb_sync');
 
   // Mode 1: By Street / Keyword
   const [streetSearchKeyword, setStreetSearchKeyword] = useState<string>('');
@@ -155,6 +155,14 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
 
   // Mode 3: By PBB Auto-Sync
   const [selectedPbbSyncIds, setSelectedPbbSyncIds] = useState<Set<string>>(new Set());
+
+  // Mode 4: By Paste List (Adopted from PBB)
+  const [pasteTargetLkId, setPasteTargetLkId] = useState<string>('kepling_1');
+  const [rawPasteListInput, setRawPasteListInput] = useState<string>('');
+  const [pasteAnalysisResult, setPasteAnalysisResult] = useState<{
+    matched: { kk: DataKeluarga; matchedBy: string; identifier: string }[];
+    unmatched: string[];
+  } | null>(null);
 
   // Common Bulk Execution State
   const [isBulkExecuting, setIsBulkExecuting] = useState<boolean>(false);
@@ -736,6 +744,139 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     await executeBatchMove([{ id: kkId, targetLkId }], 'Koreksi 1 KK');
   };
 
+  // Batch update neighborhood for all currently filtered items (Adopted directly from PBB Koreksi Massal)
+  const handleBatchUpdateFilteredLingkungan = async (targetLingkungan: number) => {
+    if (!isAdmin || filteredList.length === 0) return;
+    const targetAcc = KEPLING_ACCOUNTS.find((a) => a.nomorLingkungan === targetLingkungan);
+    if (!targetAcc) return;
+
+    const count = filteredList.length;
+    const msg =
+      count > 100
+        ? `PERINGATAN: Anda akan memindahkan ${count.toLocaleString('id-ID')} data Kartu Keluarga yang sedang terfilter ke ${targetAcc.lingkungan}. Lanjutkan?`
+        : `Pindahkan ${count} data Kartu Keluarga yang sedang terfilter ke ${targetAcc.lingkungan}?`;
+
+    if (!window.confirm(msg)) return;
+
+    const items = filteredList.map((k) => ({
+      id: k.id,
+      targetLkId: targetAcc.id,
+    }));
+
+    await executeBatchMove(items, `Pindah ${count} KK ke ${targetAcc.lingkungan}`);
+  };
+
+  // Analyze Pasted Identifiers (NOP, No. KK, NIK) - Adopted from PBB Mode 3 Pindah Lingkungan Massal
+  const handleAnalyzePasteList = () => {
+    if (!rawPasteListInput.trim()) {
+      if (onShowToast) onShowToast('Silakan tempel daftar NOP, No. KK, atau NIK terlebih dahulu.', 'error');
+      return;
+    }
+
+    const lines = rawPasteListInput
+      .split(/[\r\n,;|\t]+/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    if (lines.length === 0) {
+      if (onShowToast) onShowToast('Tidak ada data yang valid dalam teks yang ditempel.', 'error');
+      return;
+    }
+
+    // Lookup caches for fast matching
+    const nopMap = new Map<string, DataKeluarga>();
+    const kkMap = new Map<string, DataKeluarga>();
+    const nikMap = new Map<string, DataKeluarga>();
+
+    dataList.forEach((k) => {
+      if (k.nopPbb) {
+        const clean = k.nopPbb.replace(/[^0-9]/g, '');
+        if (clean) nopMap.set(clean, k);
+      }
+      if (k.nomorKk) {
+        const clean = k.nomorKk.replace(/[^0-9]/g, '');
+        if (clean) kkMap.set(clean, k);
+      }
+      if (k.nikKepalaKeluarga) {
+        const clean = k.nikKepalaKeluarga.replace(/[^0-9]/g, '');
+        if (clean) nikMap.set(clean, k);
+      }
+      if (k.anggotaKeluarga) {
+        k.anggotaKeluarga.forEach((ang) => {
+          if (ang.nik) {
+            const clean = ang.nik.replace(/[^0-9]/g, '');
+            if (clean) nikMap.set(clean, k);
+          }
+        });
+      }
+    });
+
+    const matchedList: { kk: DataKeluarga; matchedBy: string; identifier: string }[] = [];
+    const unmatchedList: string[] = [];
+    const matchedKkIds = new Set<string>();
+
+    for (const token of lines) {
+      const cleanDigits = token.replace(/[^0-9]/g, '');
+      let found: DataKeluarga | undefined;
+      let matchedBy = '';
+
+      if (cleanDigits.length === 18 && nopMap.has(cleanDigits)) {
+        found = nopMap.get(cleanDigits);
+        matchedBy = 'NOP PBB';
+      } else if (cleanDigits.length === 16 && (kkMap.has(cleanDigits) || nikMap.has(cleanDigits))) {
+        found = kkMap.get(cleanDigits) || nikMap.get(cleanDigits);
+        matchedBy = kkMap.has(cleanDigits) ? 'Nomor KK' : 'NIK';
+      } else if (nopMap.has(cleanDigits)) {
+        found = nopMap.get(cleanDigits);
+        matchedBy = 'NOP PBB';
+      } else if (kkMap.has(cleanDigits)) {
+        found = kkMap.get(cleanDigits);
+        matchedBy = 'Nomor KK';
+      } else if (nikMap.has(cleanDigits)) {
+        found = nikMap.get(cleanDigits);
+        matchedBy = 'NIK';
+      }
+
+      if (found && !matchedKkIds.has(found.id)) {
+        matchedKkIds.add(found.id);
+        matchedList.push({ kk: found, matchedBy, identifier: token });
+      } else if (!found) {
+        unmatchedList.push(token);
+      }
+    }
+
+    setPasteAnalysisResult({ matched: matchedList, unmatched: unmatchedList });
+    if (onShowToast) {
+      onShowToast(
+        `Analisis selesai: Ditemukan ${matchedList.length} KK di database (${unmatchedList.length} tidak ditemukan).`,
+        matchedList.length > 0 ? 'success' : 'info'
+      );
+    }
+  };
+
+  // Execute Pasted List Move
+  const handleExecutePasteMove = async () => {
+    if (!pasteAnalysisResult || pasteAnalysisResult.matched.length === 0) return;
+    const targetAcc = KEPLING_ACCOUNTS.find((a) => a.id === pasteTargetLkId);
+    if (!targetAcc) return;
+
+    if (
+      !window.confirm(
+        `Pindahkan ${pasteAnalysisResult.matched.length} Kartu Keluarga hasil tempel list ke ${targetAcc.lingkungan}?`
+      )
+    )
+      return;
+
+    const items = pasteAnalysisResult.matched.map((m) => ({
+      id: m.kk.id,
+      targetLkId: pasteTargetLkId,
+    }));
+
+    await executeBatchMove(items, `Pindah ${items.length} KK via Tempel List`);
+    setPasteAnalysisResult(null);
+    setRawPasteListInput('');
+  };
+
   // Automated Lingkungan Assignment based on PBB or Street
   const getAutoLingkungan = (item: Partial<DataKeluarga>) => {
     // 1. Try NOP PBB Match
@@ -1032,24 +1173,54 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
           </div>
         </div>
 
-        {/* Active Filter Tags */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-[11px] text-slate-600 font-medium">
-          <span>Menampilkan <strong className="text-slate-900">{filteredList.length}</strong> KK terdaftar</span>
-          {(filterLingkungan !== 'all' || filterDesil !== 'all' || filterBansos !== 'all' || filterSanitasi !== 'all' || searchQuery) && (
-            <button
-              type="button"
-              onClick={() => {
-                setFilterLingkungan(isKepling ? currentUser.id : 'all');
-                setFilterDesil('all');
-                setFilterBansos('all');
-                setFilterSanitasi('all');
-                setFilterStunting('all');
-                setSearchQuery('');
-              }}
-              className="text-rose-600 font-bold hover:underline cursor-pointer ml-2"
-            >
-              Reset Semua Filter
-            </button>
+        {/* Active Filter Tags & Koreksi Massal Dropdown (Adopted from PBB) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 text-[11px] text-slate-600 font-medium">
+          <div className="flex flex-wrap items-center gap-2">
+            <span>Menampilkan <strong className="text-slate-900">{filteredList.length}</strong> KK terdaftar</span>
+            {(filterLingkungan !== 'all' || filterDesil !== 'all' || filterBansos !== 'all' || filterSanitasi !== 'all' || searchQuery) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterLingkungan(isKepling ? currentUser.id : 'all');
+                  setFilterDesil('all');
+                  setFilterBansos('all');
+                  setFilterSanitasi('all');
+                  setFilterStunting('all');
+                  setSearchQuery('');
+                }}
+                className="text-rose-600 font-bold hover:underline cursor-pointer ml-1"
+              >
+                Reset Semua Filter
+              </button>
+            )}
+          </div>
+
+          {/* Quick Koreksi Massal for all filtered items (Directly from PBB Module) */}
+          {isAdmin && filteredList.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl shadow-2xs ml-auto">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span className="text-[10px] font-black text-amber-900 uppercase tracking-tight whitespace-nowrap">
+                Koreksi Massal ({filteredList.length} KK):
+              </span>
+              <select
+                onChange={(e) => {
+                  const targetLkNum = parseInt(e.target.value, 10);
+                  if (targetLkNum > 0) {
+                    handleBatchUpdateFilteredLingkungan(targetLkNum);
+                    e.target.value = "0"; // reset dropdown
+                  }
+                }}
+                defaultValue="0"
+                className="bg-white border border-amber-300 text-amber-950 font-black rounded-lg px-2 py-1 text-xs cursor-pointer focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              >
+                <option value="0">Pindah Ke Lingk...</option>
+                {KEPLING_ACCOUNTS.map((acc) => (
+                  <option key={acc.id} value={acc.nomorLingkungan}>
+                    {acc.lingkungan} ({acc.nama})
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
         </div>
       </div>
@@ -2089,6 +2260,19 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
               <MapPin className="w-4 h-4" />
               <span>3. 📍 Pindah Berdasarkan Nama Jalan</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setMoveSubMode('by_paste_list')}
+              className={`flex-1 min-w-[200px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                moveSubMode === 'by_paste_list'
+                  ? 'bg-purple-700 text-white shadow-md'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <FileUp className="w-4 h-4" />
+              <span>4. 📋 Tempel List (NOP / KK / NIK)</span>
+            </button>
           </div>
 
           {/* SUB-MODE 1: AUTO-KOREKSI NOP PBB (SMART RECONCILIATION) */}
@@ -2675,6 +2859,181 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                   </div>
                 );
               })()}
+            </div>
+          )}
+
+          {/* SUB-MODE 4: TEMPEL / PASTE LIST NOP / NO KK / NIK (DIRECTLY ADOPTED FROM PBB MODULE) */}
+          {moveSubMode === 'by_paste_list' && (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-6 sm:p-8 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center border border-purple-200 shadow-sm text-purple-700">
+                  <FileUp className="w-7 h-7" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-black text-slate-900">
+                    Pemindahan Massal via Tempel List (NOP / No. KK / NIK)
+                  </h4>
+                  <p className="text-xs sm:text-sm text-slate-500">
+                    Sistem akan memindai daftar NOP PBB, No. KK, atau NIK yang Anda tempel dan langsung memindahkannya ke lingkungan tujuan.
+                  </p>
+                </div>
+              </div>
+
+              {/* Target Lingkungan Selector */}
+              <div className="p-6 bg-purple-50/50 rounded-3xl border border-purple-200 space-y-3">
+                <label className="text-xs font-black text-purple-950 uppercase tracking-wider block">
+                  1. Pilih Lingkungan Tujuan Pemindahan:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {KEPLING_ACCOUNTS.map((acc) => (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      onClick={() => setPasteTargetLkId(acc.id)}
+                      className={`p-3 rounded-2xl text-left border font-bold text-xs transition-all cursor-pointer flex items-center justify-between ${
+                        pasteTargetLkId === acc.id
+                          ? 'bg-purple-700 text-white border-purple-800 shadow-md ring-2 ring-purple-400'
+                          : 'bg-white text-slate-800 border-purple-100 hover:border-purple-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-black">{acc.lingkungan}</div>
+                        <div className={`text-[10px] ${pasteTargetLkId === acc.id ? 'text-purple-200' : 'text-slate-500'}`}>
+                          Kepling: {acc.nama}
+                        </div>
+                      </div>
+                      {pasteTargetLkId === acc.id && <Check className="w-4 h-4 text-purple-200" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Paste Textarea */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                    2. Tempel / Paste Daftar NOP, Nomor KK, atau NIK:
+                  </label>
+                  <span className="text-[11px] text-slate-400">
+                    Pisahkan dengan enter, koma, spasi, atau copy langsung dari kolom Excel
+                  </span>
+                </div>
+                <textarea
+                  rows={6}
+                  value={rawPasteListInput}
+                  onChange={(e) => setRawPasteListInput(e.target.value)}
+                  placeholder={`Contoh tempel NOP atau NIK atau No KK:\n12.71.190.008.001-0023.0\n12.71.190.008.001-0045.0\n1271190811740002\n1271190811750003`}
+                  className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-300 font-mono text-xs text-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none focus:bg-white shadow-inner"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between gap-3 flex-wrap pt-2">
+                <button
+                  type="button"
+                  onClick={handleAnalyzePasteList}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-purple-700 hover:bg-purple-600 text-white font-black text-xs shadow-md transition-all cursor-pointer"
+                >
+                  <Search className="w-4 h-4" />
+                  <span>Analisis &amp; Cari Data di Database</span>
+                </button>
+
+                {pasteAnalysisResult && pasteAnalysisResult.matched.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleExecutePasteMove}
+                    disabled={isBulkExecuting}
+                    className="inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-lg shadow-emerald-200 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isBulkExecuting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                    <span>
+                      Eksekusi Pindah {pasteAnalysisResult.matched.length} KK ke{' '}
+                      {KEPLING_ACCOUNTS.find((a) => a.id === pasteTargetLkId)?.lingkungan}
+                    </span>
+                  </button>
+                )}
+              </div>
+
+              {/* Analysis Result Preview */}
+              {pasteAnalysisResult && (
+                <div className="space-y-4 pt-4 border-t border-slate-200 animate-in fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+                        <CheckCircle className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-emerald-800 font-bold uppercase">Ditemukan di Database</div>
+                        <div className="text-xl font-black text-emerald-950">
+                          {pasteAnalysisResult.matched.length} Kartu Keluarga
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0">
+                        <AlertCircle className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-slate-500 font-bold uppercase">Tidak Ditemukan</div>
+                        <div className="text-xl font-black text-slate-800">
+                          {pasteAnalysisResult.unmatched.length} Nomor / Baris
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {pasteAnalysisResult.matched.length > 0 && (
+                    <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-[350px]">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead className="sticky top-0 bg-slate-100 z-10 shadow-2xs">
+                          <tr className="text-[10px] font-black text-slate-600 uppercase tracking-wider border-b border-slate-200">
+                            <th className="py-2.5 px-3 text-center">No</th>
+                            <th className="py-2.5 px-4">Nama Kepala Keluarga</th>
+                            <th className="py-2.5 px-4">Dicocokkan Berdasarkan</th>
+                            <th className="py-2.5 px-4">Lingkungan Asal</th>
+                            <th className="py-2.5 px-4 text-emerald-700 font-black">➔ Lingkungan Tujuan</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {pasteAnalysisResult.matched.map((item, idx) => (
+                            <tr key={item.kk.id} className="hover:bg-slate-50">
+                              <td className="py-2 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
+                              <td className="py-2 px-4">
+                                <div className="font-bold text-slate-900">{item.kk.namaKepalaKeluarga}</div>
+                                <div className="text-[10px] text-slate-400">
+                                  {maskNik(item.kk.nikKepalaKeluarga || item.kk.nomorKk)}
+                                </div>
+                              </td>
+                              <td className="py-2 px-4 font-mono text-[11px] text-purple-900 font-semibold">
+                                {item.matchedBy}: {item.identifier}
+                              </td>
+                              <td className="py-2 px-4 font-medium text-slate-700">
+                                {item.kk.lingkunganNama}
+                              </td>
+                              <td className="py-2 px-4 font-black text-emerald-900 bg-emerald-50/50">
+                                ✓ {KEPLING_ACCOUNTS.find((a) => a.id === pasteTargetLkId)?.lingkungan}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {pasteAnalysisResult.unmatched.length > 0 && (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-1 text-xs">
+                      <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-700" />
+                        <span>Daftar {pasteAnalysisResult.unmatched.length} nomor/baris yang belum ada di database keluarga:</span>
+                      </div>
+                      <div className="font-mono text-[11px] text-amber-800 break-all">
+                        {pasteAnalysisResult.unmatched.join(', ')}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
