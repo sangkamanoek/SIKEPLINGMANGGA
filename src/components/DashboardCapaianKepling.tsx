@@ -115,36 +115,183 @@ interface DashboardCapaianKeplingProps {
   kunjunganList?: any[];
 }
 
-type PeriodFilter =
+type PeriodCategory = 'MINGGUAN' | 'BULANAN' | 'TAHUNAN' | 'HARIAN';
+
+export type PeriodFilter =
   | 'TODAY'
+  | 'THIS_WEEK'
+  | 'LAST_WEEK'
   | '7_DAYS'
-  | 'THIS_MONTH'
-  | 'ALL'
   | 'WEEK_1'
   | 'WEEK_2'
   | 'WEEK_3'
   | 'WEEK_4'
+  | 'THIS_MONTH'
+  | 'THIS_YEAR'
+  | 'ALL'
   | string;
 
-export const getPeriodLabel = (p: string) => {
+const INDONESIAN_MONTH_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+/**
+ * Returns helper dates for current week, last week, and month bounds
+ */
+export function getPeriodDateBounds(referenceDate: Date = new Date()) {
+  const now = new Date(referenceDate);
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const currentYearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const todayIso = now.toISOString().split('T')[0];
+
+  // Current Week Bounds (Monday to Sunday)
+  const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday, ...
+  const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  const thisWeekStartIso = monday.toISOString().split('T')[0];
+  const thisWeekEndIso = sunday.toISOString().split('T')[0];
+
+  // Last Week Bounds
+  const lastMonday = new Date(monday);
+  lastMonday.setDate(monday.getDate() - 7);
+  const lastSunday = new Date(sunday);
+  lastSunday.setDate(sunday.getDate() - 7);
+
+  const lastWeekStartIso = lastMonday.toISOString().split('T')[0];
+  const lastWeekEndIso = lastSunday.toISOString().split('T')[0];
+
+  // Seven days ago
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split('T')[0];
+
+  return {
+    todayIso,
+    currentYearMonth,
+    thisWeekStartIso,
+    thisWeekEndIso,
+    lastWeekStartIso,
+    lastWeekEndIso,
+    sevenDaysAgo,
+    year,
+    month,
+  };
+}
+
+/**
+ * Validates if an ISO date string falls into the selected period
+ */
+export function checkDateInPeriod(dateIso: string, period: string, referenceDate: Date = new Date()): boolean {
+  if (!dateIso) return true;
+  const bounds = getPeriodDateBounds(referenceDate);
+
+  if (period === 'TODAY' || period === 'HARIAN') {
+    return dateIso === bounds.todayIso;
+  }
+
+  if (period === 'THIS_WEEK') {
+    return dateIso >= bounds.thisWeekStartIso && dateIso <= bounds.thisWeekEndIso;
+  }
+
+  if (period === 'LAST_WEEK') {
+    return dateIso >= bounds.lastWeekStartIso && dateIso <= bounds.lastWeekEndIso;
+  }
+
+  if (period === '7_DAYS') {
+    return dateIso >= bounds.sevenDaysAgo && dateIso <= bounds.todayIso;
+  }
+
+  if (period === 'THIS_MONTH') {
+    return dateIso.startsWith(bounds.currentYearMonth);
+  }
+
+  if (period === 'THIS_YEAR' || period === 'YEAR_2026') {
+    return dateIso.startsWith('2026');
+  }
+
+  if (period === 'YEAR_2025') {
+    return dateIso.startsWith('2025');
+  }
+
+  if (period === 'ALL') {
+    return true;
+  }
+
+  // Week 1 to 4 of current month
+  if (period === 'WEEK_1') {
+    if (!dateIso.startsWith(bounds.currentYearMonth)) return false;
+    const day = parseInt(dateIso.split('-')[2], 10);
+    return day >= 1 && day <= 7;
+  }
+  if (period === 'WEEK_2') {
+    if (!dateIso.startsWith(bounds.currentYearMonth)) return false;
+    const day = parseInt(dateIso.split('-')[2], 10);
+    return day >= 8 && day <= 14;
+  }
+  if (period === 'WEEK_3') {
+    if (!dateIso.startsWith(bounds.currentYearMonth)) return false;
+    const day = parseInt(dateIso.split('-')[2], 10);
+    return day >= 15 && day <= 21;
+  }
+  if (period === 'WEEK_4') {
+    if (!dateIso.startsWith(bounds.currentYearMonth)) return false;
+    const day = parseInt(dateIso.split('-')[2], 10);
+    return day >= 22;
+  }
+
+  // Specific Month (e.g. MONTH_2026-10, MONTH_2026-09)
+  if (period.startsWith('MONTH_')) {
+    const ym = period.replace('MONTH_', '');
+    return dateIso.startsWith(ym);
+  }
+
+  // Specific Year (e.g. YEAR_2026)
+  if (period.startsWith('YEAR_')) {
+    const yr = period.replace('YEAR_', '');
+    return dateIso.startsWith(yr);
+  }
+
+  return true;
+}
+
+export const getPeriodLabel = (p: string, referenceDate: Date = new Date()) => {
+  const bounds = getPeriodDateBounds(referenceDate);
+  const curMonthName = INDONESIAN_MONTH_NAMES[bounds.month] || 'Bulan Ini';
+
   if (p === 'TODAY') return 'Hari Ini';
-  if (p === '7_DAYS') return 'Minggu Ini (7 Hari Terakhir)';
-  if (p === 'WEEK_1') return 'Minggu I (1 - 7 Sept)';
-  if (p === 'WEEK_2') return 'Minggu II (8 - 14 Sept)';
-  if (p === 'WEEK_3') return 'Minggu III (15 - 21 Sept)';
-  if (p === 'WEEK_4') return 'Minggu IV (22 - 30 Sept)';
-  if (p === 'THIS_MONTH') return 'Bulan Ini (September 2026)';
+  if (p === 'THIS_WEEK') return `Minggu Ini (${bounds.thisWeekStartIso} s/d ${bounds.thisWeekEndIso})`;
+  if (p === 'LAST_WEEK') return `Minggu Lalu (${bounds.lastWeekStartIso} s/d ${bounds.lastWeekEndIso})`;
+  if (p === '7_DAYS') return '7 Hari Terakhir';
+  if (p === 'WEEK_1') return `Minggu I (1 - 7 ${curMonthName} ${bounds.year})`;
+  if (p === 'WEEK_2') return `Minggu II (8 - 14 ${curMonthName} ${bounds.year})`;
+  if (p === 'WEEK_3') return `Minggu III (15 - 21 ${curMonthName} ${bounds.year})`;
+  if (p === 'WEEK_4') return `Minggu IV (22 - Akhir ${curMonthName} ${bounds.year})`;
+  if (p === 'THIS_MONTH') return `Bulan Ini (${curMonthName} ${bounds.year})`;
+  if (p === 'THIS_YEAR' || p === 'YEAR_2026') return 'Tahun 2026 (Tahunan)';
+  if (p === 'YEAR_2025') return 'Tahun 2025 (Tahunan)';
   if (p === 'ALL') return 'Kumulatif (Semua Waktu)';
+  
   if (p.startsWith('MONTH_')) {
     const ym = p.replace('MONTH_', '');
     const [y, m] = ym.split('-');
-    const monthNames = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-    ];
     const idx = parseInt(m, 10) - 1;
-    return `Bulan ${monthNames[idx] || m} ${y}`;
+    return `Bulan ${INDONESIAN_MONTH_NAMES[idx] || m} ${y}`;
   }
+
+  if (p.startsWith('YEAR_')) {
+    const yr = p.replace('YEAR_', '');
+    return `Tahun ${yr}`;
+  }
+
   return p;
 };
 
@@ -296,49 +443,57 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   };
 
   // Helper date calculations
-  const now = new Date();
-  const todayIso = now.toISOString().split('T')[0];
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split('T')[0];
-  const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const now = useMemo(() => new Date(), []);
+  const bounds = useMemo(() => getPeriodDateBounds(now), [now]);
+  const todayIso = bounds.todayIso;
+  const currentYearMonth = bounds.currentYearMonth;
 
-  // Filter reports by selected period
+  // 1. Filter reports by selected period
   const filteredReportsByPeriod = useMemo(() => {
     return reports.filter((r) => {
       const dateIso = getReportIsoDate(r);
-      if (!dateIso) return true;
-      if (period === 'TODAY') {
-        return dateIso === todayIso;
-      }
-      if (period === '7_DAYS') {
-        return dateIso >= sevenDaysAgo;
-      }
-      if (period === 'THIS_MONTH') {
-        return dateIso.startsWith(currentYearMonth);
-      }
-      if (period === 'WEEK_1') {
-        return dateIso.startsWith(currentYearMonth) && parseInt(dateIso.split('-')[2], 10) <= 7;
-      }
-      if (period === 'WEEK_2') {
-        const day = parseInt(dateIso.split('-')[2], 10);
-        return dateIso.startsWith(currentYearMonth) && day >= 8 && day <= 14;
-      }
-      if (period === 'WEEK_3') {
-        const day = parseInt(dateIso.split('-')[2], 10);
-        return dateIso.startsWith(currentYearMonth) && day >= 15 && day <= 21;
-      }
-      if (period === 'WEEK_4') {
-        const day = parseInt(dateIso.split('-')[2], 10);
-        return dateIso.startsWith(currentYearMonth) && day >= 22;
-      }
-      if (period.startsWith('MONTH_')) {
-        const ym = period.replace('MONTH_', '');
-        return dateIso.startsWith(ym);
-      }
-      return true; // ALL
+      return checkDateInPeriod(dateIso, period, now);
     });
-  }, [reports, period, todayIso, sevenDaysAgo, currentYearMonth]);
+  }, [reports, period, now]);
+
+  // 2. Filter Apel Pagi records strictly by selected period
+  const filteredAttendanceByPeriod = useMemo(() => {
+    return (attendanceList || []).filter((a) => {
+      const dateIso = a.tanggal || (a.createdAt ? a.createdAt.split('T')[0] : '');
+      return checkDateInPeriod(dateIso, period, now);
+    });
+  }, [attendanceList, period, now]);
+
+  // Tanggal Apel Pagi yang tercatat secara global pada periode terpilih
+  const distinctApelDatesInPeriod = useMemo(() => {
+    const dates = new Set<string>();
+    filteredAttendanceByPeriod.forEach((a) => {
+      if (a.tanggal) dates.add(a.tanggal);
+    });
+    filteredReportsByPeriod.forEach((r) => {
+      if (r.absenApel?.status === 'Hadir' || r.absenApel?.status === 'Dinas Luar') {
+        const iso = getReportIsoDate(r);
+        if (iso) dates.add(iso);
+      }
+    });
+    return dates;
+  }, [filteredAttendanceByPeriod, filteredReportsByPeriod]);
+
+  // 3. Filter Event Attendance by selected period
+  const filteredEventAttendanceByPeriod = useMemo(() => {
+    return (eventAttendanceList || []).filter((e) => {
+      const dateIso = e.tanggal || (e.createdAt ? e.createdAt.split('T')[0] : '');
+      return checkDateInPeriod(dateIso, period, now);
+    });
+  }, [eventAttendanceList, period, now]);
+
+  // 4. Filter Custom Events by selected period
+  const filteredCustomEventsByPeriod = useMemo(() => {
+    return (customEvents || []).filter((ev) => {
+      const dateIso = ev.tanggal || '';
+      return checkDateInPeriod(dateIso, period, now);
+    });
+  }, [customEvents, period, now]);
 
   // Kepling specific reports
   const myReports = useMemo(() => {
@@ -440,50 +595,23 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         getReportIsoDate(kj) ||
         (kj.tanggal && String(kj.tanggal).match(/^\d{4}-\d{2}-\d{2}$/) ? String(kj.tanggal) : '') ||
         (kj.createdAt ? String(kj.createdAt).split('T')[0] : '');
-      if (!dateIso) return true;
-      if (period === 'TODAY') {
-        return dateIso === todayIso;
-      }
-      if (period === '7_DAYS') {
-        return dateIso >= sevenDaysAgo;
-      }
-      if (period === 'THIS_MONTH') {
-        return dateIso.startsWith(currentYearMonth);
-      }
-      if (period === 'WEEK_1') {
-        return dateIso.startsWith(currentYearMonth) && parseInt(dateIso.split('-')[2], 10) <= 7;
-      }
-      if (period === 'WEEK_2') {
-        const day = parseInt(dateIso.split('-')[2], 10);
-        return dateIso.startsWith(currentYearMonth) && day >= 8 && day <= 14;
-      }
-      if (period === 'WEEK_3') {
-        const day = parseInt(dateIso.split('-')[2], 10);
-        return dateIso.startsWith(currentYearMonth) && day >= 15 && day <= 21;
-      }
-      if (period === 'WEEK_4') {
-        const day = parseInt(dateIso.split('-')[2], 10);
-        return dateIso.startsWith(currentYearMonth) && day >= 22;
-      }
-      if (period.startsWith('MONTH_')) {
-        const ym = period.replace('MONTH_', '');
-        return dateIso.startsWith(ym);
-      }
-      return true; // ALL
+      return checkDateInPeriod(dateIso, period, now);
     });
-  }, [effectiveKunjunganList, period, todayIso, sevenDaysAgo, currentYearMonth]);
-
-  // Tanggal Apel Pagi yang tercatat secara global
-  const distinctApelDates = useMemo(() => {
-    const dates = new Set<string>();
-    (attendanceList || []).forEach((a) => {
-      if (a.tanggal) dates.add(a.tanggal);
-    });
-    return dates;
-  }, [attendanceList]);
+  }, [effectiveKunjunganList, period, now]);
 
   // Aggregasi untuk Seluruh 24 Kepling (7 Kriteria Kinerja Terpadu)
   const keplingSummaryList = useMemo(() => {
+    // Dynamic Poskamling target based on period:
+    // Mingguan/Harian: 2 giat per minggu; Tahunan: 96 giat; Bulanan: 8 giat
+    const isWeeklyOrDaily =
+      period === 'TODAY' ||
+      period === 'THIS_WEEK' ||
+      period === 'LAST_WEEK' ||
+      period === '7_DAYS' ||
+      period.startsWith('WEEK_');
+    const isYearlyOrAll = period === 'THIS_YEAR' || period.startsWith('YEAR_') || period === 'ALL';
+    const targetPoskamlingPeriod = isWeeklyOrDaily ? 2 : isYearlyOrAll ? 96 : 8;
+
     return KEPLING_ACCOUNTS.map((k, index) => {
       const kReports = filteredReportsByPeriod.filter((r) => isReportMatchingKepling(r, k));
 
@@ -506,7 +634,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       const lkSummary = pbbOverview.lingkunganSummaries.find((s) => s.lingkungan === lkNum);
 
       // Target PBB (WP): Prioritaskan target riil dari SPPT PBB (totalWp) yang tersinkronisasi (misal: 255 WP untuk Lk XXII).
-      // Jika Super Admin melakukan custom override target PBB manual yang bukan default 100, gunakan nilai tersebut.
       const targetPbb =
         (targetConfig?.targetPbb && targetConfig.targetPbb !== 100)
           ? targetConfig.targetPbb
@@ -522,35 +649,47 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
       const uniqueDays = new Set(kReports.map((r) => r.createdAt?.split('T')[0] || r.tanggal));
 
-      // 1. TINGKAT KEHADIRAN APEL PAGI (Bobot 15%)
-      const kApelRecords = (attendanceList || []).filter(
+      // 1. TINGKAT KEHADIRAN APEL PAGI (Bobot 15%) - Dihitung murni dalam periode yang dipilih
+      const kApelRecords = filteredAttendanceByPeriod.filter(
         (a) =>
           a.accountId === k.id ||
           a.nomorLingkungan === k.nomorLingkungan ||
           a.namaKepling?.trim().toLowerCase() === k.nama.trim().toLowerCase()
       );
       const kApelHadirList = kApelRecords.filter((a) => a.status === 'Hadir' || a.status === 'Dinas Luar');
-      const apelHadirFromReports = kReports.filter(
-        (r) => r.absenApel?.status === 'Hadir' || r.absenApel?.status === 'Dinas Luar'
-      ).length;
-      const totalApelHadir = Math.max(kApelHadirList.length, apelHadirFromReports);
-      const totalApelSessions = distinctApelDates.size > 0 ? distinctApelDates.size : Math.max(1, uniqueDays.size);
-      const apelPercentage =
-        totalApelSessions > 0
-          ? Math.min(100, Math.round((totalApelHadir / totalApelSessions) * 100))
-          : totalApelHadir > 0
-          ? 100
-          : 85;
 
-      // 2. KEHADIRAN KEGIATAN KHUSUS (Bobot 15%)
-      const kEventRecords = (eventAttendanceList || []).filter(
+      // Kumpulkan tanggal-tanggal unik kehadiran apel kepling ini pada periode berjalan
+      const uniqueApelHadirDates = new Set<string>();
+      kApelHadirList.forEach((a) => {
+        if (a.tanggal) uniqueApelHadirDates.add(a.tanggal);
+        else if (a.createdAt) uniqueApelHadirDates.add(a.createdAt.split('T')[0]);
+      });
+      kReports.forEach((r) => {
+        if (r.absenApel?.status === 'Hadir' || r.absenApel?.status === 'Dinas Luar') {
+          const iso = getReportIsoDate(r);
+          if (iso) uniqueApelHadirDates.add(iso);
+        }
+      });
+      const totalApelHadir = uniqueApelHadirDates.size;
+
+      // Total sesi apel yang terselenggara di Kelurahan pada periode terpilih
+      const totalApelSessions = distinctApelDatesInPeriod.size > 0
+        ? distinctApelDatesInPeriod.size
+        : (totalApelHadir > 0 ? totalApelHadir : 1);
+
+      const apelPercentage = totalApelSessions > 0
+        ? Math.min(100, Math.round((totalApelHadir / totalApelSessions) * 100))
+        : (totalApelHadir > 0 ? 100 : 100);
+
+      // 2. KEHADIRAN KEGIATAN KHUSUS (Bobot 15%) - Dihitung murni dalam periode yang dipilih
+      const kEventRecords = filteredEventAttendanceByPeriod.filter(
         (e) =>
           e.accountId === k.id ||
           e.nomorLingkungan === k.nomorLingkungan ||
           e.namaKepling?.trim().toLowerCase() === k.nama.trim().toLowerCase()
       );
       const kegiatanHadir = kEventRecords.filter((e) => e.status === 'Hadir' || e.status === 'Dinas Luar').length;
-      const relevantEvents = (customEvents || []).filter(
+      const relevantEvents = filteredCustomEventsByPeriod.filter(
         (ev) => ev.required || !ev.targetKeplingIds?.length || ev.targetKeplingIds.includes(k.id)
       );
       const kegiatanPercentage =
@@ -572,11 +711,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       const bpjsPercentage = targetBpjs > 0 ? Math.round((effective.bpjs / targetBpjs) * 100) : 0;
 
       // 6. KUNJUNGAN HARIAN (Bobot 10%)
-      // Dihitung dari: (Jumlah Kunjungan Harian Warga Door to Door) / (Target KK Perlinsos)
       const kKunjunganRecords = filteredKunjunganByPeriod.filter((kj: any) =>
         isKunjunganMatchingKepling(kj, k)
       );
-      const targetKunjunganHarian = targetPerlinsos; // Target KK Perlinsos
+      const targetKunjunganHarian = targetPerlinsos;
       const totalKunjungan = kKunjunganRecords.length;
       const kunjunganPercentage =
         targetPerlinsos > 0
@@ -590,7 +728,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           (r.kinerja?.poskamlingStatus && r.kinerja.poskamlingStatus !== 'Tidak Ada') ||
           r.dokumentasiFoto?.some((f) => f.kategori === 'poskamling')
       );
-      const targetPoskamlingBulan = 8; // Target referensi 8 shift ronda
+      const targetPoskamlingBulan = targetPoskamlingPeriod;
       const poskamlingCount = poskamlingGiatReports.length;
       const poskamlingPercentage = Math.min(100, Math.round((poskamlingCount / targetPoskamlingBulan) * 100));
 
@@ -650,13 +788,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       };
     });
   }, [
+    period,
     filteredReportsByPeriod,
     reportedStatsMap,
     targetsMap,
-    attendanceList,
-    distinctApelDates,
-    eventAttendanceList,
-    customEvents,
+    filteredAttendanceByPeriod,
+    distinctApelDatesInPeriod,
+    filteredEventAttendanceByPeriod,
+    filteredCustomEventsByPeriod,
     filteredKunjunganByPeriod,
     pbbOverview.lingkunganSummaries,
   ]);
@@ -818,7 +957,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         ? Math.round((totalKunjungan / totalTargetPerlinsos) * 100)
         : 0;
 
-    const totalApelSessions = distinctApelDates.size > 0 ? distinctApelDates.size : 1;
+    const totalApelSessions = distinctApelDatesInPeriod.size > 0 ? distinctApelDatesInPeriod.size : 1;
     const totalExpectedApel = totalApelSessions * 24;
     const apelRatePercentage =
       totalExpectedApel > 0 ? Math.min(100, Math.round((totalApelHadir / totalExpectedApel) * 100)) : 100;
@@ -841,7 +980,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       activeKeplingCount,
       kepatuhanRate,
     };
-  }, [filteredReportsByPeriod, keplingSummaryList, distinctApelDates]);
+  }, [filteredReportsByPeriod, keplingSummaryList, distinctApelDatesInPeriod]);
 
   const handlePrint = () => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -873,100 +1012,125 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </p>
           </div>
 
-          {/* Period Filter Buttons */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 bg-emerald-950/80 p-1.5 rounded-2xl border border-emerald-600/50 shrink-0 print:hidden">
-            <button
-              type="button"
-              onClick={() => setPeriod('TODAY')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                period === 'TODAY'
-                  ? 'bg-white text-emerald-950 shadow-md'
-                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
-              }`}
-            >
-              Hari Ini
-            </button>
-            <button
-              type="button"
-              onClick={() => setPeriod('7_DAYS')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                period === '7_DAYS'
-                  ? 'bg-white text-emerald-950 shadow-md'
-                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
-              }`}
-            >
-              7 Hari (Mingguan)
-            </button>
-            <button
-              type="button"
-              onClick={() => setPeriod('THIS_MONTH')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                period === 'THIS_MONTH'
-                  ? 'bg-white text-emerald-950 shadow-md'
-                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
-              }`}
-            >
-              Bulan Ini
-            </button>
-
-            {/* Select Dropdown for Specific Week or Month */}
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-emerald-900 text-white border border-emerald-500/80 focus:outline-emerald-400 cursor-pointer"
-            >
-              <optgroup label="Filter Minggu Specific">
-                <option value="WEEK_1">Minggu I (1-7 Sept)</option>
-                <option value="WEEK_2">Minggu II (8-14 Sept)</option>
-                <option value="WEEK_3">Minggu III (15-21 Sept)</option>
-                <option value="WEEK_4">Minggu IV (22-30 Sept)</option>
-              </optgroup>
-              <optgroup label="Filter Bulan Specific">
-                <option value="THIS_MONTH">Bulan September 2026</option>
-                <option value="MONTH_2026-08">Bulan Agustus 2026</option>
-                <option value="MONTH_2026-07">Bulan Juli 2026</option>
-                <option value="MONTH_2026-06">Bulan Juni 2026</option>
-              </optgroup>
-              <optgroup label="Akumulasi">
-                <option value="ALL">🏆 Kumulatif (Semua Waktu)</option>
-              </optgroup>
-            </select>
-
-            <button
-              type="button"
-              onClick={() => setPeriod('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                period === 'ALL'
-                  ? 'bg-white text-emerald-950 shadow-md'
-                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
-              }`}
-            >
-              Kumulatif
-            </button>
-
-            {mode === 'super_admin' && (
+          {/* Period Filter Buttons - Perminggu, Perbulan, Pertahun, Hari Ini */}
+          <div className="flex flex-col gap-2 bg-emerald-950/90 p-2.5 rounded-2xl border border-emerald-600/50 shrink-0 print:hidden shadow-lg max-w-full">
+            {/* Primary Category Selector */}
+            <div className="flex items-center gap-1 bg-emerald-900/80 p-1 rounded-xl border border-emerald-700/60 overflow-x-auto">
               <button
                 type="button"
-                onClick={() => {
-                  setEditingKepling(null);
-                  setIsModalEditOpen(true);
-                }}
-                className="px-3.5 py-1.5 rounded-xl bg-amber-300 hover:bg-amber-200 text-amber-950 font-black text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer ml-1 border border-amber-200"
-                title="Atur Target PERLINSOS dan Edit Capaian 24 Kepling"
+                onClick={() => setPeriod('THIS_WEEK')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  period === 'THIS_WEEK' || period === 'LAST_WEEK' || period === '7_DAYS' || period.startsWith('WEEK_')
+                    ? 'bg-amber-400 text-slate-950 shadow-md scale-102'
+                    : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
+                }`}
               >
-                <Sliders className="w-3.5 h-3.5 text-amber-950" />
-                <span>Target & Capaian</span>
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Per Minggu</span>
               </button>
-            )}
 
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="p-1.5 text-emerald-200 hover:text-white rounded-lg hover:bg-white/10 transition-colors ml-1 cursor-pointer hidden sm:block"
-              title="Cetak Rekapitulasi Capaian"
-            >
-              <Printer className="w-4 h-4" />
-            </button>
+              <button
+                type="button"
+                onClick={() => setPeriod('THIS_MONTH')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  period === 'THIS_MONTH' || period.startsWith('MONTH_')
+                    ? 'bg-amber-400 text-slate-950 shadow-md scale-102'
+                    : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
+                }`}
+              >
+                <CalendarCheck className="w-3.5 h-3.5" />
+                <span>Per Bulan</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPeriod('THIS_YEAR')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  period === 'THIS_YEAR' || period.startsWith('YEAR_') || period === 'ALL'
+                    ? 'bg-amber-400 text-slate-950 shadow-md scale-102'
+                    : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
+                }`}
+              >
+                <Trophy className="w-3.5 h-3.5" />
+                <span>Per Tahun</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPeriod('TODAY')}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+                  period === 'TODAY'
+                    ? 'bg-white text-emerald-950 shadow-md'
+                    : 'text-emerald-200 hover:text-white hover:bg-white/10 font-bold'
+                }`}
+              >
+                <Sun className="w-3.5 h-3.5" />
+                <span>Hari Ini</span>
+              </button>
+            </div>
+
+            {/* Secondary Sub-Period Dropdown & Quick Selection */}
+            <div className="flex items-center gap-2">
+              <select
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                className="flex-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-900 text-white border border-emerald-500/80 focus:outline-amber-400 cursor-pointer shadow-inner"
+              >
+                <optgroup label="📅 Peringkat Per Minggu">
+                  <option value="THIS_WEEK">🌟 Minggu Ini (Berjalan)</option>
+                  <option value="LAST_WEEK">⏳ Minggu Lalu</option>
+                  <option value="7_DAYS">⏱️ 7 Hari Terakhir</option>
+                  <option value="WEEK_1">🔹 Minggu I (Tgl 1 - 7)</option>
+                  <option value="WEEK_2">🔹 Minggu II (Tgl 8 - 14)</option>
+                  <option value="WEEK_3">🔹 Minggu III (Tgl 15 - 21)</option>
+                  <option value="WEEK_4">🔹 Minggu IV (Tgl 22 - Akhir Bulan)</option>
+                </optgroup>
+                <optgroup label="🗓️ Peringkat Per Bulan">
+                  <option value="THIS_MONTH">🌟 Bulan Ini (Oktober 2026)</option>
+                  <option value="MONTH_2026-09">🍂 Bulan September 2026</option>
+                  <option value="MONTH_2026-08">☀️ Bulan Agustus 2026</option>
+                  <option value="MONTH_2026-07">🌴 Bulan Juli 2026</option>
+                  <option value="MONTH_2026-06">🌿 Bulan Juni 2026</option>
+                  <option value="MONTH_2026-05">🌱 Bulan Mei 2026</option>
+                  <option value="MONTH_2026-04">🌷 Bulan April 2026</option>
+                  <option value="MONTH_2026-03">🌸 Bulan Maret 2026</option>
+                  <option value="MONTH_2026-02">❄️ Bulan Februari 2026</option>
+                  <option value="MONTH_2026-01">🎯 Bulan Januari 2026</option>
+                </optgroup>
+                <optgroup label="🏆 Peringkat Per Tahun">
+                  <option value="THIS_YEAR">🌟 Tahun 2026 (Akumulasi Tahunan)</option>
+                  <option value="YEAR_2025">📜 Tahun 2025</option>
+                  <option value="ALL">🏆 Kumulatif (Sepanjang Waktu)</option>
+                </optgroup>
+                <optgroup label="⚡ Harian">
+                  <option value="TODAY">⚡ Hari Ini</option>
+                </optgroup>
+              </select>
+
+              {mode === 'super_admin' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingKepling(null);
+                    setIsModalEditOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-300 hover:bg-amber-200 text-amber-950 font-black text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0 border border-amber-200"
+                  title="Atur Target PERLINSOS dan Edit Capaian 24 Kepling"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-amber-950" />
+                  <span>Target</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="p-1.5 text-emerald-200 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer hidden sm:block shrink-0"
+                title="Cetak Rekapitulasi Capaian"
+              >
+                <Printer className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -2341,9 +2505,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       {leaderboardSort === 'KUNJUNGAN' && '🏠 Kunjungan Harian (10%)'}
                       {leaderboardSort === 'POSKAMLING' && '🔦 Poskamling / Siskamling (10%)'}
                     </span>
+
+                    <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-2xs">
+                      <Calendar className="w-3 h-3 text-emerald-600" />
+                      <span>{getPeriodLabel(period, now)}</span>
+                    </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">
-                    Peringkat resmi terpadu dihitung dari <strong>7 Kriteria Kinerja</strong>: Kehadiran Apel Pagi (15%), Kehadiran Kegiatan Khusus (15%), Capaian Perlinsos (20%), Realisasi PBB (20%), BPJS TK (10%), Kunjungan Harian (10%), dan Poskamling (10%).
+                    Peringkat resmi terpadu untuk periode <strong>{getPeriodLabel(period, now)}</strong> dihitung dari <strong>7 Kriteria Kinerja</strong>: Kehadiran Apel Pagi (15%), Kehadiran Kegiatan Khusus (15%), Capaian Perlinsos (20%), Realisasi PBB (20%), BPJS TK (10%), Kunjungan Harian (10%), dan Poskamling (10%).
                   </p>
                 </div>
               </div>
