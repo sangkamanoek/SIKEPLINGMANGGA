@@ -51,27 +51,212 @@ export function getLocalDataKeluarga(): DataKeluarga[] {
 export function saveLocalDataKeluarga(list: DataKeluarga[]): void {
   try {
     safeSetLocalStorage(STORAGE_KEY_DATA_KELUARGA, JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('data-keluarga-updated', { detail: { count: list.length } }));
+    }
   } catch (e) {
     console.warn('Gagal menyimpan Data Keluarga ke lokal:', e);
   }
 }
 
+// Cross-tab broadcast channel for immediate 0ms sync between tabs
+const KELUARGA_BROADCAST_CHANNEL_NAME = 'sikepling_keluarga_sync_channel';
+let keluargaBroadcastChannel: BroadcastChannel | null = null;
+try {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    keluargaBroadcastChannel = new BroadcastChannel(KELUARGA_BROADCAST_CHANNEL_NAME);
+  }
+} catch {
+  // ignore
+}
+
+export function broadcastDataKeluargaChange(item?: DataKeluarga, list?: DataKeluarga[]) {
+  try {
+    if (keluargaBroadcastChannel) {
+      keluargaBroadcastChannel.postMessage({ type: 'UPDATE', item, count: list?.length, timestamp: Date.now() });
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('data-keluarga-updated', { detail: { item, list } }));
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// ----------------------------------------------------
+// SERVER API BUFFER CLIENT (/api/data-keluarga)
+// ----------------------------------------------------
+
+export async function fetchDataKeluargaFromApi(): Promise<DataKeluarga[]> {
+  try {
+    const res = await fetch(`/api/data-keluarga?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && Array.isArray(json.data) && json.data.length > 0) {
+        return json.data;
+      }
+    }
+  } catch (err) {
+    console.warn('Notice fetching Data Keluarga from /api/data-keluarga:', err);
+  }
+  return [];
+}
+
+export async function saveDataKeluargaToApi(item: DataKeluarga): Promise<boolean> {
+  try {
+    const res = await fetch('/api/data-keluarga', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('Notice saving Data Keluarga to /api/data-keluarga:', err);
+    return false;
+  }
+}
+
+export async function batchSaveDataKeluargaToApi(items: DataKeluarga[]): Promise<boolean> {
+  try {
+    if (!Array.isArray(items) || items.length === 0) return true;
+    const res = await fetch('/api/data-keluarga/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('Notice batch saving Data Keluarga to /api/data-keluarga:', err);
+    return false;
+  }
+}
+
+export async function deleteDataKeluargaFromApi(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/data-keluarga/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('Notice deleting Data Keluarga from /api/data-keluarga:', err);
+    return false;
+  }
+}
+
+/**
+ * Smart merge Data Keluarga: overlays incoming updates on top of base items.
+ * Uses updatedAt timestamps to preserve newest changes.
+ */
+export function smartMergeDataKeluarga(baseList: DataKeluarga[], updates: DataKeluarga[]): DataKeluarga[] {
+  if (!Array.isArray(updates) || updates.length === 0) return baseList;
+  const map = new Map<string, DataKeluarga>();
+  const kkMap = new Map<string, string>();
+  const nikMap = new Map<string, string>();
+
+  // 1. Base list
+  for (const item of baseList) {
+    if (!item || !item.id) continue;
+    map.set(item.id, { ...item });
+    if (item.nomorKk) kkMap.set(item.nomorKk.replace(/[^0-9]/g, ''), item.id);
+    if (item.nikKepalaKeluarga) nikMap.set(item.nikKepalaKeluarga.replace(/[^0-9]/g, ''), item.id);
+  }
+
+  // 2. Overlay updates
+  for (const update of updates) {
+    if (!update || !update.id) continue;
+    const cleanKk = (update.nomorKk || '').replace(/[^0-9]/g, '');
+    const cleanNik = (update.nikKepalaKeluarga || '').replace(/[^0-9]/g, '');
+
+    let targetId = update.id;
+    if (!map.has(targetId)) {
+      if (cleanKk && kkMap.has(cleanKk)) targetId = kkMap.get(cleanKk)!;
+      else if (cleanNik && nikMap.has(cleanNik)) targetId = nikMap.get(cleanNik)!;
+    }
+
+    if (map.has(targetId)) {
+      const existing = map.get(targetId)!;
+      const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+      const updateTime = update.updatedAt ? new Date(update.updatedAt).getTime() : 0;
+
+      if (existingTime > updateTime) {
+        map.set(targetId, { ...update, ...existing, id: targetId });
+      } else {
+        map.set(targetId, { ...existing, ...update, id: targetId });
+      }
+    } else {
+      map.set(update.id, { ...update });
+      if (cleanKk) kkMap.set(cleanKk, update.id);
+      if (cleanNik) nikMap.set(cleanNik, update.id);
+    }
+  }
+
+  const merged = Array.from(map.values());
+  merged.sort((a, b) => {
+    if (a.lingkunganNomor !== b.lingkunganNomor) return a.lingkunganNomor - b.lingkunganNomor;
+    return a.namaKepalaKeluarga.localeCompare(b.namaKepalaKeluarga);
+  });
+  return merged;
+}
+
 // ==========================================
-// FIRESTORE CRUD OPERATIONS
+// FIRESTORE & DUAL-TIER CRUD OPERATIONS
 // ==========================================
 
 /**
- * Real-time listener for Data Keluarga from Firestore
+ * Ultra-fast Real-time listener & Dual-Tier loader for Data Keluarga
  */
 export function subscribeDataKeluarga(
   onSuccess: (data: DataKeluarga[]) => void,
   onError?: (err: Error) => void
 ): Unsubscribe {
+  // 1. Instant local load (0ms)
+  const local = getLocalDataKeluarga();
+  if (local.length > 0) {
+    onSuccess(local);
+  }
+
+  // 2. Instant Server API buffer fetch (~2ms)
+  fetchDataKeluargaFromApi()
+    .then((apiItems) => {
+      if (apiItems.length > 0) {
+        const merged = smartMergeDataKeluarga(getLocalDataKeluarga(), apiItems);
+        saveLocalDataKeluarga(merged);
+        onSuccess(merged);
+      }
+    })
+    .catch(() => {});
+
+  // 3. Cross-tab Broadcast Channel listener (0ms)
+  const handleBroadcast = (event: MessageEvent) => {
+    if (event.data?.type === 'UPDATE') {
+      const current = getLocalDataKeluarga();
+      onSuccess(current);
+    }
+  };
+  if (keluargaBroadcastChannel) {
+    keluargaBroadcastChannel.addEventListener('message', handleBroadcast);
+  }
+
+  const handleCustomEvent = () => {
+    const current = getLocalDataKeluarga();
+    onSuccess(current);
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('data-keluarga-updated', handleCustomEvent);
+  }
+
+  // 4. Cloud Firestore listener in background
   try {
     const colRef = collection(db, COLLECTION_NAME);
     const q = query(colRef);
 
-    return onSnapshot(
+    const unsubFirestore = onSnapshot(
       q,
       (snapshot) => {
         const list: DataKeluarga[] = [];
@@ -80,37 +265,64 @@ export function subscribeDataKeluarga(
           list.push(item);
         });
 
-        // Urutkan berdasarkan Lingkungan dan Nama Kepala Keluarga
-        list.sort((a, b) => {
-          if (a.lingkunganNomor !== b.lingkunganNomor) {
-            return a.lingkunganNomor - b.lingkunganNomor;
-          }
-          return a.namaKepalaKeluarga.localeCompare(b.namaKepalaKeluarga);
-        });
+        if (list.length > 0) {
+          list.sort((a, b) => {
+            if (a.lingkunganNomor !== b.lingkunganNomor) {
+              return a.lingkunganNomor - b.lingkunganNomor;
+            }
+            return a.namaKepalaKeluarga.localeCompare(b.namaKepalaKeluarga);
+          });
 
-        saveLocalDataKeluarga(list);
-        onSuccess(list);
+          const currentLocal = getLocalDataKeluarga();
+          const merged = smartMergeDataKeluarga(currentLocal, list);
+          saveLocalDataKeluarga(merged);
+          onSuccess(merged);
+        }
       },
       (error) => {
         console.warn('Firestore onSnapshot data_keluarga error, falling back to local:', error);
         if (onError) onError(error);
-        const local = getLocalDataKeluarga();
-        if (local.length > 0) onSuccess(local);
+        const currentLocal = getLocalDataKeluarga();
+        if (currentLocal.length > 0) onSuccess(currentLocal);
         handleFirestoreError(error, OperationType.LIST, COLLECTION_NAME);
       }
     );
+
+    return () => {
+      unsubFirestore();
+      if (keluargaBroadcastChannel) {
+        keluargaBroadcastChannel.removeEventListener('message', handleBroadcast);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('data-keluarga-updated', handleCustomEvent);
+      }
+    };
   } catch (err) {
     console.warn('Failed to subscribe data_keluarga:', err);
-    const local = getLocalDataKeluarga();
-    onSuccess(local);
+    const currentLocal = getLocalDataKeluarga();
+    onSuccess(currentLocal);
     return () => {};
   }
 }
 
 /**
- * Fetch all Data Keluarga from Firestore with local fallback
+ * Fetch all Data Keluarga with Dual-Tier Server Buffer & Firestore acceleration
  */
 export async function fetchAllDataKeluarga(): Promise<DataKeluarga[]> {
+  let currentList: DataKeluarga[] = getLocalDataKeluarga();
+
+  // 1. Fetch from Express Server Buffer (/api/data-keluarga) for ~2ms response
+  try {
+    const apiItems = await fetchDataKeluargaFromApi();
+    if (apiItems.length > 0) {
+      currentList = smartMergeDataKeluarga(currentList, apiItems);
+      saveLocalDataKeluarga(currentList);
+    }
+  } catch (err) {
+    console.warn('Notice reading Data Keluarga server buffer:', err);
+  }
+
+  // 2. Fetch from Firebase Firestore
   try {
     const colRef = collection(db, COLLECTION_NAME);
     const snap = await getDocs(colRef);
@@ -121,15 +333,13 @@ export async function fetchAllDataKeluarga(): Promise<DataKeluarga[]> {
         list.push(item);
       });
 
-      list.sort((a, b) => {
-        if (a.lingkunganNomor !== b.lingkunganNomor) {
-          return a.lingkunganNomor - b.lingkunganNomor;
-        }
-        return a.namaKepalaKeluarga.localeCompare(b.namaKepalaKeluarga);
-      });
-
-      saveLocalDataKeluarga(list);
-      return list;
+      if (list.length > 0) {
+        currentList = smartMergeDataKeluarga(currentList, list);
+        saveLocalDataKeluarga(currentList);
+        // Sync back to API buffer asynchronously
+        batchSaveDataKeluargaToApi(currentList).catch(() => {});
+        return currentList;
+      }
     }
   } catch (error) {
     console.warn('Notice fetchAllDataKeluarga Firestore, using local fallback:', error);
@@ -138,11 +348,9 @@ export async function fetchAllDataKeluarga(): Promise<DataKeluarga[]> {
     } catch {}
   }
 
-  // Fallback to local
-  const local = getLocalDataKeluarga();
-  if (local.length > 0) return local;
+  if (currentList.length > 0) return currentList;
 
-  // If completely empty, auto-seed default realistic data
+  // Fallback to initial seeds if completely empty
   const defaultSeeds = getInitialSeedDataKeluarga();
   saveLocalDataKeluarga(defaultSeeds);
   return defaultSeeds;
@@ -168,8 +376,6 @@ export async function saveDataKeluargaToFirestore(
 
   if (index >= 0) {
     const existing = current[index];
-    // Smart Member Merge:
-    // If existing family already has members and incoming keluarga has members, merge them by NIK/Name
     const existingMembers = existing.anggotaKeluarga || [];
     const incomingMembers = keluarga.anggotaKeluarga || [];
 
@@ -181,10 +387,8 @@ export async function saveDataKeluargaToFirestore(
           (m.nama && inc.nama && m.nama.toLowerCase().trim() === inc.nama.toLowerCase().trim())
       );
       if (mIdx >= 0) {
-        // Update member fields
         mergedMembers[mIdx] = { ...mergedMembers[mIdx], ...inc };
       } else {
-        // Append new family member
         mergedMembers.push(inc);
       }
     }
@@ -196,7 +400,6 @@ export async function saveDataKeluargaToFirestore(
       nomorKk: keluarga.nomorKk || existing.nomorKk,
       nikKepalaKeluarga: keluarga.nikKepalaKeluarga || existing.nikKepalaKeluarga,
       namaKepalaKeluarga: keluarga.namaKepalaKeluarga || existing.namaKepalaKeluarga,
-      // Preserve existing verified survey fields if incoming is empty
       desilKesejahteraan: keluarga.desilKesejahteraan || existing.desilKesejahteraan || '',
       jambanKeluarga: keluarga.jambanKeluarga || existing.jambanKeluarga || '',
       sumberAirMinum: keluarga.sumberAirMinum || existing.sumberAirMinum || '',
@@ -220,21 +423,26 @@ export async function saveDataKeluargaToFirestore(
   } else {
     updatedList = [keluarga, ...current];
   }
-  saveLocalDataKeluarga(updatedList);
 
-  // Firestore Write
+  // 1. Instant 0ms local persistence & Broadcast
+  saveLocalDataKeluarga(updatedList);
+  broadcastDataKeluargaChange(mergedKeluarga, updatedList);
+
+  // 2. Fast Save to Server API Buffer (/api/data-keluarga)
+  saveDataKeluargaToApi(mergedKeluarga).catch(() => {});
+
+  // 3. Firestore Write in background / parallel
   try {
     const docId = mergedKeluarga.id || `kk_${mergedKeluarga.nomorKk || Date.now()}`;
     const docRef = doc(db, COLLECTION_NAME, docId);
     const cleaned = cleanFirestoreData({ ...mergedKeluarga, id: docId });
     await setDoc(docRef, cleaned, { merge: true });
 
-    // Sinkronisasi otomatis ke Titik Bangunan WebGIS (Peta Spasial)
+    // Non-blocking background sync to WebGIS House Point
     if (syncWithWebgisHouse) {
       let lat = mergedKeluarga.titikKoordinat?.lat;
       let lng = mergedKeluarga.titikKoordinat?.lng;
 
-      // Jika koordinat belum pernah ditentukan, buat koordinat estimasi realistis dalam wilayah Lingkungan
       if (!lat || !lng) {
         const lk = mergedKeluarga.lingkunganNomor || 1;
         const seedStr = (mergedKeluarga.nomorKk || mergedKeluarga.nikKepalaKeluarga || mergedKeluarga.namaKepalaKeluarga || '');
@@ -284,7 +492,7 @@ export async function saveDataKeluargaToFirestore(
         updatedAt: new Date().toISOString(),
         createdByName: mergedKeluarga.createdByName || 'Database Keluarga',
       };
-      await saveHouseToFirestore(webgisItem).catch((e) => console.warn('Sync house error:', e));
+      saveHouseToFirestore(webgisItem).catch((e) => console.warn('Sync house error:', e));
     }
 
     return true;
@@ -303,8 +511,15 @@ export async function saveDataKeluargaToFirestore(
 export async function deleteDataKeluargaFromFirestore(id: string): Promise<boolean> {
   const current = getLocalDataKeluarga();
   const updated = current.filter((k) => k.id !== id);
+  
+  // 1. Instant 0ms local persistence & Broadcast
   saveLocalDataKeluarga(updated);
+  broadcastDataKeluargaChange(undefined, updated);
 
+  // 2. Fast delete from Server API Buffer
+  deleteDataKeluargaFromApi(id).catch(() => {});
+
+  // 3. Firestore deletion
   try {
     const docRef = doc(db, COLLECTION_NAME, id);
     await deleteDoc(docRef);
@@ -1448,8 +1663,10 @@ export async function batchUpdateLingkunganDataKeluarga(
     }
   }
 
-  // 1. Instant local persistence (LocalStorage + IndexedDB)
+  // 1. Instant local persistence (LocalStorage + IndexedDB + BroadcastChannel + Server API Buffer)
   saveLocalDataKeluarga(updatedList);
+  broadcastDataKeluargaChange(undefined, updatedList);
+  batchSaveDataKeluargaToApi(modifiedItems).catch(() => {});
 
   // 2. Fast chunked Firestore batch writes (400 per batch)
   let successCount = 0;
@@ -1468,9 +1685,8 @@ export async function batchUpdateLingkunganDataKeluarga(
     } catch (err) {
       console.warn('Batch write chunk error, fallbacking to per-doc save:', err);
       for (const item of chunk) {
-        const ok = await saveDataKeluargaToFirestore(item, true);
-        if (ok) successCount++;
-        else failCount++;
+        const docRef = doc(db, COLLECTION_NAME, item.id);
+        await setDoc(docRef, cleanFirestoreData(item), { merge: true }).then(() => successCount++).catch(() => failCount++);
       }
     }
     if (onProgress) {
@@ -1482,25 +1698,76 @@ export async function batchUpdateLingkunganDataKeluarga(
 }
 
 /**
- * Batch saves imported DataKeluarga list to Firestore & Local Storage with progress updates
+ * High-speed Batch saves imported DataKeluarga list to Firestore & Server API & Local Storage
  */
 export async function batchSaveDataKeluarga(
   items: DataKeluarga[],
   onProgress?: (saved: number, total: number) => void
 ): Promise<{ successCount: number; failCount: number }> {
+  if (!Array.isArray(items) || items.length === 0) return { successCount: 0, failCount: 0 };
+
+  const current = getLocalDataKeluarga();
+  const itemMap = new Map<string, DataKeluarga>();
+  current.forEach((k) => itemMap.set(k.id, k));
+
+  const now = new Date().toISOString();
+  const sanitizedItems: DataKeluarga[] = [];
+
+  for (const item of items) {
+    if (!item) continue;
+    const cleanKk = (item.nomorKk || '').replace(/[^0-9]/g, '');
+    const cleanNik = (item.nikKepalaKeluarga || '').replace(/[^0-9]/g, '');
+    const docId = item.id || `kk_${cleanKk || cleanNik || Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    
+    const readyItem: DataKeluarga = {
+      ...item,
+      id: docId,
+      updatedAt: now,
+      createdAt: item.createdAt || now,
+    };
+
+    itemMap.set(docId, readyItem);
+    sanitizedItems.push(readyItem);
+  }
+
+  const updatedList = Array.from(itemMap.values()).sort((a, b) => {
+    if (a.lingkunganNomor !== b.lingkunganNomor) return a.lingkunganNomor - b.lingkunganNomor;
+    return a.namaKepalaKeluarga.localeCompare(b.namaKepalaKeluarga);
+  });
+
+  // 1. Instant Local Persistence + 0ms Broadcast + Server API Buffer
+  saveLocalDataKeluarga(updatedList);
+  broadcastDataKeluargaChange(undefined, updatedList);
+  batchSaveDataKeluargaToApi(sanitizedItems).catch(() => {});
+
+  // 2. High-speed chunked Firestore Batch Writes (400 per batch)
   let successCount = 0;
   let failCount = 0;
 
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    const ok = await saveDataKeluargaToFirestore(item, true);
-    if (ok) {
-      successCount++;
-    } else {
-      failCount++;
+  for (let i = 0; i < sanitizedItems.length; i += 400) {
+    const chunk = sanitizedItems.slice(i, i + 400);
+    try {
+      const batch = writeBatch(db);
+      for (const item of chunk) {
+        const docRef = doc(db, COLLECTION_NAME, item.id);
+        batch.set(docRef, cleanFirestoreData(item), { merge: true });
+      }
+      await batch.commit();
+      successCount += chunk.length;
+    } catch (err) {
+      console.warn('Batch write chunk error, fallbacking to per-doc save:', err);
+      for (const item of chunk) {
+        try {
+          const docRef = doc(db, COLLECTION_NAME, item.id);
+          await setDoc(docRef, cleanFirestoreData(item), { merge: true });
+          successCount++;
+        } catch {
+          failCount++;
+        }
+      }
     }
     if (onProgress) {
-      onProgress(i + 1, items.length);
+      onProgress(Math.min(i + chunk.length, sanitizedItems.length), sanitizedItems.length);
     }
   }
 

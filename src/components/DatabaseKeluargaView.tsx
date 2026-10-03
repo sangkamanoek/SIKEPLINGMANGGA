@@ -175,7 +175,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     const unsubKeluarga = subscribeDataKeluarga(
       (list) => {
         setDataList(list);
-        if (spptList.length > 0) setIsLoading(false);
+        setIsLoading(false);
       },
       () => {
         setIsLoading(false);
@@ -184,7 +184,6 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
 
     const unsubPbb = subscribePbbSpptFromFirestore(DEFAULT_PBB_YEAR, (list) => {
       setSpptList(list);
-      setIsLoading(false);
     });
 
     return () => {

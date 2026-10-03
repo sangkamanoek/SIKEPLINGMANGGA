@@ -303,6 +303,32 @@ const saveStoredPbb = (pbbData: Record<string, any[]>) => {
 
 let pbbCache: Record<string, any[]> = loadStoredPbb();
 
+// Data Keluarga (Kartu Keluarga) Server Buffer File
+const DATA_KELUARGA_FILE = path.join(DATA_DIR, 'data_keluarga.json');
+
+const loadStoredDataKeluarga = (): any[] => {
+  try {
+    if (fs.existsSync(DATA_KELUARGA_FILE)) {
+      const content = fs.readFileSync(DATA_KELUARGA_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.error('Error reading Data Keluarga file:', err);
+  }
+  return [];
+};
+
+const saveStoredDataKeluarga = (list: any[]) => {
+  try {
+    fs.writeFileSync(DATA_KELUARGA_FILE, JSON.stringify(list, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving Data Keluarga file:', err);
+  }
+};
+
+let dataKeluargaCache: any[] = loadStoredDataKeluarga();
+
 // Accounts Data File (Dynamic accounts & soft-deleted IDs)
 const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
 
@@ -830,11 +856,122 @@ app.post('/api/pbb/clear-all', (_req, res) => {
   }
 });
 
+// ==========================================
+// DATA KELUARGA (KARTU KELUARGA) SERVER BUFFER ENDPOINTS
+// ==========================================
+
+// GET all Data Keluarga from server buffer (~2ms response)
+app.get('/api/data-keluarga', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  return res.json({ success: true, count: dataKeluargaCache.length, data: dataKeluargaCache });
+});
+
+// POST save / update single Data Keluarga record
+app.post('/api/data-keluarga', (req, res) => {
+  try {
+    const { item } = req.body;
+    if (!item || !item.id) {
+      return res.status(400).json({ success: false, message: 'Data Keluarga tidak lengkap' });
+    }
+    const cleanKk = (item.nomorKk || '').replace(/[^0-9]/g, '');
+    const cleanNik = (item.nikKepalaKeluarga || '').replace(/[^0-9]/g, '');
+
+    const index = dataKeluargaCache.findIndex(
+      (x) =>
+        x.id === item.id ||
+        (cleanKk && x.nomorKk && x.nomorKk.replace(/[^0-9]/g, '') === cleanKk) ||
+        (cleanNik && x.nikKepalaKeluarga && x.nikKepalaKeluarga.replace(/[^0-9]/g, '') === cleanNik)
+    );
+
+    if (index >= 0) {
+      dataKeluargaCache[index] = { ...dataKeluargaCache[index], ...item, updatedAt: new Date().toISOString() };
+    } else {
+      dataKeluargaCache.unshift({ ...item, updatedAt: new Date().toISOString() });
+    }
+    saveStoredDataKeluarga(dataKeluargaCache);
+    return res.json({ success: true, data: dataKeluargaCache[index >= 0 ? index : 0], total: dataKeluargaCache.length });
+  } catch (err: any) {
+    console.error('Error saving Data Keluarga to server buffer:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST batch save / update Data Keluarga records
+app.post('/api/data-keluarga/batch', (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ success: false, message: 'items harus berupa array' });
+    }
+
+    const itemMap = new Map<string, any>();
+    dataKeluargaCache.forEach((k) => itemMap.set(k.id, k));
+
+    let updatedCount = 0;
+    const now = new Date().toISOString();
+
+    for (const item of items) {
+      if (!item || !item.id) continue;
+      const cleanKk = (item.nomorKk || '').replace(/[^0-9]/g, '');
+      const cleanNik = (item.nikKepalaKeluarga || '').replace(/[^0-9]/g, '');
+
+      // Check existing in map
+      let targetId = item.id;
+      if (!itemMap.has(targetId)) {
+        for (const [id, existing] of itemMap.entries()) {
+          if (
+            (cleanKk && existing.nomorKk && existing.nomorKk.replace(/[^0-9]/g, '') === cleanKk) ||
+            (cleanNik && existing.nikKepalaKeluarga && existing.nikKepalaKeluarga.replace(/[^0-9]/g, '') === cleanNik)
+          ) {
+            targetId = id;
+            break;
+          }
+        }
+      }
+
+      if (itemMap.has(targetId)) {
+        itemMap.set(targetId, { ...itemMap.get(targetId), ...item, id: targetId, updatedAt: now });
+      } else {
+        itemMap.set(item.id, { ...item, updatedAt: now });
+      }
+      updatedCount++;
+    }
+
+    dataKeluargaCache = Array.from(itemMap.values()).sort((a, b) => {
+      if (a.lingkunganNomor !== b.lingkunganNomor) return (a.lingkunganNomor || 0) - (b.lingkunganNomor || 0);
+      return (a.namaKepalaKeluarga || '').localeCompare(b.namaKepalaKeluarga || '');
+    });
+
+    saveStoredDataKeluarga(dataKeluargaCache);
+    return res.json({ success: true, updatedCount, total: dataKeluargaCache.length, data: dataKeluargaCache });
+  } catch (err: any) {
+    console.error('Error batch saving Data Keluarga to server buffer:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE single Data Keluarga record
+app.delete('/api/data-keluarga/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    dataKeluargaCache = dataKeluargaCache.filter((x) => x.id !== id);
+    saveStoredDataKeluarga(dataKeluargaCache);
+    return res.json({ success: true, message: `Data Keluarga ${id} dihapus dari server buffer` });
+  } catch (err: any) {
+    console.error('Error deleting Data Keluarga from server buffer:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // POST wipe all operational and entry data on server
 app.post('/api/wipe-all-data', (_req, res) => {
   try {
     pbbCache = {};
     saveStoredPbb(pbbCache);
+    dataKeluargaCache = [];
+    saveStoredDataKeluarga(dataKeluargaCache);
     reportsCache = [];
     saveStoredReports(reportsCache);
     attendanceCache = [];
