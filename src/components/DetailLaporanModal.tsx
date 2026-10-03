@@ -47,6 +47,11 @@ import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { safeGetLocalStorage, safeSetLocalStorage } from '../lib/safeStorage';
 import { KunjunganWargaData } from './FormKunjunganWarga';
+import {
+  subscribeKunjunganWarga,
+  isKunjunganOnDate,
+  getLocalKunjunganList,
+} from '../lib/kunjunganService';
 
 interface DetailLaporanModalProps {
   item: LaporanHarianItem | null;
@@ -190,29 +195,13 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   }, [item?.tanggal]);
 
   // Real-time listener for door-to-door visits (Kunjungan Warga)
-  const [kunjunganList, setKunjunganList] = useState<KunjunganWargaData[]>([]);
+  const [kunjunganList, setKunjunganList] = useState<KunjunganWargaData[]>(() => getLocalKunjunganList());
 
   useEffect(() => {
-    if (!db) return;
-    try {
-      const q = query(collection(db, 'kunjungan_warga'), orderBy('createdAt', 'desc'));
-      const unsub = onSnapshot(
-        q,
-        (snapshot) => {
-          const list: KunjunganWargaData[] = [];
-          snapshot.forEach((d) => {
-            list.push({ ...(d.data() as KunjunganWargaData), id: d.id });
-          });
-          setKunjunganList(list);
-        },
-        (err) => {
-          console.warn('Firestore snapshot error on kunjungan_warga in DetailModal:', err);
-        }
-      );
-      return () => unsub();
-    } catch (e) {
-      console.warn('Error subscribing to kunjungan_warga in DetailModal:', e);
-    }
+    const unsub = subscribeKunjunganWarga((list) => {
+      setKunjunganList(list);
+    });
+    return () => unsub();
   }, []);
 
   // Filter Kunjungan Warga that match this specific report (Kepling & Date)
@@ -238,7 +227,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       extractNomorLingkungan(item.keplingId);
     const itemNamaKeplingLower = (item.namaKepling || '').trim().toLowerCase();
 
-    return kunjunganList.filter((k) => {
+    const matched = kunjunganList.filter((k) => {
       const kDate = (k.tanggal || '').trim();
       let kCreatedIso = '';
       if (k.createdAt) {
@@ -248,11 +237,11 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       }
 
       const dateMatch =
-        (isoDateFromRaw && kDate === isoDateFromRaw) ||
-        (isoDateFromCreatedAt && kDate === isoDateFromCreatedAt) ||
-        (isoDateFromRaw && kCreatedIso === isoDateFromRaw) ||
-        (displayTanggal && kDate === displayTanggal) ||
-        kDate === rawDate;
+        (isoDateFromRaw && isKunjunganOnDate(k, isoDateFromRaw)) ||
+        (isoDateFromCreatedAt && isKunjunganOnDate(k, isoDateFromCreatedAt)) ||
+        (displayTanggal && isKunjunganOnDate(k, displayTanggal)) ||
+        (kDate && (kDate === rawDate || kDate === isoDateFromRaw)) ||
+        (kCreatedIso && kCreatedIso === isoDateFromRaw);
 
       if (!dateMatch) return false;
 
@@ -266,6 +255,40 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
       return false;
     });
+
+    // Fallback synthesize from report perlinsos jika belum ada kunjungan mandiri
+    if (matched.length === 0 && item.kinerja) {
+      const kin = item.kinerja;
+      const count = parseInt(kin.perlinsosKk || '0', 10);
+      const countMenolak = parseInt(kin.perlinsosMenolakKk || '0', 10);
+      if (count > 0 || countMenolak > 0 || (kin.perlinsosKeterangan && kin.perlinsosKeterangan !== 'Pendataan Perlinsos')) {
+        const repFoto = (item.dokumentasiFoto || []).find((f) =>
+          f?.kategori === 'perlinsos' ||
+          (f?.name && (f.name.toLowerCase().includes('perlinsos') || f.name.toLowerCase().includes('kunjungan')))
+        )?.url || (item.dokumentasiFoto?.[0]?.url || '');
+
+        return [
+          {
+            id: `rep_kunj_${item.id || 'current'}`,
+            tanggal: item.tanggal || isoDateFromCreatedAt || new Date().toISOString().split('T')[0],
+            namaWarga: kin.perlinsosKeterangan ? kin.perlinsosKeterangan.replace(/Kunjungan\s*(warga)?\s*[:,-]?\s*/i, '').split(',')[0].trim() || `Warga Lingkungan ${targetNomor || ''}` : `Warga Lingkungan ${targetNomor || ''}`,
+            alamat: `Wilayah Lingkungan ${targetNomor || ''}, Kelurahan Mangga`,
+            lingkungan: (item as any).lingkungan || (targetNomor ? `Lingkungan ${targetNomor}` : 'Lingkungan'),
+            lingkunganNomor: targetNomor || 1,
+            namaKepling: item.namaKepling || 'Kepala Lingkungan',
+            keplingId: item.keplingId || `kepling_${targetNomor || 1}`,
+            perlinsos: count > 0 ? 'Sudah' : 'Menolak',
+            ikd: parseInt(kin.ikdOrang || '0', 10) > 0 ? 'Sudah' : 'Belum',
+            pbb: parseInt(kin.opsirPbbWp || '0', 10) > 0 ? 'Sudah' : 'Belum',
+            keterangan: kin.perlinsosKeterangan || 'Kunjungan dan Sambang Warga Lapangan',
+            fotoDokumentasi: repFoto,
+            createdAt: item.createdAt || new Date().toISOString(),
+          } as KunjunganWargaData,
+        ];
+      }
+    }
+
+    return matched;
   }, [kunjunganList, item, displayTanggal]);
 
   // Total capaian kunjungan harian door-to-door

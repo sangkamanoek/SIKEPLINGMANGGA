@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import ViewImagesPage from './components/ViewImagesPage';
 import { KunjunganHarianView } from './components/KunjunganHarianView';
+import { subscribeKunjunganWarga } from './lib/kunjunganService';
 import { RealisasiPembangunanView } from './components/RealisasiPembangunanView';
 import { syncInfraReportToPembangunan } from './lib/pembangunanService';
 import { GoogleUser, SheetMetadata, LaporanHarianItem, UserAccount, TargetsCapaianMap, isKelurahanAdmin } from './types';
@@ -522,50 +523,12 @@ export default function App() {
       }
     });
 
-    // Subscribe to real-time kunjungan_warga directly from Firebase Firestore
-    let unsubscribeKunjungan: (() => void) | null = null;
-    if (db) {
-      try {
-        const qKunjungan = query(collection(db, 'kunjungan_warga'), orderBy('createdAt', 'desc'));
-        unsubscribeKunjungan = onSnapshot(
-          qKunjungan,
-          (snapshot) => {
-            const firestoreItems: any[] = [];
-            snapshot.forEach((doc) => {
-              firestoreItems.push({ id: doc.id, ...doc.data() });
-            });
-            if (firestoreItems.length > 0) {
-              setKunjunganList(firestoreItems);
-              try {
-                safeSetLocalStorage('sikepling_kunjungan_harian_list_v1', JSON.stringify(firestoreItems));
-              } catch {}
-            }
-          },
-          (err) => {
-            console.warn('Firestore snapshot error on kunjungan_warga in App:', err);
-          }
-        );
-      } catch (err) {
-        console.warn('Error subscribing kunjungan_warga in App:', err);
+    // Ultra-fast Dual-Tier Real-time Listener & Server Sync untuk Kunjungan Warga
+    const unsubscribeKunjungan = subscribeKunjunganWarga((items) => {
+      if (Array.isArray(items)) {
+        setKunjunganList(items);
       }
-    }
-
-    // Single lightweight fetch for kunjungan as fast fallback
-    fetch(`/api/kunjungan?light=true&_t=${Date.now()}`, { cache: 'no-store' })
-      .then((res) => res.json())
-      .then((json) => {
-        if (Array.isArray(json?.data) && json.data.length > 0) {
-          setKunjunganList((prev) => {
-            const map = new Map<string, any>();
-            json.data.forEach((k: any) => map.set(k.id, k));
-            prev.forEach((k: any) => {
-              if (!map.has(k.id)) map.set(k.id, k);
-            });
-            return Array.from(map.values());
-          });
-        }
-      })
-      .catch(() => {});
+    });
 
     const pollNotifications = setInterval(() => {
       if (typeof window === 'undefined' || !('Notification' in window)) return;
@@ -1863,6 +1826,7 @@ export default function App() {
           <ErrorBoundary fallbackTitle="Gagal Memuat Kunjungan Harian">
             <KunjunganHarianView
               currentUser={activeAccount}
+              reports={reports}
               onNavigateToForm={() => setActiveTab('form')}
             />
           </ErrorBoundary>

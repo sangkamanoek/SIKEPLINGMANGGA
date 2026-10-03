@@ -17,43 +17,48 @@ import {
   Send,
   Archive,
   Image as ImageIcon,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
-import { UserAccount, isKelurahanAdmin } from '../types';
+import { UserAccount, isKelurahanAdmin, LaporanHarianItem } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { FormKunjunganWarga, KunjunganWargaData } from './FormKunjunganWarga';
-import { db } from '../lib/firebase';
-import {
-  collection,
-  query,
-  orderBy,
-  onSnapshot,
-  deleteDoc,
-  doc,
-} from 'firebase/firestore';
 import { downloadImage, downloadMultipleImages } from '../lib/imageDownloader';
 import { exportKunjunganWargaToExcel, exportKunjunganWargaZipPackage } from '../lib/excelExport';
 import { safeGetLocalStorage, safeSetLocalStorage } from '../lib/safeStorage';
-
-const STORAGE_CACHE_KEY = 'sikepling_kunjungan_harian_list_v1';
+import { getReportIsoDate, isReportMatchingDate, getTodayLocalIso, extractNomorLingkungan } from '../lib/formatter';
+import {
+  subscribeKunjunganWarga,
+  deleteKunjunganWarga,
+  consolidateKunjunganWithReports,
+  isKunjunganOnDate,
+  getKunjunganIsoDate,
+  KUNJUNGAN_STORAGE_KEY,
+} from '../lib/kunjunganService';
 
 interface KunjunganHarianViewProps {
   currentUser: UserAccount;
+  reports?: LaporanHarianItem[];
   onNavigateToForm?: () => void;
 }
 
 export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   currentUser,
+  reports = [],
 }) => {
   const isAdmin = isKelurahanAdmin(currentUser.role);
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => getTodayLocalIso(), []);
 
-  const [records, setRecords] = useState<KunjunganWargaData[]>([]);
+  // 1. Instant 0ms Load from Local Cache
+  const [records, setRecords] = useState<KunjunganWargaData[]>(() => {
+    return safeGetLocalStorage<KunjunganWargaData[]>(KUNJUNGAN_STORAGE_KEY, []);
+  });
   const [dateFilterMode, setDateFilterMode] = useState<'SINGLE' | 'RANGE' | 'ALL'>('SINGLE');
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [startDate, setStartDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7);
-    return d.toISOString().split('T')[0];
+    return getTodayLocalIso(d);
   });
   const [endDate, setEndDate] = useState<string>(todayStr);
   const [selectedLingkungan, setSelectedLingkungan] = useState<string>('ALL');
@@ -65,6 +70,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const [isExportingZip, setIsExportingZip] = useState<boolean>(false);
   const [zipProgress, setZipProgress] = useState<{ current: number; total: number } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   // Label tampilan tanggal/periode terpilih untuk Laporan/WA/Print/Excel
   const dateDisplayLabel = useMemo(() => {
@@ -98,72 +104,50 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // Online Fetch from Server Buffer & Real-time listener dari Firestore
+  // Online Fetch from Server Buffer & Real-time listener dari Firestore & Cross-tab Broadcast
   useEffect(() => {
-    // 1. Fetch from Server API buffer
-    fetch(`/api/kunjungan?_t=${Date.now()}`, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
-      },
-    })
-      .then((res) => res.json())
-      .then((json) => {
-        if (Array.isArray(json?.data) && json.data.length > 0) {
+    const unsubscribe = subscribeKunjunganWarga((newList) => {
+      setRecords(newList);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  const refreshKunjunganData = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await fetch(`/api/kunjungan?_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json?.data)) {
           setRecords((prev) => {
             const map = new Map<string, KunjunganWargaData>();
             json.data.forEach((k: KunjunganWargaData) => map.set(k.id, k));
             prev.forEach((k) => {
               if (!map.has(k.id)) map.set(k.id, k);
             });
-            return Array.from(map.values());
+            const merged = Array.from(map.values());
+            safeSetLocalStorage(KUNJUNGAN_STORAGE_KEY, JSON.stringify(merged));
+            return merged;
           });
+          showToast('Data kunjungan warga berhasil diperbarui.');
         }
-      })
-      .catch((err) => console.warn('Notice loading kunjungan from server:', err));
-
-    // 2. Real-time listener from Firestore
-    if (!db) return;
-
-    try {
-      const q = query(collection(db, 'kunjungan_warga'), orderBy('createdAt', 'desc'));
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const map = new Map<string, KunjunganWargaData>();
-          snapshot.forEach((d) => {
-            const data = d.data() as KunjunganWargaData;
-            if (data && data.id && !map.has(data.id)) {
-              map.set(data.id, data);
-            }
-          });
-          const list = Array.from(map.values());
-          setRecords(list);
-        },
-        (err) => {
-          console.warn('Firestore snapshot error on kunjungan_warga:', err);
-        }
-      );
-      return () => unsubscribe();
-    } catch (e) {
-      console.warn('Error subscribing to kunjungan_warga:', e);
+      }
+    } catch (err) {
+      console.warn('Notice refreshing kunjungan:', err);
+    } finally {
+      setIsRefreshing(false);
     }
-  }, []);
+  }, [showToast]);
 
   const handleDelete = async (id: string, namaWarga: string) => {
     if (!window.confirm(`Hapus catatan kunjungan ke ${namaWarga}?`)) return;
     try {
-      // 1. Delete on Server Buffer
-      fetch(`/api/kunjungan/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch((err) => {
-        console.warn('Notice deleting kunjungan from server:', err);
-      });
-
-      // 2. Delete on Firestore
-      if (db) {
-        await deleteDoc(doc(db, 'kunjungan_warga', id));
-      }
-
+      await deleteKunjunganWarga(id);
       setRecords((prev) => prev.filter((r) => r.id !== id));
       showToast(`Catatan kunjungan ke ${namaWarga} berhasil dihapus.`);
     } catch (e) {
@@ -171,40 +155,68 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     }
   };
 
+  // 🛡️ Gabungkan data kunjungan mandiri dengan data kunjungan yang diinput melalui Laporan Kinerja
+  const combinedRecords = useMemo(() => {
+    return consolidateKunjunganWithReports(records, reports);
+  }, [records, reports]);
+
   // Filter records
   const filtered = useMemo(() => {
     const qLower = searchQuery.toLowerCase().trim();
-    return records.filter((r) => {
+    return combinedRecords.filter((r) => {
       let isDate = true;
+      const rIso = getKunjunganIsoDate(r);
+
       if (dateFilterMode === 'SINGLE') {
-        isDate = !selectedDate || r.tanggal === selectedDate;
+        if (selectedDate) {
+          isDate = isKunjunganOnDate(r, selectedDate);
+        } else {
+          isDate = true;
+        }
       } else if (dateFilterMode === 'RANGE') {
         if (startDate && endDate) {
-          isDate = r.tanggal >= startDate && r.tanggal <= endDate;
+          isDate = (rIso >= startDate && rIso <= endDate) || (r.tanggal >= startDate && r.tanggal <= endDate);
         } else if (startDate) {
-          isDate = r.tanggal >= startDate;
+          isDate = rIso >= startDate || r.tanggal >= startDate;
         } else if (endDate) {
-          isDate = r.tanggal <= endDate;
+          isDate = rIso <= endDate || r.tanggal <= endDate;
         }
       } else if (dateFilterMode === 'ALL') {
         isDate = true;
       }
 
+      const rLingkunganNum =
+        r.lingkunganNomor ||
+        extractNomorLingkungan(r.lingkungan) ||
+        extractNomorLingkungan(r.keplingId);
+
       const isLingkungan =
         selectedLingkungan === 'ALL' ||
+        (rLingkunganNum !== null && Number(selectedLingkungan) === rLingkunganNum) ||
         r.lingkunganNomor === Number(selectedLingkungan) ||
-        r.keplingId === selectedLingkungan;
-      const isRole = isAdmin || r.keplingId === currentUser.id;
+        r.keplingId === selectedLingkungan ||
+        r.keplingId === `kepling_${selectedLingkungan}` ||
+        (r.lingkungan && (r.lingkungan.toLowerCase().includes(selectedLingkungan.toLowerCase()) || r.lingkungan.includes(String(selectedLingkungan))));
+
+      const isRole =
+        isAdmin ||
+        r.keplingId === currentUser.id ||
+        (rLingkunganNum !== null && currentUser.nomorLingkungan && rLingkunganNum === currentUser.nomorLingkungan) ||
+        r.lingkunganNomor === currentUser.nomorLingkungan ||
+        (r.namaKepling && currentUser.nama && r.namaKepling.trim().toLowerCase() === currentUser.nama.trim().toLowerCase());
+
       const isSearch =
         !qLower ||
-        r.namaWarga.toLowerCase().includes(qLower) ||
-        r.alamat.toLowerCase().includes(qLower) ||
-        r.lingkungan.toLowerCase().includes(qLower) ||
-        r.namaKepling.toLowerCase().includes(qLower);
+        (r.namaWarga && r.namaWarga.toLowerCase().includes(qLower)) ||
+        (r.alamat && r.alamat.toLowerCase().includes(qLower)) ||
+        (r.lingkungan && r.lingkungan.toLowerCase().includes(qLower)) ||
+        (r.namaKepling && r.namaKepling.toLowerCase().includes(qLower)) ||
+        (r.keterangan && r.keterangan.toLowerCase().includes(qLower));
+
       return isDate && isLingkungan && isRole && isSearch;
     });
   }, [
-    records,
+    combinedRecords,
     dateFilterMode,
     selectedDate,
     startDate,
@@ -213,6 +225,8 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     searchQuery,
     isAdmin,
     currentUser.id,
+    currentUser.nomorLingkungan,
+    currentUser.nama,
   ]);
 
   const photosCount = useMemo(

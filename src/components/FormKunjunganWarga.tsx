@@ -13,6 +13,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { sanitizeText, safeSetLocalStorage, safeGetLocalStorage } from '../lib/safeStorage';
+import { saveKunjunganWargaToFirestore } from '../lib/kunjunganService';
 
 export type KeteranganKunjunganType = 'Sudah' | 'Belum' | 'Menolak';
 
@@ -263,20 +264,8 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
     }
 
     try {
-      // 1. Cloud Firestore Persistence
-      if (db) {
-        const docRef = doc(db, 'kunjungan_warga', id);
-        await setDoc(docRef, firestorePayload);
-      }
-
-      // 2. Server API Buffer Persistence
-      fetch('/api/kunjungan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item: firestorePayload }),
-      }).catch((err) => {
-        console.warn('Notice saving kunjungan to /api/kunjungan:', err);
-      });
+      // 1. Dual-tier saving & broadcasting (0ms local + Server Buffer + Firestore)
+      await saveKunjunganWargaToFirestore(data);
 
       setSuccessMessage('Data kunjungan warga berhasil disimpan secara online!');
 

@@ -41,6 +41,7 @@ import {
   getReportIsoDate,
   isReportMatchingKepling,
   extractNomorLingkungan,
+  isKunjunganMatchingKepling,
   NAMA_BULAN,
 } from '../lib/formatter';
 import {
@@ -50,6 +51,10 @@ import {
 import { printOfficialDocument } from '../utils/printHelper';
 import { KopSuratResmi } from './KopSuratResmi';
 import { FormKunjunganWarga, KunjunganWargaData } from './FormKunjunganWarga';
+import {
+  consolidateKunjunganWithReports,
+  isKunjunganOnDate,
+} from '../lib/kunjunganService';
 
 interface RangkumanLaporanKelurahanProps {
   reports: LaporanHarianItem[];
@@ -190,6 +195,11 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     }
   }, [selectedDate]);
 
+  // 🛡️ Gabungkan data kunjungan mandiri dengan laporan kinerja agar tidak ada data kunjungan yang tertinggal
+  const effectiveKunjunganList = useMemo(() => {
+    return consolidateKunjunganWithReports(kunjunganList, reports);
+  }, [kunjunganList, reports]);
+
   // Statistik Terpadu Mingguan (Apel, Laporan, Kunjungan, & Sektoral)
   const weeklyStats = useMemo(() => {
     if (!weekInfo.days || weekInfo.days.length === 0) {
@@ -205,13 +215,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       // Laporan pada hari ini
       const dayReports = reports.filter((r) => isReportMatchingDate(r, day.dateStr));
       // Kunjungan pada hari ini
-      const dayKunjungan = (kunjunganList || []).filter(
-        (k) =>
-          k &&
-          (isAttendanceMatchingDate(k, day.dateStr) ||
-            k.tanggal === day.dateStr ||
-            (k.createdAt && k.createdAt.startsWith(day.dateStr)))
-      );
+      const dayKunjungan = (effectiveKunjunganList || []).filter((k) => isKunjunganOnDate(k, day.dateStr));
 
       // Hitung apel hadir (termasuk fallback dari laporan harian)
       let hadirApelCount = 0;
@@ -313,23 +317,11 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       const persenLaporan = Math.min(100, Math.round((totalLaporan / 5) * 100));
 
       // Kunjungan warga kepling ini dalam sepekan
-      const keplingWeekKunjungan = (kunjunganList || []).filter((k) => {
+      const keplingWeekKunjungan = (effectiveKunjunganList || []).filter((k) => {
         if (!k) return false;
-        const inDate = allWeekDates.some(
-          (d) =>
-            isAttendanceMatchingDate(k, d) ||
-            k.tanggal === d ||
-            (k.createdAt && k.createdAt.startsWith(d))
-        );
+        const inDate = allWeekDates.some((d) => isKunjunganOnDate(k, d));
         if (!inDate) return false;
-        if (k.keplingId && kepling.id && k.keplingId.toLowerCase() === kepling.id.toLowerCase()) return true;
-        if (k.lingkunganNomor && nomor > 0 && Number(k.lingkunganNomor) === nomor) return true;
-        if (k.lingkungan) {
-          const lNum = extractNomorLingkungan(k.lingkungan);
-          if (lNum !== null && nomor > 0 && lNum === nomor) return true;
-        }
-        if (k.namaKepling && kepling.nama && k.namaKepling.trim().toLowerCase() === kepling.nama.trim().toLowerCase()) return true;
-        return false;
+        return isKunjunganMatchingKepling(k, kepling);
       });
 
       // Akumulasi indikator sektoral sepekan
@@ -459,13 +451,8 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
 
   // 3. Filter Kunjungan Warga pada selectedDate
   const kunjunganOnDate = useMemo(() => {
-    return (kunjunganList || []).filter((k) => {
-      if (!k) return false;
-      if (k.tanggal === selectedDate) return true;
-      if (k.createdAt && k.createdAt.startsWith(selectedDate)) return true;
-      return false;
-    });
-  }, [kunjunganList, selectedDate]);
+    return (effectiveKunjunganList || []).filter((k) => isKunjunganOnDate(k, selectedDate));
+  }, [effectiveKunjunganList, selectedDate]);
 
   // Konsolidasi Data per Kepling (1 sampai 24)
   const consolidatedKeplingData = useMemo(() => {
@@ -501,18 +488,33 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       }
 
       // Cari Kunjungan Warga
-      const kunjungan = kunjunganOnDate.filter((k) => {
-        if (!k) return false;
-        if (k.keplingId && kepling.id && k.keplingId.toLowerCase() === kepling.id.toLowerCase()) return true;
-        if (k.lingkunganNomor && nomor > 0 && Number(k.lingkunganNomor) === nomor) return true;
-        if (k.lingkungan) {
-          const lNum = extractNomorLingkungan(k.lingkungan);
-          if (lNum !== null && nomor > 0 && lNum === nomor) return true;
-          if (k.lingkungan.trim().toLowerCase() === kepling.lingkungan.trim().toLowerCase()) return true;
+      let kunjungan = kunjunganOnDate.filter((k) => isKunjunganMatchingKepling(k, kepling));
+
+      // 🛡️ FALLBACK KUNJUNGAN: Jika belum ada entri kunjungan mandiri tetapi ada laporan kinerja dengan kunjungan/perlinsos
+      if (kunjungan.length === 0 && laporan?.kinerja) {
+        const kin = laporan.kinerja;
+        const count = parseInt(kin.perlinsosKk || '0', 10);
+        const countMenolak = parseInt(kin.perlinsosMenolakKk || '0', 10);
+        if (count > 0 || countMenolak > 0 || (kin.perlinsosKeterangan && kin.perlinsosKeterangan !== 'Pendataan Perlinsos')) {
+          kunjungan = [
+            {
+              id: `synced_kunj_${kepling.id}_${selectedDate}`,
+              tanggal: selectedDate,
+              namaWarga: kin.perlinsosKeterangan ? kin.perlinsosKeterangan.replace(/Kunjungan\s*(warga)?\s*[:,-]?\s*/i, '').split(',')[0].trim() || `Warga ${kepling.lingkungan}` : `Warga ${kepling.lingkungan}`,
+              alamat: `Wilayah ${kepling.lingkungan}`,
+              lingkungan: kepling.lingkungan,
+              lingkunganNomor: nomor,
+              namaKepling: kepling.nama,
+              keplingId: kepling.id,
+              perlinsos: count > 0 ? 'Sudah' : 'Menolak',
+              ikd: parseInt(kin.ikdOrang || '0', 10) > 0 ? 'Sudah' : 'Belum',
+              pbb: parseInt(kin.opsirPbbWp || '0', 10) > 0 ? 'Sudah' : 'Belum',
+              keterangan: kin.perlinsosKeterangan || 'Kunjungan Sambang Warga',
+              createdAt: laporan.createdAt || new Date().toISOString(),
+            } as any,
+          ];
         }
-        if (k.namaKepling && kepling.nama && k.namaKepling.trim().toLowerCase() === kepling.nama.trim().toLowerCase()) return true;
-        return false;
-      });
+      }
 
       const statusLower = (absen?.status || '').toLowerCase().trim();
       const isApelHadir = Boolean(absen && (statusLower === 'hadir' || statusLower.includes('hadir')));

@@ -582,10 +582,10 @@ app.post('/api/accounts/restore', (req, res) => {
 app.get('/api/kunjungan', (req, res) => {
   if (req.query.light === 'true') {
     const lightKunjungan = kunjunganCache.map((k) => {
-      const { fotoRumah, ...rest } = k;
+      const { fotoDokumentasi, fotoRumah, ...rest } = k;
       return {
         ...rest,
-        hasFoto: Boolean(fotoRumah),
+        hasFoto: Boolean(fotoDokumentasi || fotoRumah),
       };
     });
     return res.json({
@@ -604,7 +604,9 @@ app.get('/api/kunjungan', (req, res) => {
 // POST save single or batch kunjungan records
 app.post('/api/kunjungan', (req, res) => {
   try {
-    const { item, items } = req.body;
+    const rawBody = req.body;
+    const items = rawBody?.items || (Array.isArray(rawBody) ? rawBody : null);
+    const item = rawBody?.item || (!items && rawBody?.namaWarga ? rawBody : null);
 
     // Batch save
     if (Array.isArray(items)) {
