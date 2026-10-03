@@ -40,6 +40,13 @@ import {
   ArrowRight,
   CheckCircle,
   Sparkles,
+  CheckSquare,
+  Square,
+  SlidersHorizontal,
+  ArrowLeftRight,
+  Shuffle,
+  Zap,
+  CheckCheck,
 } from 'lucide-react';
 import {
   DataKeluarga,
@@ -60,6 +67,8 @@ import {
   parseDataKeluargaFile,
   parseDataKeluargaText,
   batchSaveDataKeluarga,
+  batchUpdateLingkunganDataKeluarga,
+  normalizeStreetName,
   maskNik,
   ImportParsedResult,
 } from '../lib/dataKeluargaService';
@@ -125,11 +134,32 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
   const [isImporting, setIsImporting] = useState<boolean>(false);
   const [importProgress, setImportProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
 
-  // Bulk Move State
-  const [bulkMoveStreet, setBulkMoveStreet] = useState<string>('');
-  const [bulkMoveTargetLkid, setBulkMoveTargetLkid] = useState<string>('');
-  const [isBulkMoving, setIsBulkMoving] = useState<boolean>(false);
-  const [bulkMoveResults, setBulkMoveResults] = useState<{ success: number; total: number } | null>(null);
+  // Tab 1: Multi-Select Table State
+  const [selectedTableKkIds, setSelectedTableKkIds] = useState<Set<string>>(new Set());
+  const [tableTargetLkId, setTableTargetLkId] = useState<string>('kepling_23');
+
+  // Tab 4: Sub-Mode & Comprehensive Move State
+  const [moveSubMode, setMoveSubMode] = useState<'by_street' | 'by_source_lk' | 'by_pbb_sync'>('by_street');
+
+  // Mode 1: By Street / Keyword
+  const [streetSearchKeyword, setStreetSearchKeyword] = useState<string>('');
+  const [streetSourceLkFilter, setStreetSourceLkFilter] = useState<string>('all');
+  const [streetTargetLkId, setStreetTargetLkId] = useState<string>('kepling_23');
+  const [selectedStreetKkIds, setSelectedStreetKkIds] = useState<Set<string>>(new Set());
+
+  // Mode 2: By Source Lingkungan
+  const [sourceLkId, setSourceLkId] = useState<string>('kepling_1');
+  const [sourceLkStreetFilter, setSourceLkStreetFilter] = useState<string>('');
+  const [sourceTargetLkId, setSourceTargetLkId] = useState<string>('kepling_23');
+  const [selectedSourceKkIds, setSelectedSourceKkIds] = useState<Set<string>>(new Set());
+
+  // Mode 3: By PBB Auto-Sync
+  const [selectedPbbSyncIds, setSelectedPbbSyncIds] = useState<Set<string>>(new Set());
+
+  // Common Bulk Execution State
+  const [isBulkExecuting, setIsBulkExecuting] = useState<boolean>(false);
+  const [bulkExecuteProgress, setBulkExecuteProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  const [bulkExecuteMessage, setBulkExecuteMessage] = useState<string | null>(null);
 
   // Real-time Firestore subscription
   useEffect(() => {
@@ -540,6 +570,172 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     }
   };
 
+  // Mismatch & Smart Recommendations Engine
+  const mismatchedList = useMemo(() => {
+    const result: Array<{
+      kk: DataKeluarga;
+      currentLkNomor: number;
+      currentLkNama: string;
+      recommendedLkId: string;
+      recommendedLkNomor: number;
+      recommendedLkNama: string;
+      reason: 'NOP_PBB' | 'STREET_CLUSTER';
+      detail: string;
+    }> = [];
+
+    // Map of clean NOP to SPPT
+    const nopMap = new Map<string, SpptPbbItem>();
+    spptList.forEach((s) => {
+      if (s.nop) {
+        const clean = s.nop.replace(/[^0-9]/g, '');
+        if (clean) nopMap.set(clean, s);
+      }
+    });
+
+    // Calculate street consensus from dataList and spptList
+    const streetToLkCount: Record<string, Record<number, number>> = {};
+    
+    // From spptList
+    spptList.forEach((s) => {
+      if (s.alamatOp && s.lingkungan) {
+        const norm = normalizeStreetName(s.alamatOp);
+        if (norm) {
+          if (!streetToLkCount[norm]) streetToLkCount[norm] = {};
+          streetToLkCount[norm][s.lingkungan] = (streetToLkCount[norm][s.lingkungan] || 0) + 1;
+        }
+      }
+    });
+
+    // From dataList
+    dataList.forEach((k) => {
+      if (k.namaJalan && k.lingkunganNomor) {
+        const norm = normalizeStreetName(k.namaJalan);
+        if (norm) {
+          if (!streetToLkCount[norm]) streetToLkCount[norm] = {};
+          streetToLkCount[norm][k.lingkunganNomor] = (streetToLkCount[norm][k.lingkunganNomor] || 0) + 1;
+        }
+      }
+    });
+
+    const streetConsensusMap = new Map<string, { lkNomor: number; count: number }>();
+    Object.entries(streetToLkCount).forEach(([street, counts]) => {
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      if (sorted.length > 0 && sorted[0][1] >= 2) {
+        streetConsensusMap.set(street, { lkNomor: Number(sorted[0][0]), count: sorted[0][1] });
+      }
+    });
+
+    for (const kk of dataList) {
+      const currentLkNomor = kk.lingkunganNomor || 0;
+
+      // 1. Check NOP PBB Match
+      if (kk.nopPbb) {
+        const clean = kk.nopPbb.replace(/[^0-9]/g, '');
+        const match = nopMap.get(clean);
+        if (match && match.lingkungan && match.lingkungan !== currentLkNomor) {
+          const targetAccount = KEPLING_ACCOUNTS.find((a) => a.nomorLingkungan === match.lingkungan);
+          if (targetAccount) {
+            result.push({
+              kk,
+              currentLkNomor,
+              currentLkNama: kk.lingkunganNama || `Lingkungan ${currentLkNomor}`,
+              recommendedLkId: targetAccount.id,
+              recommendedLkNomor: match.lingkungan,
+              recommendedLkNama: targetAccount.lingkungan,
+              reason: 'NOP_PBB',
+              detail: `NOP PBB: ${kk.nopPbb} terdata di ${targetAccount.lingkungan}`,
+            });
+            continue;
+          }
+        }
+      }
+
+      // 2. Check Street Consensus Match
+      if (kk.namaJalan) {
+        const norm = normalizeStreetName(kk.namaJalan);
+        const consensus = streetConsensusMap.get(norm);
+        if (consensus && consensus.lkNomor !== currentLkNomor) {
+          const targetAccount = KEPLING_ACCOUNTS.find((a) => a.nomorLingkungan === consensus.lkNomor);
+          if (targetAccount) {
+            result.push({
+              kk,
+              currentLkNomor,
+              currentLkNama: kk.lingkunganNama || `Lingkungan ${currentLkNomor}`,
+              recommendedLkId: targetAccount.id,
+              recommendedLkNomor: consensus.lkNomor,
+              recommendedLkNama: targetAccount.lingkungan,
+              reason: 'STREET_CLUSTER',
+              detail: `${norm} mayoritas berada di ${targetAccount.lingkungan} (${consensus.count} data)`,
+            });
+          }
+        }
+      }
+    }
+
+    return result;
+  }, [dataList, spptList]);
+
+  // Fast lookup map of KK ID to Mismatch recommendation
+  const mismatchMap = useMemo(() => {
+    const map = new Map<string, typeof mismatchedList[0]>();
+    mismatchedList.forEach((m) => map.set(m.kk.id, m));
+    return map;
+  }, [mismatchedList]);
+
+  // Execute Batch Move
+  const executeBatchMove = async (
+    itemsToMove: { id: string; targetLkId: string }[],
+    actionLabel: string
+  ) => {
+    if (itemsToMove.length === 0) {
+      if (onShowToast) onShowToast('Tidak ada data yang dipilih untuk dipindahkan.', 'info');
+      return;
+    }
+
+    setIsBulkExecuting(true);
+    setBulkExecuteProgress({ done: 0, total: itemsToMove.length });
+    setBulkExecuteMessage(`Memindahkan ${itemsToMove.length} data keluarga...`);
+
+    try {
+      const payload = itemsToMove.map((item) => {
+        const targetAcc = KEPLING_ACCOUNTS.find((a) => a.id === item.targetLkId);
+        return {
+          id: item.id,
+          lingkunganId: item.targetLkId,
+          lingkunganNomor: targetAcc?.nomorLingkungan || 0,
+          lingkunganNama: targetAcc?.lingkungan || '',
+        };
+      });
+
+      const result = await batchUpdateLingkunganDataKeluarga(payload, (saved, total) => {
+        setBulkExecuteProgress({ done: saved, total });
+      });
+
+      if (onShowToast) {
+        onShowToast(
+          `Berhasil memindahkan ${result.successCount} Kartu Keluarga!`,
+          'success'
+        );
+      }
+      setBulkExecuteMessage(`Selesai! ${result.successCount} KK berhasil dipindahkan.`);
+      // Clear selection
+      setSelectedTableKkIds(new Set());
+      setSelectedSourceKkIds(new Set());
+      setSelectedPbbSyncIds(new Set());
+      setSelectedStreetKkIds(new Set());
+    } catch (err: any) {
+      console.error('Error executing batch move:', err);
+      if (onShowToast) onShowToast('Gagal memindahkan data: ' + err.message, 'error');
+    } finally {
+      setIsBulkExecuting(false);
+    }
+  };
+
+  // Quick single-item fix
+  const handleQuickFixSingle = async (kkId: string, targetLkId: string) => {
+    await executeBatchMove([{ id: kkId, targetLkId }], 'Koreksi 1 KK');
+  };
+
   // Automated Lingkungan Assignment based on PBB or Street
   const getAutoLingkungan = (item: Partial<DataKeluarga>) => {
     // 1. Try NOP PBB Match
@@ -583,56 +779,6 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     }
 
     return null;
-  };
-
-  // Bulk Move Execution
-  const handleBulkMove = async () => {
-    if (!bulkMoveStreet || !bulkMoveTargetLkid) {
-      if (onShowToast) onShowToast('Silakan pilih jalan dan lingkungan tujuan.', 'error');
-      return;
-    }
-
-    const targetAccount = KEPLING_ACCOUNTS.find(a => a.id === bulkMoveTargetLkid);
-    if (!targetAccount) return;
-
-    const familiesToMove = dataList.filter(k => 
-      k.namaJalan?.toUpperCase() === bulkMoveStreet.toUpperCase() && 
-      k.lingkunganId !== bulkMoveTargetLkid
-    );
-
-    if (familiesToMove.length === 0) {
-      if (onShowToast) onShowToast(`Tidak ada keluarga di ${bulkMoveStreet} yang perlu dipindahkan ke ${targetAccount.lingkungan}.`, 'info');
-      return;
-    }
-
-    if (!window.confirm(`Pindahkan ${familiesToMove.length} keluarga di ${bulkMoveStreet} ke ${targetAccount.lingkungan}?`)) return;
-
-    setIsBulkMoving(true);
-    setBulkMoveResults(null);
-    let successCount = 0;
-
-    try {
-      // In a real app, we might use a server-side batch update. 
-      // Here we use the existing batchSaveDataKeluarga to be safe and consistent with our IndexedDB/Firestore sync.
-      const updatedFamilies = familiesToMove.map(f => ({
-        ...f,
-        lingkunganId: targetAccount.id,
-        lingkunganNomor: targetAccount.nomorLingkungan || 0,
-        lingkunganNama: targetAccount.lingkungan,
-        updatedAt: new Date().toISOString()
-      }));
-
-      const { successCount: resSuccess } = await batchSaveDataKeluarga(updatedFamilies);
-      successCount = resSuccess;
-
-      setBulkMoveResults({ success: successCount, total: familiesToMove.length });
-      if (onShowToast) onShowToast(`Berhasil memindahkan ${successCount} keluarga.`, 'success');
-    } catch (err: any) {
-      console.error('Error in bulk move:', err);
-      if (onShowToast) onShowToast('Gagal memindahkan data: ' + err.message, 'error');
-    } finally {
-      setIsBulkMoving(false);
-    }
   };
 
   // Unique streets for bulk move dropdown
@@ -909,11 +1055,33 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
       </div>
 
       {/* Main Table Database Data Keluarga */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/80 text-[11px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                {isAdmin && (
+                  <th className="py-3 px-3 text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={
+                        paginatedKkList.length > 0 &&
+                        paginatedKkList.every((k) => selectedTableKkIds.has(k.id))
+                      }
+                      onChange={(e) => {
+                        const newSet = new Set(selectedTableKkIds);
+                        if (e.target.checked) {
+                          paginatedKkList.forEach((k) => newSet.add(k.id));
+                        } else {
+                          paginatedKkList.forEach((k) => newSet.delete(k.id));
+                        }
+                        setSelectedTableKkIds(newSet);
+                      }}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                      title="Pilih Semua di Halaman Ini"
+                    />
+                  </th>
+                )}
                 <th className="py-3 px-4 text-center w-12">No</th>
                 <th className="py-3 px-4">Kartu Keluarga (KK)</th>
                 <th className="py-3 px-4">Kepala Keluarga</th>
@@ -928,14 +1096,14 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
             <tbody className="divide-y divide-slate-100 text-xs">
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={isAdmin ? 10 : 9} className="py-12 text-center text-slate-400 font-medium">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
                     <span>Memuat database data keluarga dari Firestore...</span>
                   </td>
                 </tr>
               ) : filteredList.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={isAdmin ? 10 : 9} className="py-12 text-center text-slate-400 font-medium">
                     Belum ada data keluarga yang sesuai dengan filter pencarian.
                   </td>
                 </tr>
@@ -946,15 +1114,37 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                     item.desilKesejahteraan?.includes('Desil 1') ||
                     item.desilKesejahteraan?.includes('Desil 2') ||
                     item.desilKesejahteraan?.includes('Desil 3');
+                  const mismatch = mismatchMap.get(item.id);
+                  const isSelected = selectedTableKkIds.has(item.id);
 
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={item.id} className={`hover:bg-slate-50/80 transition-colors ${isSelected ? 'bg-rose-50/40' : ''}`}>
+                      {isAdmin && (
+                        <td className="py-3 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              const newSet = new Set(selectedTableKkIds);
+                              if (e.target.checked) newSet.add(item.id);
+                              else newSet.delete(item.id);
+                              setSelectedTableKkIds(newSet);
+                            }}
+                            className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                          />
+                        </td>
+                      )}
                       <td className="py-3 px-4 text-center font-bold text-slate-400">{itemIndex}</td>
 
                       <td className="py-3 px-4">
                         <div className="font-mono font-bold text-slate-900 tracking-tight">
                           NIK: {maskNik(item.nikKepalaKeluarga || item.nomorKk)}
                         </div>
+                        {item.nopPbb && (
+                          <div className="text-[10px] font-mono text-emerald-700 font-semibold mt-0.5">
+                            NOP: {item.nopPbb}
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-3 px-4">
@@ -968,8 +1158,21 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                       </td>
 
                       <td className="py-3 px-4 max-w-xs">
-                        <div className="font-semibold text-slate-800">{item.lingkunganNama}</div>
-                        <div className="text-[11px] text-slate-600 truncate font-medium">📍 {item.namaJalan} {item.nomorRumah ? `No. ${item.nomorRumah}` : ''}</div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900">{item.lingkunganNama}</span>
+                          {mismatch && isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickFixSingle(item.id, mismatch.recommendedLkId)}
+                              title={`Klik untuk pindahkan ke ${mismatch.recommendedLkNama} (${mismatch.detail})`}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 text-[9px] font-black border border-amber-300 transition-colors cursor-pointer animate-pulse"
+                            >
+                              <AlertTriangle className="w-2.5 h-2.5 text-amber-700" />
+                              <span>Pindah ➔ {mismatch.recommendedLkNama}</span>
+                            </button>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-600 truncate font-medium mt-0.5">📍 {item.namaJalan} {item.nomorRumah ? `No. ${item.nomorRumah}` : ''}</div>
                         <div className="text-[10px] text-slate-500 font-medium">
                           Agama: <span className="font-bold text-slate-700">{item.agama || item.anggotaKeluarga?.[0]?.agama || 'Islam'}</span>
                         </div>
@@ -1152,6 +1355,93 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Floating Sticky Bulk Move Action Toolbar */}
+      {isAdmin && selectedTableKkIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 text-white backdrop-blur-md px-5 py-3.5 rounded-2xl shadow-2xl border border-slate-700 flex flex-wrap items-center gap-4 animate-in slide-in-from-bottom-5 duration-300 max-w-[95vw]">
+          <div className="flex items-center gap-2 font-black text-xs text-rose-400">
+            <CheckSquare className="w-4 h-4" />
+            <span>{selectedTableKkIds.size} KK Terpilih</span>
+          </div>
+
+          <div className="h-4 w-px bg-slate-700 hidden sm:block" />
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-slate-300 text-[11px] font-bold">Pindah Ke:</span>
+            <select
+              value={tableTargetLkId}
+              onChange={(e) => setTableTargetLkId(e.target.value)}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 text-white font-bold text-xs border border-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
+            >
+              {KEPLING_ACCOUNTS.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.lingkungan} ({acc.nama})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const targetAcc = KEPLING_ACCOUNTS.find((a) => a.id === tableTargetLkId);
+              if (!targetAcc) return;
+              if (
+                !window.confirm(
+                  `Pindahkan ${selectedTableKkIds.size} Kartu Keluarga terpilih ke ${targetAcc.lingkungan}?`
+                )
+              )
+                return;
+              const items: { id: string; targetLkId: string }[] = Array.from(selectedTableKkIds).map((id) => ({
+                id: String(id),
+                targetLkId: tableTargetLkId,
+              }));
+              executeBatchMove(items, `Pindah ${items.length} KK`);
+            }}
+            disabled={isBulkExecuting}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
+          >
+            {isBulkExecuting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
+            <span>Pindahkan Terpilih</span>
+          </button>
+
+          {/* Quick Auto-fix according to NOP for selected items */}
+          {Array.from(selectedTableKkIds).some((id) => mismatchMap.has(id)) && (
+            <button
+              type="button"
+              onClick={() => {
+                const fixItems: { id: string; targetLkId: string }[] = [];
+                selectedTableKkIds.forEach((id) => {
+                  const m = mismatchMap.get(id);
+                  if (m) fixItems.push({ id, targetLkId: m.recommendedLkId });
+                });
+                if (fixItems.length === 0) return;
+                if (
+                  !window.confirm(
+                    `Perbaiki ${fixItems.length} KK yang memiliki rekomendasi NOP PBB / Jalan ke lingkungan sebenarnya?`
+                  )
+                )
+                  return;
+                executeBatchMove(fixItems, `Auto-Fix ${fixItems.length} KK`);
+              }}
+              disabled={isBulkExecuting}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Zap className="w-3.5 h-3.5 text-slate-950" />
+              <span>⚡ Auto-Koreksi NOP</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setSelectedTableKkIds(new Set())}
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors cursor-pointer"
+            title="Batalkan Pilihan"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
         </>
       )}
 
@@ -1710,100 +2000,704 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
         </div>
       )}
 
-      {/* TAB 4: PINDAH LINGKUNGAN MASAL (MANUAL STREET BASED) */}
+      {/* TAB 4: PINDAH LINGKUNGAN MASAL (SMART NOP PBB AUTO-CORRECTION & BATCH MOVE) */}
       {isAdmin && activeTab === 'pindah_lingkungan' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-slate-200 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
-            
-            <div className="relative z-10 space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-rose-100 flex items-center justify-center border border-rose-200 shadow-sm">
-                  <MapPin className="w-7 h-7 text-rose-600" />
+          {/* Header Banner */}
+          <div className="bg-linear-to-r from-rose-950 via-slate-900 to-indigo-950 p-6 sm:p-8 rounded-[2.5rem] border border-rose-900/40 text-white shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/30 text-xs font-bold">
+                  <Shuffle className="w-3.5 h-3.5" />
+                  <span>Pusat Tata Kelola &amp; Rekonsiliasi Wilayah Lingkungan</span>
                 </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-900">Pemindahan Lingkungan Masal (Berdasarkan Jalan)</h3>
-                  <p className="text-sm text-slate-500">Pindahkan seluruh data keluarga pada nama jalan tertentu ke lingkungan yang baru secara sekaligus.</p>
-                </div>
+                <h3 className="text-2xl sm:text-3xl font-black tracking-tight">
+                  Pusat Pemindahan &amp; Auto-Koreksi Lingkungan
+                </h3>
+                <p className="text-slate-300 text-xs sm:text-sm max-w-2xl leading-relaxed">
+                  Perbaiki dan pindahkan seluruh Kartu Keluarga (KK) yang tercatat di lingkungan yang salah ke lingkungan sebenarnya secara otomatis menggunakan integrasi <strong>NOP SPPT PBB</strong> atau pemindahan masal multi-filter.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50 rounded-3xl border border-slate-200">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider ml-1">1. Pilih Nama Jalan / Gang:</label>
-                  <select
-                    value={bulkMoveStreet}
-                    onChange={(e) => setBulkMoveStreet(e.target.value)}
-                    className="w-full p-4 rounded-2xl bg-white border border-slate-300 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none shadow-sm appearance-none"
-                  >
-                    <option value="">-- Pilih Jalan --</option>
-                    {uniqueStreets.map(street => (
-                      <option key={street} value={street}>{street}</option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-slate-400 ml-1 italic">*Hanya menampilkan jalan yang sudah terdaftar di database.</p>
+              {/* Quick Summary Cards */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 text-center min-w-[110px]">
+                  <div className="text-[10px] uppercase font-bold text-slate-400">Total KK</div>
+                  <div className="text-xl font-black text-white">{dataList.length}</div>
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider ml-1">2. Pindah Ke Lingkungan Tujuan:</label>
-                  <select
-                    value={bulkMoveTargetLkid}
-                    onChange={(e) => setBulkMoveTargetLkid(e.target.value)}
-                    className="w-full p-4 rounded-2xl bg-white border border-slate-300 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none shadow-sm appearance-none"
-                  >
-                    <option value="">-- Pilih Lingkungan --</option>
-                    {KEPLING_ACCOUNTS.map(acc => (
-                      <option key={acc.id} value={acc.id}>{acc.lingkungan} ({acc.nama})</option>
-                    ))}
-                  </select>
+                <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 text-center min-w-[110px]">
+                  <div className="text-[10px] uppercase font-bold text-slate-400">SPPT PBB Terdata</div>
+                  <div className="text-xl font-black text-emerald-400">{spptList.length}</div>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 flex-wrap pt-2">
-                <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-                  <AlertCircle className="w-4 h-4 text-amber-500" />
-                  <span>Pastikan nama jalan sudah benar agar tidak salah sasaran.</span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleBulkMove}
-                  disabled={isBulkMoving || !bulkMoveStreet || !bulkMoveTargetLkid}
-                  className="inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm shadow-lg shadow-rose-200 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isBulkMoving ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <ArrowRight className="w-5 h-5" />
-                  )}
-                  <span>Eksekusi Pemindahan Sekarang</span>
-                </button>
-              </div>
-
-              {bulkMoveResults && (
-                <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-4 animate-in zoom-in-95 duration-300">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                    <CheckCircle className="w-6 h-6 text-emerald-600" />
+                <div className={`backdrop-blur-md px-4 py-3 rounded-2xl border text-center min-w-[120px] ${
+                  mismatchedList.length > 0
+                    ? 'bg-amber-500/20 border-amber-400/40 text-amber-200'
+                    : 'bg-emerald-500/20 border-emerald-400/40 text-emerald-200'
+                }`}>
+                  <div className="text-[10px] uppercase font-bold">Perlu Dikoreksi</div>
+                  <div className="text-xl font-black">
+                    {mismatchedList.length > 0 ? `${mismatchedList.length} KK` : '0 (Sempurna)'}
                   </div>
-                  <div>
-                    <div className="text-sm font-black text-emerald-950">Berhasil Memindahkan Data!</div>
-                    <div className="text-xs text-emerald-800">
-                      Sebanyak <strong>{bulkMoveResults.success}</strong> dari {bulkMoveResults.total} keluarga di <strong>{bulkMoveStreet}</strong> telah berhasil dipindahkan.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-Mode Navigation Buttons */}
+          <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMoveSubMode('by_pbb_sync')}
+              className={`flex-1 min-w-[200px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                moveSubMode === 'by_pbb_sync'
+                  ? 'bg-amber-500 text-slate-950 shadow-md'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              <span>1. ⚡ Auto-Koreksi Cerdas NOP PBB</span>
+              {mismatchedList.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-slate-950 text-amber-300 text-[10px] font-black">
+                  {mismatchedList.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMoveSubMode('by_source_lk')}
+              className={`flex-1 min-w-[200px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                moveSubMode === 'by_source_lk'
+                  ? 'bg-rose-600 text-white shadow-md'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+              <span>2. 🔄 Pindah Antar Lingkungan (Asal ➔ Tujuan)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMoveSubMode('by_street')}
+              className={`flex-1 min-w-[200px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                moveSubMode === 'by_street'
+                  ? 'bg-blue-700 text-white shadow-md'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <MapPin className="w-4 h-4" />
+              <span>3. 📍 Pindah Berdasarkan Nama Jalan</span>
+            </button>
+          </div>
+
+          {/* SUB-MODE 1: AUTO-KOREKSI NOP PBB (SMART RECONCILIATION) */}
+          {moveSubMode === 'by_pbb_sync' && (
+            <div className="space-y-6">
+              {mismatchedList.length === 0 ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-sm">
+                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600">
+                    <CheckCircle className="w-9 h-9" />
+                  </div>
+                  <h4 className="text-xl font-black text-emerald-950">
+                    Semua Data Keluarga Sudah Sesuai Lingkungan!
+                  </h4>
+                  <p className="text-emerald-800 text-xs sm:text-sm max-w-xl mx-auto leading-relaxed">
+                    Sistem telah memindai seluruh {dataList.length} Kartu Keluarga terhadap {spptList.length} data SPPT PBB dan klaster jalan. Tidak ditemukan adanya data yang salah lingkungan.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-6 sm:p-8 space-y-6">
+                  {/* Warning & 1-Click Fix All Action Card */}
+                  <div className="bg-linear-to-r from-amber-500 via-amber-600 to-orange-600 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-slate-950 font-black text-xs uppercase tracking-wider bg-amber-300 px-2.5 py-0.5 rounded-full w-fit">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>Deteksi Ketidaksesuaian Otomatis</span>
+                      </div>
+                      <h4 className="text-xl sm:text-2xl font-black">
+                        Ditemukan {mismatchedList.length} KK di Lingkungan yang Salah!
+                      </h4>
+                      <p className="text-amber-100 text-xs leading-relaxed max-w-xl">
+                        Berdasarkan pencocokan Nomor NOP SPPT PBB dan konsensus alamat jalan, keluarga-keluarga di bawah ini tercatat di lingkungan yang berbeda dengan lokasi aslinya.
+                      </p>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            `Yakin ingin memperbaiki dan memindahkan seluruh ${mismatchedList.length} KK sekaligus ke lingkungan yang sebenarnya sesuai NOP PBB?`
+                          )
+                        )
+                          return;
+                        const items = mismatchedList.map((m) => ({
+                          id: m.kk.id,
+                          targetLkId: m.recommendedLkId,
+                        }));
+                        executeBatchMove(items, `Koreksi Masal ${items.length} KK`);
+                      }}
+                      disabled={isBulkExecuting}
+                      className="inline-flex items-center gap-2.5 px-6 py-4 rounded-2xl bg-slate-950 hover:bg-slate-900 text-amber-300 font-black text-sm shadow-xl transition-all cursor-pointer whitespace-nowrap border border-amber-400/40 disabled:opacity-50"
+                    >
+                      {isBulkExecuting ? (
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Zap className="w-5 h-5 text-amber-400" />
+                      )}
+                      <span>⚡ Koreksi Semua ({mismatchedList.length} KK) Sekaligus</span>
+                    </button>
+                  </div>
+
+                  {/* Filter & Selection in Mismatch List */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                    <div className="text-xs font-black text-slate-800 flex items-center gap-2">
+                      <Table className="w-4 h-4 text-slate-500" />
+                      <span>Daftar KK yang Perlu Dipindahkan ({mismatchedList.length})</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedPbbSyncIds.size === mismatchedList.length) {
+                            setSelectedPbbSyncIds(new Set());
+                          } else {
+                            setSelectedPbbSyncIds(new Set(mismatchedList.map((m) => m.kk.id)));
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer border border-slate-200"
+                      >
+                        {selectedPbbSyncIds.size === mismatchedList.length
+                          ? 'Batal Pilih Semua'
+                          : 'Pilih Semua'}
+                      </button>
+
+                      {selectedPbbSyncIds.size > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const itemsToFix = mismatchedList
+                              .filter((m) => selectedPbbSyncIds.has(m.kk.id))
+                              .map((m) => ({ id: m.kk.id, targetLkId: m.recommendedLkId }));
+                            if (
+                              !window.confirm(
+                                `Pindahkan ${itemsToFix.length} KK yang dipilih ke lingkungan sebenarnya?`
+                              )
+                            )
+                              return;
+                            executeBatchMove(itemsToFix, `Koreksi ${itemsToFix.length} KK`);
+                          }}
+                          disabled={isBulkExecuting}
+                          className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs cursor-pointer shadow-sm"
+                        >
+                          Pindahkan {selectedPbbSyncIds.size} KK Terpilih
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Table of Mismatched KKs */}
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-100 text-[10px] font-black text-slate-600 uppercase tracking-wider border-b border-slate-200">
+                          <th className="py-3 px-3 text-center w-10">
+                            <input
+                              type="checkbox"
+                              checked={
+                                mismatchedList.length > 0 &&
+                                selectedPbbSyncIds.size === mismatchedList.length
+                              }
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedPbbSyncIds(new Set(mismatchedList.map((m) => m.kk.id)));
+                                } else {
+                                  setSelectedPbbSyncIds(new Set());
+                                }
+                              }}
+                              className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                            />
+                          </th>
+                          <th className="py-3 px-4">Nama Kepala Keluarga / NIK</th>
+                          <th className="py-3 px-4">Alamat / Jalan</th>
+                          <th className="py-3 px-4">NOP PBB</th>
+                          <th className="py-3 px-4 text-center">Lingkungan Sekarang</th>
+                          <th className="py-3 px-4 text-center">➔ Rekomendasi Sebenarnya</th>
+                          <th className="py-3 px-4 text-right">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {mismatchedList.map((item) => {
+                          const isChecked = selectedPbbSyncIds.has(item.kk.id);
+                          return (
+                            <tr
+                              key={item.kk.id}
+                              className={`hover:bg-slate-50 transition-colors ${
+                                isChecked ? 'bg-amber-50/60' : ''
+                              }`}
+                            >
+                              <td className="py-3 px-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    const next = new Set(selectedPbbSyncIds);
+                                    if (e.target.checked) next.add(item.kk.id);
+                                    else next.delete(item.kk.id);
+                                    setSelectedPbbSyncIds(next);
+                                  }}
+                                  className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                />
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="font-bold text-slate-900">{item.kk.namaKepalaKeluarga}</div>
+                                <div className="text-[10px] font-mono text-slate-500">
+                                  {maskNik(item.kk.nikKepalaKeluarga || item.kk.nomorKk)}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="font-medium text-slate-800">{item.kk.namaJalan}</div>
+                                <div className="text-[10px] text-slate-400">
+                                  {item.kk.nomorRumah ? `No. ${item.kk.nomorRumah}` : ''}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 font-mono text-[11px] font-semibold text-emerald-800">
+                                {item.kk.nopPbb || '-'}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <span className="inline-block px-2.5 py-1 rounded-lg bg-rose-100 text-rose-900 font-extrabold text-[11px] border border-rose-200">
+                                  {item.currentLkNama}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <span className="inline-block px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-950 font-black text-[11px] border border-emerald-300 shadow-2xs">
+                                  ✓ {item.recommendedLkNama}
+                                </span>
+                                <div className="text-[9.5px] text-slate-500 font-medium mt-0.5">
+                                  {item.detail}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickFixSingle(item.kk.id, item.recommendedLkId)}
+                                  disabled={isBulkExecuting}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-sm transition-colors cursor-pointer"
+                                >
+                                  <span>Pindahkan</span>
+                                  <ArrowRight className="w-3 h-3" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          )}
 
-          <div className="bg-blue-50 border border-blue-100 p-6 rounded-3xl space-y-4">
-            <h4 className="text-sm font-black text-blue-900 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-blue-600" />
-              <span>Info Pengelompokan Otomatis</span>
-            </h4>
-            <p className="text-xs text-blue-800 leading-relaxed">
-              Sistem kini dilengkapi dengan <strong>Smart Grouping Engine</strong>. Saat Anda mengimpor data keluarga baru, sistem akan mencoba mencocokkan nomor <strong>NOP PBB</strong> keluarga tersebut dengan basis data SPPT PBB yang sudah Anda unggah. Jika cocok, sistem akan otomatis menetapkan lingkungan yang sesuai tanpa perlu input manual. Jika NOP tidak tersedia, sistem akan mencoba menebak lingkungan berdasarkan kemiripan nama jalan dari data yang sudah ada sebelumnya.
-            </p>
-          </div>
+          {/* SUB-MODE 2: PEMINDAHAN ANTAR LINGKUNGAN (ASAL -> TUJUAN + FILTER JALAN) */}
+          {moveSubMode === 'by_source_lk' && (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-6 sm:p-8 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-rose-100 flex items-center justify-center border border-rose-200 shadow-sm text-rose-600">
+                  <ArrowLeftRight className="w-7 h-7" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-black text-slate-900">
+                    Pemindahan Antar Lingkungan (Lingkungan Asal ➔ Lingkungan Tujuan)
+                  </h4>
+                  <p className="text-xs sm:text-sm text-slate-500">
+                    Pilih lingkungan asal untuk melihat daftar KK di dalamnya, saring berdasarkan jalan atau kata kunci, lalu pindahkan ke lingkungan tujuan.
+                  </p>
+                </div>
+              </div>
+
+              {/* Selection Controls */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 bg-slate-50 rounded-3xl border border-slate-200">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                    1. Lingkungan Asal (Sumber Data):
+                  </label>
+                  <select
+                    value={sourceLkId}
+                    onChange={(e) => {
+                      setSourceLkId(e.target.value);
+                      setSelectedSourceKkIds(new Set());
+                    }}
+                    className="w-full p-3.5 rounded-2xl bg-white border border-slate-300 text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none shadow-sm"
+                  >
+                    {KEPLING_ACCOUNTS.map((acc) => {
+                      const count = dataList.filter((k) => k.lingkunganId === acc.id).length;
+                      return (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.lingkungan} ({count} KK) - Kepling {acc.nama}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                    2. Filter Jalan / Pencarian (Opsional):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Semua jalan (atau ketik nama jalan / NIK)..."
+                    value={sourceLkStreetFilter}
+                    onChange={(e) => setSourceLkStreetFilter(e.target.value)}
+                    className="w-full p-3.5 rounded-2xl bg-white border border-slate-300 text-xs sm:text-sm font-medium text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none shadow-sm"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                    3. Pindah Ke Lingkungan Tujuan:
+                  </label>
+                  <select
+                    value={sourceTargetLkId}
+                    onChange={(e) => setSourceTargetLkId(e.target.value)}
+                    className="w-full p-3.5 rounded-2xl bg-white border border-slate-300 text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none shadow-sm"
+                  >
+                    {KEPLING_ACCOUNTS.map((acc) => (
+                      <option key={acc.id} value={acc.id} disabled={acc.id === sourceLkId}>
+                        {acc.lingkungan} ({acc.nama}) {acc.id === sourceLkId ? '(Sama)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Source Families List */}
+              {(() => {
+                const sourceFamilies = dataList.filter((k) => {
+                  if (k.lingkunganId !== sourceLkId) return false;
+                  if (sourceLkStreetFilter.trim()) {
+                    const q = sourceLkStreetFilter.toLowerCase().trim();
+                    const street = (k.namaJalan || '').toLowerCase();
+                    const name = (k.namaKepalaKeluarga || '').toLowerCase();
+                    const nik = (k.nikKepalaKeluarga || k.nomorKk || '').toLowerCase();
+                    if (!street.includes(q) && !name.includes(q) && !nik.includes(q)) return false;
+                  }
+                  return true;
+                });
+
+                const targetAcc = KEPLING_ACCOUNTS.find((a) => a.id === sourceTargetLkId);
+
+                return (
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                      <div className="text-xs font-bold text-slate-700">
+                        Menemukan <strong className="text-slate-950 font-black">{sourceFamilies.length}</strong> KK di Lingkungan Asal
+                        {selectedSourceKkIds.size > 0 && (
+                          <span className="ml-2 text-rose-600 font-black">
+                            ({selectedSourceKkIds.size} dipilih)
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedSourceKkIds.size === sourceFamilies.length) {
+                              setSelectedSourceKkIds(new Set());
+                            } else {
+                              setSelectedSourceKkIds(new Set(sourceFamilies.map((k) => k.id)));
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer border border-slate-200"
+                        >
+                          {selectedSourceKkIds.size === sourceFamilies.length
+                            ? 'Batal Pilih Semua'
+                            : `Pilih Semua (${sourceFamilies.length} KK)`}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedSourceKkIds.size === 0) {
+                              if (onShowToast) onShowToast('Centang minimal 1 KK untuk dipindahkan.', 'error');
+                              return;
+                            }
+                            if (!targetAcc) return;
+                            if (
+                              !window.confirm(
+                                `Pindahkan ${selectedSourceKkIds.size} KK terpilih ke ${targetAcc.lingkungan}?`
+                              )
+                            )
+                              return;
+                            const items: { id: string; targetLkId: string }[] = Array.from(selectedSourceKkIds).map((id) => ({
+                              id: String(id),
+                              targetLkId: sourceTargetLkId,
+                            }));
+                            executeBatchMove(items, `Pindah ${items.length} KK`);
+                          }}
+                          disabled={isBulkExecuting || selectedSourceKkIds.size === 0}
+                          className="inline-flex items-center gap-2 px-6 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          {isBulkExecuting ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          )}
+                          <span>
+                            Pindahkan {selectedSourceKkIds.size} KK ke {targetAcc?.lingkungan}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {sourceFamilies.length === 0 ? (
+                      <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-2xl text-slate-400 text-xs">
+                        Tidak ada data keluarga di lingkungan asal ini yang sesuai dengan filter.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-[500px]">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className="sticky top-0 bg-slate-100 z-10 shadow-2xs">
+                            <tr className="text-[10px] font-black text-slate-600 uppercase tracking-wider border-b border-slate-200">
+                              <th className="py-2.5 px-3 text-center w-10">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    sourceFamilies.length > 0 &&
+                                    selectedSourceKkIds.size === sourceFamilies.length
+                                  }
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedSourceKkIds(new Set(sourceFamilies.map((k) => k.id)));
+                                    } else {
+                                      setSelectedSourceKkIds(new Set());
+                                    }
+                                  }}
+                                  className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                                />
+                              </th>
+                              <th className="py-2.5 px-3">No</th>
+                              <th className="py-2.5 px-4">Nama Kepala Keluarga / NIK</th>
+                              <th className="py-2.5 px-4">Alamat Jalan / Gang</th>
+                              <th className="py-2.5 px-4">NOP PBB</th>
+                              <th className="py-2.5 px-4 text-center">Jiwa</th>
+                              <th className="py-2.5 px-4 text-right">Aksi Cepat</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {sourceFamilies.map((item, idx) => {
+                              const isChecked = selectedSourceKkIds.has(item.id);
+                              return (
+                                <tr
+                                  key={item.id}
+                                  className={`hover:bg-slate-50 transition-colors ${
+                                    isChecked ? 'bg-rose-50/50' : ''
+                                  }`}
+                                >
+                                  <td className="py-2.5 px-3 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={(e) => {
+                                        const next = new Set(selectedSourceKkIds);
+                                        if (e.target.checked) next.add(item.id);
+                                        else next.delete(item.id);
+                                        setSelectedSourceKkIds(next);
+                                      }}
+                                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                                    />
+                                  </td>
+                                  <td className="py-2.5 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
+                                  <td className="py-2.5 px-4">
+                                    <div className="font-bold text-slate-900">{item.namaKepalaKeluarga}</div>
+                                    <div className="text-[10px] font-mono text-slate-500">
+                                      {maskNik(item.nikKepalaKeluarga || item.nomorKk)}
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-4 font-medium text-slate-700">
+                                    📍 {item.namaJalan} {item.nomorRumah ? `No. ${item.nomorRumah}` : ''}
+                                  </td>
+                                  <td className="py-2.5 px-4 font-mono text-[11px] text-emerald-800">
+                                    {item.nopPbb || '-'}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-center">
+                                    <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-900 font-black text-[10px]">
+                                      {item.jumlahAnggotaKeluarga}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickFixSingle(item.id, sourceTargetLkId)}
+                                      disabled={isBulkExecuting}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-900 font-bold text-[11px] transition-colors cursor-pointer"
+                                    >
+                                      <span>Pindah</span>
+                                      <ArrowRight className="w-2.5 h-2.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* SUB-MODE 3: PEMINDAHAN BERDASARKAN JALAN */}
+          {moveSubMode === 'by_street' && (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-6 sm:p-8 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center border border-blue-200 shadow-sm text-blue-700">
+                  <MapPin className="w-7 h-7" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-black text-slate-900">
+                    Pemindahan Berdasarkan Nama Jalan
+                  </h4>
+                  <p className="text-xs sm:text-sm text-slate-500">
+                    Pindahkan seluruh keluarga di suatu nama jalan/gang ke lingkungan yang baru sekaligus.
+                  </p>
+                </div>
+              </div>
+
+              {/* Form Controls */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50 rounded-3xl border border-slate-200">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider ml-1">
+                    1. Pilih Nama Jalan / Gang:
+                  </label>
+                  <select
+                    value={streetSearchKeyword}
+                    onChange={(e) => setStreetSearchKeyword(e.target.value)}
+                    className="w-full p-4 rounded-2xl bg-white border border-slate-300 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
+                  >
+                    <option value="">-- Pilih Jalan ({uniqueStreets.length} Jalan Terdaftar) --</option>
+                    {uniqueStreets.map((street) => {
+                      const count = dataList.filter((k) => k.namaJalan?.toUpperCase() === street).length;
+                      return (
+                        <option key={street} value={street}>
+                          {street} ({count} KK)
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider ml-1">
+                    2. Pindah Ke Lingkungan Tujuan:
+                  </label>
+                  <select
+                    value={streetTargetLkId}
+                    onChange={(e) => setStreetTargetLkId(e.target.value)}
+                    className="w-full p-4 rounded-2xl bg-white border border-slate-300 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
+                  >
+                    {KEPLING_ACCOUNTS.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.lingkungan} ({acc.nama})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Street Summary & Action */}
+              {streetSearchKeyword && (() => {
+                const matchingKks = dataList.filter(
+                  (k) => k.namaJalan?.toUpperCase() === streetSearchKeyword.toUpperCase()
+                );
+                const targetAccount = KEPLING_ACCOUNTS.find((a) => a.id === streetTargetLkId);
+                const needsMoveCount = matchingKks.filter((k) => k.lingkunganId !== streetTargetLkId).length;
+
+                // Group breakdown by current Lingkungan
+                const lkBreakdown: Record<string, number> = {};
+                matchingKks.forEach((k) => {
+                  lkBreakdown[k.lingkunganNama || 'Tidak Diketahui'] =
+                    (lkBreakdown[k.lingkunganNama || 'Tidak Diketahui'] || 0) + 1;
+                });
+
+                return (
+                  <div className="p-6 bg-blue-50/50 border border-blue-200 rounded-3xl space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-black text-blue-950">
+                          Ringkasan Data di {streetSearchKeyword}:
+                        </div>
+                        <div className="text-xs text-blue-800 mt-1 flex flex-wrap gap-2">
+                          <span>Total: <strong>{matchingKks.length} KK</strong></span>
+                          <span>•</span>
+                          <span>Sebaran saat ini: {Object.entries(lkBreakdown).map(([lk, cnt]) => `${lk}: ${cnt} KK`).join(', ')}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (needsMoveCount === 0) {
+                            if (onShowToast) onShowToast(`Seluruh keluarga di ${streetSearchKeyword} sudah berada di ${targetAccount?.lingkungan}.`, 'info');
+                            return;
+                          }
+                          if (!targetAccount) return;
+                          if (
+                            !window.confirm(
+                              `Pindahkan ${needsMoveCount} KK di ${streetSearchKeyword} ke ${targetAccount.lingkungan}?`
+                            )
+                          )
+                            return;
+                          const items = matchingKks
+                            .filter((k) => k.lingkunganId !== streetTargetLkId)
+                            .map((k) => ({ id: k.id, targetLkId: streetTargetLkId }));
+                          executeBatchMove(items, `Pindah ${items.length} KK`);
+                        }}
+                        disabled={isBulkExecuting || needsMoveCount === 0}
+                        className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-blue-700 hover:bg-blue-600 text-white font-black text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {isBulkExecuting ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <ArrowRight className="w-4 h-4" />
+                        )}
+                        <span>
+                          Pindahkan {needsMoveCount} KK ke {targetAccount?.lingkungan}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Execution Progress Overlay / Banner */}
+          {isBulkExecuting && (
+            <div className="p-6 bg-slate-900 text-white rounded-3xl border border-slate-700 shadow-2xl flex items-center gap-4 animate-in fade-in">
+              <RefreshCw className="w-6 h-6 animate-spin text-amber-400 shrink-0" />
+              <div className="space-y-1 flex-1">
+                <div className="text-sm font-black">{bulkExecuteMessage || 'Sedang memproses pemindahan data...'}</div>
+                <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+                  <div
+                    className="bg-linear-to-r from-amber-400 to-rose-500 h-full transition-all duration-300"
+                    style={{
+                      width: `${bulkExecuteProgress.total > 0 ? (bulkExecuteProgress.done / bulkExecuteProgress.total) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  {bulkExecuteProgress.done} dari {bulkExecuteProgress.total} KK berhasil diperbarui ke Firestore &amp; Database Lokal
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1822,24 +2716,21 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
             {/* Header Resmi Database Keluarga */}
             <div className="border-b-2 border-slate-900 pb-4 text-center space-y-1">
               <div className="text-xs font-bold tracking-widest text-slate-500 uppercase">
-                REPUBLIK INDONESIA • PEMERINTAH KOTA MEDAN
+                DATABASE KELUARGA KELURAHAN MANGGA
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
-                DATABASE KELUARGA
+                KARTU KELUARGA
               </h2>
-              <div className="text-sm sm:text-base font-black text-slate-800 tracking-wider uppercase">
-                KELURAHAN MANGGA
-              </div>
               <div className="flex items-center justify-center gap-2 pt-1">
                 <span className="text-base sm:text-lg font-mono font-black text-blue-900 tracking-wider">
-                  NIK: {showFullNik
-                    ? (selectedDetailKk.nikKepalaKeluarga || selectedDetailKk.nomorKk)
-                    : maskNik(selectedDetailKk.nikKepalaKeluarga || selectedDetailKk.nomorKk)}
+                  No. {showFullNik
+                    ? (selectedDetailKk.nomorKk || selectedDetailKk.nikKepalaKeluarga)
+                    : maskNik(selectedDetailKk.nomorKk || selectedDetailKk.nikKepalaKeluarga)}
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowFullNik(!showFullNik)}
-                  title={showFullNik ? 'Samarkan NIK (5 digit akhir *****)' : 'Tampilkan NIK Lengkap'}
+                  title={showFullNik ? 'Samarkan Nomor (5 digit akhir *****)' : 'Tampilkan Nomor Lengkap'}
                   className="p-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 transition-colors cursor-pointer border border-blue-200"
                 >
                   {showFullNik ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

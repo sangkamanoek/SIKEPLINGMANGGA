@@ -5,6 +5,7 @@ import {
   getDoc,
   setDoc,
   deleteDoc,
+  writeBatch,
   onSnapshot,
   Unsubscribe,
   query,
@@ -1376,6 +1377,108 @@ export async function parseDataKeluargaText(rawText: string): Promise<ImportPars
   const file = new File([buf], 'pasted_data.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
   return parseDataKeluargaFile(file);
+}
+
+/**
+ * Normalizes street names into clean, grouped root names
+ * E.g. "JL NILAM 02 NO 5 PERUMNAS" -> "JL NILAM 02"
+ * E.g. "JL. FLAMBOYAN RAYA BLOK C NO 12" -> "JL FLAMBOYAN RAYA"
+ * E.g. "GG. MELATI NO. 14 LK. 1" -> "GG MELATI"
+ */
+export function normalizeStreetName(rawAddress?: string): string {
+  if (!rawAddress) return 'TIDAK ADA ALAMAT';
+  let clean = rawAddress
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Strip common address noise at the end:
+  // e.g. "NO 5 PERUMNAS", "NO. 12B", "BLOK A NO 3", "KELURAHAN MANGGA", "LINGKUNGAN I", "LK 1"
+  clean = clean.replace(/(\bNO\.?|\bNOMOR|\bBLOK|\bRT|\bRW|\bLK\.?|\bLINGKUNGAN|\bKELURAHAN|\bKECAMATAN|\bMEDAN).*/gi, '').trim();
+  clean = clean.replace(/[,.-]+$/, '').trim();
+
+  // Standardize prefixes
+  clean = clean.replace(/^JALAN\b/i, 'JL').replace(/^JLN\b/i, 'JL').replace(/^GANG\b/i, 'GG');
+  if (!clean.startsWith('JL') && !clean.startsWith('GG') && !clean.startsWith('KOMPLEK') && !clean.startsWith('ASRAMA') && !clean.startsWith('PERUM')) {
+    clean = 'JL ' + clean;
+  }
+
+  return clean.replace(/\s+/g, ' ').trim() || 'JL UTAMA';
+}
+
+export interface LingkunganMoveTarget {
+  id: string; // DataKeluarga ID
+  lingkunganId: string;
+  lingkunganNomor: number;
+  lingkunganNama: string;
+}
+
+/**
+ * Super-fast Batch update Lingkungan for multiple DataKeluarga records
+ * Updates local cache instantly and commits in Firestore chunks (400 per batch)
+ */
+export async function batchUpdateLingkunganDataKeluarga(
+  itemsToUpdate: LingkunganMoveTarget[],
+  onProgress?: (saved: number, total: number) => void
+): Promise<{ successCount: number; failCount: number }> {
+  if (!itemsToUpdate || itemsToUpdate.length === 0) return { successCount: 0, failCount: 0 };
+
+  const current = getLocalDataKeluarga();
+  const updateMap = new Map<string, LingkunganMoveTarget>();
+  itemsToUpdate.forEach((item) => updateMap.set(item.id, item));
+
+  const updatedList: DataKeluarga[] = [];
+  const modifiedItems: DataKeluarga[] = [];
+
+  for (const kk of current) {
+    if (updateMap.has(kk.id)) {
+      const target = updateMap.get(kk.id)!;
+      const updatedKk: DataKeluarga = {
+        ...kk,
+        lingkunganId: target.lingkunganId,
+        lingkunganNomor: target.lingkunganNomor,
+        lingkunganNama: target.lingkunganNama,
+        alamatLengkap: `${kk.namaJalan || ''} ${kk.nomorRumah ? `NO. ${kk.nomorRumah}` : ''}, ${target.lingkunganNama.toUpperCase()}, KELURAHAN MANGGA`.replace(/\s+/g, ' ').trim(),
+        updatedAt: new Date().toISOString(),
+      };
+      updatedList.push(updatedKk);
+      modifiedItems.push(updatedKk);
+    } else {
+      updatedList.push(kk);
+    }
+  }
+
+  // 1. Instant local persistence (LocalStorage + IndexedDB)
+  saveLocalDataKeluarga(updatedList);
+
+  // 2. Fast chunked Firestore batch writes (400 per batch)
+  let successCount = 0;
+  let failCount = 0;
+
+  for (let i = 0; i < modifiedItems.length; i += 400) {
+    const chunk = modifiedItems.slice(i, i + 400);
+    try {
+      const batch = writeBatch(db);
+      for (const item of chunk) {
+        const docRef = doc(db, COLLECTION_NAME, item.id);
+        batch.set(docRef, cleanFirestoreData(item), { merge: true });
+      }
+      await batch.commit();
+      successCount += chunk.length;
+    } catch (err) {
+      console.warn('Batch write chunk error, fallbacking to per-doc save:', err);
+      for (const item of chunk) {
+        const ok = await saveDataKeluargaToFirestore(item, true);
+        if (ok) successCount++;
+        else failCount++;
+      }
+    }
+    if (onProgress) {
+      onProgress(Math.min(i + chunk.length, modifiedItems.length), modifiedItems.length);
+    }
+  }
+
+  return { successCount, failCount };
 }
 
 /**
