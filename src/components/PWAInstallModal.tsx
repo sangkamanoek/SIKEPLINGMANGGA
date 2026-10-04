@@ -91,11 +91,11 @@ Silakan buka dan pasang aplikasi resmi *SISTEM KINERJA KEPALA LINGKUNGAN KELURAH
         {/* Header */}
         <div className="px-5 py-4 bg-emerald-800 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-white p-1 flex items-center justify-center shrink-0 shadow-md ring-2 ring-white/30">
               <img
                 src="/logo_pemko_medan.png"
                 alt="Logo Pemko Medan"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain filter drop-shadow-xs"
               />
             </div>
             <div>
@@ -135,13 +135,13 @@ Silakan buka dan pasang aplikasi resmi *SISTEM KINERJA KEPALA LINGKUNGAN KELURAH
               </div>
             </div>
           ) : (
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-11 h-11 rounded-xl bg-white border border-emerald-200 p-1 flex items-center justify-center shrink-0 shadow-sm">
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-emerald-200 p-1 flex items-center justify-center shrink-0 shadow-md ring-2 ring-emerald-500/20">
                   <img
                     src="/logo_pemko_medan.png"
                     alt="Logo Pemko Medan"
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-contain filter drop-shadow-xs"
                   />
                 </div>
                 <div className="flex-1 min-w-0">

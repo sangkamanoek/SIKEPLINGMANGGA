@@ -179,11 +179,11 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               />
             </div>
             {isPkk && (
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-2.5 shadow-md shrink-0 border border-white/20 animate-fade-in overflow-hidden">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-1.5 shadow-md shrink-0 border border-white/20 animate-fade-in overflow-hidden">
                 <img
                   src="/logo_pkk.jpg"
                   alt="Logo PKK"
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-cover scale-[1.75] transform"
                 />
               </div>
             )}

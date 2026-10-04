@@ -426,8 +426,10 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
         <div className="absolute right-0 top-0 translate-x-10 -translate-y-8 w-72 h-72 rounded-full bg-white/10 blur-2xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-tosca-100 text-xs font-bold tracking-wide">
-              <img src="/logo_pkk.jpg" alt="Logo PKK" className="w-4 h-4 object-contain" />
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-tosca-100 text-xs font-bold tracking-wide shadow-xs">
+              <div className="w-6 h-6 rounded-full bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                <img src="/logo_pkk.jpg" alt="Logo PKK" className="w-full h-full object-contain scale-110" />
+              </div>
               <span>TIM PENGGERAK PKK KELURAHAN MANGGA</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2">
