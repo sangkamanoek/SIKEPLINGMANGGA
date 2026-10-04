@@ -21,6 +21,12 @@ import {
   ExternalLink,
   DollarSign,
   Sparkles,
+  Trash2,
+  CheckSquare,
+  Square,
+  RefreshCw,
+  AlertCircle,
+  MapPin,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -39,6 +45,10 @@ interface TabulasiWilayahViewProps {
   onSelectHouseForMap?: (house: TitikRumahBangunan) => void;
   onSwitchToMap?: () => void;
   onOpenDatabaseKeluarga?: () => void;
+  onDeleteHouse?: (houseId: string, houseName?: string) => void;
+  onDeleteBulkHouses?: (houseIds: string[]) => void;
+  onClearAllHouses?: () => void;
+  onDeleteHousesByLingkungan?: (lingkunganId: string) => void;
 }
 
 export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
@@ -49,12 +59,16 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
   onSelectHouseForMap,
   onSwitchToMap,
   onOpenDatabaseKeluarga,
+  onDeleteHouse,
+  onDeleteBulkHouses,
+  onClearAllHouses,
+  onDeleteHousesByLingkungan,
 }) => {
   const isKepling = currentUser.role === 'kepling';
   const isAdmin = currentUser.role === 'super_admin' || currentUser.role.startsWith('kasi_');
 
-  // Tabulation View Level: KELURAHAN | LINGKUNGAN | JALAN
-  const [tabLevel, setTabLevel] = useState<'KELURAHAN' | 'LINGKUNGAN' | 'JALAN'>('KELURAHAN');
+  // Tabulation View Level: KELURAHAN | LINGKUNGAN | JALAN | TITIK_BANGUNAN
+  const [tabLevel, setTabLevel] = useState<'KELURAHAN' | 'LINGKUNGAN' | 'JALAN' | 'TITIK_BANGUNAN'>('KELURAHAN');
 
   // Filters
   const [filterLingkungan, setFilterLingkungan] = useState<string>(
@@ -64,6 +78,10 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
   const [filterBansos, setFilterBansos] = useState<string>('all');
   const [filterSanitasi, setFilterSanitasi] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Checkbox selection for bulk deleting misplaced houses
+  const [selectedHouseIds, setSelectedHouseIds] = useState<Set<string>>(new Set());
+  const [isDeletingBulk, setIsDeletingBulk] = useState<boolean>(false);
 
   // Selected Street for Drill-Down Modal
   const [selectedStreetDetail, setSelectedStreetDetail] = useState<{
@@ -926,6 +944,21 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
                 {streetRows.length} Ruas
               </span>
             </button>
+            <button
+              type="button"
+              onClick={() => setTabLevel('TITIK_BANGUNAN')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all cursor-pointer ${
+                tabLevel === 'TITIK_BANGUNAN'
+                  ? 'bg-rose-800 text-white shadow-md'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>4. Kelola / Hapus Titik Lokasi</span>
+              <span className="bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full text-[10px] font-mono">
+                {filteredHouses.length}
+              </span>
+            </button>
           </div>
 
           {/* Quick Filter Bar */}
@@ -1704,6 +1737,290 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
       )}
 
       {/* ========================================================= */}
+      {/* TAB 4: KELOLA & HAPUS TITIK BANGUNAN SALAH LOKASI          */}
+      {/* ========================================================= */}
+      {tabLevel === 'TITIK_BANGUNAN' && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-5 animate-in fade-in duration-200">
+          {/* Header & Warning Banner */}
+          <div className="bg-gradient-to-r from-rose-950 via-slate-900 to-red-950 text-white p-5 rounded-2xl border border-rose-900/50 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1 max-w-2xl">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-bold border border-rose-500/30 uppercase tracking-wider flex items-center gap-1">
+                  <Trash2 className="w-3 h-3 text-rose-400" />
+                  <span>Pusat Manajemen &amp; Pembersihan Titik Spasial</span>
+                </span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-black text-white">
+                Kelola &amp; Hapus Titik Bangunan / Rumah Salah Lokasi
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Gunakan menu ini untuk memilih dan menghapus titik-titik koordinat bangunan yang salah penempatan,
+                menghapus per lingkungan, atau mengosongkan seluruh titik untuk dipetakan ulang dengan akurat.
+              </p>
+            </div>
+
+            {/* Quick Summary KPI */}
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-white/10 rounded-xl border border-white/10 text-center min-w-[100px]">
+                <div className="text-[10px] uppercase font-bold text-slate-400">Total Titik</div>
+                <div className="text-xl font-black text-white">{filteredHouses.length}</div>
+              </div>
+              <div className="p-3 bg-white/10 rounded-xl border border-white/10 text-center min-w-[100px]">
+                <div className="text-[10px] uppercase font-bold text-slate-400">Terpilih</div>
+                <div className="text-xl font-black text-rose-400">{selectedHouseIds.size}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedHouseIds.size === filteredHouses.length) {
+                    setSelectedHouseIds(new Set());
+                  } else {
+                    setSelectedHouseIds(new Set(filteredHouses.map((h) => h.id)));
+                  }
+                }}
+                className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold border border-slate-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                {selectedHouseIds.size === filteredHouses.length && filteredHouses.length > 0 ? (
+                  <CheckSquare className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <Square className="w-4 h-4 text-slate-400" />
+                )}
+                <span>
+                  {selectedHouseIds.size === filteredHouses.length && filteredHouses.length > 0
+                    ? 'Batalkan Pilihan Semua'
+                    : 'Pilih Semua Titik Terfilter'}
+                </span>
+              </button>
+
+              {selectedHouseIds.size > 0 && onDeleteBulkHouses && (
+                <button
+                  type="button"
+                  disabled={isDeletingBulk}
+                  onClick={() => {
+                    const count = selectedHouseIds.size;
+                    if (window.confirm(`⚠️ Yakin ingin menghapus ${count} titik bangunan terpilih dari peta dan database? Tindakan ini permanen.`)) {
+                      setIsDeletingBulk(true);
+                      onDeleteBulkHouses(Array.from(selectedHouseIds));
+                      setSelectedHouseIds(new Set());
+                      setTimeout(() => setIsDeletingBulk(false), 500);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-black shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95 animate-pulse border border-rose-400/40"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>HAPUS MASSAL ({selectedHouseIds.size} TITIK TERPILIH)</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {filterLingkungan !== 'all' && onDeleteHousesByLingkungan && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const lkAcc = KEPLING_ACCOUNTS.find((k) => k.id === filterLingkungan);
+                    const lkName = lkAcc ? lkAcc.lingkungan : filterLingkungan;
+                    if (window.confirm(`⚠️ Yakin ingin menghapus SEMUA titik bangunan di ${lkName} (${filteredHouses.length} titik)?`)) {
+                      onDeleteHousesByLingkungan(filterLingkungan);
+                      setSelectedHouseIds(new Set());
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4 text-amber-600" />
+                  <span>Hapus Semua Titik di Lingkungan Ini</span>
+                </button>
+              )}
+
+              {isAdmin && onClearAllHouses && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.prompt('⚠️ PERINGATAN: Anda akan MENGHAPUS SELURUH TITIK BANGUNAN DI SEMUA LINGKUNGAN dari Peta WebGIS!\n\nKetik "HAPUS SEMUA" untuk konfirmasi:') === 'HAPUS SEMUA') {
+                      onClearAllHouses();
+                      setSelectedHouseIds(new Set());
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-900 text-xs font-bold border border-rose-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Kosongkan seluruh titik bangunan yang salah lokasi"
+                >
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  <span>Kosongkan Seluruh Titik (Reset Peta)</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Search Box inside this tab */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari nama kepala keluarga, NIK, alamat, atau nama jalan untuk dihapus..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-rose-500 bg-slate-50"
+            />
+          </div>
+
+          {/* Table of Houses */}
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-2xs max-h-[600px] overflow-y-auto">
+            <table className="w-full text-xs text-left border-collapse whitespace-nowrap">
+              <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 uppercase text-[10px] text-slate-700 font-black shadow-xs">
+                <tr>
+                  <th className="p-3 text-center w-10">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedHouseIds.size === filteredHouses.length) {
+                          setSelectedHouseIds(new Set());
+                        } else {
+                          setSelectedHouseIds(new Set(filteredHouses.map((h) => h.id)));
+                        }
+                      }}
+                      className="cursor-pointer"
+                    >
+                      {selectedHouseIds.size === filteredHouses.length && filteredHouses.length > 0 ? (
+                        <CheckSquare className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <Square className="w-4 h-4 text-slate-400" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="p-3">No</th>
+                  <th className="p-3">Lingkungan</th>
+                  <th className="p-3">Nama Kepala Keluarga / Bangunan</th>
+                  <th className="p-3">NIK / NOP</th>
+                  <th className="p-3">Alamat / Jalan</th>
+                  <th className="p-3">Kategori</th>
+                  <th className="p-3">Koordinat (Lat, Lng)</th>
+                  <th className="p-3 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {filteredHouses.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-8 text-center text-slate-400">
+                      Tidak ada data titik bangunan yang cocok dengan kriteria filter.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredHouses.slice(0, 500).map((house, idx) => {
+                    const isSelected = selectedHouseIds.has(house.id);
+                    const hasValidCoords = house.lat && house.lng && Number(house.lat) !== 0 && Number(house.lng) !== 0;
+
+                    return (
+                      <tr
+                        key={house.id}
+                        className={`transition-colors ${
+                          isSelected ? 'bg-rose-50/70 hover:bg-rose-100/70' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <td className="p-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = new Set(selectedHouseIds);
+                              if (next.has(house.id)) next.delete(house.id);
+                              else next.add(house.id);
+                              setSelectedHouseIds(next);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-4 h-4 text-rose-600" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-300" />
+                            )}
+                          </button>
+                        </td>
+                        <td className="p-3 font-bold text-slate-400">{idx + 1}</td>
+                        <td className="p-3 font-bold text-slate-800">
+                          {house.lingkunganNomor ? `Lingkungan ${house.lingkunganNomor}` : house.lingkunganId}
+                        </td>
+                        <td className="p-3">
+                          <div className="font-bold text-slate-900">{house.namaKepalaKeluarga || 'Bangunan'}</div>
+                          {house.nomorRumah && (
+                            <div className="text-[10px] text-slate-400">No. Rumah: {house.nomorRumah}</div>
+                          )}
+                        </td>
+                        <td className="p-3 font-mono text-[11px] text-slate-600">
+                          {house.nikKk || house.nopPbb || '-'}
+                        </td>
+                        <td className="p-3 text-slate-700 max-w-xs truncate">
+                          {house.namaJalan || '-'}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                            {house.kategoriBangunan || 'RUMAH_TINGGAL'}
+                          </span>
+                        </td>
+                        <td className="p-3 font-mono text-[10px]">
+                          {hasValidCoords ? (
+                            <span className="text-slate-700">
+                              {Number(house.lat).toFixed(6)}, {Number(house.lng).toFixed(6)}
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold">
+                              ⚠️ Koordinat Kosong
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {onSelectHouseForMap && (
+                              <button
+                                type="button"
+                                onClick={() => onSelectHouseForMap(house)}
+                                className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] cursor-pointer"
+                                title="Buka Titik di Peta WebGIS"
+                              >
+                                📍 Peta
+                              </button>
+                            )}
+                            {onDeleteHouse && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm(`Hapus titik bangunan "${house.namaKepalaKeluarga}" (${house.namaJalan})?`)) {
+                                    onDeleteHouse(house.id, house.namaKepalaKeluarga);
+                                    setSelectedHouseIds((prev) => {
+                                      const next = new Set(prev);
+                                      next.delete(house.id);
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer"
+                                title="Hapus Titik Bangunan Ini"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+          {filteredHouses.length > 500 && (
+            <div className="p-2 text-center text-xs text-slate-500 font-medium">
+              Menampilkan 500 dari {filteredHouses.length} titik. Gunakan pencarian atau filter lingkungan untuk mempersempit data.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================= */}
       {/* MODAL: DETAIL DAFTAR KEPALA KELUARGA (KK) PER JALAN       */}
       {/* ========================================================= */}
       {selectedStreetDetail && (
@@ -1756,7 +2073,7 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
                         <th className="p-2.5">Sanitasi (Jamban &amp; Air)</th>
                         <th className="p-2.5 text-center">PBB</th>
                         <th className="p-2.5 text-center">WRS</th>
-                        <th className="p-2.5 text-center">Aksi Peta</th>
+                        <th className="p-2.5 text-center">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
@@ -1842,18 +2159,43 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
                             </span>
                           </td>
                           <td className="p-2.5 text-center">
-                            {onSelectHouseForMap && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedStreetDetail(null);
-                                  onSelectHouseForMap(house);
-                                }}
-                                className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] cursor-pointer"
-                              >
-                                📍 Peta
-                              </button>
-                            )}
+                            <div className="flex items-center justify-center gap-1.5">
+                              {onSelectHouseForMap && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedStreetDetail(null);
+                                    onSelectHouseForMap(house);
+                                  }}
+                                  className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] cursor-pointer"
+                                  title="Buka di Peta WebGIS"
+                                >
+                                  📍 Peta
+                                </button>
+                              )}
+                              {onDeleteHouse && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm(`Hapus titik rumah "${house.namaKepalaKeluarga}" (${house.namaJalan})?`)) {
+                                      onDeleteHouse(house.id, house.namaKepalaKeluarga);
+                                      setSelectedStreetDetail((prev) =>
+                                        prev
+                                          ? {
+                                              ...prev,
+                                              houses: prev.houses.filter((h) => h.id !== house.id),
+                                            }
+                                          : null
+                                      );
+                                    }
+                                  }}
+                                  className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors cursor-pointer"
+                                  title="Hapus Titik Rumah Ini"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}

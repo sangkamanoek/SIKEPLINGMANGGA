@@ -782,6 +782,31 @@ app.delete('/api/webgis/houses/:id', (req, res) => {
   }
 });
 
+app.post('/api/webgis/houses/bulk-delete', (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (Array.isArray(ids)) {
+      const idSet = new Set(ids);
+      webgisHousesCache = webgisHousesCache.filter((h) => !idSet.has(h.id));
+      saveStoredWebgisHouses(webgisHousesCache);
+      return res.json({ success: true, count: webgisHousesCache.length, deletedCount: ids.length });
+    }
+    return res.status(400).json({ success: false, message: 'Array ID tidak valid' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/webgis/houses/clear-all', (_req, res) => {
+  try {
+    webgisHousesCache = [];
+    saveStoredWebgisHouses(webgisHousesCache);
+    return res.json({ success: true, count: 0, message: 'Semua titik bangunan berhasil dikosongkan' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // =========================================================================
 // PKK KEUANGAN (BUKU KAS UMUM TP PKK) CRUD ENDPOINTS
 // =========================================================================

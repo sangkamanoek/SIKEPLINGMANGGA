@@ -272,6 +272,64 @@ export async function deleteHouseFromFirestore(houseId: string): Promise<boolean
   }
 }
 
+export async function deleteBulkHousesFromFirestore(houseIds: string[]): Promise<boolean> {
+  if (!Array.isArray(houseIds) || houseIds.length === 0) return true;
+  const idSet = new Set(houseIds);
+
+  // Update local cache
+  const current = getLocalHouses();
+  const updated = current.filter((h) => !idSet.has(h.id));
+  saveLocalHouses(updated);
+
+  // 1. Delete on Server Buffer
+  fetch('/api/webgis/houses/bulk-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids: houseIds }),
+  }).catch((err) => {
+    console.warn('Notice bulk deleting houses from server:', err);
+  });
+
+  // 2. Delete on Firestore in batches
+  try {
+    const promises = houseIds.map((id) => {
+      const docRef = doc(db, COLLECTION_HOUSES, id);
+      return deleteDoc(docRef).catch(() => {});
+    });
+    await Promise.all(promises);
+    return true;
+  } catch (e) {
+    console.error('Gagal menghapus bulk houses di Firestore:', e);
+    return false;
+  }
+}
+
+export async function deleteAllHousesFromFirestore(): Promise<boolean> {
+  // Update local cache
+  saveLocalHouses([]);
+
+  // 1. Server clear
+  fetch('/api/webgis/houses/clear-all', {
+    method: 'POST',
+  }).catch((err) => {
+    console.warn('Notice clearing houses on server:', err);
+  });
+
+  // 2. Firestore clear
+  try {
+    const colRef = collection(db, COLLECTION_HOUSES);
+    const snap = await getDocs(colRef);
+    if (!snap.empty) {
+      const deletePromises = snap.docs.map((d) => deleteDoc(d.ref).catch(() => {}));
+      await Promise.all(deletePromises);
+    }
+    return true;
+  } catch (e) {
+    console.error('Gagal mengosongkan rumah di Firestore:', e);
+    return false;
+  }
+}
+
 // ==========================================
 // 3. RUAS JALAN LINGKUNGAN
 // ==========================================

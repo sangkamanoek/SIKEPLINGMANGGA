@@ -54,6 +54,10 @@ import {
   Table,
   Check,
   Sparkles,
+  Crosshair,
+  AlertOctagon,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import {
   UserAccount,
@@ -79,6 +83,8 @@ import {
   fetchAllHouses,
   saveHouseToFirestore,
   deleteHouseFromFirestore,
+  deleteBulkHousesFromFirestore,
+  deleteAllHousesFromFirestore,
   fetchAllRoads,
   saveRoadToFirestore,
   deleteRoadFromFirestore,
@@ -220,6 +226,26 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
   // Add House Form Modal
   const [isHouseModalOpen, setIsHouseModalOpen] = useState(false);
+  const [isManageDeleteModalOpen, setIsManageDeleteModalOpen] = useState(false);
+  const [deleteModalLingkungan, setDeleteModalLingkungan] = useState<string>('all');
+  const [deleteModalSearch, setDeleteModalSearch] = useState<string>('');
+  const [deleteModalSelectedIds, setDeleteModalSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteModalFilterTab, setDeleteModalFilterTab] = useState<'ALL' | 'SUSPICIOUS' | 'SELECTED'>('ALL');
+  const [isProcessingDelete, setIsProcessingDelete] = useState<boolean>(false);
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    action: () => Promise<void>;
+  } | null>(null);
+
+  // Quick Delete Mode on Map
+  const [isQuickDeleteModeActive, setIsQuickDeleteModeActive] = useState<boolean>(false);
+  const isQuickDeleteModeRef = useRef<boolean>(false);
+  useEffect(() => {
+    isQuickDeleteModeRef.current = isQuickDeleteModeActive;
+  }, [isQuickDeleteModeActive]);
+
   const [isKmlTextModalOpen, setIsKmlTextModalOpen] = useState(false);
   const [kmlRawInputText, setKmlRawInputText] = useState('');
   const [editingHouse, setEditingHouse] = useState<TitikRumahBangunan | null>(null);
@@ -1116,6 +1142,10 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
       );
 
       marker.on('click', () => {
+        if (isQuickDeleteModeRef.current) {
+          handleQuickDeleteMarker(h);
+          return;
+        }
         setSelectedHouse(h);
         setSelectedRoad(null);
       });
@@ -1654,6 +1684,153 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
     );
   };
 
+  // Handler: Delete Single House
+  const handleDeleteSingleHouse = async (houseId: string, houseName?: string) => {
+    try {
+      setHouses((prev) => prev.filter((h) => h.id !== houseId));
+      if (selectedHouse?.id === houseId) {
+        setSelectedHouse(null);
+      }
+      await deleteHouseFromFirestore(houseId);
+      onShowToast?.(`Titik bangunan "${houseName || houseId}" berhasil dihapus dari peta & database.`, 'success');
+    } catch (e) {
+      console.error('Error deleting house:', e);
+      onShowToast?.('Gagal menghapus titik bangunan.', 'error');
+    }
+  };
+
+  // Handler: Delete Bulk Houses
+  const handleDeleteBulkHouses = async (houseIds: string[]) => {
+    try {
+      const idSet = new Set(houseIds);
+      setHouses((prev) => prev.filter((h) => !idSet.has(h.id)));
+      if (selectedHouse && idSet.has(selectedHouse.id)) {
+        setSelectedHouse(null);
+      }
+      await deleteBulkHousesFromFirestore(houseIds);
+      onShowToast?.(`${houseIds.length} titik bangunan berhasil dihapus secara permanen.`, 'success');
+    } catch (e) {
+      console.error('Error bulk deleting houses:', e);
+      onShowToast?.('Gagal menghapus titik bangunan massal.', 'error');
+    }
+  };
+
+  // Handler: Delete Houses by Lingkungan
+  const handleDeleteHousesByLingkungan = async (lingkunganId: string) => {
+    try {
+      const targetHouses = houses.filter((h) => h.lingkunganId === lingkunganId);
+      const ids = targetHouses.map((h) => h.id);
+      if (ids.length === 0) {
+        onShowToast?.('Tidak ada titik bangunan di lingkungan tersebut.', 'info');
+        return;
+      }
+      setHouses((prev) => prev.filter((h) => h.lingkunganId !== lingkunganId));
+      await deleteBulkHousesFromFirestore(ids);
+      onShowToast?.(`Semua titik bangunan (${ids.length} titik) di lingkungan tersebut berhasil dihapus.`, 'success');
+    } catch (e) {
+      console.error('Error deleting houses by lingkungan:', e);
+      onShowToast?.('Gagal menghapus titik bangunan lingkungan.', 'error');
+    }
+  };
+
+  // Handler: Clear All Houses
+  const handleClearAllHouses = async () => {
+    try {
+      setHouses([]);
+      setSelectedHouse(null);
+      await deleteAllHousesFromFirestore();
+      onShowToast?.('Seluruh titik bangunan berhasil dikosongkan dari peta WebGIS.', 'success');
+    } catch (e) {
+      console.error('Error clearing all houses:', e);
+      onShowToast?.('Gagal mengosongkan titik bangunan.', 'error');
+    }
+  };
+
+  // Quick Delete Marker on Map (for Misplaced Points)
+  const handleQuickDeleteMarker = (h: TitikRumahBangunan) => {
+    const lk = h.lingkunganNomor || extractNomorLingkungan(h.lingkunganId) || '-';
+    const msg = `⚠️ HAPUS TITIK SALAH LOKASI?\n\n• Nama: ${h.namaKepalaKeluarga || 'Tanpa Nama'}\n• Alamat: ${h.namaJalan || '-'}\n• Lingkungan: Lk ${lk}\n• Koordinat: ${h.lat}, ${h.lng}\n\nApakah Anda yakin ingin menghapus titik bangunan ini dari peta & database karena salah penempatan lokasi?`;
+    if (window.confirm(msg)) {
+      handleDeleteSingleHouse(h.id, h.namaKepalaKeluarga);
+    }
+  };
+
+  // Detection of Suspicious / Misplaced House Points
+  const suspiciousHouses = useMemo(() => {
+    // Kelurahan Mangga rough bounding box in Medan Tuntungan
+    const MIN_LAT = 3.48;
+    const MAX_LAT = 3.55;
+    const MIN_LNG = 98.59;
+    const MAX_LNG = 98.67;
+
+    // Detect duplicate coordinates
+    const coordMap = new Map<string, number>();
+    houses.forEach((h) => {
+      const lat = Number(String(h.lat || '').replace(',', '.'));
+      const lng = Number(String(h.lng || '').replace(',', '.'));
+      if (!isNaN(lat) && !isNaN(lng)) {
+        const key = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
+        coordMap.set(key, (coordMap.get(key) || 0) + 1);
+      }
+    });
+
+    return houses.filter((h) => {
+      const lat = Number(String(h.lat || '').replace(',', '.'));
+      const lng = Number(String(h.lng || '').replace(',', '.'));
+      if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return true;
+      if (lat < MIN_LAT || lat > MAX_LAT || lng < MIN_LNG || lng > MAX_LNG) return true;
+      // Exact default center coordinates
+      if (
+        Math.abs(lat - KELURAHAN_MANGGA_CENTER[0]) < 0.00001 &&
+        Math.abs(lng - KELURAHAN_MANGGA_CENTER[1]) < 0.00001
+      ) {
+        return true;
+      }
+      // Stacked exact coordinates (> 1 house on same micro-coordinate)
+      const key = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
+      if ((coordMap.get(key) || 0) > 1) return true;
+
+      return false;
+    });
+  }, [houses]);
+
+  // Filtered Houses for Delete / Manage Modal
+  const filteredModalHouses = useMemo(() => {
+    return houses.filter((h) => {
+      // Filter Lingkungan
+      if (deleteModalLingkungan !== 'all') {
+        const targetLkNum = extractNomorLingkungan(deleteModalLingkungan);
+        const houseLkNum = h.lingkunganNomor || extractNomorLingkungan(h.lingkunganId);
+        if (h.lingkunganId !== deleteModalLingkungan && houseLkNum !== targetLkNum) {
+          return false;
+        }
+      }
+
+      // Filter Tab: ALL vs SUSPICIOUS vs SELECTED
+      if (deleteModalFilterTab === 'SUSPICIOUS') {
+        const isSuspicious = suspiciousHouses.some((sh) => sh.id === h.id);
+        if (!isSuspicious) return false;
+      } else if (deleteModalFilterTab === 'SELECTED') {
+        if (!deleteModalSelectedIds.has(h.id)) return false;
+      }
+
+      // Search Query
+      if (deleteModalSearch.trim()) {
+        const q = deleteModalSearch.toLowerCase().trim();
+        const matchName = (h.namaKepalaKeluarga || '').toLowerCase().includes(q);
+        const matchJalan = (h.namaJalan || '').toLowerCase().includes(q);
+        const matchNop = (h.nopPbb || '').toLowerCase().includes(q);
+        const matchCatatan = (h.catatan || '').toLowerCase().includes(q);
+        const matchFasilitas = (h.jenisFasilitas || '').toLowerCase().includes(q);
+        if (!matchName && !matchJalan && !matchNop && !matchCatatan && !matchFasilitas) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [houses, deleteModalLingkungan, deleteModalFilterTab, deleteModalSearch, suspiciousHouses, deleteModalSelectedIds]);
+
   // Handler: Save Road
   const handleSaveRoad = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1856,32 +2033,36 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto px-1 sm:px-2 pb-12 animate-fade-in">
-      {/* Top Header Card */}
-      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white rounded-2xl p-5 border border-emerald-700/60 shadow-lg relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border border-emerald-500/40 flex items-center gap-1">
-                <Compass className="w-3 h-3 text-emerald-400" />
-                SISTEM INFORMASI GEOGRAFIS (WEBGIS)
+      {/* Top Header Card: Branding & View Mode Switcher */}
+      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white rounded-3xl p-5 sm:p-6 border border-emerald-700/60 shadow-xl relative overflow-hidden">
+        {/* Subtle decorative background glow */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          {/* Left: Branding & Overview */}
+          <div className="space-y-2 max-w-2xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs">
+                <Compass className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>SISTEM INFORMASI GEOGRAFIS (WEBGIS)</span>
               </span>
-              <span className="bg-amber-500/20 text-amber-300 text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-amber-500/40">
-                24 LINGKUNGAN MANGGA
+              <span className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs">
+                <span>📍 24 LINGKUNGAN MANGGA</span>
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white flex items-center gap-2">
               <span>Pemetaan Wilayah, Infrastruktur &amp; WRS</span>
             </h2>
-            <p className="text-xs text-slate-300 max-w-2xl">
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               Visualisasi batas poligon 24 lingkungan, titik rumah warga, kepatuhan Wajib Retribusi
               Sampah (WRS), penerima bantuan sosial, dan kondisi ruas jalan.
             </p>
           </div>
 
-          {/* Quick Action Buttons & Master Mode Switcher */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* View Mode Switcher: PETA SPASIAL vs TABULASI TERPADU */}
-            <div className="inline-flex rounded-2xl bg-black/40 p-1 border border-emerald-500/50 text-xs font-black shadow-inner mr-1">
+          {/* Right: Master Mode Switcher & Real-time Cloud Sync */}
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            {/* View Mode Switcher: PETA SPASIAL vs TABULASI TERPADU vs DATA KELUARGA */}
+            <div className="inline-flex rounded-2xl bg-black/50 p-1.5 border border-white/10 backdrop-blur-md shadow-inner">
               <button
                 type="button"
                 onClick={() => {
@@ -1892,9 +2073,9 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                     }
                   }, 150);
                 }}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                   gisViewTab === 'PETA'
-                    ? 'bg-emerald-500 text-slate-950 font-black shadow-md'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-md scale-[1.02]'
                     : 'text-emerald-200 hover:text-white hover:bg-white/10'
                 }`}
               >
@@ -1904,15 +2085,15 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
               <button
                 type="button"
                 onClick={() => setGisViewTab('TABULASI')}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                   gisViewTab === 'TABULASI'
-                    ? 'bg-emerald-500 text-slate-950 font-black shadow-md'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black shadow-md scale-[1.02]'
                     : 'text-emerald-200 hover:text-white hover:bg-white/10'
                 }`}
               >
                 <Table className="w-4 h-4" />
                 <span>📊 Tabulasi Data</span>
-                <span className="bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded-full text-[9px] font-black">
+                <span className="bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase">
                   Baru
                 </span>
               </button>
@@ -1920,7 +2101,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                 <button
                   type="button"
                   onClick={onOpenDatabaseKeluarga}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-emerald-200 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-emerald-200 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
                   title="Buka Database Master Data Keluarga"
                 >
                   <Users className="w-4 h-4 text-emerald-300" />
@@ -1929,160 +2110,201 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
               )}
             </div>
 
-            {/* Draw Polygon Button */}
-            {!isDrawingPolygon ? (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleStartDrawPolygon(
-                      isKepling
-                        ? currentUser.id
-                        : filterLingkungan === 'all'
-                        ? 'kepling_1'
-                        : filterLingkungan
-                    )
-                  }
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-md cursor-pointer transition-transform hover:scale-[1.02]"
-                  title="Gambar poligon batas wilayah lingkungan langsung di atas peta"
-                >
-                  <Edit3 className="w-4 h-4 text-slate-950" />
-                  <span>Gambar Batas Wilayah</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetAllPolygons}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md cursor-pointer transition-colors"
-                  title="Hapus semua batas poligon lama untuk digambar ulang dari awal"
-                >
-                  <span>🗑️ Hapus Peta Lama</span>
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 bg-amber-950/90 p-1.5 rounded-xl border border-amber-500/60 animate-pulse">
-                <button
-                  type="button"
-                  onClick={() => setDrawnPoints((prev) => prev.slice(0, -1))}
-                  className="px-2.5 py-1 rounded-lg bg-amber-900 text-amber-200 text-xs font-bold hover:bg-amber-800 cursor-pointer"
-                >
-                  ↩️ Titik Terakhir
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveDrawnPolygon}
-                  className="px-3 py-1 rounded-lg bg-emerald-500 text-white text-xs font-black hover:bg-emerald-400 shadow-xs cursor-pointer"
-                >
-                  💾 Simpan Batas
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsDrawingPolygon(false);
-                    setDrawnPoints([]);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-red-900 text-red-200 text-xs font-bold hover:bg-red-800 cursor-pointer"
-                >
-                  ✖️ Batal
-                </button>
-              </div>
-            )}
-
-            {/* Add Building Pin */}
-            <button
-              type="button"
-              onClick={() => {
-                setEditingHouse(null);
-                setHouseForm(getEmptyHouseFormData(isKepling ? currentUser.id : 'kepling_1'));
-                setGoogleMapsUrlInput('');
-                setDetectedStreetOverlay(null);
-                setMatchedPbbItem(null);
-                setIsPbbPickerOpen(false);
-                setIsHouseModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md cursor-pointer transition-transform hover:scale-[1.02]"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Tambah Titik Bangunan</span>
-            </button>
-
-            {/* Add Road */}
-            <button
-              type="button"
-              onClick={() => {
-                setRoadForm((prev) => ({
-                  ...prev,
-                  lingkunganId: isKepling ? currentUser.id : 'kepling_1',
-                }));
-                setIsRoadModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Ruas Jalan</span>
-            </button>
-
-            {/* Import KML */}
-            <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-800 hover:bg-teal-700 text-teal-100 text-xs font-bold border border-teal-600/50 cursor-pointer">
-              <Upload className="w-4 h-4" />
-              <span>Import KML</span>
-              <input
-                ref={kmlInputRef}
-                type="file"
-                accept=".kml,.kmz,.xml,.geojson,.json,.txt"
-                onChange={handleImportKML}
-                className="hidden"
-              />
-            </label>
-
-            {/* Paste KML Teks Button */}
-            <button
-              type="button"
-              onClick={() => setIsKmlTextModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-700 hover:bg-teal-600 text-teal-100 text-xs font-bold border border-teal-500/50 cursor-pointer"
-            >
-              <span>📝 Paste KML Teks</span>
-            </button>
-
-            {/* Export Excel */}
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-950 hover:bg-emerald-900 text-emerald-200 text-xs font-bold border border-emerald-700/60 cursor-pointer"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-              <span>Ekspor Excel</span>
-            </button>
-
             {/* Sync WebGIS Real-time */}
             <button
               type="button"
               onClick={handleManualSyncWebgis}
               disabled={isSyncingWebgis}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black shadow-md cursor-pointer transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black shadow-md cursor-pointer transition-all ${
                 isSyncingWebgis
                   ? 'bg-blue-900 text-blue-200 border border-blue-600/60 cursor-wait'
                   : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border border-blue-400/40 hover:scale-[1.02]'
               }`}
-              title="Sinkronkan data WebGIS langsung dengan Cloud Firestore & server"
+              title="Sinkronkan data WebGIS langsung dengan Cloud Firestore"
             >
               <RefreshCw className={`w-4 h-4 ${isSyncingWebgis ? 'animate-spin text-blue-300' : 'text-white'}`} />
-              <span>{isSyncingWebgis ? 'Menyinkronkan...' : 'Sinkronkan WebGIS'}</span>
+              <span className="hidden sm:inline">{isSyncingWebgis ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
             </button>
           </div>
         </div>
 
         {/* Drawing Guidance Alert */}
         {isDrawingPolygon && (
-          <div className="mt-3 p-3 bg-amber-500/20 border border-amber-400/50 rounded-xl text-xs text-amber-200 flex items-center justify-between gap-3">
+          <div className="mt-4 p-3.5 bg-amber-500/20 border border-amber-400/50 rounded-2xl text-xs text-amber-200 flex flex-wrap items-center justify-between gap-3 animate-fade-in">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
               <span>
-                <b>Mode Gambar Aktif:</b> Ketuk atau klik peta pada setiap titik sudut wilayah
-                (minimal 3 titik). Saat ini terpasang: <b>{drawnPoints.length} titik</b>.
+                <b>Mode Gambar Aktif:</b> Ketuk atau klik peta pada setiap titik sudut wilayah (minimal 3 titik). Saat ini terpasang: <b>{drawnPoints.length} titik</b>.
               </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDrawnPoints((prev) => prev.slice(0, -1))}
+                className="px-2.5 py-1 rounded-lg bg-amber-900 text-amber-200 text-xs font-bold hover:bg-amber-800 cursor-pointer"
+              >
+                ↩️ Titik Terakhir
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveDrawnPolygon}
+                className="px-3 py-1 rounded-lg bg-emerald-500 text-white text-xs font-black hover:bg-emerald-400 shadow-xs cursor-pointer"
+              >
+                💾 Simpan Batas
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDrawingPolygon(false);
+                  setDrawnPoints([]);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-red-900 text-red-200 text-xs font-bold hover:bg-red-800 cursor-pointer"
+              >
+                ✖️ Batal
+              </button>
             </div>
           </div>
         )}
+      </div>
+
+      {/* Dedicated Modern Action & Management Bar */}
+      <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/90 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        {/* Left Side: Create Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Add Building Pin */}
+          <button
+            type="button"
+            onClick={() => {
+              setEditingHouse(null);
+              setHouseForm(getEmptyHouseFormData(isKepling ? currentUser.id : 'kepling_1'));
+              setGoogleMapsUrlInput('');
+              setDetectedStreetOverlay(null);
+              setMatchedPbbItem(null);
+              setIsPbbPickerOpen(false);
+              setIsHouseModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black shadow-md cursor-pointer transition-all hover:scale-[1.02]"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Tambah Titik Bangunan</span>
+          </button>
+
+          {/* Add Road */}
+          <button
+            type="button"
+            onClick={() => {
+              setRoadForm((prev) => ({
+                ...prev,
+                lingkunganId: isKepling ? currentUser.id : 'kepling_1',
+              }));
+              setIsRoadModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 cursor-pointer transition-all hover:scale-[1.01]"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Ruas Jalan</span>
+          </button>
+
+          {/* Draw Polygon Boundary */}
+          {!isDrawingPolygon && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  handleStartDrawPolygon(
+                    isKepling
+                      ? currentUser.id
+                      : filterLingkungan === 'all'
+                      ? 'kepling_1'
+                      : filterLingkungan
+                  )
+                }
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-sm cursor-pointer transition-all hover:scale-[1.01]"
+                title="Gambar poligon batas wilayah lingkungan langsung di atas peta"
+              >
+                <Edit3 className="w-4 h-4 text-slate-950" />
+                <span>Gambar Batas</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetAllPolygons}
+                className="p-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 text-xs font-bold border border-slate-200 hover:border-rose-200 cursor-pointer transition-colors"
+                title="Hapus semua batas poligon lama untuk digambar ulang dari awal"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Center / Right: PROMINENT HAPUS MASSAL & QUICK DELETE & IMPORT/EXPORT */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* THE PROMINENT "HAPUS MASSAL" BUTTON */}
+          <button
+            type="button"
+            onClick={() => setIsManageDeleteModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 via-rose-700 to-red-700 hover:from-rose-500 hover:to-red-600 text-white text-xs font-black shadow-md cursor-pointer transition-all hover:scale-[1.02] active:scale-95 border border-rose-400/40"
+            title="Buka panel Hapus Massal: hapus titik salah penempatan lokasi, per lingkungan, atau titik terpilih"
+          >
+            <Trash2 className="w-4 h-4 text-white" />
+            <span>HAPUS MASSAL TITIK</span>
+            {suspiciousHouses.length > 0 && (
+              <span className="bg-white text-rose-700 text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                {suspiciousHouses.length} Salah
+              </span>
+            )}
+          </button>
+
+          {/* Quick Click-to-Delete Mode on Map Canvas */}
+          <button
+            type="button"
+            onClick={() => setIsQuickDeleteModeActive((prev) => !prev)}
+            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-black shadow-xs cursor-pointer transition-all ${
+              isQuickDeleteModeActive
+                ? 'bg-rose-600 text-white ring-2 ring-rose-400 shadow-md animate-pulse'
+                : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+            }`}
+            title="Klik langsung titik di peta untuk menghapus yang salah penempatan lokasi"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+            <span>{isQuickDeleteModeActive ? '🛑 Matikan Hapus di Peta' : '⚡ Hapus di Peta'}</span>
+          </button>
+
+          <div className="h-6 w-px bg-slate-200 hidden sm:block mx-1" />
+
+          {/* Import KML */}
+          <label className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold border border-teal-200 cursor-pointer transition-colors">
+            <Upload className="w-3.5 h-3.5 text-teal-600" />
+            <span>Import KML</span>
+            <input
+              ref={kmlInputRef}
+              type="file"
+              accept=".kml,.kmz,.xml,.geojson,.json,.txt"
+              onChange={handleImportKML}
+              className="hidden"
+            />
+          </label>
+
+          {/* Paste KML Teks */}
+          <button
+            type="button"
+            onClick={() => setIsKmlTextModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-200 cursor-pointer transition-colors"
+          >
+            <span>📝 Paste KML</span>
+          </button>
+
+          {/* Export Excel */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 cursor-pointer transition-colors"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Ekspor Excel</span>
+          </button>
+        </div>
       </div>
 
       {/* CONDITIONAL CONTENT: TABULASI TERPADU vs PETA WEBGIS */}
@@ -2093,13 +2315,17 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
           currentUser={currentUser}
           onShowToast={onShowToast}
           onOpenDatabaseKeluarga={onOpenDatabaseKeluarga}
+          onDeleteHouse={(houseId, houseName) => handleDeleteSingleHouse(houseId, houseName)}
+          onDeleteBulkHouses={(houseIds) => handleDeleteBulkHouses(houseIds)}
+          onClearAllHouses={() => handleClearAllHouses()}
+          onDeleteHousesByLingkungan={(lingId) => handleDeleteHousesByLingkungan(lingId)}
           onSelectHouseForMap={(house) => {
             setGisViewTab('PETA');
             setSelectedHouse(house);
             setTimeout(() => {
-              if (mapInstanceRef.current) {
+              if (mapInstanceRef.current && house.lat && house.lng) {
                 mapInstanceRef.current.invalidateSize();
-                mapInstanceRef.current.flyTo([house.lat, house.lng], 19, { animate: true, duration: 1.2 });
+                mapInstanceRef.current.flyTo([Number(house.lat), Number(house.lng)], 19, { animate: true, duration: 1.2 });
               }
             }, 200);
           }}
@@ -2590,6 +2816,33 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
             </div>
           )}
 
+          {/* Active Quick Delete Mode Banner */}
+          {isQuickDeleteModeActive && (
+            <div className="absolute top-3 left-3 right-3 z-[1000] bg-rose-950/95 text-white p-3 rounded-2xl border-2 border-rose-400 shadow-2xl flex items-center justify-between backdrop-blur-md animate-pulse">
+              <div className="flex items-center gap-3 text-xs">
+                <Trash2 className="w-5 h-5 text-rose-400 shrink-0 animate-bounce" />
+                <div>
+                  <div className="font-black text-rose-300 text-xs sm:text-sm flex items-center gap-2">
+                    <span>⚡ MODE HAPUS CEPAT AKTIF (SALAH LOKASI)</span>
+                    <span className="bg-rose-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Klik Titik di Peta
+                    </span>
+                  </div>
+                  <div className="text-[10px] sm:text-xs text-rose-100">
+                    Klik langsung titik bangunan mana saja di peta yang salah penempatan lokasi untuk langsung menghapusnya dari database.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQuickDeleteModeActive(false)}
+                className="px-3 py-1.5 rounded-xl bg-white text-rose-950 font-black text-xs hover:bg-rose-100 cursor-pointer shadow-sm shrink-0"
+              >
+                Selesai / Matikan
+              </button>
+            </div>
+          )}
+
           {/* Floating Map Legend (Bottom-Left) */}
           <div className="absolute bottom-3 left-3 z-[1000] bg-slate-900/90 backdrop-blur-md text-white p-3 rounded-2xl border border-slate-700/80 shadow-lg text-[10px] space-y-1.5 max-w-[240px]">
             {filterTheme === 'HEATMAP' ? (
@@ -2999,18 +3252,20 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                 <button
                   type="button"
                   onClick={async () => {
-                    if (confirm(`Hapus titik rumah ${selectedHouse.namaKepalaKeluarga}?`)) {
-                      const houseId = selectedHouse.id;
-                      setHouses((prev) => prev.filter((h) => h.id !== houseId));
-                      setSelectedHouse(null);
-                      deleteHouseFromFirestore(houseId).catch(() => {});
-                      onShowToast?.('Titik rumah berhasil dihapus', 'info');
+                    const lk = selectedHouse.lingkunganNomor || extractNomorLingkungan(selectedHouse.lingkunganId) || '-';
+                    if (
+                      window.confirm(
+                        `⚠️ HAPUS TITIK BANGUNAN INI?\n\n• Nama: ${selectedHouse.namaKepalaKeluarga || 'Tanpa Nama'}\n• Alamat: ${selectedHouse.namaJalan || '-'}\n• Lingkungan: Lk ${lk}\n• Koordinat: ${selectedHouse.lat}, ${selectedHouse.lng}\n\nApakah Anda yakin ingin menghapus titik ini dari peta & database karena salah penempatan lokasi?`
+                      )
+                    ) {
+                      await handleDeleteSingleHouse(selectedHouse.id, selectedHouse.namaKepalaKeluarga);
                     }
                   }}
-                  className="p-1.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 cursor-pointer"
-                  title="Hapus Rumah"
+                  className="py-1.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+                  title="Hapus titik bangunan ini dari peta & database"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hapus Titik</span>
                 </button>
               </div>
             </div>
@@ -4617,6 +4872,27 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
               </div>
 
               <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                {editingHouse && (
+                  <button
+                    type="button"
+                    disabled={isSavingHouse}
+                    onClick={async () => {
+                      if (
+                        window.confirm(
+                          `⚠️ HAPUS TITIK BANGUNAN INI?\n\n• Nama: ${editingHouse.namaKepalaKeluarga || 'Tanpa Nama'}\n• Alamat: ${editingHouse.namaJalan || '-'}\n• Koordinat: ${editingHouse.lat}, ${editingHouse.lng}\n\nApakah Anda yakin ingin menghapus titik ini secara permanen dari peta WebGIS & Firestore karena salah penempatan lokasi?`
+                        )
+                      ) {
+                        setIsHouseModalOpen(false);
+                        await handleDeleteSingleHouse(editingHouse.id, editingHouse.namaKepalaKeluarga);
+                      }
+                    }}
+                    className="py-2.5 px-3.5 rounded-xl bg-rose-50 text-rose-700 font-bold border border-rose-200 hover:bg-rose-100 cursor-pointer flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 shrink-0"
+                    title="Hapus titik bangunan ini dari database"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-600" />
+                    <span>Hapus Titik</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={isSavingHouse}
@@ -4822,6 +5098,633 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   Proses & Simpan Peta
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: KELOLA & HAPUS TITIK BANGUNAN (SALAH PENEMPATAN LOKASI) */}
+      {isManageDeleteModalOpen && (
+        <div className="fixed inset-0 z-[2500] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-5xl w-full h-[92vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-rose-900 via-rose-800 to-red-900 text-white px-5 py-4 flex items-center justify-between shrink-0 shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-500/30 border border-rose-400/40 rounded-2xl shadow-inner">
+                  <Trash2 className="w-5 h-5 text-rose-200" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base sm:text-lg flex items-center gap-2">
+                    <span>Kelola & Hapus Titik Bangunan</span>
+                    <span className="bg-rose-500/40 text-rose-200 text-[10px] font-black px-2 py-0.5 rounded-full border border-rose-400/40 uppercase tracking-wider">
+                      Salah Penempatan Lokasi
+                    </span>
+                  </h3>
+                  <p className="text-xs text-rose-200">
+                    Pembersihan titik koordinat salah tempat, bertumpuk, atau di luar batas wilayah Kelurahan Mangga.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManageDeleteModalOpen(false)}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-rose-100 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Filter & Toolbar */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 space-y-3 shrink-0">
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Search Input */}
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Cari nama warga, jalan, NOP, atau catatan..."
+                    value={deleteModalSearch}
+                    onChange={(e) => setDeleteModalSearch(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-hidden"
+                  />
+                  {deleteModalSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteModalSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Lingkungan Selector */}
+                {isAdmin ? (
+                  <select
+                    value={deleteModalLingkungan}
+                    onChange={(e) => {
+                      setDeleteModalLingkungan(e.target.value);
+                      setDeleteModalSelectedIds(new Set());
+                    }}
+                    className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold bg-white text-slate-800 shadow-2xs focus:ring-2 focus:ring-rose-500 shrink-0"
+                  >
+                    <option value="all">🌐 Semua Lingkungan (24 Lingkungan)</option>
+                    {KEPLING_ACCOUNTS.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.lingkungan} — {acc.nama}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="px-3 py-2 rounded-xl border border-rose-300 text-xs font-bold bg-rose-50 text-rose-900 shrink-0">
+                    📍 {currentUser.lingkungan}
+                  </div>
+                )}
+              </div>
+
+              {/* Tabs: Semua vs Terindikasi Salah vs Terpilih */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200">
+                <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModalFilterTab('ALL')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      deleteModalFilterTab === 'ALL'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
+                    }`}
+                  >
+                    <span>📌 Semua Titik</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                      deleteModalFilterTab === 'ALL' ? 'bg-slate-700 text-slate-100' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {houses.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModalFilterTab('SUSPICIOUS')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      deleteModalFilterTab === 'SUSPICIOUS'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+                    }`}
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                    <span>⚠️ Terindikasi Salah Lokasi</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                      deleteModalFilterTab === 'SUSPICIOUS' ? 'bg-rose-800 text-white' : 'bg-rose-200 text-rose-900'
+                    }`}>
+                      {suspiciousHouses.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModalFilterTab('SELECTED')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      deleteModalFilterTab === 'SELECTED'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
+                    }`}
+                  >
+                    <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>☑️ Terpilih</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                      deleteModalFilterTab === 'SELECTED' ? 'bg-emerald-900 text-white' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {deleteModalSelectedIds.size}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Batch Action Buttons */}
+                <div className="flex items-center gap-2">
+                  {deleteModalSelectedIds.size > 0 && (
+                    <button
+                      type="button"
+                      disabled={isProcessingDelete}
+                      onClick={() => {
+                        const count = deleteModalSelectedIds.size;
+                        setDeleteConfirmDialog({
+                          isOpen: true,
+                          title: `Hapus ${count} Titik Terpilih?`,
+                          description: `Apakah Anda yakin ingin menghapus ${count} titik bangunan terpilih secara permanen dari peta WebGIS dan database Cloud Firestore? Titik-titik ini tidak dapat dipulihkan.`,
+                          action: async () => {
+                            setIsProcessingDelete(true);
+                            await handleDeleteBulkHouses(Array.from(deleteModalSelectedIds));
+                            setDeleteModalSelectedIds(new Set());
+                            setIsProcessingDelete(false);
+                            setDeleteConfirmDialog(null);
+                          },
+                        });
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95 animate-pulse transition-transform"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus {deleteModalSelectedIds.size} Terpilih</span>
+                    </button>
+                  )}
+
+                  {deleteModalLingkungan !== 'all' && (
+                    <button
+                      type="button"
+                      disabled={isProcessingDelete}
+                      onClick={() => {
+                        const acc = KEPLING_ACCOUNTS.find((k) => k.id === deleteModalLingkungan);
+                        const lingName = acc ? acc.lingkungan : deleteModalLingkungan;
+                        const lingHouses = houses.filter((h) => h.lingkunganId === deleteModalLingkungan);
+                        setDeleteConfirmDialog({
+                          isOpen: true,
+                          title: `Hapus Semua Titik di ${lingName}?`,
+                          description: `PERINGATAN: Anda akan menghapus SEMUA titik bangunan (${lingHouses.length} titik) di ${lingName} dari peta WebGIS & database Cloud Firestore. Tindakan ini akan mengosongkan titik di lingkungan tersebut.`,
+                          action: async () => {
+                            setIsProcessingDelete(true);
+                            await handleDeleteHousesByLingkungan(deleteModalLingkungan);
+                            setDeleteModalSelectedIds(new Set());
+                            setIsProcessingDelete(false);
+                            setDeleteConfirmDialog(null);
+                          },
+                        });
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-300 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Hapus Semua Titik Lingkungan Ini</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Dedicated Quick Mass Actions Banner */}
+              <div className="p-3 bg-gradient-to-r from-rose-50 via-red-50 to-amber-50 rounded-2xl border border-rose-200 flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-rose-600 text-white rounded-xl shadow-xs">
+                    <Trash2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-rose-950 flex items-center gap-1.5">
+                      <span>TINDAKAN HAPUS MASSAL CEPAT</span>
+                      <span className="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
+                        1-Klik
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-rose-700">
+                      Pilih aksi pembersihan massal otomatis untuk titik yang salah penempatan lokasi.
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Hapus Massal Titik Salah Lokasi */}
+                  {suspiciousHouses.length > 0 && (
+                    <button
+                      type="button"
+                      disabled={isProcessingDelete}
+                      onClick={() => {
+                        const count = suspiciousHouses.length;
+                        setDeleteConfirmDialog({
+                          isOpen: true,
+                          title: `Hapus Massal ${count} Titik Salah Lokasi?`,
+                          description: `Anda akan menghapus ${count} titik bangunan yang terdeteksi berada di luar batas Kelurahan Mangga, berkoordinat ganda/bertumpuk, atau berkoordinat default secara massal. Tindakan ini permanen.`,
+                          action: async () => {
+                            setIsProcessingDelete(true);
+                            await handleDeleteBulkHouses(suspiciousHouses.map((h) => h.id));
+                            setDeleteModalSelectedIds(new Set());
+                            setIsProcessingDelete(false);
+                            setDeleteConfirmDialog(null);
+                          },
+                        });
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-700 to-red-700 hover:from-rose-600 hover:to-red-600 text-white text-xs font-black shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-200" />
+                      <span>Hapus Massal {suspiciousHouses.length} Titik Salah Lokasi</span>
+                    </button>
+                  )}
+
+                  {/* Hapus Massal Terpilih */}
+                  {deleteModalSelectedIds.size > 0 && (
+                    <button
+                      type="button"
+                      disabled={isProcessingDelete}
+                      onClick={() => {
+                        const count = deleteModalSelectedIds.size;
+                        setDeleteConfirmDialog({
+                          isOpen: true,
+                          title: `Hapus Massal ${count} Titik Tercentang?`,
+                          description: `Apakah Anda yakin ingin menghapus ${count} titik bangunan yang dicentang secara permanen?`,
+                          action: async () => {
+                            setIsProcessingDelete(true);
+                            await handleDeleteBulkHouses(Array.from(deleteModalSelectedIds));
+                            setDeleteModalSelectedIds(new Set());
+                            setIsProcessingDelete(false);
+                            setDeleteConfirmDialog(null);
+                          },
+                        });
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus Massal {deleteModalSelectedIds.size} Tercentang</span>
+                    </button>
+                  )}
+
+                  {/* Kosongkan Semua Titik Peta (Admin) */}
+                  {isAdmin && houses.length > 0 && (
+                    <button
+                      type="button"
+                      disabled={isProcessingDelete}
+                      onClick={() => {
+                        setDeleteConfirmDialog({
+                          isOpen: true,
+                          title: `⚠️ HAPUS MASSAL SELURUH TITIK PETA (${houses.length} Titik)?`,
+                          description: `PERINGATAN TINGKAT TINGGI: Tindakan ini akan mengosongkan SELURUH ${houses.length} titik bangunan di peta WebGIS untuk seluruh 24 Lingkungan Kelurahan Mangga. Gunakan jika Anda ingin memulai pemetaan ulang dari nol.`,
+                          action: async () => {
+                            setIsProcessingDelete(true);
+                            await handleClearAllHouses();
+                            setDeleteModalSelectedIds(new Set());
+                            setIsProcessingDelete(false);
+                            setDeleteConfirmDialog(null);
+                          },
+                        });
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-rose-100 text-rose-800 border border-rose-300 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Kosongkan seluruh titik bangunan peta WebGIS"
+                    >
+                      <span>⚠️ Kosongkan Semua Titik</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Selection Bar: Select All / Deselect All */}
+              <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (deleteModalSelectedIds.size === filteredModalHouses.length && filteredModalHouses.length > 0) {
+                        setDeleteModalSelectedIds(new Set());
+                      } else {
+                        setDeleteModalSelectedIds(new Set(filteredModalHouses.map((h) => h.id)));
+                      }
+                    }}
+                    className="flex items-center gap-1.5 font-bold text-slate-700 hover:text-slate-900 cursor-pointer"
+                  >
+                    {deleteModalSelectedIds.size === filteredModalHouses.length && filteredModalHouses.length > 0 ? (
+                      <>
+                        <CheckSquare className="w-4 h-4 text-rose-600" />
+                        <span>Batal Pilih Semua</span>
+                      </>
+                    ) : (
+                      <>
+                        <Square className="w-4 h-4 text-slate-400" />
+                        <span>Pilih Semua di Daftar Ini ({filteredModalHouses.length})</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div>
+                  Menampilkan <b>{filteredModalHouses.length}</b> dari {houses.length} total titik bangunan
+                </div>
+              </div>
+            </div>
+
+            {/* List of Houses */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+              {filteredModalHouses.length === 0 ? (
+                <div className="p-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                  <div className="w-14 h-14 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+                    🔍
+                  </div>
+                  <h4 className="font-black text-slate-800 text-sm">Tidak ada titik bangunan yang cocok</h4>
+                  <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                    {deleteModalFilterTab === 'SUSPICIOUS'
+                      ? 'Luar biasa! Tidak ada titik bangunan yang terdeteksi berada di luar batas atau memiliki koordinat ganda/abnormal.'
+                      : deleteModalFilterTab === 'SELECTED'
+                      ? 'Belum ada titik yang dipilih. Beri centang pada kotak di samping nama warga untuk memilih titik yang ingin dihapus.'
+                      : 'Coba ubah kata kunci pencarian atau ganti filter lingkungan di atas.'}
+                  </p>
+                </div>
+              ) : (
+                filteredModalHouses.map((house) => {
+                  const isSelected = deleteModalSelectedIds.has(house.id);
+                  const isSuspicious = suspiciousHouses.some((sh) => sh.id === house.id);
+                  const lkNum = house.lingkunganNomor || extractNomorLingkungan(house.lingkunganId) || '-';
+                  const latNum = Number(String(house.lat || '').replace(',', '.'));
+                  const lngNum = Number(String(house.lng || '').replace(',', '.'));
+
+                  let suspiciousReason = '';
+                  if (isNaN(latNum) || isNaN(lngNum) || latNum === 0 || lngNum === 0) {
+                    suspiciousReason = 'Koordinat tidak valid / kosong (0, 0)';
+                  } else if (latNum < 3.48 || latNum > 3.55 || lngNum < 98.59 || lngNum > 98.67) {
+                    suspiciousReason = 'Koordinat berada di luar wilayah Kelurahan Mangga';
+                  } else if (
+                    Math.abs(latNum - KELURAHAN_MANGGA_CENTER[0]) < 0.00001 &&
+                    Math.abs(lngNum - KELURAHAN_MANGGA_CENTER[1]) < 0.00001
+                  ) {
+                    suspiciousReason = 'Menggunakan koordinat default kantor tanpa disesuaikan';
+                  } else {
+                    suspiciousReason = 'Koordinat bertumpuk persis dengan titik lain';
+                  }
+
+                  return (
+                    <div
+                      key={house.id}
+                      className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-rose-50/80 border-rose-300 shadow-xs'
+                          : isSuspicious
+                          ? 'bg-amber-50/50 border-amber-200 hover:border-amber-300'
+                          : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+                      }`}
+                    >
+                      {/* Checkbox & Details */}
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {
+                            setDeleteModalSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(house.id)) {
+                                next.delete(house.id);
+                              } else {
+                                next.add(house.id);
+                              }
+                              return next;
+                            });
+                          }}
+                          className="mt-1 w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer shrink-0"
+                        />
+
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-900 text-white font-black text-[10px]">
+                              Lk {lkNum}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              house.kategoriBangunan === 'RUMAH_TINGGAL' || !house.kategoriBangunan
+                                ? 'bg-blue-100 text-blue-800'
+                                : house.kategoriBangunan === 'RUMAH_IBADAH'
+                                ? 'bg-teal-100 text-teal-800'
+                                : house.kategoriBangunan === 'FASILITAS_KESEHATAN'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-purple-100 text-purple-800'
+                            }`}>
+                              {house.kategoriBangunan ? house.kategoriBangunan.replace('_', ' ') : 'RUMAH TINGGAL'}
+                            </span>
+                            {house.isKkMangga === false && (
+                              <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
+                                KK Luar
+                              </span>
+                            )}
+                            {house.statusWrs && (
+                              <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                                WRS {house.statusWrs}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="font-black text-slate-900 text-xs sm:text-sm truncate">
+                            {house.namaKepalaKeluarga || 'Tanpa Nama Kepala Keluarga'}
+                            {house.nomorRumah ? ` (No. ${house.nomorRumah})` : ''}
+                          </div>
+
+                          <div className="text-xs text-slate-600 flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span>🛣️ {house.namaJalan || 'Alamat Belum Diisi'}</span>
+                            {house.nopPbb && <span>🏛️ NOP: <b className="font-mono">{house.nopPbb}</b></span>}
+                            <span className="font-mono text-[11px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                              📍 {latNum.toFixed(6)}, {lngNum.toFixed(6)}
+                            </span>
+                          </div>
+
+                          {isSuspicious && (
+                            <div className="text-[11px] text-rose-700 font-bold bg-rose-100/80 px-2 py-0.5 rounded-lg inline-flex items-center gap-1.5 border border-rose-200">
+                              <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                              <span>{suspiciousReason}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                        {/* Fly to Map */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsManageDeleteModalOpen(false);
+                            setGisViewTab('PETA');
+                            setSelectedHouse(house);
+                            setTimeout(() => {
+                              if (mapInstanceRef.current && house.lat && house.lng) {
+                                mapInstanceRef.current.invalidateSize();
+                                mapInstanceRef.current.flyTo([Number(house.lat), Number(house.lng)], 19, {
+                                  animate: true,
+                                  duration: 1.2,
+                                });
+                              }
+                            }, 250);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Tinjau posisi titik ini langsung di peta WebGIS"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="hidden sm:inline">Tinjau di Peta</span>
+                        </button>
+
+                        {/* Edit / Reposition Coordinate */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingHouse(house);
+                            setHouseForm({
+                              lingkunganId: house.lingkunganId,
+                              namaJalan: house.namaJalan || '',
+                              nomorRumah: house.nomorRumah || '',
+                              namaKepalaKeluarga: house.namaKepalaKeluarga || '',
+                              nikKk: house.nikKk || '',
+                              jumlahJiwa: house.jumlahJiwa || 0,
+                              jumlahLakiLaki: house.jumlahLakiLaki || 0,
+                              jumlahPerempuan: house.jumlahPerempuan || 0,
+                              jumlahLansia: house.jumlahLansia || 0,
+                              jumlahAnak: house.jumlahAnak || 0,
+                              pekerjaanKk: house.pekerjaanKk || '',
+                              penerimaBansos: house.penerimaBansos || false,
+                              jenisBansos: house.jenisBansos || [],
+                              desilKesejahteraan: house.desilKesejahteraan || house.desilBansos || '',
+                              desilBansos: house.desilKesejahteraan || house.desilBansos || '',
+                              kategoriRentan: house.kategoriRentan || false,
+                              jambanKeluarga: house.jambanKeluarga || 'Jamban Sendiri (Leher Angsa / Septik SNI)',
+                              sumberAirMinum: house.sumberAirMinum || 'PDAM / Air Perpipaan',
+                              sumberAirBersih: house.sumberAirBersih || 'PDAM Tirtanadi',
+                              pembuanganSampahRumah: house.pembuanganSampahRumah || 'Diangkut Petugas / WRS',
+                              statusStuntingRentan: house.statusStuntingRentan || 'Bebas Risiko Stunting',
+                              tempatAkhirTinja: house.tempatAkhirTinja || 'Tangki Septik / SPALD',
+                              statusWrs: house.statusWrs,
+                              tarifRetribusi: house.tarifRetribusi || 15000,
+                              nopPbb: house.nopPbb || '',
+                              statusPbb: house.statusPbb || 'LUNAS',
+                              nominalPbb: house.nominalPbb !== undefined ? house.nominalPbb : '',
+                              tahunPbb: house.tahunPbb !== undefined ? house.tahunPbb : '',
+                              catatan: house.catatan || '',
+                              memilikiUsaha: house.memilikiUsaha || false,
+                              jenisUsaha: house.jenisUsaha || 'Toko Kelontong / Sembako',
+                              namaUsaha: house.namaUsaha || '',
+                              luasTanahM2: house.luasTanahM2 !== undefined ? house.luasTanahM2 : '',
+                              luasBangunanM2: house.luasBangunanM2 !== undefined ? house.luasBangunanM2 : '',
+                              isKkMangga: house.isKkMangga !== false,
+                              asalKk: house.asalKk || (house.isKkMangga !== false ? 'Kelurahan Mangga' : 'Luar Kelurahan Mangga'),
+                              kewarganegaraan: house.kewarganegaraan || 'WNI',
+                              negaraAsalWna: house.negaraAsalWna || '',
+                              kategoriBangunan: house.kategoriBangunan || 'RUMAH_TINGGAL',
+                              jenisFasilitas: house.jenisFasilitas || '',
+                              lat: house.lat,
+                              lng: house.lng,
+                            });
+                            setIsManageDeleteModalOpen(false);
+                            setIsHouseModalOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Perbaiki koordinat atau data bangunan tanpa menghapus"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                          <span className="hidden sm:inline">Perbaiki</span>
+                        </button>
+
+                        {/* Delete Single */}
+                        <button
+                          type="button"
+                          disabled={isProcessingDelete}
+                          onClick={() => {
+                            setDeleteConfirmDialog({
+                              isOpen: true,
+                              title: `Hapus Titik Bangunan?`,
+                              description: `Apakah Anda yakin ingin menghapus titik "${house.namaKepalaKeluarga || 'Tanpa Nama'}" (${house.namaJalan || 'Tanpa Alamat'}, Lk ${lkNum}) dari peta dan database Cloud Firestore?`,
+                              action: async () => {
+                                setIsProcessingDelete(true);
+                                await handleDeleteSingleHouse(house.id, house.namaKepalaKeluarga);
+                                setDeleteModalSelectedIds((prev) => {
+                                  const next = new Set(prev);
+                                  next.delete(house.id);
+                                  return next;
+                                });
+                                setIsProcessingDelete(false);
+                                setDeleteConfirmDialog(null);
+                              },
+                            });
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black flex items-center gap-1 cursor-pointer shadow-xs transition-colors"
+                          title="Hapus titik bangunan ini secara permanen"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+              <div className="text-xs text-slate-500 flex items-center gap-1.5">
+                <Info className="w-4 h-4 text-blue-500 shrink-0" />
+                <span>
+                  💡 <b>Tip:</b> Jika titik bangunan berada di lokasi yang salah tapi datanya masih diperlukan, klik tombol <b>Perbaiki</b> untuk memindahkan koordinat tanpa harus menghapusnya.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManageDeleteModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer shadow-sm self-end sm:self-auto"
+              >
+                Tutup Jendela
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION POPUP DIALOG */}
+      {deleteConfirmDialog && (
+        <div className="fixed inset-0 z-[3000] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-200 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6 text-rose-600" />
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="font-black text-slate-900 text-base">{deleteConfirmDialog.title}</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">{deleteConfirmDialog.description}</p>
+            </div>
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isProcessingDelete}
+                onClick={() => setDeleteConfirmDialog(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isProcessingDelete}
+                onClick={deleteConfirmDialog.action}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isProcessingDelete ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <span>Menghapus...</span>
+                  </>
+                ) : (
+                  <span>Ya, Hapus Sekarang</span>
+                )}
+              </button>
             </div>
           </div>
         </div>

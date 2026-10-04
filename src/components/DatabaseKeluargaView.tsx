@@ -16,6 +16,7 @@ import {
   HeartHandshake,
   Droplets,
   Shield,
+  ShieldAlert,
   Activity,
   Baby,
   Building2,
@@ -58,6 +59,13 @@ import {
   StatusBpjsKesehatanType,
 } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import { DuplicateCheckBadge } from './DuplicateCheckBadge';
+import { PengecekanDuplikasiView } from './PengecekanDuplikasiView';
+import {
+  checkNikDuplicate,
+  checkNomorKkDuplicate,
+  checkNopDuplicate,
+} from '../lib/duplicateCheckService';
 import {
   subscribeDataKeluarga,
   saveDataKeluargaToFirestore,
@@ -123,7 +131,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
   const [isDeletingKk, setIsDeletingKk] = useState<boolean>(false);
 
   // Tab Menu State
-  const [activeTab, setActiveTab] = useState<'daftar' | 'statistik' | 'import' | 'pindah_lingkungan'>('daftar');
+  const [activeTab, setActiveTab] = useState<'daftar' | 'statistik' | 'import' | 'pindah_lingkungan' | 'cek_duplikasi'>('daftar');
 
   // Import State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1052,6 +1060,22 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
           <span>Import Data Keluarga (Excel)</span>
           <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-black uppercase tracking-wider">
             Import
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('cek_duplikasi')}
+          className={`flex-1 min-w-[150px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black text-xs transition-all cursor-pointer ${
+            activeTab === 'cek_duplikasi'
+              ? 'bg-white text-blue-950 shadow-sm border border-slate-200'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4 text-rose-600" />
+          <span>Cek Duplikasi NOP & NIK</span>
+          <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-black uppercase tracking-wider">
+            Instan
           </span>
         </button>
 
@@ -3094,6 +3118,24 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
         </div>
       )}
 
+      {/* TAB 5: PENGECEKAN DUPLIKASI NOP & NIK INSTAN */}
+      {activeTab === 'cek_duplikasi' && (
+        <PengecekanDuplikasiView
+          currentUser={currentUser}
+          dataKeluarga={dataList}
+          spptList={spptList}
+          onShowToast={onShowToast}
+          onOpenKkDetail={(kk) => setSelectedDetailKk(kk)}
+          onOpenEditKk={(kk) => {
+            setEditingKk(kk);
+            setIsFormOpen(true);
+          }}
+          onOpenEditSppt={(sppt) => {
+            if (onShowToast) onShowToast(`Data SPPT NOP ${sppt.nop} (${sppt.namaWp}) siap diverifikasi.`, 'info');
+          }}
+        />
+      )}
+
       {/* MODAL 1: DETAIL KARTU KELUARGA (OFFICIAL VIEW) */}
       {selectedDetailKk && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -3538,6 +3580,69 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
   const [tempAnggotaAgama, setTempAnggotaAgama] = useState<AgamaType>('Islam');
   const [tempAnggotaPekerjaan, setTempAnggotaPekerjaan] = useState<string>('Pelajar');
 
+  // Debounced input states for instant duplicate checks
+  const [debouncedNik, setDebouncedNik] = useState<string>(initialData?.nikKepalaKeluarga || '');
+  const [debouncedNomorKk, setDebouncedNomorKk] = useState<string>(initialData?.nomorKk || '');
+  const [debouncedNop, setDebouncedNop] = useState<string>(initialData?.nopPbb || '');
+  const [debouncedTempNik, setDebouncedTempNik] = useState<string>('');
+  const [isCheckingNik, setIsCheckingNik] = useState<boolean>(false);
+  const [isCheckingKk, setIsCheckingKk] = useState<boolean>(false);
+  const [isCheckingNop, setIsCheckingNop] = useState<boolean>(false);
+  const [isCheckingTempNik, setIsCheckingTempNik] = useState<boolean>(false);
+
+  useEffect(() => {
+    setIsCheckingNik(true);
+    const timer = setTimeout(() => {
+      setDebouncedNik(nikKk || nomorKk);
+      setIsCheckingNik(false);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [nikKk, nomorKk]);
+
+  useEffect(() => {
+    setIsCheckingKk(true);
+    const timer = setTimeout(() => {
+      setDebouncedNomorKk(nomorKk);
+      setIsCheckingKk(false);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [nomorKk]);
+
+  useEffect(() => {
+    setIsCheckingNop(true);
+    const timer = setTimeout(() => {
+      setDebouncedNop(nopPbb);
+      setIsCheckingNop(false);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [nopPbb]);
+
+  useEffect(() => {
+    setIsCheckingTempNik(true);
+    const timer = setTimeout(() => {
+      setDebouncedTempNik(tempAnggotaNik);
+      setIsCheckingTempNik(false);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [tempAnggotaNik]);
+
+  // Live duplicate validation results
+  const nikCheckResult = useMemo(() => {
+    return checkNikDuplicate(debouncedNik, dataList, { excludeKkId: initialData?.id });
+  }, [debouncedNik, dataList, initialData]);
+
+  const kkCheckResult = useMemo(() => {
+    return checkNomorKkDuplicate(debouncedNomorKk, dataList, { excludeKkId: initialData?.id });
+  }, [debouncedNomorKk, dataList, initialData]);
+
+  const nopCheckResult = useMemo(() => {
+    return checkNopDuplicate(debouncedNop, spptList, dataList, { excludeKkId: initialData?.id });
+  }, [debouncedNop, spptList, dataList, initialData]);
+
+  const tempAnggotaNikResult = useMemo(() => {
+    return checkNikDuplicate(debouncedTempNik, dataList, { excludeKkId: initialData?.id });
+  }, [debouncedTempNik, dataList, initialData]);
+
   // Auto-assign Lingkungan based on NOP or Street
   useEffect(() => {
     if (!initialData && (nopPbb || namaJalan)) {
@@ -3797,6 +3902,11 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                       }}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                     />
+                    <DuplicateCheckBadge
+                      type="nik"
+                      result={nikCheckResult}
+                      isChecking={isCheckingNik}
+                    />
                   </div>
 
                   <div>
@@ -3810,6 +3920,11 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                       onChange={(e) => setNomorKk(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                     />
+                    <DuplicateCheckBadge
+                      type="kk"
+                      result={kkCheckResult}
+                      isChecking={isCheckingKk}
+                    />
                   </div>
 
                   <div>
@@ -3822,6 +3937,11 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                       value={nopPbb}
                       onChange={(e) => setNopPbb(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                    />
+                    <DuplicateCheckBadge
+                      type="nop"
+                      result={nopCheckResult}
+                      isChecking={isCheckingNop}
                     />
                     <p className="text-[10px] text-indigo-500 mt-1 font-medium italic">
                       *Jika diisi, sistem akan otomatis mencocokkan Lingkungan berdasarkan data PBB.
@@ -4098,6 +4218,12 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                       value={tempAnggotaNik}
                       onChange={(e) => setTempAnggotaNik(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-blue-950/50 border border-blue-700 text-xs font-mono font-bold text-white placeholder:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                    <DuplicateCheckBadge
+                      type="nik"
+                      result={tempAnggotaNikResult}
+                      isChecking={isCheckingTempNik}
+                      className="bg-blue-950/80 border-blue-700 text-white"
                     />
                   </div>
                 </div>

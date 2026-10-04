@@ -41,6 +41,8 @@ import {
 import { INITIAL_PBB_SUMMARY, SAMPLE_SPPT_ITEMS, SpptPbbItem } from '../data/pbbSampleData';
 import { parsePbbCsv } from '../utils/pbbParser';
 import { UserAccount } from '../types';
+import { DuplicateCheckBadge } from './DuplicateCheckBadge';
+import { checkNopDuplicate } from '../lib/duplicateCheckService';
 import { PbbTrendCharts } from './PbbTrendCharts';
 import {
   ResponsiveContainer,
@@ -509,6 +511,25 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [formStatus, setFormStatus] = useState<'Belum Bayar' | 'Sudah Bayar'>('Belum Bayar');
   const [formKeterangan, setFormKeterangan] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Debounced NOP check state for instant validation
+  const [debouncedFormNop, setDebouncedFormNop] = useState<string>('');
+  const [isCheckingFormNop, setIsCheckingFormNop] = useState<boolean>(false);
+
+  useEffect(() => {
+    setIsCheckingFormNop(true);
+    const timer = setTimeout(() => {
+      setDebouncedFormNop(formNop);
+      setIsCheckingFormNop(false);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [formNop]);
+
+  const formNopCheckResult = useMemo(() => {
+    return checkNopDuplicate(debouncedFormNop, spptList, undefined, {
+      excludeSpptId: editingWpItem?.id,
+    });
+  }, [debouncedFormNop, spptList, editingWpItem]);
 
   // Helper notification handler
   const notify = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -3203,6 +3224,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                     onChange={(e) => setFormNop(formatNop(e.target.value))}
                     placeholder="Contoh: 12.75.010.009.005-0012.0"
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <DuplicateCheckBadge
+                    type="nop"
+                    result={formNopCheckResult}
+                    isChecking={isCheckingFormNop}
                   />
                 </div>
 

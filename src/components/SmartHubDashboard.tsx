@@ -715,7 +715,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
               3 Pilar Layanan Utama SI-Mangga
             </h3>
           </div>
-          <span className="text-[10px] font-bold text-slate-400">Kecamatan Medan Tuntungan</span>
+          <span className="text-[10px] font-bold text-slate-400">Kelurahan Mangga Kecamatan Medan Tuntungan</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div 
