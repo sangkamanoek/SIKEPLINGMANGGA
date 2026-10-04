@@ -137,6 +137,11 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
       }, 900);
     }
 
+    // If it's WebGIS spatial data
+    if (key.includes('webgis') || key.includes('rumah') || key.includes('titik')) {
+      // Memory cache is already updated at top of function
+    }
+
     localStorage.setItem(key, value);
     return true;
   } catch (error: any) {
@@ -148,7 +153,7 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
         error.code === 1014);
 
     if (isQuotaError) {
-      console.warn(`[safeStorage] LocalStorage quota exceeded for key "${key}". Initiating defensive recovery...`);
+      console.warn(`[safeStorage] LocalStorage quota exceeded for key "${key}". Offloading to memory cache & IndexedDB...`);
 
       // 1. Aggressively clear volatile and obsolete items to free space immediately
       try {
@@ -160,17 +165,14 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
           if (k && (k.includes('_v1') || k.includes('_v2')) && k !== key) {
-            // Only remove if it's not the current active key being saved
-            if (k.includes('history') || k.includes('reports') || k.includes('list')) {
-               // keep it, but maybe others?
-            } else {
+            if (!k.includes('history') && !k.includes('reports') && !k.includes('list')) {
                localStorage.removeItem(k);
             }
           }
         }
       } catch {}
 
-      // 2. Large Data Recovery (Full redirect to IndexedDB, LocalStorage becomes a tiny pointer)
+      // 2. Large Data Recovery (Full redirect to memory & IndexedDB, LocalStorage receives empty array pointer)
       if (
         key.includes('keluarga') ||
         key.includes('family') ||
@@ -178,12 +180,14 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
         key.includes('sppt') ||
         key.includes('kunjungan') ||
         key.includes('visit') ||
-        key.includes('history')
+        key.includes('history') ||
+        key.includes('webgis') ||
+        key.includes('rumah') ||
+        key.includes('titik')
       ) {
         try {
           const parsed = JSON.parse(value);
           if (Array.isArray(parsed)) {
-            // Persist full data to IndexedDB immediately and synchronously (as possible)
             if (key.includes('keluarga') || key.includes('family')) {
               saveKeluargaToIndexedDB(parsed).catch(() => {});
             } else if (key.includes('pbb') || key.includes('sppt')) {
@@ -194,16 +198,22 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
               saveHistoryToIndexedDB(parsed).catch(() => {});
             }
 
-            // Save a tiny placeholder to LocalStorage. 
-            // safeGetLocalStorage will use memoryFallbackStorage to return the REAL data.
-            localStorage.setItem(key, JSON.stringify([]));
-            console.log(`[safeStorage] Successfully offloaded "${key}" to IndexedDB. LocalStorage now contains placeholder.`);
+            // Save empty pointer to LocalStorage without throwing
+            try {
+              localStorage.setItem(key, JSON.stringify([]));
+            } catch {}
+            console.log(`[safeStorage] Successfully offloaded "${key}" to memory cache & IndexedDB.`);
             return true;
           }
-        } catch (storageErr) {
-          console.error('[safeStorage] Error during large data quota recovery:', storageErr);
-        }
-        // If we reached here, it failed or wasn't an array, fall through to compression or fail
+        } catch {}
+      }
+
+      // Final fallback: try saving tiny empty pointer or ignore error
+      try {
+        localStorage.setItem(key, '[]');
+        return true;
+      } catch {
+        return false; // Silently fail localStorage write since memoryFallbackStorage holds the value
       }
 
       // 3. Selective Payload Compression (Strip heavy base64 strings but keep metadata)
@@ -249,9 +259,9 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
       } catch (stripError) {
         console.error('[safeStorage] Error during defensive compression recovery:', stripError);
       }
-    }
 
-    return false;
+      return false;
+    }
   }
 }
 

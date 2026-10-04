@@ -1440,18 +1440,18 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
   // Handler: Automatic Street & Gang Overlay Detection
   const handleAutoDetectStreet = async (targetLat?: number, targetLng?: number) => {
-    const lat = targetLat !== undefined ? targetLat : houseForm.lat;
-    const lng = targetLng !== undefined ? targetLng : houseForm.lng;
+    const numLat = Number(targetLat !== undefined ? targetLat : houseForm.lat);
+    const numLng = Number(targetLng !== undefined ? targetLng : houseForm.lng);
 
-    if (!lat || !lng) {
+    if (!numLat || !numLng || isNaN(numLat) || isNaN(numLng)) {
       onShowToast?.('Silakan tentukan koordinat Latitude dan Longitude terlebih dahulu', 'error');
       return;
     }
 
     setIsDetectingStreet(true);
     try {
-      const result = await detectStreetAndGangOverlay(lat, lng);
-      setDetectedStreetOverlay({ ...result, lat, lng });
+      const result = await detectStreetAndGangOverlay(numLat, numLng);
+      setDetectedStreetOverlay({ ...result, lat: numLat, lng: numLng });
 
       // Automatically populate namaJalan if empty or default placeholder
       if (
@@ -1467,7 +1467,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
 
       // Pan map to point
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.setView([lat, lng], 18);
+        mapInstanceRef.current.setView([numLat, numLng], 18);
       }
 
       onShowToast?.(

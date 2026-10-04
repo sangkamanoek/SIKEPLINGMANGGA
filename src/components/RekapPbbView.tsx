@@ -556,7 +556,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     setFormNop(item.nop);
     setFormNamaWp(item.namaWp);
     setFormAlamatOp(item.alamatOp);
-    setFormBuku(item.buku || 'IV, V');
+    setFormBuku((item.buku as any) || 'IV, V');
     setFormPbbTerutang(String(item.pbbTerutang));
     setFormJumlahBayar(item.jumlahBayar !== undefined && item.jumlahBayar !== null ? String(item.jumlahBayar) : String(item.pbbTerutang));
     setFormLingkungan(item.lingkungan);
@@ -1908,7 +1908,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 <span>{unsyncedItems.length} Data Belum Sinkron</span>
               </div>
               <button
-                onClick={handleManualSync}
+                onClick={() => handleManualSync()}
                 disabled={isSyncing}
                 className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-[10px] font-black rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-3xs"
                 title="Tekan untuk sinkronisasikan data lokal Anda ke Firebase sekarang!"
@@ -1995,7 +1995,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   <span>{chartConfig.title}</span>
                 </h4>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  Metrik Aktif: <span className="font-extrabold text-emerald-800 bg-emerald-100/80 border border-emerald-300 px-1.5 py-0.5 rounded text-[10px]">{chartConfig.badge}</span> • {chartConfig.subtitle}
+                  Metrik Aktif: <span className="font-extrabold text-emerald-800 bg-emerald-100/80 border border-emerald-300 px-1.5 py-0.5 rounded text-[10px]">{chartConfig.badge}</span>
                 </p>
               </div>
 
@@ -2489,7 +2489,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
                 <button
                   type="button"
-                  onClick={handleManualSync}
+                  onClick={() => handleManualSync()}
                   disabled={isSyncing}
                   title="Sinkronisasi Data Real-time (Firestore & Server Buffer)"
                   className="px-3 py-2 bg-slate-100 hover:bg-slate-200 active:scale-98 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"

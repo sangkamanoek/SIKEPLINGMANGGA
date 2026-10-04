@@ -331,7 +331,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       let bpjsOrang = 0;
 
       keplingWeekReports.forEach((r) => {
-        const k = r.kinerja || {};
+        const k: any = r.kinerja || {};
         pbbWp += parseInt(String(k.opsirPbbWp || 0), 10) || 0;
         perlinsosKk += parseInt(String(k.perlinsosKk || 0), 10) || 0;
         ikdOrang += parseInt(String(k.ikdOrang || 0), 10) || 0;
@@ -493,8 +493,8 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       // 🛡️ FALLBACK KUNJUNGAN: Jika belum ada entri kunjungan mandiri tetapi ada laporan kinerja dengan kunjungan/perlinsos
       if (kunjungan.length === 0 && laporan?.kinerja) {
         const kin = laporan.kinerja;
-        const count = parseInt(kin.perlinsosKk || '0', 10);
-        const countMenolak = parseInt(kin.perlinsosMenolakKk || '0', 10);
+        const count = parseInt(String(kin.perlinsosKk || '0'), 10);
+        const countMenolak = parseInt(String(kin.perlinsosMenolakKk || '0'), 10);
         if (count > 0 || countMenolak > 0 || (kin.perlinsosKeterangan && kin.perlinsosKeterangan !== 'Pendataan Perlinsos')) {
           kunjungan = [
             {
@@ -507,8 +507,8 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
               namaKepling: kepling.nama,
               keplingId: kepling.id,
               perlinsos: count > 0 ? 'Sudah' : 'Menolak',
-              ikd: parseInt(kin.ikdOrang || '0', 10) > 0 ? 'Sudah' : 'Belum',
-              pbb: parseInt(kin.opsirPbbWp || '0', 10) > 0 ? 'Sudah' : 'Belum',
+              ikd: parseInt(String(kin.ikdOrang || '0'), 10) > 0 ? 'Sudah' : 'Belum',
+              pbb: parseInt(String(kin.opsirPbbWp || '0'), 10) > 0 ? 'Sudah' : 'Belum',
               keterangan: kin.perlinsosKeterangan || 'Kunjungan Sambang Warga',
               createdAt: laporan.createdAt || new Date().toISOString(),
             } as any,
@@ -596,7 +596,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
 
     consolidatedKeplingData.forEach((item) => {
       if (item.laporan) {
-        const k = item.laporan.kinerja || {};
+        const k: any = item.laporan.kinerja || {};
         totalPbbWp += parseInt(String(k.opsirPbbWp || 0), 10) || 0;
         totalPerlinsosKk += parseInt(String(k.perlinsosKk || 0), 10) || 0;
         totalPerlinsosMenolak += parseInt(String(k.perlinsosMenolakKk || 0), 10) || 0;
@@ -702,7 +702,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
 
       // Kinerja Harian
       if (it.laporan) {
-        const kin = it.laporan.kinerja || {};
+        const kin: any = it.laporan.kinerja || {};
         const pbbStr = kin.opsirPbbWp ? `${kin.opsirPbbWp} WP` : 'NIHIL';
         const pbbKet = kin.opsirPbbKeterangan ? ` (${kin.opsirPbbKeterangan})` : '';
         lines.push(`   • PBB: ${pbbStr}${pbbKet}`);
@@ -2509,7 +2509,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
               </thead>
               <tbody>
                 {consolidatedKeplingData.map((it) => {
-                  const kin = it.laporan?.kinerja || {};
+                  const kin: any = it.laporan?.kinerja || {};
                   return (
                     <tr key={it.kepling.id} className="border border-black">
                       <td className="border border-black p-1 text-center">{it.nomor}</td>

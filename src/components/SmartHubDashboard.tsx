@@ -22,6 +22,7 @@ import {
   Plus,
   FileSpreadsheet,
   Wrench,
+  Wallet,
 } from 'lucide-react';
 import { UserAccount, LaporanHarianItem, AbsenApelItem } from '../types';
 import { DeadlineNotifAlert } from './DeadlineNotifAlert';
@@ -50,7 +51,7 @@ interface SmartHubDashboardProps {
   onForceSyncAll?: () => Promise<void> | void;
 }
 
-export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
+export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
   activeAccount,
   reports,
   attendanceList,
@@ -704,6 +705,66 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
 
       {/* Visual Alert & Deadline 23:30 Push Notif Component */}
       <DeadlineNotifAlert activeAccount={activeAccount} reports={reports} onNavigate={onNavigate} />
+
+      {/* 3 Pilar Utama SI-Mangga Banner Quick Navigation */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-emerald-600" />
+            <h3 className="text-xs sm:text-sm font-black uppercase text-slate-900 tracking-wider">
+              3 Pilar Layanan Utama SI-Mangga
+            </h3>
+          </div>
+          <span className="text-[10px] font-bold text-slate-400">Kecamatan Medan Tuntungan</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div 
+            onClick={() => onNavigate(isKepling ? 'form' : 'dashboard_kasi')}
+            className="p-3 bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200 rounded-xl transition-all cursor-pointer group flex items-center gap-3"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-black text-emerald-800 uppercase block">Pilar 1</span>
+              <h4 className="text-xs font-bold text-slate-900 truncate">Kinerja Kepling & Layanan</h4>
+              <p className="text-[10px] text-slate-600 truncate">Presensi, Laporan Harian, PBB & GIS</p>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('switch-to-pkk-role'));
+            }}
+            className="p-3 bg-tosca-50/70 hover:bg-tosca-100/70 border border-tosca-200 rounded-xl transition-all cursor-pointer group flex items-center gap-3"
+          >
+            <div className="w-10 h-10 rounded-xl bg-tosca-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+              <Users className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-black text-tosca-800 uppercase block">Pilar 2</span>
+              <h4 className="text-xs font-bold text-slate-900 truncate">Kegiatan TP-PKK</h4>
+              <p className="text-[10px] text-slate-600 truncate">Pusat Menu, Laporan & Dasa Wisma</p>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'surat_kedinasan' }));
+            }}
+            className="p-3 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200 rounded-xl transition-all cursor-pointer group flex items-center gap-3"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-black text-blue-800 uppercase block">Pilar 3</span>
+              <h4 className="text-xs font-bold text-slate-900 truncate">Surat Kedinasan</h4>
+              <p className="text-[10px] text-slate-600 truncate">Arsip Surat Masuk, Keluar & SK</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* RENDER MODE A: MODERN CONSOLIDATED BENTO-GRID */}
       {dashboardStyle === 'consolidated' ? (
@@ -1451,5 +1512,5 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = ({
       </div>
     </div>
   );
-};
+});
 

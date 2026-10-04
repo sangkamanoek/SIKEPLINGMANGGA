@@ -645,16 +645,20 @@ export async function wipeAllPbbSpptEverywhere(years: number[] = [2025, 2026, 20
       console.warn('Server clear PBB notice:', e);
     }
 
-    // 3. Clear Firestore Collections
+    // 3. Clear Firestore Collections in 400-doc chunks
     const collectionsToClean = ['pbb_sppt', ...years.map((y) => `${PBB_COLLECTION_PREFIX}${y}`)];
     for (const colName of collectionsToClean) {
       try {
         const colRef = collection(db, colName);
         const snap = await getDocs(colRef);
         if (!snap.empty) {
-          const batch = writeBatch(db);
-          snap.forEach((d) => batch.delete(d.ref));
-          await batch.commit();
+          const docs = snap.docs;
+          for (let i = 0; i < docs.length; i += 400) {
+            const batch = writeBatch(db);
+            const chunk = docs.slice(i, i + 400);
+            chunk.forEach((d) => batch.delete(d.ref));
+            await batch.commit();
+          }
         }
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, colName);

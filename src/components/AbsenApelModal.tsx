@@ -411,7 +411,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                 <span>PRESENSI APEL PAGI KEPALA LINGKUNGAN</span>
               </h2>
               <p className="text-xs text-emerald-100 font-medium">
-                Kelurahan Mangga • Kecamatan Medan Tuntungan
+                Kecamatan Medan Tuntungan
               </p>
             </div>
           </div>

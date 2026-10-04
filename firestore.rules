@@ -117,6 +117,38 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Laporan Keuangan & Buku Kas Umum Tim Penggerak PKK
+    match /pkk_keuangan/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'tanggal', 'jenis', 'jumlah'])
+                            && isValidString(request.resource.data.id, 1, 100);
+      allow delete: if true;
+    }
+
+    // Laporan Kegiatan & Dokumentasi 4 Pokja PKK & PKK Lingkungan
+    match /pkk_kegiatan/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'tanggal', 'namaKegiatan'])
+                            && isValidString(request.resource.data.id, 1, 120);
+      allow delete: if true;
+    }
+
+    // Kelompok Dasa Wisma & Posyandu PKK
+    match /pkk_dasa_wisma/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'namaKelompok', 'lingkunganNomor'])
+                            && isValidString(request.resource.data.id, 1, 120);
+      allow delete: if true;
+    }
+
+    // Arsip Surat Kedinasan & Persuratan Kelurahan
+    match /surat_kedinasan/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'nomorSurat', 'perihal'])
+                            && isValidString(request.resource.data.id, 1, 120);
+      allow delete: if true;
+    }
+
     // Default Fallback Match
     match /{document=**} {
       allow read: if true;

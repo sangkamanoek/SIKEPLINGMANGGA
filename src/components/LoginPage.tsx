@@ -15,12 +15,6 @@ import {
   RotateCcw,
   Sparkles,
   Presentation,
-  Building,
-  Landmark,
-  HeartHandshake,
-  ShieldAlert,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import { UserAccount } from '../types';
 import {
@@ -33,7 +27,6 @@ import {
   syncPasswordsWithServer,
   ALL_ACCOUNTS,
 } from '../data/keplingList';
-import { getAllKasiProfiles } from '../data/kasiTupoksiData';
 
 interface LoginPageProps {
   onLoginSuccess: (account: UserAccount, remember: boolean) => void;
@@ -57,10 +50,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // Modals
   const [isForgotHelpOpen, setIsForgotHelpOpen] = useState<boolean>(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
-  const [isKasiGuideOpen, setIsKasiGuideOpen] = useState<boolean>(false);
-
-  // Kasi profiles for quick reference
-  const kasiProfiles = getAllKasiProfiles();
 
   // Change Password Form State
   const [changeUserSelect, setChangeUserSelect] = useState<string>('');
@@ -248,13 +237,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               />
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-emerald-950 tracking-tight leading-tight uppercase">
-              SI-KEPLING MANGGA
+              SI-MANGGA
             </h1>
             <p className="text-[11px] font-extrabold text-emerald-700 mt-2 uppercase tracking-wider">
-              Laporan Kegiatan Harian Kepala Lingkungan
+              Sistem Informasi & Administrasi <br /> Kelurahan Mangga
             </p>
             <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-              Kelurahan Mangga • Kecamatan Medan Tuntungan
+              Kecamatan Medan Tuntungan
             </p>
           </div>
 
@@ -274,7 +263,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
             )}
 
-            {/* Username Selector & Input */}
+            {/* Username Input Field */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
@@ -283,36 +272,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </span>
               </label>
 
-              {/* Dropdown Pilihan Username */}
-              <select
-                id="select-login-fixed-username"
-                value={detectedAccount ? detectedAccount.id : ''}
-                onChange={(e) => handleSelectFixedUser(e.target.value)}
-                className="w-full px-3 py-2.5 text-xs sm:text-sm border border-emerald-300 rounded-xl bg-emerald-50/50 font-semibold text-emerald-950 focus:bg-white focus:outline-emerald-600 cursor-pointer transition-colors"
-              >
-                <option value="">-- Pilih Username Akun Resmi --</option>
-                <optgroup label="Pimpinan & Administrator Kelurahan">
-                  <option value="super_admin">🔑 super_admin (Super Admin / Lurah)</option>
-                </optgroup>
-                <optgroup label="Kepala Seksi (Kasi) Kelurahan Mangga">
-                  <option value="kasi_pemerintahan">🏛️ kasi_pemerintahan — Kasi Tata Pemerintahan (PBB, IKD & Apel)</option>
-                  <option value="kasi_pembangunan">🏗️ kasi_pembangunan — Kasi Pembangunan & Kesos (Perlinsos & Posyandu)</option>
-                  <option value="kasi_trantibum">🛡️ kasi_trantibum — Kasi Trantibum & Linmas (Poskamling & Trantib)</option>
-                </optgroup>
-                <optgroup label="Pengawas / Auditor Pajak Daerah">
-                  <option value="petugas_bapenda">📊 petugas_bapenda — Petugas Bapenda Kota Medan</option>
-                </optgroup>
-                <optgroup label="24 Kepala Lingkungan (kepling_1 s/d kepling_24)">
-                  {FIXED_ACCOUNTS_LIST.filter((a) => a.role === 'kepling').map((acc) => (
-                    <option key={acc.username} value={acc.username}>
-                      📍 {acc.username} ({acc.nama} - {acc.lingkungan})
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-
               {/* Manual Input Field */}
-              <div className="relative pt-1">
+              <div className="relative">
                 <input
                   id="input-login-username"
                   type="text"
@@ -323,7 +284,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     if (errorMessage) setErrorMessage('');
                     if (successMessage) setSuccessMessage('');
                   }}
-                  placeholder="Atau ketik username (contoh: kepling_1, kasi_pemerintahan, super_admin)"
+                  placeholder="Ketik username Anda (contoh: kepling_1, kasi_pemerintahan, ketua_pkk)"
                   className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl bg-slate-50 font-mono text-slate-900 focus:bg-white focus:outline-emerald-600 focus:ring-2 focus:ring-emerald-600/30 transition-colors"
                   required
                 />
@@ -435,54 +396,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </button>
           </form>
 
-          {/* Quick Guide Card: 3 Kepala Seksi & Bidang Tugas */}
-          <div className="border-t border-slate-100 bg-slate-50/80 p-4">
-            <button
-              type="button"
-              onClick={() => setIsKasiGuideOpen(!isKasiGuideOpen)}
-              className="w-full flex items-center justify-between text-xs font-bold text-slate-700 hover:text-emerald-800 transition-colors cursor-pointer"
-            >
-              <span className="flex items-center gap-1.5">
-                <Building className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Daftar Username & Tugas 3 Kepala Seksi</span>
-              </span>
-              {isKasiGuideOpen ? (
-                <ChevronUp className="w-4 h-4 text-slate-400" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-slate-400" />
-              )}
-            </button>
-
-            {isKasiGuideOpen && (
-              <div className="mt-3 space-y-2 pt-2 border-t border-slate-200/70 text-[11px] text-slate-600 animate-in fade-in">
-                {kasiProfiles.map((k) => (
-                  <div
-                    key={k.role}
-                    onClick={() => handleSelectFixedUser(k.usernameUtama)}
-                    className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-emerald-500 transition-all cursor-pointer space-y-1 shadow-2xs"
-                  >
-                    <div className="flex items-center justify-between font-bold text-slate-900">
-                      <span className="flex items-center gap-1">
-                        {k.role === 'kasi_pemerintahan' && <Landmark className="w-3.5 h-3.5 text-teal-600" />}
-                        {k.role === 'kasi_pembangunan' && <HeartHandshake className="w-3.5 h-3.5 text-blue-600" />}
-                        {k.role === 'kasi_trantibum' && <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />}
-                        <span>{k.namaSeksi}</span>
-                      </span>
-                      <span className="font-mono text-[10px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                        {k.usernameUtama}
-                      </span>
-                    </div>
-                    <p className="text-[10.5px] text-slate-500 leading-tight">
-                      <strong>Fokus Bidang:</strong> {k.singkatan}
-                    </p>
-                    <p className="text-[10px] text-slate-400">
-                      Kata sandi bawaan: <code className="font-mono text-slate-600">{k.passwordDefault}</code>
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -667,8 +580,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   Format Username Resmi:
                 </p>
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 font-mono text-[11px] text-slate-700 space-y-1">
-                  <p>• Kepala Lingkungan : <span className="font-bold text-emerald-800">kepling_1</span> s/d <span className="font-bold text-emerald-800">kepling_24</span></p>
                   <p>• Super Admin : <span className="font-bold text-amber-800">super_admin</span></p>
+                  <p>• Kepala Lingkungan : <span className="font-bold text-emerald-800">kepling_1</span> s/d <span className="font-bold text-emerald-800">kepling_24</span></p>
+                  <p>• Ketua TP-PKK Kelurahan : <span className="font-bold text-teal-800">ketua_pkk</span></p>
+                  <p>• Sekretaris PKK Kelurahan : <span className="font-bold text-teal-800">sekretaris_pkk</span></p>
+                  <p>• Ketua Pokja PKK : <span className="font-bold text-teal-800">pokja_1</span> s/d <span className="font-bold text-teal-800">pokja_4</span></p>
+                  <p>• Ketua PKK Lingkungan : <span className="font-bold text-teal-800">pkk_lingkungan_1</span> s/d <span className="font-bold text-teal-800">pkk_lingkungan_24</span></p>
                 </div>
               </div>
 

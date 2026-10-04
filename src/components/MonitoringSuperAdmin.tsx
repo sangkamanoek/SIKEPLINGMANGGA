@@ -35,12 +35,23 @@ import {
   Coins,
   ClipboardList,
   LayoutGrid,
+  Smartphone,
+  CloudUpload,
+  Server,
+  Database,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import {
+  saveSuperAdminDeviceDataToFirestore,
+  syncSuperAdminDeviceDataToLiveFirestore,
+  getSuperAdminDeviceDataSnapshot,
+} from '../lib/appBackupService';
+import { fetchSyncAuditLogs, SyncAuditLog } from '../lib/firestoreService';
 import {
   LaporanHarianItem,
   SheetMetadata,
   UserAccount,
+  UserRole,
   TitikRumahBangunan,
   RuasJalanLingkungan,
   LingkunganPolygon,
@@ -94,14 +105,13 @@ interface MonitoringSuperAdminProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
   onResetReports?: () => Promise<void>;
-  onSeedInitialReports?: () => Promise<void>;
   onOpenCapaianDashboard?: () => void;
   onOpenPemetaan?: (lingkunganNomor?: number) => void;
   onOpenPbb?: () => void;
   sheetMeta?: SheetMetadata | null;
 }
 
-export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
+export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.memo(({
   reports,
   onSelectReport,
   onDraftForKepling,
@@ -110,7 +120,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
   onRefresh,
   isRefreshing,
   onResetReports,
-  onSeedInitialReports,
   onOpenCapaianDashboard,
   onOpenPemetaan,
   onOpenPbb,
@@ -334,6 +343,47 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
   const [isSeeding, setIsSeeding] = useState(false);
   const [copiedWa, setCopiedWa] = useState(false);
 
+  // States for local device synchronization & backup to Firestore
+  const [isDeviceSyncModalOpen, setIsDeviceSyncModalOpen] = useState(false);
+  const [deviceSyncProgress, setDeviceSyncProgress] = useState('');
+  const [deviceSyncError, setDeviceSyncError] = useState('');
+  const [deviceSyncSuccess, setDeviceSyncSuccess] = useState('');
+  const [deviceBackupStats, setDeviceBackupStats] = useState<any>(null);
+  const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
+  const [isPushingLive, setIsPushingLive] = useState(false);
+  const [syncAuditLogs, setSyncAuditLogs] = useState<SyncAuditLog[]>([]);
+
+  // Load local device metrics when sync modal opens
+  useEffect(() => {
+    if (isDeviceSyncModalOpen) {
+      setDeviceSyncProgress('Menghitung data lokal perangkat...');
+      setDeviceSyncError('');
+      setDeviceSyncSuccess('');
+      
+      getSuperAdminDeviceDataSnapshot()
+        .then((snapshot) => {
+          setDeviceBackupStats(snapshot.summary);
+          setDeviceSyncProgress('');
+        })
+        .catch((err) => {
+          console.error(err);
+          setDeviceSyncError('Gagal memuat data lokal perangkat');
+          setDeviceSyncProgress('');
+        });
+
+      // Load device sync audit logs
+      fetchSyncAuditLogs()
+        .then((logs) => {
+          setSyncAuditLogs(logs);
+        })
+        .catch((err) => {
+          console.error('Gagal memuat audit log sinkronisasi:', err);
+        });
+    } else {
+      setDeviceBackupStats(null);
+    }
+  }, [isDeviceSyncModalOpen]);
+
   // Check if 23:30 cutoff time has passed for the selected date or today
   const isCutoffPassed = useMemo(() => {
     const targetDateIso = selectedDate || todayIso;
@@ -502,15 +552,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
     });
   };
 
-  const handleTriggerSeed = async () => {
-    if (!onSeedInitialReports) return;
-    setIsSeeding(true);
-    try {
-      await onSeedInitialReports();
-    } finally {
-      setIsSeeding(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -567,18 +608,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
               </button>
             )}
 
-            {onSeedInitialReports && (
-              <button
-                type="button"
-                onClick={handleTriggerSeed}
-                disabled={isSeeding || isRefreshing}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/40 text-xs font-black transition-colors cursor-pointer shadow-md disabled:opacity-50"
-                title="Muat / Pulihkan data laporan resmi 24 Kepling ke database"
-              >
-                <Sparkles className={`w-3.5 h-3.5 text-amber-300 ${isSeeding ? 'animate-spin' : ''}`} />
-                <span>{isSeeding ? 'Memuat...' : 'Muat Laporan 24 Kepling'}</span>
-              </button>
-            )}
 
             <button
               type="button"
@@ -631,6 +660,16 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                 <span>Buku Sandi</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setIsDeviceSyncModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-100 border border-indigo-400/40 text-xs font-bold transition-colors cursor-pointer shadow-xs"
+              title="Sinkronisasikan data HP/Laptop lokal Anda ke Firestore Cloud"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-indigo-300" />
+              <span>Sinkronisasi HP/Laptop</span>
+            </button>
 
             {onResetReports && (
               <button
@@ -877,17 +916,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                 </p>
               </div>
             </div>
-            {onSeedInitialReports && (
-              <button
-                type="button"
-                onClick={handleTriggerSeed}
-                disabled={isSeeding}
-                className="shrink-0 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>{isSeeding ? 'Sedang Memuat...' : 'Muat Data 24 Kepling Sekarang'}</span>
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -1802,7 +1830,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
               </div>
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
                 <span className="text-slate-500">Penerima Bansos:</span>
-                <strong className="text-emerald-700 font-bold">{kelurahanPemetaan.totalBansosKkAll} KK</strong>
+                <strong className="text-emerald-700 font-bold">{(kelurahanPemetaan as any).totalBansosKkAll ?? kelurahanPemetaan.totalBansosAll ?? 0} KK</strong>
               </div>
             </div>
 
@@ -1936,7 +1964,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
                 <span className="text-slate-500">Poligon Batas:</span>
                 <strong className="text-emerald-700 font-bold">
-                  {kelurahanPemetaan.totalPoligonAda} dari 24 Lingkungan
+                  {(kelurahanPemetaan as any).totalPoligonAda ?? 0} dari 24 Lingkungan
                 </strong>
               </div>
             </div>
@@ -1957,7 +1985,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-              {kelurahanPemetaan.topLingkunganByRumah.slice(0, 3).map((item, idx) => (
+              {(kelurahanPemetaan?.topLingkunganList || (kelurahanPemetaan as any)?.topLingkunganByRumah || []).slice(0, 3).map((item: any, idx: number) => (
                 <div
                   key={item.lingkunganNomor}
                   className={`p-4 rounded-xl border relative overflow-hidden flex flex-col justify-between ${
@@ -2364,7 +2392,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
 
                 const newAccount: UserAccount = {
                   id: usernameClean,
-                  role: newRole,
+                  role: newRole as UserRole,
                   nama: newNama.trim(),
                   jabatan: newJabatan.trim() || (newRole === 'kepling' ? `Kepala Lingkungan ${newNomorLingkungan || ''}` : `Staf Kasi`),
                   kelurahan: 'Kelurahan Mangga',
@@ -2588,12 +2616,12 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
                       <div key={acc.id} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-150 hover:border-indigo-150 rounded-xl transition-all text-xs">
                         <div className="flex items-start gap-2.5">
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold ${
-                            acc.role === 'superadmin' ? 'bg-rose-100 text-rose-800' :
-                            acc.role === 'kasi' ? 'bg-amber-100 text-amber-800' :
-                            acc.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                            acc.role === 'super_admin' ? 'bg-rose-100 text-rose-800' :
+                            (acc.role as string) === 'kasi' ? 'bg-amber-100 text-amber-800' :
+                            (acc.role as string) === 'admin' ? 'bg-blue-100 text-blue-800' :
                             'bg-emerald-100 text-emerald-800'
                           }`}>
-                            {acc.role === 'superadmin' ? 'SA' : acc.role === 'kasi' ? 'KS' : 'KP'}
+                            {acc.role === 'super_admin' ? 'SA' : (acc.role as string) === 'kasi' ? 'KS' : 'KP'}
                           </div>
                           <div>
                             <div className="flex flex-wrap items-center gap-1.5">
@@ -2755,6 +2783,242 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = ({
           </div>
         </div>
       )}
+
+      {/* Device Sync & Backup Modal */}
+      {isDeviceSyncModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in fade-in max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="p-5 bg-indigo-700 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <Smartphone className="w-5 h-5 text-indigo-200" />
+                <h3 className="font-bold text-sm sm:text-base text-white">Sinkronisasi Data HP / Laptop Lokal</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isSavingSnapshot && !isPushingLive) {
+                    setIsDeviceSyncModalOpen(false);
+                  }
+                }}
+                disabled={isSavingSnapshot || isPushingLive}
+                className="text-white/80 hover:text-white cursor-pointer disabled:opacity-30"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 text-xs text-slate-600 overflow-y-auto flex-1">
+              <div className="p-3.5 bg-indigo-50 border border-indigo-100 text-indigo-900 rounded-xl space-y-1.5 leading-relaxed">
+                <p className="font-bold">📱 Penyelarasan & Cadangan Data Perangkat</p>
+                <p>
+                  Fitur ini mengambil data terbaru yang saat ini tersimpan di browser (IndexedDB / LocalStorage) laptop atau HP Anda, lalu menyimpannya ke Cloud Firestore. Ini sangat bermanfaat jika Anda melakukan pembaruan secara offline atau dari aplikasi versi lama.
+                </p>
+              </div>
+
+              {/* Loader for first count */}
+              {deviceSyncProgress && !isSavingSnapshot && !isPushingLive && (
+                <div className="flex flex-col items-center justify-center py-6 gap-2 text-indigo-600">
+                  <RefreshCw className="w-7 h-7 animate-spin" />
+                  <p className="font-bold">{deviceSyncProgress}</p>
+                </div>
+              )}
+
+              {/* Error Alert */}
+              {deviceSyncError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl font-bold">
+                  ⚠️ {deviceSyncError}
+                </div>
+              )}
+
+              {/* Success Alert */}
+              {deviceSyncSuccess && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl space-y-1.5 animate-in zoom-in-95 whitespace-pre-line">
+                  <p className="font-bold flex items-center gap-1.5 text-emerald-900">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Berhasil!
+                  </p>
+                  <p>{deviceSyncSuccess}</p>
+                </div>
+              )}
+
+              {/* Data Statistics Panel */}
+              {deviceBackupStats && !deviceSyncProgress && (
+                <div className="space-y-3">
+                  <h4 className="font-extrabold text-slate-700 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5 text-indigo-500" />
+                    Data Terdeteksi di HP / Laptop Anda:
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Laporan Harian</span>
+                      <span className="text-base font-black text-slate-800">{deviceBackupStats.reportsCount} <span className="text-[10px] font-medium text-slate-500">item</span></span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Data Keluarga</span>
+                      <span className="text-base font-black text-slate-800">{deviceBackupStats.familyCount} <span className="text-[10px] font-medium text-slate-500">KK</span></span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Realisasi PBB</span>
+                      <span className="text-base font-black text-slate-800">{deviceBackupStats.pbbCount} <span className="text-[10px] font-medium text-slate-500">SPPT</span></span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Kunjungan Warga</span>
+                      <span className="text-base font-black text-slate-800">{deviceBackupStats.visitsCount} <span className="text-[10px] font-medium text-slate-500">item</span></span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Administrasi PKK</span>
+                      <span className="text-base font-black text-slate-800">
+                        {deviceBackupStats.pkkKeuanganCount + deviceBackupStats.pkkKegiatanCount + deviceBackupStats.pkkDasaWismaCount} <span className="text-[10px] font-medium text-slate-500">item</span>
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">WebGIS Spasial</span>
+                      <span className="text-base font-black text-slate-800">
+                        {deviceBackupStats.polygonsCount + deviceBackupStats.housesCount + deviceBackupStats.roadsCount} <span className="text-[10px] font-medium text-slate-500">fitur</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Audit Log Sinkronisasi Terakhir */}
+              {syncAuditLogs && syncAuditLogs.length > 0 && (
+                <div className="space-y-2.5 pt-4 border-t border-slate-200">
+                  <h4 className="font-extrabold text-slate-700 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                    Riwayat Sinkronisasi Perangkat Terakhir (Audit Log):
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {syncAuditLogs.map((log) => (
+                      <div key={log.deviceId} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-slate-700 text-xs truncate max-w-[200px]" title={log.deviceId}>
+                            📱 ID: {log.deviceId} {log.deviceId === localStorage.getItem('sikepling_device_id') && <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[8px] font-bold ml-1">Perangkat Ini</span>}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                            log.status === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          }`}>
+                            {log.status === 'success' ? 'Sukses' : 'Gagal'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 font-medium">
+                          <div>
+                            Terakhir Sinkron: <span className="font-bold text-slate-700">{formatTanggalIndonesia(new Date(log.lastSyncAt.split('T')[0]))} {log.lastSyncAt.split('T')[1]?.substring(0, 5) || ''} WIB</span>
+                          </div>
+                          <div>
+                            Operator: <span className="font-bold text-indigo-700">{log.operatorName || 'Super Admin'}</span>
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          Data Terunggah: <span className="font-extrabold text-indigo-800">{(log.summary?.totalCount ?? 0)} item</span> ({log.summary?.reportsCount || 0} Laporan, {log.summary?.familyCount || 0} Keluarga, {log.summary?.pbbCount || 0} PBB, {log.summary?.visitsCount || 0} Kunjungan)
+                        </div>
+                        <div className="text-[9px] text-slate-400 italic truncate" title={log.deviceInfo?.userAgent}>
+                          Platform: {log.deviceInfo?.platform} ({log.deviceInfo?.screenResolution})
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Progress Indicators */}
+              {(isSavingSnapshot || isPushingLive) && (
+                <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl flex flex-col items-center justify-center gap-3 py-6 animate-pulse">
+                  <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
+                  <div className="space-y-1 text-center">
+                    <p className="font-black text-indigo-900 text-xs">
+                      {isSavingSnapshot ? 'Sedang Membuat Snapshot Cadangan...' : 'Sedang Menyinkronkan Data...'}
+                    </p>
+                    <p className="text-[11px] text-indigo-700 italic font-medium">{deviceSyncProgress}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-end gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsDeviceSyncModalOpen(false)}
+                disabled={isSavingSnapshot || isPushingLive}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs cursor-pointer transition-colors disabled:opacity-50"
+              >
+                Tutup
+              </button>
+
+              {/* Action 1: Create Backup snapshot */}
+              <button
+                type="button"
+                disabled={isSavingSnapshot || isPushingLive || !deviceBackupStats}
+                onClick={async () => {
+                  setIsSavingSnapshot(true);
+                  setDeviceSyncProgress('Mengambil snapshot data lokal...');
+                  setDeviceSyncError('');
+                  setDeviceSyncSuccess('');
+                  const res = await saveSuperAdminDeviceDataToFirestore('Super Admin (Manual Sync)');
+                  if (res.success) {
+                    setDeviceSyncSuccess(res.message);
+                    fetchSyncAuditLogs().then(setSyncAuditLogs).catch(console.error);
+                  } else {
+                    setDeviceSyncError(res.message);
+                  }
+                  setIsSavingSnapshot(false);
+                  setDeviceSyncProgress('');
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer shadow-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                title="Menyimpan snapshot data lokal ke folder cadangan Firestore tanpa menimpa data live"
+              >
+                <CloudUpload className="w-3.5 h-3.5" />
+                <span>Simpan File Cadangan</span>
+              </button>
+
+              {/* Action 2: Sync directly to Live Database */}
+              <button
+                type="button"
+                disabled={isSavingSnapshot || isPushingLive || !deviceBackupStats}
+                onClick={async () => {
+                  if (window.confirm('Apakah Anda yakin ingin menyinkronkan seluruh data perangkat lokal ke database live di Firestore? Data lama yang bentrok akan diperbarui.')) {
+                    setIsPushingLive(true);
+                    setDeviceSyncError('');
+                    setDeviceSyncSuccess('');
+                    const res = await syncSuperAdminDeviceDataToLiveFirestore((msg) => {
+                      setDeviceSyncProgress(msg);
+                    });
+                    if (res.success) {
+                      fetchSyncAuditLogs().then(setSyncAuditLogs).catch(console.error);
+                      setDeviceSyncSuccess(
+                        `${res.message}\n\n` +
+                        `• Laporan Harian: ${res.stats.reports.synced}/${res.stats.reports.total} berhasil\n` +
+                        `• Data Keluarga: ${res.stats.family.synced}/${res.stats.family.total} berhasil\n` +
+                        `• PBB SPPT: ${res.stats.pbb.synced}/${res.stats.pbb.total} berhasil\n` +
+                        `• Kunjungan: ${res.stats.visits.synced}/${res.stats.visits.total} berhasil\n` +
+                        `• PKK Keuangan: ${res.stats.pkkKeuangan.synced}/${res.stats.pkkKeuangan.total} berhasil\n` +
+                        `• PKK Kegiatan: ${res.stats.pkkKegiatan.synced}/${res.stats.pkkKegiatan.total} berhasil\n` +
+                        `• Dasa Wisma: ${res.stats.pkkDasaWisma.synced}/${res.stats.pkkDasaWisma.total} berhasil\n` +
+                        `• Surat: ${res.stats.surat.synced}/${res.stats.surat.total} berhasil\n` +
+                        `• Peta Poligon: ${res.stats.polygons.synced}/${res.stats.polygons.total} berhasil\n` +
+                        `• Peta Rumah: ${res.stats.houses.synced}/${res.stats.houses.total} berhasil\n` +
+                        `• Peta Jalan: ${res.stats.roads.synced}/${res.stats.roads.total} berhasil`
+                      );
+                    } else {
+                      setDeviceSyncError(res.message);
+                    }
+                    setIsPushingLive(false);
+                    setDeviceSyncProgress('');
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                title="Unggah dan sinkronkan data lokal langsung ke koleksi database live Firestore"
+              >
+                <Server className="w-3.5 h-3.5" />
+                <span>Penyelarasan Live (Push To Cloud)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
+});

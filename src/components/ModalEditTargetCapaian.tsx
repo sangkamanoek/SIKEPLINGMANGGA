@@ -865,7 +865,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                                 value={currentTarget}
                                 onChange={(e) => {
                                   const val = Number(e.target.value);
-                                  setBulkTargets((prev) => ({
+                                  setBulkTargets((prev: any) => ({
                                     ...prev,
                                     [k.id]: {
                                       ...(prev[k.id] || {
@@ -904,7 +904,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                                   onChange={(e) => {
                                     const val =
                                       e.target.value === '' ? null : Number(e.target.value);
-                                    setBulkTargets((prev) => ({
+                                    setBulkTargets((prev: any) => ({
                                       ...prev,
                                       [k.id]: {
                                         ...(prev[k.id] || {
@@ -927,7 +927,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setBulkTargets((prev) => ({
+                                      setBulkTargets((prev: any) => ({
                                         ...prev,
                                         [k.id]: {
                                           ...(prev[k.id] || {}),

@@ -62,6 +62,7 @@ import {
   subscribeDataKeluarga,
   saveDataKeluargaToFirestore,
   deleteDataKeluargaFromFirestore,
+  wipeAllFirestoreDataKeluarga,
   exportDataKeluargaToExcel,
   downloadImportTemplateExcel,
   parseDataKeluargaFile,
@@ -265,17 +266,18 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
       }
 
       // Live search
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
+      if (searchQuery.trim() || streetSearchKeyword.trim()) {
+        const q = (searchQuery || streetSearchKeyword).toLowerCase().trim();
         const matchKk = item.nomorKk?.toLowerCase().includes(q);
         const matchNama = item.namaKepalaKeluarga?.toLowerCase().includes(q);
         const matchNik = item.nikKepalaKeluarga?.toLowerCase().includes(q);
         const matchJalan = item.namaJalan?.toLowerCase().includes(q);
+        const matchAlamat = item.alamatLengkap?.toLowerCase().includes(q);
         const matchTelepon = item.telepon?.toLowerCase().includes(q);
         const matchAnggota = item.anggotaKeluarga?.some((a) =>
           a.nama.toLowerCase().includes(q) || a.nik.toLowerCase().includes(q)
         );
-        return matchKk || matchNama || matchNik || matchJalan || matchTelepon || matchAnggota;
+        return matchKk || matchNama || matchNik || matchJalan || matchAlamat || matchTelepon || matchAnggota;
       }
 
       return true;
@@ -288,6 +290,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     filterSanitasi,
     filterStunting,
     searchQuery,
+    streetSearchKeyword,
   ]);
 
   // Pagination State for high performance rendering
@@ -545,7 +548,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     const duplicateCount = parseResult.items.length - itemsToImport.length;
     
     if (itemsToImport.length === 0) {
-      if (onShowToast) onShowToast(`Seluruh data (${duplicateCount} KK) sudah ada dalam database (NIK/No. KK ganda). Import diabaikan sesuai permintaan sistem.`, 'warning');
+      if (onShowToast) onShowToast(`Seluruh data (${duplicateCount} KK) sudah ada dalam database (NIK/No. KK ganda). Import diabaikan sesuai permintaan sistem.`, 'info');
       setParseResult(null);
       return;
     }
@@ -563,7 +566,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
         let msg = `Import selesai! ${successCount} KK berhasil disimpan.`;
         if (duplicateCount > 0) msg += ` (${duplicateCount} data dilewati karena NIK sudah ada).`;
         if (failCount > 0) msg += ` ${failCount} gagal.`;
-        onShowToast(msg, failCount > 0 ? 'warning' : 'success');
+        onShowToast(msg, failCount > 0 ? 'error' : 'success');
       }
       // Reset state & switch tab
       setImportFile(null);
@@ -964,6 +967,24 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
               <Plus className="w-4 h-4 text-slate-950" />
               <span>Tambah Data KK</span>
             </button>
+            
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm('Yakin ingin menghapus SELURUH data keluarga dari database? Tindakan ini tidak dapat dibatalkan.')) return;
+                  setIsSaving(true);
+                  const result = await wipeAllFirestoreDataKeluarga();
+                  setIsSaving(false);
+                  if (onShowToast) onShowToast(result.message, result.success ? 'success' : 'error');
+                }}
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs shadow-md transition-all cursor-pointer border border-red-500"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Hapus Semua Data</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -2211,6 +2232,20 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* SEARCH & FILTER FOR ALL MOVE MODES */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="relative">
+              <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari Alamat / Jalan untuk Pindah..."
+                className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-rose-500"
+                value={streetSearchKeyword}
+                onChange={(e) => setStreetSearchKeyword(e.target.value)}
+              />
             </div>
           </div>
 

@@ -15,8 +15,9 @@ export default defineConfig(() => {
       },
     },
     build: {
-      target: ['es2020', 'edge88', 'firefox78', 'chrome80', 'safari14'],
+      target: ['es2015', 'edge88', 'firefox78', 'chrome80', 'safari14'],
       cssTarget: ['chrome80', 'firefox78', 'safari14', 'edge88'],
+      minify: 'terser' as const,
       sourcemap: false,
       chunkSizeWarningLimit: 2500,
     },

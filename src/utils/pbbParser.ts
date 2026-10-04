@@ -9,6 +9,9 @@ export interface SpptPbbItem {
   status: 'Sudah Bayar' | 'Belum Bayar';
   lingkungan: number;
   jumlahBayar?: number | null;
+  isDiskon?: boolean;
+  diskonPembayaran?: number;
+  persenDiskon?: number;
   keterangan?: string | null;
   updatedAt?: string;
 }

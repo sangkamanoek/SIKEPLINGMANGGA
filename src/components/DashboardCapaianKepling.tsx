@@ -482,7 +482,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   // 3. Filter Event Attendance by selected period
   const filteredEventAttendanceByPeriod = useMemo(() => {
     return (eventAttendanceList || []).filter((e) => {
-      const dateIso = e.tanggal || (e.createdAt ? e.createdAt.split('T')[0] : '');
+      const dateIso = (e as any).tanggal || (e.createdAt ? e.createdAt.split('T')[0] : '');
       return checkDateInPeriod(dateIso, period, now);
     });
   }, [eventAttendanceList, period, now]);
@@ -490,7 +490,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   // 4. Filter Custom Events by selected period
   const filteredCustomEventsByPeriod = useMemo(() => {
     return (customEvents || []).filter((ev) => {
-      const dateIso = ev.tanggal || '';
+      const dateIso = (ev as any).tanggal || '';
       return checkDateInPeriod(dateIso, period, now);
     });
   }, [customEvents, period, now]);

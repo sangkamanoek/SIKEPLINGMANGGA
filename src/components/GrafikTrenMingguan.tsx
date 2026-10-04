@@ -156,10 +156,10 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
         : weekReports;
 
       // 2. Absensi pada minggu ini
-      const weekAttendance = attendanceList.filter((a) => isDateInWeek(a.date));
+      const weekAttendance = attendanceList.filter((a: any) => isDateInWeek(a.date || a.tanggal));
       const targetAttendance = selectedKeplingAccount
         ? weekAttendance.filter(
-            (a) =>
+            (a: any) =>
               a.accountId === selectedKeplingAccount.id ||
               a.nomorLingkungan === selectedKeplingAccount.nomorLingkungan ||
               a.namaKepling?.trim().toLowerCase() === selectedKeplingAccount.nama.trim().toLowerCase()
@@ -178,8 +178,8 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
       let poskamlingCount = 0;
 
       targetReports.forEach((r) => {
-        totalPerlinsos += Number(r.kinerja?.perlinsos || 0);
-        totalPbb += Number(r.kinerja?.pbb || 0);
+        totalPerlinsos += Number((r.kinerja as any)?.perlinsosKk || (r.kinerja as any)?.perlinsos || 0);
+        totalPbb += Number((r.kinerja as any)?.opsirPbbWp || (r.kinerja as any)?.pbb || 0);
         if (
           r.kinerja?.poskamlingAdaGiat === true ||
           (r.kinerja?.poskamlingStatus && r.kinerja.poskamlingStatus !== 'Tidak Ada') ||
@@ -190,7 +190,7 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
       });
 
       const uniqueApelDays = new Set(
-        weekAttendance.map((a) => a.date?.split('T')[0]).filter(Boolean)
+        weekAttendance.map((a: any) => (a.date || a.tanggal)?.split('T')[0]).filter(Boolean)
       );
       const apelTotal = uniqueApelDays.size > 0 ? uniqueApelDays.size : Math.min(5, w.endDay - w.startDay + 1);
       const apelHadir = targetAttendance.filter(
@@ -225,8 +225,8 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
       );
 
       // Hitung Benchmark Kelurahan (Rata-rata 24 Lingkungan)
-      const allWeekPerlinsos = weekReports.reduce((s, r) => s + (Number(r.kinerja?.perlinsos) || 0), 0) / 24;
-      const allWeekPbb = weekReports.reduce((s, r) => s + (Number(r.kinerja?.pbb) || 0), 0) / 24;
+      const allWeekPerlinsos = weekReports.reduce((s, r) => s + (Number((r.kinerja as any)?.perlinsosKk || (r.kinerja as any)?.perlinsos) || 0), 0) / 24;
+      const allWeekPbb = weekReports.reduce((s, r) => s + (Number((r.kinerja as any)?.opsirPbbWp || (r.kinerja as any)?.pbb) || 0), 0) / 24;
       const allWeekApelHadir = weekAttendance.filter((a) => a.status === 'Hadir' || a.status === 'Dinas Luar').length / 24;
       const allWeekApelRate = apelTotal > 0 ? Math.min(100, Math.round((allWeekApelHadir / apelTotal) * 100)) : 80;
 

@@ -214,19 +214,9 @@ const saveStoredAttendance = (attendance: any[]) => {
 
 let attendanceCache = loadStoredAttendance();
 
-const DEFAULT_TARGETS_LIST = [
-  429, 330, 342, 298, 210, 400,
-  398, 255, 367, 465, 498, 373,
-  440, 451, 362, 295, 476, 340,
-  423, 215, 253, 264, 426, 229
-];
+const DEFAULT_TARGETS_LIST = new Array(24).fill(0);
 
-const DEFAULT_PERLINSOS_BASELINES = [
-  256, 278, 328, 249, 194, 218,
-  164, 154, 192, 218, 186, 164,
-  253, 164, 116, 175, 222, 149,
-  242, 132, 233, 215, 218, 123
-];
+const DEFAULT_PERLINSOS_BASELINES = new Array(24).fill(0);
 
 const generateDefaultTargets = () => {
   const map: Record<string, any> = {};
@@ -414,6 +404,32 @@ const saveStoredWebgisHouses = (items: any[]) => {
 };
 
 let webgisHousesCache = loadStoredWebgisHouses();
+
+// PKK Keuangan Data File (Buku Kas Umum Tim Penggerak PKK)
+const PKK_KEUANGAN_FILE = path.join(DATA_DIR, 'pkk_keuangan.json');
+
+const loadStoredPkkKeuangan = (): any[] => {
+  try {
+    if (fs.existsSync(PKK_KEUANGAN_FILE)) {
+      const content = fs.readFileSync(PKK_KEUANGAN_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.error('Error reading pkk keuangan file:', err);
+  }
+  return [];
+};
+
+const saveStoredPkkKeuangan = (items: any[]) => {
+  try {
+    fs.writeFileSync(PKK_KEUANGAN_FILE, JSON.stringify(items, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving pkk keuangan file:', err);
+  }
+};
+
+let pkkKeuanganCache = loadStoredPkkKeuangan();
 
 // Strict Anti-Cache Headers Middleware for all /api calls
 app.use('/api', (_req, res, next) => {
@@ -758,6 +774,77 @@ app.delete('/api/webgis/houses/:id', (req, res) => {
   }
 });
 
+// =========================================================================
+// PKK KEUANGAN (BUKU KAS UMUM TP PKK) CRUD ENDPOINTS
+// =========================================================================
+
+app.get('/api/pkk/keuangan', (_req, res) => {
+  return res.json({
+    success: true,
+    count: pkkKeuanganCache.length,
+    data: pkkKeuanganCache,
+  });
+});
+
+app.post('/api/pkk/keuangan', (req, res) => {
+  try {
+    const rawBody = req.body;
+    const items = rawBody?.items || (Array.isArray(rawBody) ? rawBody : null);
+    const item = rawBody?.item || (!items && rawBody?.uraian ? rawBody : null);
+
+    // Batch save
+    if (Array.isArray(items)) {
+      for (const it of items) {
+        if (!it || !it.id) continue;
+        const idx = pkkKeuanganCache.findIndex((k) => k.id === it.id);
+        if (idx >= 0) {
+          pkkKeuanganCache[idx] = { ...pkkKeuanganCache[idx], ...it, updatedAt: new Date().toISOString() };
+        } else {
+          pkkKeuanganCache.unshift({ ...it, updatedAt: new Date().toISOString() });
+        }
+      }
+      saveStoredPkkKeuangan(pkkKeuanganCache);
+      return res.json({ success: true, count: pkkKeuanganCache.length, data: pkkKeuanganCache });
+    }
+
+    if (!item) {
+      return res.status(400).json({ success: false, message: 'Data transaksi PKK tidak lengkap' });
+    }
+
+    if (!item.id) {
+      item.id = 'pkk_tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    }
+    if (!item.createdAt) {
+      item.createdAt = new Date().toISOString();
+    }
+
+    const idx = pkkKeuanganCache.findIndex((k) => k.id === item.id);
+    if (idx >= 0) {
+      pkkKeuanganCache[idx] = { ...pkkKeuanganCache[idx], ...item, updatedAt: new Date().toISOString() };
+    } else {
+      pkkKeuanganCache.unshift({ ...item, updatedAt: new Date().toISOString() });
+    }
+
+    saveStoredPkkKeuangan(pkkKeuanganCache);
+    return res.json({ success: true, data: item, count: pkkKeuanganCache.length });
+  } catch (err: any) {
+    console.error('Error saving pkk keuangan:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/pkk/keuangan/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    pkkKeuanganCache = pkkKeuanganCache.filter((k) => k.id !== id);
+    saveStoredPkkKeuangan(pkkKeuanganCache);
+    return res.json({ success: true, count: pkkKeuanganCache.length, message: `Transaksi PKK ${id} dihapus` });
+  } catch (err: any) {
+    console.error('Error deleting pkk keuangan:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET PBB SPPT records for given year (e.g. ?year=2026)
 app.get('/api/pbb', (req, res) => {
   const year = String(req.query.year || '2026');
@@ -963,6 +1050,17 @@ app.delete('/api/data-keluarga/:id', (req, res) => {
     return res.json({ success: true, message: `Data Keluarga ${id} dihapus dari server buffer` });
   } catch (err: any) {
     console.error('Error deleting Data Keluarga from server buffer:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST wipe all Data Keluarga records on server
+app.post('/api/data-keluarga/wipe', (_req, res) => {
+  try {
+    dataKeluargaCache = [];
+    saveStoredDataKeluarga(dataKeluargaCache);
+    return res.json({ success: true, message: 'Seluruh data keluarga server berhasil dikosongkan' });
+  } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -1239,20 +1337,9 @@ app.post('/api/pembangunan/batch', (req, res) => {
   }
 });
 
-// POST seed initial reports for 24 Kepling
-app.post('/api/reports/seed-initial', (req, res) => {
-  try {
-    const rawData = fs.readFileSync(REPORTS_FILE, 'utf-8');
-    const items = JSON.parse(rawData);
-    if (Array.isArray(items) && items.length > 0) {
-      reportsCache = items;
-      saveStoredReports(reportsCache);
-      return res.json({ success: true, total: reportsCache.length, data: reportsCache });
-    }
-  } catch (err: any) {
-    console.error('Error seeding initial reports:', err);
-  }
-  return res.json({ success: true, total: reportsCache.length, data: reportsCache });
+// POST seed initial reports - DISABLED for clean start
+app.post('/api/reports/seed-initial', (_req, res) => {
+  res.json({ success: true, count: 0, data: [], message: 'Seeding disabled.' });
 });
 
 // GET all targets & capaian

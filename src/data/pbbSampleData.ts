@@ -7,6 +7,9 @@ export interface SpptPbbItem {
   alamatOp: string;
   pbbTerutang: number;
   jumlahBayar?: number | null; // Realisasi nominal yang dibayarkan jika ada pemotongan
+  isDiskon?: boolean;
+  diskonPembayaran?: number;
+  persenDiskon?: number;
   status: 'Sudah Bayar' | 'Belum Bayar';
   lingkungan: number;
   keterangan?: string | null;

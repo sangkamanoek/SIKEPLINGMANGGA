@@ -37,24 +37,14 @@ export const DEFAULT_PERLINSOS_TARGETS: number[] = [
 ];
 
 /**
- * Baseline Capaian Perlinsos awal/override berturut-turut Lk 1 s/d 24 per 21 September 2026:
+ * Baseline Capaian Perlinsos awal/override berturut-turut Lk 1 s/d 24 (Dikosongkan agar 100% bersih):
  */
-export const DEFAULT_PERLINSOS_BASELINES: number[] = [
-  256, 278, 328, 249, 194, 218,
-  164, 154, 192, 218, 186, 164,
-  253, 164, 116, 175, 222, 149,
-  242, 132, 233, 215, 218, 123
-];
+export const DEFAULT_PERLINSOS_BASELINES: number[] = new Array(24).fill(0);
 
 /**
- * Baseline Capaian BPJS Ketenagakerjaan berturut-turut Lk 1 s/d 24 (Total 173 Orang):
+ * Baseline Capaian BPJS Ketenagakerjaan berturut-turut Lk 1 s/d 24 (Dikosongkan agar 100% bersih):
  */
-export const DEFAULT_BPJS_BASELINES: number[] = [
-  5, 23, 6, 13, 42, 8,
-  6, 3, 0, 1, 1, 6,
-  1, 2, 4, 7, 7, 4,
-  5, 7, 5, 7, 5, 5
-];
+export const DEFAULT_BPJS_BASELINES: number[] = new Array(24).fill(0);
 
 /**
  * Generate default Targets & Capaian map for all 24 Kepling (per 26 September 2026)

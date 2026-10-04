@@ -76,6 +76,7 @@ export interface KelurahanPemetaanOverview {
   perLingkunganMap: Record<string, LingkunganPemetaanStats>;
   perLingkunganList: LingkunganPemetaanStats[];
   topLingkunganList: LingkunganPemetaanStats[];
+  topLingkunganByRumah: LingkunganPemetaanStats[];
 }
 
 export function computeLingkunganPemetaanStats(
@@ -427,5 +428,6 @@ export function computeKelurahanPemetaanOverview(
     perLingkunganMap,
     perLingkunganList,
     topLingkunganList,
+    topLingkunganByRumah: topLingkunganList,
   };
 }

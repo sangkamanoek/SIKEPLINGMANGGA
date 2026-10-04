@@ -662,7 +662,7 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
                   <div className="h-10 sm:h-12 flex items-center justify-center"></div>
                   <div className="space-y-0.2">
                     <p className="font-black text-slate-950 underline uppercase text-[8.5px]">
-                      {currentUser.role === 'kasi' ? currentUser.namaLengkap : 'STAF SEKSI TRANTIBUM'}
+                      {(currentUser.role as string) === 'kasi' ? currentUser.namaLengkap || currentUser.nama : 'STAF SEKSI TRANTIBUM'}
                     </p>
                     <p className="text-[7px] text-slate-600">
                       Kelurahan Mangga - Kec. Medan Tuntungan

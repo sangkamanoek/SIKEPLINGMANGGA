@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+@theme {
+  --color-tosca-50: #f0fdfa;
+  --color-tosca-100: #ccfbf1;
+  --color-tosca-200: #99f6e4;
+  --color-tosca-300: #5eead4;
+  --color-tosca-400: #2dd4bf;
+  --color-tosca-500: #14b8a6;
+  --color-tosca-600: #0d9488;
+  --color-tosca-700: #0f766e;
+  --color-tosca-800: #115e59;
+  --color-tosca-900: #134e4a;
+  --color-tosca-950: #042f2e;
+}
+
 @media print {
   @page {
     size: A4 portrait;

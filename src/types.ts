@@ -52,6 +52,7 @@ export interface FotoDokumentasi {
   id: string;
   url: string;
   name: string;
+  namaFile?: string;
   timestamp: string;
   kategori?: 'poskamling' | 'posyandu' | 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'apel' | 'umum' | 'infrastruktur' | 'lainnya' | string;
 }
@@ -78,6 +79,11 @@ export interface LaporanHarianItem {
   absenApel?: InfoAbsenApelLaporan;
   jumlahDokumentasi: number;
   dokumentasiFoto?: FotoDokumentasi[];
+  petugasNama?: string;
+  tanggalLaporan?: string;
+  lingkungan?: string | number;
+  uraianTugas?: string;
+  catatanUmum?: string;
   nomorWaAtasan?: string;
   namaAtasan?: string;
   createdAt: string;
@@ -140,11 +146,34 @@ export type UserRole =
   | 'kasi_pemerintahan'
   | 'kasi_pembangunan'
   | 'kasi_trantibum'
-  | 'petugas_bapenda';
+  | 'petugas_bapenda'
+  | 'ketua_pkk_kelurahan'
+  | 'ketua_pokja'
+  | 'ketua_pkk_lingkungan'
+  | 'sekretaris_pkk';
 
 export const isKelurahanAdmin = (role: UserRole | string): boolean => {
   return (
     role === 'super_admin' ||
+    role === 'kasi_pemerintahan' ||
+    role === 'kasi_pembangunan' ||
+    role === 'kasi_trantibum' ||
+    role === 'petugas_bapenda'
+  );
+};
+
+export const isPkkRole = (role: UserRole | string): boolean => {
+  return (
+    role === 'ketua_pkk_kelurahan' ||
+    role === 'ketua_pokja' ||
+    role === 'ketua_pkk_lingkungan' ||
+    role === 'sekretaris_pkk'
+  );
+};
+
+export const isKelurahanRole = (role: UserRole | string): boolean => {
+  return (
+    role === 'kepling' ||
     role === 'kasi_pemerintahan' ||
     role === 'kasi_pembangunan' ||
     role === 'kasi_trantibum' ||
@@ -196,6 +225,7 @@ export interface UserAccount {
   role: UserRole;
   lingkungan: string; // e.g. "Lingkungan I" or "Kantor Kelurahan"
   nama: string; // e.g. "Juan Prananta Purba" or "SUPER ADMIN"
+  namaLengkap?: string;
   jabatan: string; // e.g. "Kepala Lingkungan I" or "Super Admin Kelurahan Mangga"
   kelurahan: string; // "Kelurahan Mangga"
   kecamatan: string; // "Kecamatan Medan Tuntungan"
@@ -257,7 +287,9 @@ export interface EventAttendance {
   lingkungan: string;
   nomorLingkungan?: number;
   status: 'Hadir' | 'Izin' | 'Sakit' | 'Dinas Luar' | 'Tidak Hadir';
+  tanggal?: string;
   timestamp: string;
+  createdAt?: string;
   fotoSelfieUrl?: string;
   lokasiGps?: string;
   catatan?: string;
@@ -304,7 +336,9 @@ export interface TitikRumahBangunan {
   lingkunganId: string; // "kepling_1"
   lingkunganNomor: number;
   namaJalan: string; // e.g. "Jl. Bunga Raya Gg. Melati"
+  namaGang?: string;
   nomorRumah: string; // e.g. "No. 14A"
+  alamat?: string;
   namaKepalaKeluarga: string;
   nikKk?: string;
   // Status Kartu Keluarga (KK) & Kewarganegaraan
@@ -583,5 +617,114 @@ export interface DataKeluarga {
   createdAt: string;
   updatedAt?: string;
   createdByName?: string;
+}
+
+// =========================================================================
+// LAPORAN KEUANGAN TIM PENGGERAK PKK KELURAHAN MANGGA
+// =========================================================================
+
+export type JenisTransaksiPkk = 'PENERIMAAN' | 'PENGELUARAN';
+
+export type PosAnggaranPkk =
+  | 'SEKRETARIAT'
+  | 'POKJA_I'
+  | 'POKJA_II'
+  | 'POKJA_III'
+  | 'POKJA_IV'
+  | 'UP2K'
+  | 'BANTUAN_PEMERINTAH'
+  | 'IURAN_KAS'
+  | 'SWADAYA_SPONSOR'
+  | 'LAINNYA';
+
+export interface TransaksiKeuanganPkk {
+  id: string;
+  tanggal: string; // YYYY-MM-DD
+  nomorBukti?: string; // e.g. "BKM-01/PKK/X/2026" atau "BKK-01/PKK/X/2026"
+  jenis: JenisTransaksiPkk;
+  posAnggaran: PosAnggaranPkk;
+  uraian: string; // Keterangan transaksi / rincian belanja
+  jumlah: number; // Nominal Rupiah
+  sumberDana?: string; // e.g. "APBD Kelurahan", "Iuran Kas Rutin", "UP2K PKK", "Swadaya"
+  penerimaPenyetor?: string; // Nama pihak penyetor / penerima
+  lingkunganNomor?: number; // 1-24 jika ada alokasi per lingkungan, 0 jika TP PKK Kelurahan
+  lingkunganNama?: string;
+  buktiFotoUrl?: string; // Lampiran foto nota belanja / kuitansi / bukti transfer
+  catatan?: string;
+  dibuatOlehNama?: string;
+  dibuatOlehRole?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type PokjaPkkType = 'SEKRETARIAT' | 'POKJA_I' | 'POKJA_II' | 'POKJA_III' | 'POKJA_IV' | 'PKK_LINGKUNGAN';
+
+export interface LaporanKegiatanPkk {
+  id: string;
+  tanggal: string; // YYYY-MM-DD
+  pokja: PokjaPkkType;
+  namaKegiatan: string;
+  kategoriProgram: string; // e.g. "Pola Asuh Anak", "UP2K", "HATINYA PKK", "Posyandu / PHBS", "Gotong Royong", dll.
+  lokasi: string;
+  lingkunganNomor?: number;
+  lingkunganNama?: string;
+  jumlahPeserta?: number;
+  uraianHasil: string;
+  tindakLanjut?: string;
+  fotoDokumentasi?: { id: string; url: string; name: string; timestamp: string }[];
+  pelaporNama: string;
+  pelaporRole: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface KelompokDasaWisma {
+  id: string;
+  namaKelompok: string; // e.g. "Dasa Wisma Mawar 1"
+  lingkunganNomor: number;
+  lingkunganNama: string;
+  namaKetuaDawis: string;
+  teleponKetua?: string;
+  jumlahKk: number;
+  jumlahJiwa: number;
+  jumlahBalita: number;
+  jumlahIbuHamil: number;
+  jumlahLansia: number;
+  punyaJambanSehat: number;
+  punyaSpal: number;
+  punyaToga: number;
+  kegiatanUtama?: string;
+  updatedAt: string;
+}
+
+export type JenisSuratKedinasan =
+  | 'SURAT_MASUK'
+  | 'SURAT_KELUAR'
+  | 'NOTA_DINAS'
+  | 'SURAT_EDARAN'
+  | 'SURAT_KETERANGAN'
+  | 'SK_LURAH'
+  | 'UNDANGAN';
+
+export interface SuratKedinasanItem {
+  id: string;
+  nomorSurat: string;
+  tanggalSurat: string; // YYYY-MM-DD
+  jenisSurat: JenisSuratKedinasan;
+  perihal: string;
+  asalSurat?: string; // Untuk surat masuk
+  tujuanSurat?: string; // Untuk surat keluar
+  sifat: 'BIASA' | 'PENTING' | 'RAHASIA' | 'SEGERA';
+  status: 'DRAFT' | 'TERCATAT' | 'DISETUJUI' | 'DIARSIPKAN';
+  isiRingkas: string;
+  fileUrl?: string; // Attachment / scan PDF (Data URL or storage link)
+  fileName?: string; // e.g. "Surat_Undangan_Rakor_005.pdf"
+  fileSize?: number; // Size in bytes
+  fileType?: string; // e.g. "application/pdf"
+  penandatangan?: string;
+  dibuatOlehNama?: string;
+  dibuatOlehRole?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 

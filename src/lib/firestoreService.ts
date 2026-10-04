@@ -812,6 +812,25 @@ export function subscribeEventAttendanceFromFirestore(
   );
 }
 
+// Helper to delete any Firestore collection in chunked batches (max 400 per batch)
+async function deleteCollectionInChunks(colName: string): Promise<void> {
+  try {
+    const c = collection(db, colName);
+    const snap = await getDocs(c);
+    if (!snap.empty) {
+      const docs = snap.docs;
+      for (let i = 0; i < docs.length; i += 400) {
+        const batch = writeBatch(db);
+        const chunk = docs.slice(i, i + 400);
+        chunk.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    }
+  } catch (e) {
+    handleFirestoreError(e, OperationType.DELETE, colName);
+  }
+}
+
 /**
  * WIPE ALL CAPAIAN, REPORTS, ATTENDANCE, AND PBB DATA IN FIRESTORE
  * Cleans all operational data back to a fresh 0-baseline while STRICTLY PRESERVING
@@ -820,59 +839,17 @@ export function subscribeEventAttendanceFromFirestore(
 export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean; message: string }> {
   try {
     // 1. Delete all reports from 'reports'
-    const reportColNames = [REPORTS_COLLECTION];
-    for (const colName of reportColNames) {
-      try {
-        const c = collection(db, colName);
-        const snap = await getDocs(c);
-        if (!snap.empty) {
-          const batch = writeBatch(db);
-          snap.forEach((d) => batch.delete(d.ref));
-          await batch.commit();
-        }
-      } catch (e) {
-        handleFirestoreError(e, OperationType.DELETE, colName);
-      }
-    }
+    await deleteCollectionInChunks(REPORTS_COLLECTION);
 
     // 2. Delete all tombstones from 'deleted_reports'
-    try {
-      const delCol = collection(db, DELETED_REPORTS_COLLECTION);
-      const delSnap = await getDocs(delCol);
-      if (!delSnap.empty) {
-        const batch = writeBatch(db);
-        delSnap.forEach((d) => batch.delete(d.ref));
-        await batch.commit();
-      }
-    } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, DELETED_REPORTS_COLLECTION);
-    }
+    await deleteCollectionInChunks(DELETED_REPORTS_COLLECTION);
 
     // 3. Delete all attendance from 'attendance' & 'event_attendance'
-    try {
-      const attCol = collection(db, ATTENDANCE_COLLECTION);
-      const attSnap = await getDocs(attCol);
-      if (!attSnap.empty) {
-        const batch = writeBatch(db);
-        attSnap.forEach((d) => batch.delete(d.ref));
-        await batch.commit();
-      }
-    } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, ATTENDANCE_COLLECTION);
-    }
+    await deleteCollectionInChunks(ATTENDANCE_COLLECTION);
+    await deleteCollectionInChunks(EVENT_ATTENDANCE_COLLECTION);
 
     // 4. Delete all custom events from 'custom_events'
-    try {
-      const evtCol = collection(db, CUSTOM_EVENTS_COLLECTION);
-      const evtSnap = await getDocs(evtCol);
-      if (!evtSnap.empty) {
-        const batch = writeBatch(db);
-        evtSnap.forEach((d) => batch.delete(d.ref));
-        await batch.commit();
-      }
-    } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, CUSTOM_EVENTS_COLLECTION);
-    }
+    await deleteCollectionInChunks(CUSTOM_EVENTS_COLLECTION);
 
     // 5. Reset all targets_capaian in Firestore to 21 September 2026 baseline
     try {
@@ -891,20 +868,10 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
       handleFirestoreError(e, OperationType.WRITE, TARGETS_COLLECTION);
     }
 
-    // 6. Delete all PBB SPPT records from Firestore completely
+    // 6. Delete all PBB SPPT records from Firestore completely in safe 400-doc chunks
     const pbbCols = ['pbb_sppt', 'pbb_sppt_2026', 'pbb_sppt_2025', 'pbb_sppt_2027'];
     for (const colName of pbbCols) {
-      try {
-        const pbbCol = collection(db, colName);
-        const pbbSnap = await getDocs(pbbCol);
-        if (!pbbSnap.empty) {
-          const batch = writeBatch(db);
-          pbbSnap.forEach((d) => batch.delete(d.ref));
-          await batch.commit();
-        }
-      } catch (e) {
-        handleFirestoreError(e, OperationType.DELETE, colName);
-      }
+      await deleteCollectionInChunks(colName);
     }
 
     // Clear memory cache
@@ -914,6 +881,90 @@ export async function wipeAllFirestoreCapaianData(): Promise<{ success: boolean;
   } catch (err: any) {
     console.error('Fatal error in wipeAllFirestoreCapaianData:', err);
     return { success: false, message: err?.message || 'Gagal mereset Firebase Firestore' };
+  }
+}
+
+export interface SyncAuditLog {
+  deviceId: string;
+  deviceInfo: {
+    userAgent: string;
+    platform: string;
+    screenResolution: string;
+    language: string;
+  };
+  lastSyncAt: string;
+  status: 'success' | 'failed';
+  summary: {
+    reportsCount: number;
+    familyCount: number;
+    pbbCount: number;
+    visitsCount: number;
+    totalCount: number;
+  };
+  operatorName: string;
+}
+
+const SYNC_AUDIT_LOG_COLLECTION = 'sync_audit_logs';
+
+/**
+ * Saves a simple audit log of a device's synchronization to Firestore.
+ */
+export async function saveSyncAuditLog(
+  deviceId: string,
+  deviceInfo: any,
+  status: 'success' | 'failed',
+  summary: any,
+  operatorName: string = 'Super Admin'
+): Promise<boolean> {
+  try {
+    if (!db) return false;
+    const docRef = doc(db, SYNC_AUDIT_LOG_COLLECTION, deviceId);
+    await setDoc(docRef, {
+      deviceId,
+      deviceInfo: {
+        userAgent: deviceInfo.userAgent || '',
+        platform: deviceInfo.platform || '',
+        screenResolution: deviceInfo.screenResolution || '',
+        language: deviceInfo.language || '',
+      },
+      lastSyncAt: new Date().toISOString(),
+      status,
+      summary: {
+        reportsCount: summary.reportsCount || 0,
+        familyCount: summary.familyCount || 0,
+        pbbCount: summary.pbbCount || 0,
+        visitsCount: summary.visitsCount || 0,
+        totalCount: (summary.reportsCount || 0) + (summary.familyCount || 0) + (summary.pbbCount || 0) + (summary.visitsCount || 0),
+      },
+      operatorName,
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('Error saving sync audit log:', err);
+    return false;
+  }
+}
+
+/**
+ * Fetches all sync audit logs from Firestore.
+ */
+export async function fetchSyncAuditLogs(): Promise<SyncAuditLog[]> {
+  try {
+    if (!db) return [];
+    const snapshot = await getDocs(collection(db, SYNC_AUDIT_LOG_COLLECTION));
+    const logs: SyncAuditLog[] = [];
+    snapshot.forEach((docSnap) => {
+      logs.push({
+        deviceId: docSnap.id,
+        ...docSnap.data()
+      } as SyncAuditLog);
+    });
+    // Sort descending by lastSyncAt
+    logs.sort((a, b) => new Date(b.lastSyncAt).getTime() - new Date(a.lastSyncAt).getTime());
+    return logs;
+  } catch (err) {
+    console.error('Error fetching sync audit logs:', err);
+    return [];
   }
 }
 

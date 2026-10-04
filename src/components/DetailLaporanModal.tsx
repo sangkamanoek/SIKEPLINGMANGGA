@@ -32,7 +32,7 @@ import {
   Camera,
   Info,
 } from 'lucide-react';
-import { LaporanHarianItem, SheetMetadata, AbsenApelItem } from '../types';
+import { LaporanHarianItem, SheetMetadata, AbsenApelItem, FotoDokumentasi } from '../types';
 import { KopSuratResmi } from './KopSuratResmi';
 import {
   formatTanggalIndonesia,
@@ -259,8 +259,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     // Fallback synthesize from report perlinsos jika belum ada kunjungan mandiri
     if (matched.length === 0 && item.kinerja) {
       const kin = item.kinerja;
-      const count = parseInt(kin.perlinsosKk || '0', 10);
-      const countMenolak = parseInt(kin.perlinsosMenolakKk || '0', 10);
+      const count = parseInt(String(kin.perlinsosKk || '0'), 10);
+      const countMenolak = parseInt(String(kin.perlinsosMenolakKk || '0'), 10);
       if (count > 0 || countMenolak > 0 || (kin.perlinsosKeterangan && kin.perlinsosKeterangan !== 'Pendataan Perlinsos')) {
         const repFoto = (item.dokumentasiFoto || []).find((f) =>
           f?.kategori === 'perlinsos' ||
@@ -278,8 +278,8 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
             namaKepling: item.namaKepling || 'Kepala Lingkungan',
             keplingId: item.keplingId || `kepling_${targetNomor || 1}`,
             perlinsos: count > 0 ? 'Sudah' : 'Menolak',
-            ikd: parseInt(kin.ikdOrang || '0', 10) > 0 ? 'Sudah' : 'Belum',
-            pbb: parseInt(kin.opsirPbbWp || '0', 10) > 0 ? 'Sudah' : 'Belum',
+            ikd: parseInt(String(kin.ikdOrang || '0'), 10) > 0 ? 'Sudah' : 'Belum',
+            pbb: parseInt(String(kin.opsirPbbWp || '0'), 10) > 0 ? 'Sudah' : 'Belum',
             keterangan: kin.perlinsosKeterangan || 'Kunjungan dan Sambang Warga Lapangan',
             fotoDokumentasi: repFoto,
             createdAt: item.createdAt || new Date().toISOString(),
@@ -474,17 +474,17 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       setEditTanggal(item.tanggal || '');
       setEditNamaKepling(item.namaKepling || '');
       setEditJabatan(item.jabatan || '');
-      setEditOpsirPbbWp(item.kinerja?.opsirPbbWp || '0');
+      setEditOpsirPbbWp(String(item.kinerja?.opsirPbbWp || '0'));
       setEditOpsirPbbKet(item.kinerja?.opsirPbbKeterangan || '');
-      setEditPerlinsosKk(item.kinerja?.perlinsosKk || '0');
+      setEditPerlinsosKk(String(item.kinerja?.perlinsosKk || '0'));
       setEditPerlinsosKet(item.kinerja?.perlinsosKeterangan || '');
       setEditPerlinsosMenolakKk(item.kinerja?.perlinsosMenolakKk ? String(item.kinerja.perlinsosMenolakKk) : '0');
       setEditPerlinsosMenolakRincian(item.kinerja?.perlinsosMenolakRincian || '');
       setEditPerlinsosTidakDiTempatKk(item.kinerja?.perlinsosTidakDiTempatKk ? String(item.kinerja.perlinsosTidakDiTempatKk) : '0');
       setEditPerlinsosTidakDiTempatRincian(item.kinerja?.perlinsosTidakDiTempatRincian || '');
-      setEditIkdOrang(item.kinerja?.ikdOrang || '0');
+      setEditIkdOrang(String(item.kinerja?.ikdOrang || '0'));
       setEditIkdKet(item.kinerja?.ikdKeterangan || '');
-      setEditBpjsOrang(item.kinerja?.bpjsKetenagakerjaanOrang || '0');
+      setEditBpjsOrang(String(item.kinerja?.bpjsKetenagakerjaanOrang || '0'));
       setEditBpjsKet(item.kinerja?.bpjsKetenagakerjaanKeterangan || '');
       setEditPoskamlingStatus(item.kinerja?.poskamlingStatus || '');
       setEditPoskamlingLokasi(item.kinerja?.poskamlingLokasi || '');
@@ -859,7 +859,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         }
       : item;
 
-    const kin = activeItem?.kinerja || {};
+    const kin: any = activeItem?.kinerja || {};
 
     const text = formatReportToText({
       hari: activeItem?.hari || '',
@@ -911,7 +911,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       posyanduLansia60TahunKeatas: kin.posyanduLansia60TahunKeatas || '0',
       posyanduJenisLayanan: kin.posyanduJenisLayanan || [],
       posyanduKeterangan: kin.posyanduKeterangan || '',
-      totalFoto: activeItem?.jumlahDokumentasi || (activeItem?.dokumentasiFoto ? activeItem.dokumentasiFoto.length : 0),
+      totalFoto: activeItem?.jumlahDokumentasi || ((activeItem as any)?.dokumentasiFoto ? (activeItem as any).dokumentasiFoto.length : 0),
     });
 
     navigator.clipboard.writeText(text);
@@ -930,7 +930,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         namaKepling: editNamaKepling,
         jabatan: editJabatan,
         jumlahDokumentasi: editDokumentasiFoto.length,
-        dokumentasiFoto: editDokumentasiFoto,
+        dokumentasiFoto: editDokumentasiFoto as FotoDokumentasi[],
         kinerja: {
           opsirPbbWp: editOpsirPbbWp,
           opsirPbbKeterangan: editOpsirPbbKet,

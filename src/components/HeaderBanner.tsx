@@ -15,7 +15,7 @@ import {
   Loader2,
   Sparkles,
 } from 'lucide-react';
-import { GoogleUser, SheetMetadata, UserAccount } from '../types';
+import { GoogleUser, SheetMetadata, UserAccount, isPkkRole } from '../types';
 import { CURRENT_APP_VERSION, hasUnseenAppUpdate } from '../lib/appVersionService';
 
 interface HeaderBannerProps {
@@ -51,6 +51,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   onOpenAbsenApel,
   onOpenUpdateModal,
 }) => {
+  const isPkk = isPkkRole(activeAccount.role);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -122,9 +123,9 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isMobileMenuOpen]);
   return (
-    <header className="bg-emerald-800 text-white shadow-lg print:hidden">
+    <header className={`${isPkk ? 'bg-tosca-700' : 'bg-emerald-800'} text-white shadow-lg print:hidden transition-colors duration-500`}>
       {/* Top Banner with Medan Logo Replica and Tagline */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-emerald-700/60 text-xs">
+      <div className={`max-w-6xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b ${isPkk ? 'border-tosca-600/60' : 'border-emerald-700/60'} text-xs`}>
         {/* Official Slogan Badge */}
         <div className="flex items-center gap-2.5">
           <div className="inline-flex items-center rounded-md overflow-hidden shadow-xs text-[11px] font-black tracking-wider uppercase">
@@ -135,7 +136,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               UNTUK SEMUA
             </span>
           </div>
-          <span className="hidden sm:inline-block text-xs font-semibold text-emerald-100/90 tracking-wide">
+          <span className={`hidden sm:inline-block text-xs font-semibold ${isPkk ? 'text-tosca-100/90' : 'text-emerald-100/90'} tracking-wide`}>
             #MedanUntukSemua • #SemuaUntukMedan
           </span>
         </div>
@@ -148,9 +149,9 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               <span>MENYINKRONKAN KE FIREBASE...</span>
             </span>
           ) : isOnline ? (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-100 bg-emerald-950/80 border border-emerald-500/30 px-3 py-1 rounded-full shadow-xs transition-all duration-300">
-              <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${isPkk ? 'text-tosca-100 bg-tosca-950/80 border-tosca-500/30' : 'text-emerald-100 bg-emerald-950/80 border-emerald-500/30'} px-3 py-1 rounded-full shadow-xs transition-all duration-300`}>
+              <Wifi className={`w-3.5 h-3.5 ${isPkk ? 'text-tosca-400' : 'text-emerald-400'}`} />
+              <span className={`w-2 h-2 rounded-full ${isPkk ? 'bg-tosca-400' : 'bg-emerald-400'} animate-pulse`} />
               <span>TERHUBUNG (ONLINE)</span>
             </span>
           ) : (
@@ -167,17 +168,28 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5 sm:gap-4">
         {/* Brand & Identity (Left) */}
         <div className="flex items-center gap-3.5 sm:gap-4 shrink-0 min-w-0">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-1.5 shadow-md shrink-0 border border-white/20">
-            <img
-              src="/logo_pemko_medan.svg"
-              alt="Logo Pemko Medan"
-              className="w-full h-full object-contain"
-            />
+          <div className="flex items-center gap-2.5">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-0 shadow-md shrink-0 border border-white/20 overflow-hidden">
+              <img
+                src="/logo_pemko_medan.svg"
+                alt="Logo Pemko Medan"
+                className="w-full h-full object-contain scale-[1.4]"
+              />
+            </div>
+            {isPkk && (
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-0 shadow-md shrink-0 border border-white/20 animate-fade-in overflow-hidden">
+                <img
+                  src="/logo_pkk.jpg"
+                  alt="Logo PKK"
+                  className="w-full h-full object-contain scale-[1.8]"
+                />
+              </div>
+            )}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg sm:text-xl font-black tracking-tight text-white drop-shadow-xs uppercase whitespace-nowrap">
-                SI-KEPLING MANGGA
+                SI-MANGGA
               </h1>
               <span
                 className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md shadow-xs whitespace-nowrap ${
@@ -189,7 +201,12 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                     ? 'bg-blue-400 text-blue-950 font-black'
                     : activeAccount.role === 'kasi_trantibum'
                     ? 'bg-orange-400 text-orange-950 font-black'
-                    : 'bg-emerald-950 text-emerald-200 border border-emerald-600'
+                    : activeAccount.role === 'ketua_pkk_kelurahan' ||
+                      activeAccount.role === 'ketua_pokja' ||
+                      activeAccount.role === 'ketua_pkk_lingkungan' ||
+                      activeAccount.role === 'sekretaris_pkk'
+                    ? 'bg-white text-tosca-800 font-black'
+                    : isPkk ? 'bg-tosca-950 text-tosca-200 border border-tosca-600' : 'bg-emerald-950 text-emerald-200 border border-emerald-600'
                 }`}
               >
                 {activeAccount.role === 'super_admin'
@@ -200,10 +217,14 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                   ? 'KASI PEMBANGUNAN (PERLINSOS)'
                   : activeAccount.role === 'kasi_trantibum'
                   ? 'KASI TRANTIBUM (KETERTIBAN)'
-                  : 'APLIKASI KEPALA LINGKUNGAN'}
+                  : activeAccount.role === 'sekretaris_pkk'
+                  ? 'SEKRETARIS TP-PKK KELURAHAN'
+                  : isPkk
+                  ? 'PENGURUS TP-PKK KELURAHAN'
+                  : 'KEPALA LINGKUNGAN'}
               </span>
             </div>
-            <p className="text-emerald-100/90 text-[11px] sm:text-xs uppercase tracking-wider font-semibold mt-0.5 truncate max-w-xl">
+            <p className={`${isPkk ? 'text-tosca-100/90' : 'text-emerald-100/90'} text-[11px] sm:text-xs uppercase tracking-wider font-semibold mt-0.5 truncate max-w-xl`}>
               {activeAccount.role === 'super_admin'
                 ? 'MONITORING LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN'
                 : activeAccount.role === 'kasi_pemerintahan'
@@ -212,14 +233,22 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                 ? 'DASHBOARD LAPORAN & CAPAIAN TARGET PERLINDUNGAN SOSIAL (PERLINSOS)'
                 : activeAccount.role === 'kasi_trantibum'
                 ? 'DASHBOARD KETENTRAMAN, KETERTIBAN UMUM, POSKAMLING & KEDISIPLINAN'
-                : `PELAPORAN HARIAN ${String(activeAccount.lingkungan || 'KEPALA LINGKUNGAN').toUpperCase()} • KELURAHAN MANGGA`}
+                : activeAccount.role === 'ketua_pkk_kelurahan' ||
+                  activeAccount.role === 'ketua_pokja' ||
+                  activeAccount.role === 'ketua_pkk_lingkungan' ||
+                  activeAccount.role === 'sekretaris_pkk'
+                ? 'PORTAL KEGIATAN & KEUANGAN TIM PENGGERAK PKK'
+                : `KECAMATAN MEDAN TUNTUNGAN`}
             </p>
           </div>
         </div>
 
         {/* Header Actions Toolbar (Right) */}
         <div className="flex items-center gap-1.5 sm:gap-2 justify-end w-auto">
-          {onOpenAbsenApel && (
+          {onOpenAbsenApel &&
+            activeAccount.role !== 'ketua_pkk_kelurahan' &&
+            activeAccount.role !== 'ketua_pokja' &&
+            activeAccount.role !== 'ketua_pkk_lingkungan' && (
             <button
               id="btn-open-absen-apel-header"
               type="button"

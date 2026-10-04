@@ -343,11 +343,111 @@ export const KEPLING_ACCOUNTS: UserAccount[] = [
   },
 ];
 
+// ==========================================
+// AKUN RESMI TIM PENGGERAK PKK KELURAHAN MANGGA
+// ==========================================
+
+export const KETUA_PKK_KELURAHAN_ACCOUNT: UserAccount = {
+  id: 'ketua_pkk',
+  role: 'ketua_pkk_kelurahan',
+  lingkungan: 'Kantor Kelurahan Mangga',
+  nama: 'Ny. Ketua TP-PKK Kelurahan Mangga',
+  jabatan: 'Ketua Tim Penggerak PKK Kelurahan Mangga',
+  kelurahan: 'Kelurahan Mangga',
+  kecamatan: 'Kecamatan Medan Tuntungan',
+  password: 'pkk_mangga2026',
+};
+
+export const SEKRETARIS_PKK_ACCOUNT: UserAccount = {
+  id: 'sekretaris_pkk',
+  role: 'sekretaris_pkk',
+  lingkungan: 'Kantor Kelurahan Mangga',
+  nama: 'Ny. Sekretaris PKK Kelurahan Mangga',
+  jabatan: 'Sekretaris Tim Penggerak PKK Kelurahan Mangga',
+  kelurahan: 'Kelurahan Mangga',
+  kecamatan: 'Kecamatan Medan Tuntungan',
+  password: 'sekretaris_pkk2026',
+};
+
+export const KETUA_POKJA_ACCOUNTS: UserAccount[] = [
+  {
+    id: 'pokja_1',
+    role: 'ketua_pokja',
+    lingkungan: 'Kelurahan Mangga',
+    nama: 'Ketua Pokja I TP-PKK',
+    jabatan: 'Ketua Pokja I (Pancasila & Gotong Royong)',
+    kelurahan: 'Kelurahan Mangga',
+    kecamatan: 'Kecamatan Medan Tuntungan',
+    password: 'pokja1_2026',
+  },
+  {
+    id: 'pokja_2',
+    role: 'ketua_pokja',
+    lingkungan: 'Kelurahan Mangga',
+    nama: 'Ketua Pokja II TP-PKK',
+    jabatan: 'Ketua Pokja II (Pendidikan & UP2K)',
+    kelurahan: 'Kelurahan Mangga',
+    kecamatan: 'Kecamatan Medan Tuntungan',
+    password: 'pokja2_2026',
+  },
+  {
+    id: 'pokja_3',
+    role: 'ketua_pokja',
+    lingkungan: 'Kelurahan Mangga',
+    nama: 'Ketua Pokja III TP-PKK',
+    jabatan: 'Ketua Pokja III (Pangan, Sandang, Rumah Sehat)',
+    kelurahan: 'Kelurahan Mangga',
+    kecamatan: 'Kecamatan Medan Tuntungan',
+    password: 'pokja3_2026',
+  },
+  {
+    id: 'pokja_4',
+    role: 'ketua_pokja',
+    lingkungan: 'Kelurahan Mangga',
+    nama: 'Ketua Pokja IV TP-PKK',
+    jabatan: 'Ketua Pokja IV (Kesehatan, Posyandu, PHBS, LH)',
+    kelurahan: 'Kelurahan Mangga',
+    kecamatan: 'Kecamatan Medan Tuntungan',
+    password: 'pokja4_2026',
+  },
+];
+
+const ROMAN_NAMES = [
+  'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
+  'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX',
+  'XXI', 'XXII', 'XXIII', 'XXIV'
+];
+
+export const KETUA_PKK_LINGKUNGAN_ACCOUNTS: UserAccount[] = Array.from({ length: 24 }, (_, i) => {
+  const num = i + 1;
+  const roman = ROMAN_NAMES[i];
+  const pad = String(num).padStart(2, '0');
+  return {
+    id: `pkk_lingkungan_${num}`,
+    role: 'ketua_pkk_lingkungan' as const,
+    nomorLingkungan: num,
+    lingkungan: `Lingkungan ${roman}`,
+    nama: `Ketua PKK Lingkungan ${roman}`,
+    jabatan: `Ketua Tim Penggerak PKK Lingkungan ${roman}`,
+    kelurahan: 'Kelurahan Mangga',
+    kecamatan: 'Kecamatan Medan Tuntungan',
+    password: `pkkmangga${pad}`,
+  };
+});
+
+export const PKK_ALL_ACCOUNTS: UserAccount[] = [
+  KETUA_PKK_KELURAHAN_ACCOUNT,
+  SEKRETARIS_PKK_ACCOUNT,
+  ...KETUA_POKJA_ACCOUNTS,
+  ...KETUA_PKK_LINGKUNGAN_ACCOUNTS,
+];
+
 export const ALL_ACCOUNTS: UserAccount[] = [
   SUPER_ADMIN_ACCOUNT,
   ...KASI_ACCOUNTS,
   PETUGAS_BAPENDA_ACCOUNT,
   ...KEPLING_ACCOUNTS,
+  ...PKK_ALL_ACCOUNTS,
 ];
 
 export const STORAGE_KEY_CUSTOM_PASSWORDS = 'kepling_custom_passwords';
@@ -754,6 +854,34 @@ export const getFixedAccountsList = (): FixedAccountOption[] => {
       role: 'petugas_bapenda',
       defaultPasswordHint: 'bapenda2026',
     },
+    {
+      username: 'ketua_pkk',
+      nama: 'KETUA TP-PKK KELURAHAN MANGGA',
+      lingkungan: 'Kantor Kelurahan Mangga',
+      role: 'ketua_pkk_kelurahan' as const,
+      defaultPasswordHint: 'pkk_mangga2026',
+    },
+    ...KETUA_POKJA_ACCOUNTS.map((p) => {
+      const eff = getEffectiveAccount(p);
+      return {
+        username: eff.id,
+        nama: eff.nama.toUpperCase(),
+        lingkungan: eff.lingkungan,
+        role: 'ketua_pokja' as const,
+        defaultPasswordHint: eff.password,
+      };
+    }),
+    ...KETUA_PKK_LINGKUNGAN_ACCOUNTS.map((k) => {
+      const eff = getEffectiveAccount(k);
+      return {
+        username: eff.id,
+        nama: eff.nama.toUpperCase(),
+        lingkungan: eff.lingkungan,
+        role: 'ketua_pkk_lingkungan' as const,
+        nomorLingkungan: eff.nomorLingkungan,
+        defaultPasswordHint: eff.password,
+      };
+    }),
     ...KEPLING_ACCOUNTS.map((k) => {
       const eff = getEffectiveAccount(k);
       return {
@@ -804,6 +932,28 @@ export const FIXED_ACCOUNTS_LIST: FixedAccountOption[] = [
     role: 'petugas_bapenda',
     defaultPasswordHint: 'bapenda2026',
   },
+  {
+    username: 'ketua_pkk',
+    nama: 'KETUA TP-PKK KELURAHAN MANGGA',
+    lingkungan: 'Kantor Kelurahan Mangga',
+    role: 'ketua_pkk_kelurahan' as const,
+    defaultPasswordHint: 'pkk_mangga2026',
+  },
+  ...KETUA_POKJA_ACCOUNTS.map((p) => ({
+    username: p.id,
+    nama: p.nama.toUpperCase(),
+    lingkungan: 'Kelurahan Mangga',
+    role: 'ketua_pokja' as const,
+    defaultPasswordHint: p.password,
+  })),
+  ...KETUA_PKK_LINGKUNGAN_ACCOUNTS.map((k) => ({
+    username: k.id,
+    nama: k.nama.toUpperCase(),
+    lingkungan: k.lingkungan,
+    role: 'ketua_pkk_lingkungan' as const,
+    nomorLingkungan: k.nomorLingkungan,
+    defaultPasswordHint: k.password,
+  })),
   ...KEPLING_ACCOUNTS.map((k) => ({
     username: k.id,
     nama: k.nama,
@@ -957,6 +1107,49 @@ export const findAccountByUsername = (input: string): UserAccount | undefined =>
 
   if (trantibAliases.includes(norm)) {
     return getEffectiveAccount(KASI_TRANTIBUM_ACCOUNT);
+  }
+
+  // 1e. Check Ketua PKK Kelurahan
+  if (
+    norm === 'ketua_pkk' ||
+    norm === 'ketuapkk' ||
+    norm === 'pkk' ||
+    norm === 'tp_pkk' ||
+    norm === 'tppkk' ||
+    norm === 'pkk_kelurahan' ||
+    norm === 'pkk_mangga' ||
+    norm === 'ketua_tp_pkk' ||
+    norm === 'ketua_tp_pkk_kelurahan' ||
+    norm === 'pkk_kelurahan_mangga'
+  ) {
+    return getEffectiveAccount(KETUA_PKK_KELURAHAN_ACCOUNT);
+  }
+
+  // 1f. Check 4 Ketua Pokja PKK
+  if (norm === 'pokja_1' || norm === 'pokja1' || norm === 'ketua_pokja_1' || norm === 'ketuapokja1' || norm === 'pokja_i') {
+    return getEffectiveAccount(KETUA_POKJA_ACCOUNTS[0]);
+  }
+  if (norm === 'pokja_2' || norm === 'pokja2' || norm === 'ketua_pokja_2' || norm === 'ketuapokja2' || norm === 'pokja_ii') {
+    return getEffectiveAccount(KETUA_POKJA_ACCOUNTS[1]);
+  }
+  if (norm === 'pokja_3' || norm === 'pokja3' || norm === 'ketua_pokja_3' || norm === 'ketuapokja3' || norm === 'pokja_iii') {
+    return getEffectiveAccount(KETUA_POKJA_ACCOUNTS[2]);
+  }
+  if (norm === 'pokja_4' || norm === 'pokja4' || norm === 'ketua_pokja_4' || norm === 'ketuapokja4' || norm === 'pokja_iv') {
+    return getEffectiveAccount(KETUA_POKJA_ACCOUNTS[3]);
+  }
+
+  // 1g. Check Ketua PKK Lingkungan (pkk_lingkungan_1 s/d 24, pkklk1, pkk1, pkk_1, etc.)
+  const pkkLingNumMatch = norm.match(/^(?:pkk_lingkungan|pkk_lk|pkklk|pkk_ling|pkk)_?0*([1-9]|1[0-9]|2[0-4])$/);
+  if (pkkLingNumMatch) {
+    const num = parseInt(pkkLingNumMatch[1], 10);
+    return KETUA_PKK_LINGKUNGAN_ACCOUNTS.find((k) => k.nomorLingkungan === num);
+  }
+
+  const pkkLingRomanMatch = norm.match(/^(?:pkk_lingkungan|pkk_lk|pkklk|pkk_ling|pkk)_?([ivx]+)$/);
+  if (pkkLingRomanMatch && ROMAN_NUMERALS[pkkLingRomanMatch[1]]) {
+    const num = ROMAN_NUMERALS[pkkLingRomanMatch[1]];
+    return KETUA_PKK_LINGKUNGAN_ACCOUNTS.find((k) => k.nomorLingkungan === num);
   }
 
   // 2. Exact ID match (e.g. kepling_1, kepling_2, ...)
@@ -1150,6 +1343,61 @@ export const verifyAccountPassword = (
       '123456',
     ];
     if (trantibVariants.includes(trimmed.toLowerCase())) {
+      return true;
+    }
+  }
+
+  // Flexible Ketua PKK Kelurahan default passwords
+  if (account.role === 'ketua_pkk_kelurahan') {
+    const pkkVariants = [
+      'pkk_mangga2026',
+      'pkkmangga2026',
+      'pkk2026',
+      'pkkmangga',
+      'pkk',
+      '123456',
+    ];
+    if (pkkVariants.includes(trimmed.toLowerCase())) {
+      return true;
+    }
+  }
+
+  // Flexible Ketua Pokja default passwords
+  if (account.role === 'ketua_pokja') {
+    const num = account.id.replace('pokja_', '');
+    const pokjaVariants = [
+      `pokja${num}_2026`,
+      `pokja_${num}_2026`,
+      `pokja${num}`,
+      `pokja_${num}`,
+      'pkk2026',
+      'pkkmangga2026',
+      '123456',
+    ];
+    if (pokjaVariants.includes(trimmed.toLowerCase())) {
+      return true;
+    }
+  }
+
+  // Flexible Ketua PKK Lingkungan default passwords
+  if (account.role === 'ketua_pkk_lingkungan' && account.nomorLingkungan) {
+    const num = account.nomorLingkungan;
+    const padded = num < 10 ? `0${num}` : `${num}`;
+    const unpadded = `${num}`;
+    const pkkLingVariants = [
+      `pkkmangga${padded}`,
+      `pkkmangga${unpadded}`,
+      `pkkmangga_${padded}`,
+      `pkk${padded}`,
+      `pkk${unpadded}`,
+      `pkk_${padded}`,
+      `pkk_${unpadded}`,
+      `pkk_mangga${padded}`,
+      'pkkmangga',
+      'pkk',
+      '123456',
+    ];
+    if (pkkLingVariants.includes(trimmed.toLowerCase())) {
       return true;
     }
   }
