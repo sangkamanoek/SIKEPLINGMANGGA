@@ -550,7 +550,8 @@ export function subscribePbbSpptFromFirestore(
   }).catch(() => {});
 
   // 1. Firestore Real-time listener
-  const firestoreUnsub = onSnapshot(
+  let firestoreUnsub: (() => void) | null = null;
+  firestoreUnsub = onSnapshot(
     colRef,
     (snapshot) => {
       const firestoreItems: SpptPbbItem[] = [];
@@ -573,7 +574,17 @@ export function subscribePbbSpptFromFirestore(
         onData(activeList);
       }
     },
-    (err) => {
+    (err: any) => {
+      if (
+        err?.code === 'resource-exhausted' ||
+        err?.message?.includes('Quota exceeded') ||
+        err?.message?.includes('resource-exhausted')
+      ) {
+        console.warn(`Firestore quota exhausted for PBB SPPT ${year}, detaching listener.`);
+        if (firestoreUnsub) {
+          try { firestoreUnsub(); } catch {}
+        }
+      }
       handleFirestoreError(err, OperationType.LIST, colName);
     }
   );

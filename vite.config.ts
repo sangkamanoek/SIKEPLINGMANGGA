@@ -1,4 +1,3 @@
-import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
@@ -7,7 +6,6 @@ export default defineConfig(() => {
   return {
     plugins: [
       react(),
-      tailwindcss(),
     ],
     resolve: {
       alias: {
@@ -15,6 +13,8 @@ export default defineConfig(() => {
       },
     },
     build: {
+      outDir: 'dist',
+      emptyOutDir: true,
       target: ['es2015', 'edge88', 'firefox78', 'chrome80', 'safari14'],
       cssTarget: ['chrome80', 'firefox78', 'safari14', 'edge88'],
       minify: 'terser' as const,

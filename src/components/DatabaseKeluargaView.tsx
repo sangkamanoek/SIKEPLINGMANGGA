@@ -77,6 +77,8 @@ import {
   parseDataKeluargaText,
   batchSaveDataKeluarga,
   batchUpdateLingkunganDataKeluarga,
+  autoCleanDuplicateDataKeluarga,
+  DeduplicateResult,
   normalizeStreetName,
   maskNik,
   ImportParsedResult,
@@ -108,6 +110,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
 
   // Filters
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   const [filterLingkungan, setFilterLingkungan] = useState<string>(
     isKepling ? currentUser.id : 'all'
   );
@@ -116,10 +119,19 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
   const [filterSanitasi, setFilterSanitasi] = useState<string>('all');
   const [filterStunting, setFilterStunting] = useState<string>('all');
 
-  // Modals
+  // Debounced search for ultra-fast typing without blocking UI
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Modals & Action States
   const [selectedDetailKk, setSelectedDetailKk] = useState<DataKeluarga | null>(null);
   const [showFullNik, setShowFullNik] = useState<boolean>(false);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
+  const [formInitialTab, setFormInitialTab] = useState<'UTAMA' | 'ANGGOTA' | 'BANSOS' | 'SANITASI'>('UTAMA');
   const [editingKk, setEditingKk] = useState<DataKeluarga | null>(null);
   const [deletingKk, setDeletingKk] = useState<{
     id: string;
@@ -129,6 +141,10 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     alamat?: string;
   } | null>(null);
   const [isDeletingKk, setIsDeletingKk] = useState<boolean>(false);
+
+  // Deduplication cleaning state
+  const [isCleaningDuplicates, setIsCleaningDuplicates] = useState<boolean>(false);
+  const [confirmCleanDuplicatesModal, setConfirmCleanDuplicatesModal] = useState<boolean>(false);
 
   // Tab Menu State
   const [activeTab, setActiveTab] = useState<'daftar' | 'statistik' | 'import' | 'pindah_lingkungan' | 'cek_duplikasi'>('daftar');
@@ -273,9 +289,9 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
         }
       }
 
-      // Live search
-      if (searchQuery.trim() || streetSearchKeyword.trim()) {
-        const q = (searchQuery || streetSearchKeyword).toLowerCase().trim();
+      // Live search (debounced for smooth performance)
+      if (debouncedSearchQuery.trim() || streetSearchKeyword.trim()) {
+        const q = (debouncedSearchQuery || streetSearchKeyword).toLowerCase().trim();
         const matchKk = item.nomorKk?.toLowerCase().includes(q);
         const matchNama = item.namaKepalaKeluarga?.toLowerCase().includes(q);
         const matchNik = item.nikKepalaKeluarga?.toLowerCase().includes(q);
@@ -297,7 +313,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     filterBansos,
     filterSanitasi,
     filterStunting,
-    searchQuery,
+    debouncedSearchQuery,
     streetSearchKeyword,
   ]);
 
@@ -308,7 +324,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
   // Reset to page 1 on filter/search change
   useEffect(() => {
     setPageKk(1);
-  }, [filterLingkungan, filterDesil, filterBansos, filterSanitasi, filterStunting, searchQuery, pageSizeKk]);
+  }, [filterLingkungan, filterDesil, filterBansos, filterSanitasi, filterStunting, debouncedSearchQuery, pageSizeKk]);
 
   const totalKkPages = Math.max(1, Math.ceil(filteredList.length / (pageSizeKk === -1 ? filteredList.length || 1 : pageSizeKk)));
   const paginatedKkList = useMemo(() => {
@@ -317,37 +333,73 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     return filteredList.slice(start, start + pageSizeKk);
   }, [filteredList, pageKk, pageSizeKk]);
 
-  // Aggregate Metrics
+  // Aggregate Metrics - Single O(N) pass for high performance
   const stats = useMemo(() => {
+    let totalJiwa = 0;
+    let totalLakiLaki = 0;
+    let totalPerempuan = 0;
+    let totalBalita = 0;
+    let totalLansia = 0;
+
+    let countDesil1 = 0;
+    let countDesil2 = 0;
+    let countDesil3 = 0;
+    let countDesil4 = 0;
+    let countDesil5 = 0;
+    let countDesil6Plus = 0;
+
+    let countPkhMedanMakmur = 0;
+    let countPkhNasional = 0;
+    let countBpnt = 0;
+    let countPbiJk = 0;
+    let countPenerimaBansos = 0;
+
+    let countJambanSendiri = 0;
+    let countJambanKomunal = 0;
+    let countBabs = 0;
+    let countAirPdam = 0;
+    let countAirDepot = 0;
+    let countAirSumur = 0;
+    let countRestiStunting = 0;
+
     const totalKk = filteredList.length;
-    const totalJiwa = filteredList.reduce((s, k) => s + (k.jumlahAnggotaKeluarga || 0), 0);
-    const totalLakiLaki = filteredList.reduce((s, k) => s + (k.jumlahLakiLaki || 0), 0);
-    const totalPerempuan = filteredList.reduce((s, k) => s + (k.jumlahPerempuan || 0), 0);
-    const totalBalita = filteredList.reduce((s, k) => s + (k.jumlahBalita || 0), 0);
-    const totalLansia = filteredList.reduce((s, k) => s + (k.jumlahLansia || 0), 0);
+    for (let i = 0; i < filteredList.length; i++) {
+      const k = filteredList[i];
+      totalJiwa += k.jumlahAnggotaKeluarga || 0;
+      totalLakiLaki += k.jumlahLakiLaki || 0;
+      totalPerempuan += k.jumlahPerempuan || 0;
+      totalBalita += k.jumlahBalita || 0;
+      totalLansia += k.jumlahLansia || 0;
 
-    // Kesejahteraan & Bansos
-    const countDesil1 = filteredList.filter((k) => k.desilKesejahteraan?.includes('Desil 1')).length;
-    const countDesil2 = filteredList.filter((k) => k.desilKesejahteraan?.includes('Desil 2')).length;
-    const countDesil3 = filteredList.filter((k) => k.desilKesejahteraan?.includes('Desil 3')).length;
-    const countDesil4 = filteredList.filter((k) => k.desilKesejahteraan?.includes('Desil 4')).length;
-    const countDesil5 = filteredList.filter((k) => k.desilKesejahteraan?.includes('Desil 5')).length;
-    const countDesil6Plus = filteredList.filter((k) => k.desilKesejahteraan?.includes('Desil 6') || k.desilKesejahteraan?.includes('Mampu')).length;
+      const desil = k.desilKesejahteraan || '';
+      if (desil.includes('Desil 1')) countDesil1++;
+      else if (desil.includes('Desil 2')) countDesil2++;
+      else if (desil.includes('Desil 3')) countDesil3++;
+      else if (desil.includes('Desil 4')) countDesil4++;
+      else if (desil.includes('Desil 5')) countDesil5++;
+      else if (desil.includes('Desil 6') || desil.includes('Mampu')) countDesil6Plus++;
 
-    const countPkhMedanMakmur = filteredList.filter((k) => k.bantuanDiterima?.includes('PKH Medan Makmur')).length;
-    const countPkhNasional = filteredList.filter((k) => k.bantuanDiterima?.includes('PKH Nasional')).length;
-    const countBpnt = filteredList.filter((k) => k.bantuanDiterima?.some((b) => b.includes('BPNT'))).length;
-    const countPbiJk = filteredList.filter((k) => k.bantuanDiterima?.some((b) => b.includes('PBI'))).length;
-    const countPenerimaBansos = filteredList.filter((k) => k.penerimaBansos || (k.bantuanDiterima && k.bantuanDiterima.length > 0)).length;
+      const bList = k.bantuanDiterima || [];
+      if (bList.includes('PKH Medan Makmur')) countPkhMedanMakmur++;
+      if (bList.includes('PKH Nasional')) countPkhNasional++;
+      if (bList.some((b) => b.includes('BPNT'))) countBpnt++;
+      if (bList.some((b) => b.includes('PBI'))) countPbiJk++;
+      if (k.penerimaBansos || bList.length > 0) countPenerimaBansos++;
 
-    // Sanitasi
-    const countJambanSendiri = filteredList.filter((k) => k.jambanKeluarga?.includes('Sendiri')).length;
-    const countJambanKomunal = filteredList.filter((k) => k.jambanKeluarga?.includes('Bersama') || k.jambanKeluarga?.includes('Komunal')).length;
-    const countBabs = filteredList.filter((k) => k.jambanKeluarga?.includes('Tidak Memiliki') || k.jambanKeluarga?.includes('BABS')).length;
-    const countAirPdam = filteredList.filter((k) => k.sumberAirMinum?.includes('PDAM') || k.sumberAirBersih?.includes('PDAM')).length;
-    const countAirDepot = filteredList.filter((k) => k.sumberAirMinum?.includes('Depot') || k.sumberAirMinum?.includes('Kemasan')).length;
-    const countAirSumur = filteredList.filter((k) => k.sumberAirMinum?.includes('Sumur') || k.sumberAirBersih?.includes('Sumur')).length;
-    const countRestiStunting = filteredList.filter((k) => k.statusStuntingRentan?.includes('Stunting') || k.statusStuntingRentan?.includes('Resti')).length;
+      const jamban = k.jambanKeluarga || '';
+      if (jamban.includes('Sendiri')) countJambanSendiri++;
+      else if (jamban.includes('Bersama') || jamban.includes('Komunal')) countJambanKomunal++;
+      else if (jamban.includes('Tidak Memiliki') || jamban.includes('BABS')) countBabs++;
+
+      const minum = k.sumberAirMinum || '';
+      const bersih = k.sumberAirBersih || '';
+      if (minum.includes('PDAM') || bersih.includes('PDAM')) countAirPdam++;
+      if (minum.includes('Depot') || minum.includes('Kemasan')) countAirDepot++;
+      if (minum.includes('Sumur') || bersih.includes('Sumur')) countAirSumur++;
+
+      const stunting = k.statusStuntingRentan || '';
+      if (stunting.includes('Stunting') || stunting.includes('Resti')) countRestiStunting++;
+    }
 
     return {
       totalKk,
@@ -588,8 +640,10 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     }
   };
 
-  // Mismatch & Smart Recommendations Engine
+  // Mismatch & Smart Recommendations Engine (computed lazily only when activeTab === 'pindah_lingkungan')
   const mismatchedList = useMemo(() => {
+    if (activeTab !== 'pindah_lingkungan') return [];
+
     const result: Array<{
       kk: DataKeluarga;
       currentLkNomor: number;
@@ -691,14 +745,15 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     }
 
     return result;
-  }, [dataList, spptList]);
+  }, [dataList, spptList, activeTab]);
 
   // Fast lookup map of KK ID to Mismatch recommendation
   const mismatchMap = useMemo(() => {
+    if (activeTab !== 'pindah_lingkungan') return new Map<string, typeof mismatchedList[0]>();
     const map = new Map<string, typeof mismatchedList[0]>();
     mismatchedList.forEach((m) => map.set(m.kk.id, m));
     return map;
-  }, [mismatchedList]);
+  }, [mismatchedList, activeTab]);
 
   // Execute Batch Move
   const executeBatchMove = async (
@@ -932,13 +987,31 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
     return null;
   };
 
-  // Unique streets for bulk move dropdown
+  // Unique streets for bulk move dropdown (computed lazily)
   const uniqueStreets = useMemo(() => {
+    if (activeTab !== 'pindah_lingkungan') return [];
     const streets = new Set<string>();
     dataList.forEach(k => {
       if (k.namaJalan) streets.add(k.namaJalan.toUpperCase());
     });
     return Array.from(streets).sort();
+  }, [dataList, activeTab]);
+
+  // Deteksi jumlah KK yang terduplikasi secara global
+  const duplicateKkCount = useMemo(() => {
+    const seen = new Set<string>();
+    let count = 0;
+    for (const item of dataList) {
+      const cleanKk = (item.nomorKk || '').replace(/[^0-9]/g, '');
+      if (cleanKk && cleanKk.length >= 6) {
+        if (seen.has(cleanKk)) {
+          count++;
+        } else {
+          seen.add(cleanKk);
+        }
+      }
+    }
+    return count;
   }, [dataList]);
 
   return (
@@ -968,12 +1041,24 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
               type="button"
               onClick={() => {
                 setEditingKk(null);
+                setFormInitialTab('UTAMA');
                 setIsFormOpen(true);
               }}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer border border-emerald-300"
             >
               <Plus className="w-4 h-4 text-slate-950" />
               <span>Tambah Data KK</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setConfirmCleanDuplicatesModal(true)}
+              disabled={isCleaningDuplicates}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-md transition-all cursor-pointer border border-rose-400/40"
+              title="Otomatis bersihkan data KK duplikat, mempertahankan yang memiliki lingkungan"
+            >
+              <ShieldAlert className="w-4 h-4 text-rose-200" />
+              <span>{isCleaningDuplicates ? 'Membersihkan...' : 'Bersihkan Duplikasi Otomatis'}</span>
             </button>
             
             {isAdmin && (
@@ -1269,6 +1354,37 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
         </div>
       </div>
 
+      {/* BANNER NOTIFIKASI DUPLIKASI KK & TOMBOL PEMBERSIHAN */}
+      {duplicateKkCount > 0 && activeTab === 'daftar' && (
+        <div className="p-4 bg-linear-to-r from-rose-50 via-amber-50 to-rose-50 border-2 border-rose-300 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm animate-in fade-in">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-md">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-black text-slate-900 flex items-center gap-2">
+                <span>TERDETEKSI {duplicateKkCount} DATA KARTU KELUARGA (KK) TERDUPLIKASI</span>
+                <span className="text-[10px] bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full font-bold">
+                  Perlu Dibersihkan
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Aturan: Sistem akan <strong>mempertahankan KK yang memiliki Lingkungan (1–24)</strong>, menghapus duplikat tanpa lingkungan (atau menghapus 1 data jika keduanya tanpa lingkungan), dan <strong>menyatukan seluruh anggota keluarga</strong> agar aman tanpa ada yang hilang.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setConfirmCleanDuplicatesModal(true)}
+            disabled={isCleaningDuplicates}
+            className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-2 shrink-0 self-start md:self-center"
+          >
+            <ShieldAlert className="w-4 h-4 text-rose-200" />
+            <span>Bersihkan Duplikasi Otomatis</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Table Database Data Keluarga */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative">
         <div className="overflow-x-auto">
@@ -1461,6 +1577,20 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
+                            onClick={() => {
+                              setEditingKk(item);
+                              setFormInitialTab('ANGGOTA');
+                              setIsFormOpen(true);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer border border-emerald-200 flex items-center gap-1 text-[11px] font-bold"
+                            title="Tambah Anggota ke KK Ini (Tanpa Duplikasi)"
+                          >
+                            <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="hidden xl:inline">Anggota</span>
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={() => setSelectedDetailKk(item)}
                             className="p-1.5 rounded-lg bg-blue-50 text-blue-800 hover:bg-blue-100 transition-colors cursor-pointer border border-blue-200"
                             title="Lihat Detail Kartu Keluarga"
@@ -1472,6 +1602,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                             type="button"
                             onClick={() => {
                               setEditingKk(item);
+                              setFormInitialTab('UTAMA');
                               setIsFormOpen(true);
                             }}
                             className="p-1.5 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer border border-amber-200"
@@ -3375,6 +3506,23 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                     const itemToEdit = selectedDetailKk;
                     setSelectedDetailKk(null);
                     setEditingKk(itemToEdit);
+                    setFormInitialTab('ANGGOTA');
+                    setIsFormOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all cursor-pointer shadow-md"
+                  title="Tambah Anggota ke Kartu Keluarga Ini"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Anggota</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const itemToEdit = selectedDetailKk;
+                    setSelectedDetailKk(null);
+                    setEditingKk(itemToEdit);
+                    setFormInitialTab('UTAMA');
                     setIsFormOpen(true);
                   }}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 text-amber-900 font-bold text-xs hover:bg-amber-100 transition-colors cursor-pointer border border-amber-300 shadow-2xs"
@@ -3470,17 +3618,90 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
         </div>
       )}
 
+      {/* MODAL: KONFIRMASI BERSIHKAN DUPLIKASI OTOMATIS */}
+      {confirmCleanDuplicatesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full border border-slate-200 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">Bersihkan Data KK Duplikat Otomatis?</h3>
+                <p className="text-xs text-slate-500 font-medium">Sistem akan menyeleksi seluruh Nomor KK dan NIK yang ganda.</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700 space-y-2">
+              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                <span>Aturan Pembersihan Sesuai Permintaan Anda:</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1 text-[11px]">
+                <li><strong>Prioritas Lingkungan:</strong> KK yang memiliki Lingkungan (1–24) akan <strong>dipertahankan</strong>.</li>
+                <li><strong>Hapus Duplikat Tanpa Lingkungan:</strong> Data ganda yang tidak memiliki lingkungan akan <strong>dihapus otomatis</strong>.</li>
+                <li><strong>Gabungkan Anggota Keluarga:</strong> Seluruh anggota keluarga dari data duplikat akan <strong>disatukan ke data utama</strong> agar tidak ada data warga yang hilang.</li>
+                <li><strong>Jaminan Unik:</strong> Jika sama-sama tidak memiliki lingkungan, 1 data disimpan dan data duplikat lainnya dibersihkan sehingga Nomor KK benar-benar unik.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmCleanDuplicatesModal(false)}
+                disabled={isCleaningDuplicates}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsCleaningDuplicates(true);
+                  try {
+                    const res = await autoCleanDuplicateDataKeluarga();
+                    setConfirmCleanDuplicatesModal(false);
+                    if (onShowToast) onShowToast(res.message, res.deletedCount > 0 ? 'success' : 'info');
+                  } catch (err: any) {
+                    console.error(err);
+                    if (onShowToast) onShowToast('Gagal membersihkan duplikasi: ' + err.message, 'error');
+                  } finally {
+                    setIsCleaningDuplicates(false);
+                  }
+                }}
+                disabled={isCleaningDuplicates}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-2"
+              >
+                {isCleaningDuplicates ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Memproses...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Ya, Jalankan Pembersihan</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL 2: FORM TAMBAH / EDIT KARTU KELUARGA */}
       {isFormOpen && (
         <FormKeluargaModal
           isOpen={isFormOpen}
           initialData={editingKk}
+          initialTab={formInitialTab}
           currentUser={currentUser}
           spptList={spptList}
           dataList={dataList}
           onClose={() => {
             setIsFormOpen(false);
             setEditingKk(null);
+            setFormInitialTab('UTAMA');
           }}
           onSave={async (savedData) => {
             setIsSaving(true);
@@ -3490,6 +3711,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                 if (onShowToast) onShowToast(`Data Keluarga "${savedData.namaKepalaKeluarga}" berhasil disimpan ke database.`, 'success');
                 setIsFormOpen(false);
                 setEditingKk(null);
+                setFormInitialTab('UTAMA');
               } else {
                 if (onShowToast) onShowToast('Gagal menyimpan data keluarga.', 'error');
               }
@@ -3513,6 +3735,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
 interface FormKeluargaModalProps {
   isOpen: boolean;
   initialData: DataKeluarga | null;
+  initialTab?: 'UTAMA' | 'ANGGOTA' | 'BANSOS' | 'SANITASI';
   currentUser: UserAccount;
   onClose: () => void;
   onSave: (data: DataKeluarga) => Promise<void>;
@@ -3523,6 +3746,7 @@ interface FormKeluargaModalProps {
 const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
   isOpen,
   initialData,
+  initialTab = 'UTAMA',
   currentUser,
   onClose,
   onSave,
@@ -3533,8 +3757,12 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
   const defaultLingkunganId = isKepling ? currentUser.id : 'kepling_1';
   const defaultKepling = KEPLING_ACCOUNTS.find((k) => k.id === defaultLingkunganId) || KEPLING_ACCOUNTS[0];
 
-  const [activeTab, setActiveTab] = useState<'UTAMA' | 'ANGGOTA' | 'BANSOS' | 'SANITASI'>('UTAMA');
+  const [activeTab, setActiveTab] = useState<'UTAMA' | 'ANGGOTA' | 'BANSOS' | 'SANITASI'>(initialTab);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   // Form Fields
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -3580,6 +3808,29 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
   const [tempAnggotaAgama, setTempAnggotaAgama] = useState<AgamaType>('Islam');
   const [tempAnggotaPekerjaan, setTempAnggotaPekerjaan] = useState<string>('');
 
+  const [editingAnggotaId, setEditingAnggotaId] = useState<string | null>(null);
+
+  const startEditAnggota = (ang: AnggotaKeluarga) => {
+    setEditingAnggotaId(ang.id);
+    setTempAnggotaNama(ang.nama || '');
+    setTempAnggotaNik(ang.nik || '');
+    setTempAnggotaHub(ang.hubunganKeluarga || '');
+    setTempAnggotaJk(ang.jenisKelamin || '');
+    setTempAnggotaUsia(ang.usia || 0);
+    setTempAnggotaAgama((ang.agama as AgamaType) || 'Islam');
+    setTempAnggotaPekerjaan(ang.pekerjaan || '');
+  };
+
+  const cancelEditAnggota = () => {
+    setEditingAnggotaId(null);
+    setTempAnggotaNama('');
+    setTempAnggotaNik('');
+    setTempAnggotaHub('');
+    setTempAnggotaJk('');
+    setTempAnggotaUsia('');
+    setTempAnggotaPekerjaan('');
+  };
+
   // Removal reason & Pecah KK Modal state
   const [isRemovalModalOpen, setIsRemovalModalOpen] = useState<boolean>(false);
   const [targetAnggotaToRemove, setTargetAnggotaToRemove] = useState<AnggotaKeluarga | null>(null);
@@ -3608,14 +3859,20 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
         nikKepalaKeluarga: targetAnggotaToRemove.nik || '1271010000000000',
         namaKepalaKeluarga: targetAnggotaToRemove.nama,
         lingkunganId: lingkunganId,
-        nomorLingkungan: Number(lingkunganId.replace('kepling_', '')) || 1,
-        lingkungan: KEPLING_ACCOUNTS.find(k => k.id === lingkunganId)?.lingkungan || 'Lingkungan I',
-        kelurahan: 'Kelurahan Mangga',
-        kecamatan: 'Kecamatan Medan Tuntungan',
+        lingkunganNomor: Number(lingkunganId.replace('kepling_', '')) || 1,
+        lingkunganNama: KEPLING_ACCOUNTS.find(k => k.id === lingkunganId)?.lingkungan || 'Lingkungan I',
+        alamatLengkap: `${namaJalan || 'Jl. Utama'}, ${KEPLING_ACCOUNTS.find(k => k.id === lingkunganId)?.lingkungan || 'Lingkungan I'}, KELURAHAN MANGGA`,
+        statusDomisili: 'KK Kelurahan Mangga (KTP/KK Setempat)',
         namaJalan: namaJalan || 'Jl. Utama',
-        rt: '001',
-        rw: '001',
         jumlahAnggotaKeluarga: 1,
+        jumlahLakiLaki: targetAnggotaToRemove.jenisKelamin === 'L' ? 1 : 0,
+        jumlahPerempuan: targetAnggotaToRemove.jenisKelamin === 'P' ? 1 : 0,
+        jumlahBalita: (targetAnggotaToRemove.usia || 0) <= 5 ? 1 : 0,
+        jumlahUsiaSekolah: (targetAnggotaToRemove.usia || 0) >= 6 && (targetAnggotaToRemove.usia || 0) <= 18 ? 1 : 0,
+        jumlahUsiaProduktif: (targetAnggotaToRemove.usia || 0) >= 19 && (targetAnggotaToRemove.usia || 0) <= 59 ? 1 : 0,
+        jumlahLansia: (targetAnggotaToRemove.usia || 0) >= 60 ? 1 : 0,
+        desilKesejahteraan: 'Desil 6-10 (Mampu / Non-Desil)',
+        penerimaBansos: false,
         anggotaKeluarga: [
           {
             ...targetAnggotaToRemove,
@@ -3623,13 +3880,14 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
             statusPerkawinan: 'Kawin',
           }
         ],
-        statusEkonomi: 'Mampu',
         bantuanDiterima: [],
-        sumberAirMinum: airMinum || 'PDAM',
-        jambanKeluarga: jamban || 'Milik Sendiri',
-        statusRumah: 'Milik Sendiri',
-        latitude: 3.48,
-        longitude: 98.62,
+        sumberAirMinum: airMinum || 'PDAM / Air Perpipaan',
+        sumberAirBersih: airBersih || 'PDAM Tirtanadi',
+        jambanKeluarga: jamban || 'Jamban Sendiri (Leher Angsa / Septik SNI)',
+        tempatAkhirTinja: tempatTinja || 'Tangki Septik / SPALD',
+        pembuanganSampahRumah: sampah || 'Diangkut Petugas / WRS',
+        statusStuntingRentan: stunting || 'Bebas Risiko Stunting',
+        statusKepemilikanRumah: 'Milik Sendiri',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -3709,6 +3967,47 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
     return checkNikDuplicate(debouncedTempNik, dataList, { excludeKkId: initialData?.id });
   }, [debouncedTempNik, dataList, initialData]);
 
+  // Deteksi cerdas apakah No KK atau NIK sudah ada di database saat mendaftar baru
+  const matchedExistingKk = useMemo(() => {
+    if (initialData) return null;
+    const cleanInputKk = (debouncedNomorKk || nomorKk || '').replace(/[^0-9]/g, '');
+    const cleanInputNik = (debouncedNik || nikKk || '').replace(/[^0-9]/g, '');
+    if ((!cleanInputKk || cleanInputKk.length < 6) && (!cleanInputNik || cleanInputNik.length < 6)) {
+      return null;
+    }
+
+    return dataList.find((k) => {
+      const kCleanKk = (k.nomorKk || '').replace(/[^0-9]/g, '');
+      const kCleanNik = (k.nikKepalaKeluarga || '').replace(/[^0-9]/g, '');
+      if (cleanInputKk && cleanInputKk.length >= 6 && kCleanKk === cleanInputKk) return true;
+      if (cleanInputNik && cleanInputNik.length >= 6 && kCleanNik === cleanInputNik) return true;
+      return false;
+    }) || null;
+  }, [debouncedNomorKk, nomorKk, debouncedNik, nikKk, dataList, initialData]);
+
+  const handleSwitchToAddAnggotaToExisting = (existing: DataKeluarga) => {
+    setNomorKk(existing.nomorKk || '');
+    setNikKk(existing.nikKepalaKeluarga || '');
+    setNamaKk(existing.namaKepalaKeluarga || '');
+    setTelepon(existing.telepon || '');
+    setLingkunganId(existing.lingkunganId || defaultLingkunganId);
+    setNamaJalan(existing.namaJalan || '');
+    setNomorRumah(existing.nomorRumah || '');
+    setAgama(existing.agama || 'Islam');
+    setDesil(existing.desilKesejahteraan || '');
+    setBantuanDiterima(existing.bantuanDiterima || []);
+    setJamban(existing.jambanKeluarga || '');
+    setTempatTinja(existing.tempatAkhirTinja || '');
+    setAirMinum(existing.sumberAirMinum || '');
+    setAirBersih(existing.sumberAirBersih || '');
+    setSampah(existing.pembuanganSampahRumah || '');
+    setStunting(existing.statusStuntingRentan || '');
+    setNopPbb(existing.nopPbb || '');
+    setAnggotaList(existing.anggotaKeluarga || []);
+    setFormError(null);
+    setActiveTab('ANGGOTA');
+  };
+
   // Auto-assign Lingkungan based on NOP or Street
   useEffect(() => {
     if (!initialData && (nopPbb || namaJalan)) {
@@ -3762,30 +4061,51 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
       return;
     }
     const ageNum = Number(tempAnggotaUsia) || 0;
-    const newAnggota: AnggotaKeluarga = {
-      id: `ang_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      nik: tempAnggotaNik.trim() || `127101${String(Date.now()).substring(0, 10)}`,
-      nama: tempAnggotaNama.trim().toUpperCase(),
-      hubunganKeluarga: tempAnggotaHub as HubunganKeluargaType,
-      jenisKelamin: tempAnggotaJk as 'L' | 'P',
-      usia: ageNum,
-      agama: tempAnggotaAgama || (agama as AgamaType) || 'Islam',
-      pendidikanTerakhir: 'SMA/SMK/Sederajat',
-      pekerjaan: tempAnggotaPekerjaan.trim() || '-',
-      statusPerkawinan: tempAnggotaHub === 'Kepala Keluarga' || tempAnggotaHub === 'Istri' ? 'Kawin' : 'Belum Kawin',
-      memilikiKtpIkd: ageNum >= 17,
-      memilikiAktaKelahiran: true,
-      statusBpjsKesehatan: 'PBI-JK (Bansos APBD/APBN)',
-      terdaftarBpjsKetenagakerjaan: ageNum >= 18,
-    };
 
-    setAnggotaList([...anggotaList, newAnggota]);
-    setTempAnggotaNama('');
-    setTempAnggotaNik('');
-    setTempAnggotaHub('');
-    setTempAnggotaJk('');
-    setTempAnggotaUsia('');
-    setTempAnggotaPekerjaan('');
+    if (editingAnggotaId) {
+      setAnggotaList(
+        anggotaList.map((a) =>
+          a.id === editingAnggotaId
+            ? {
+                ...a,
+                nik: tempAnggotaNik.trim() || a.nik,
+                nama: tempAnggotaNama.trim().toUpperCase(),
+                hubunganKeluarga: tempAnggotaHub as HubunganKeluargaType,
+                jenisKelamin: tempAnggotaJk as 'L' | 'P',
+                usia: ageNum,
+                agama: tempAnggotaAgama || a.agama || 'Islam',
+                pekerjaan: tempAnggotaPekerjaan.trim() || '-',
+              }
+            : a
+        )
+      );
+      cancelEditAnggota();
+    } else {
+      const newAnggota: AnggotaKeluarga = {
+        id: `ang_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        nik: tempAnggotaNik.trim() || `127101${String(Date.now()).substring(0, 10)}`,
+        nama: tempAnggotaNama.trim().toUpperCase(),
+        hubunganKeluarga: tempAnggotaHub as HubunganKeluargaType,
+        jenisKelamin: tempAnggotaJk as 'L' | 'P',
+        usia: ageNum,
+        agama: tempAnggotaAgama || (agama as AgamaType) || 'Islam',
+        pendidikanTerakhir: 'SMA/SMK/Sederajat',
+        pekerjaan: tempAnggotaPekerjaan.trim() || '-',
+        statusPerkawinan: tempAnggotaHub === 'Kepala Keluarga' || tempAnggotaHub === 'Istri' ? 'Kawin' : 'Belum Kawin',
+        memilikiKtpIkd: ageNum >= 17,
+        memilikiAktaKelahiran: true,
+        statusBpjsKesehatan: 'PBI-JK (Bansos APBD/APBN)',
+        terdaftarBpjsKetenagakerjaan: ageNum >= 18,
+      };
+
+      setAnggotaList([...anggotaList, newAnggota]);
+      setTempAnggotaNama('');
+      setTempAnggotaNik('');
+      setTempAnggotaHub('');
+      setTempAnggotaJk('');
+      setTempAnggotaUsia('');
+      setTempAnggotaPekerjaan('');
+    }
   };
 
   const removeAnggota = (id: string) => {
@@ -3831,19 +4151,35 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
     const totalUsiaSekolah = anggotaList.filter((a) => a.usia >= 6 && a.usia <= 18).length;
     const totalProduktif = anggotaList.filter((a) => a.usia >= 19 && a.usia <= 59).length;
 
+    // SMART GUARD: Cegah duplikasi jika No KK atau NIK sudah ada dalam database
+    let finalId = initialData?.id;
+    let finalLingkunganId = targetKepling.id;
+    let finalLingkunganNomor = targetKepling.nomorLingkungan || 1;
+    let finalLingkunganNama = targetKepling.lingkungan;
+
+    if (!finalId && matchedExistingKk) {
+      finalId = matchedExistingKk.id;
+      // Pertahankan lingkungan KK asal jika sudah memiliki lingkungan valid
+      if (matchedExistingKk.lingkunganNomor && matchedExistingKk.lingkunganId) {
+        finalLingkunganId = matchedExistingKk.lingkunganId;
+        finalLingkunganNomor = matchedExistingKk.lingkunganNomor;
+        finalLingkunganNama = matchedExistingKk.lingkunganNama;
+      }
+    }
+
     const newKeluargaData: DataKeluarga = {
-      id: initialData?.id || `kk_${primaryNik.replace(/[^0-9]/g, '') || Date.now()}`,
+      id: finalId || `kk_${primaryNik.replace(/[^0-9]/g, '') || Date.now()}`,
       nomorKk: (nomorKk || primaryNik).trim(),
       nikKepalaKeluarga: primaryNik,
       namaKepalaKeluarga: namaKk.trim().toUpperCase(),
       telepon: telepon.trim(),
-      lingkunganId: targetKepling.id,
-      lingkunganNomor: targetKepling.nomorLingkungan || 1,
-      lingkunganNama: targetKepling.lingkungan,
+      lingkunganId: finalLingkunganId,
+      lingkunganNomor: finalLingkunganNomor,
+      lingkunganNama: finalLingkunganNama,
       namaJalan: namaJalan.trim().toUpperCase(),
       nomorRumah: nomorRumah.trim().toUpperCase(),
       agama: agama,
-      alamatLengkap: `${namaJalan.trim().toUpperCase()} ${nomorRumah.trim() ? `NO. ${nomorRumah.trim().toUpperCase()}` : ''}, ${targetKepling.lingkungan.toUpperCase()}, KELURAHAN MANGGA`,
+      alamatLengkap: `${namaJalan.trim().toUpperCase()} ${nomorRumah.trim() ? `NO. ${nomorRumah.trim().toUpperCase()}` : ''}, ${finalLingkunganNama.toUpperCase()}, KELURAHAN MANGGA`,
       statusDomisili,
       jumlahAnggotaKeluarga: totalJiwa,
       jumlahLakiLaki: totalL,
@@ -4026,6 +4362,41 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                     </p>
                   </div>
                 </div>
+
+                {/* SMART BANNER: No KK / NIK Sudah Terdaftar */}
+                {matchedExistingKk && !initialData && (
+                  <div className="p-4 bg-linear-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-300 rounded-2xl space-y-2.5 shadow-sm animate-in fade-in">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-black text-amber-950 flex items-center gap-2">
+                          <span>KARTU KELUARGA SUDAH TERDAFTAR!</span>
+                          <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-bold">
+                            Cegah Duplikasi KK
+                          </span>
+                        </div>
+                        <p className="text-xs text-amber-900 mt-1">
+                          No. KK / NIK ini sudah terdaftar atas nama <strong>{matchedExistingKk.namaKepalaKeluarga}</strong> di <strong>{matchedExistingKk.lingkunganNama || `Lingkungan ${matchedExistingKk.lingkunganNomor}`}</strong> (Jalan: {matchedExistingKk.namaJalan || '-'}).
+                        </p>
+                        <p className="text-[11px] text-amber-800 mt-0.5">
+                          Jika Anda ingin <strong>menambahkan anggota keluarga</strong> ke KK ini, silakan klik tombol di bawah agar data tidak tersimpan ganda:
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-1.5 flex flex-wrap items-center gap-2 border-t border-amber-200">
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchToAddAnggotaToExisting(matchedExistingKk)}
+                        className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Hanya Tambah Anggota Ke KK Ini (Pindah ke Tab Anggota)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -4256,14 +4627,24 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                             </div>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => promptRemoveAnggota(ang)}
-                          className="p-2 rounded-xl text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
-                          title="Hapus Anggota / Alasan Perubahan"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => startEditAnggota(ang)}
+                            className="p-2 rounded-xl text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-all cursor-pointer"
+                            title="Edit Anggota (Jenis Kelamin, NIK, dll)"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => promptRemoveAnggota(ang)}
+                            className="p-2 rounded-xl text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
+                            title="Hapus Anggota / Alasan Perubahan"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -4272,9 +4653,20 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
 
               {/* Form Input Cepat Anggota */}
               <div className="p-5 bg-blue-900 rounded-2xl border border-blue-800 shadow-lg space-y-4">
-                <div className="text-xs font-black text-blue-100 flex items-center gap-2">
-                  <Plus className="w-4 h-4" />
-                  <span>FORM TAMBAH ANGGOTA KELUARGA CEPAT</span>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-black text-blue-100 flex items-center gap-2">
+                    {editingAnggotaId ? <Edit3 className="w-4 h-4 text-amber-300" /> : <Plus className="w-4 h-4" />}
+                    <span>{editingAnggotaId ? 'FORM EDIT ANGGOTA KELUARGA' : 'FORM TAMBAH ANGGOTA KELUARGA CEPAT'}</span>
+                  </div>
+                  {editingAnggotaId && (
+                    <button
+                      type="button"
+                      onClick={cancelEditAnggota}
+                      className="px-2.5 py-1 bg-amber-500 text-slate-950 rounded-lg text-[10px] font-black hover:bg-amber-400 transition-all cursor-pointer"
+                    >
+                      Batal Edit
+                    </button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -4360,10 +4752,14 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                 <button
                   type="button"
                   onClick={addAnggota}
-                  className="w-full py-3 bg-white text-blue-900 rounded-xl text-xs font-black hover:bg-blue-50 transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 active:scale-[0.98]"
+                  className={`w-full py-3 rounded-xl text-xs font-black transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 active:scale-[0.98] ${
+                    editingAnggotaId
+                      ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
+                      : 'bg-white text-blue-900 hover:bg-blue-50'
+                  }`}
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Tambahkan Anggota Ke Dalam Daftar</span>
+                  {editingAnggotaId ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                  <span>{editingAnggotaId ? 'Simpan Perubahan Anggota' : 'Tambahkan Anggota Ke Dalam Daftar'}</span>
                 </button>
               </div>
             </div>

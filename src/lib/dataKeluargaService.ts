@@ -256,7 +256,8 @@ export function subscribeDataKeluarga(
     const colRef = collection(db, COLLECTION_NAME);
     const q = query(colRef);
 
-    const unsubFirestore = onSnapshot(
+    let unsubFirestore: (() => void) | null = null;
+    unsubFirestore = onSnapshot(
       q,
       (snapshot) => {
         const list: DataKeluarga[] = [];
@@ -279,8 +280,18 @@ export function subscribeDataKeluarga(
           onSuccess(merged);
         }
       },
-      (error) => {
+      (error: any) => {
         console.warn('Firestore onSnapshot data_keluarga error, falling back to local:', error);
+        if (
+          error?.code === 'resource-exhausted' ||
+          error?.message?.includes('Quota exceeded') ||
+          error?.message?.includes('resource-exhausted')
+        ) {
+          console.warn('Firestore quota exhausted for data_keluarga, detaching listener.');
+          if (unsubFirestore) {
+            try { unsubFirestore(); } catch {}
+          }
+        }
         if (onError) onError(error);
         const currentLocal = getLocalDataKeluarga();
         if (currentLocal.length > 0) onSuccess(currentLocal);
@@ -289,7 +300,9 @@ export function subscribeDataKeluarga(
     );
 
     return () => {
-      unsubFirestore();
+      if (unsubFirestore) {
+        try { unsubFirestore(); } catch {}
+      }
       if (keluargaBroadcastChannel) {
         keluargaBroadcastChannel.removeEventListener('message', handleBroadcast);
       }
@@ -364,11 +377,18 @@ export async function saveDataKeluargaToFirestore(
   syncWithWebgisHouse: boolean = true
 ): Promise<boolean> {
   const current = getLocalDataKeluarga();
+  const inputCleanKk = (keluarga.nomorKk || '').replace(/[^0-9]/g, '');
+  const inputCleanNik = (keluarga.nikKepalaKeluarga || '').replace(/[^0-9]/g, '');
+
   const index = current.findIndex(
-    (k) =>
-      k.id === keluarga.id ||
-      (k.nomorKk && keluarga.nomorKk && k.nomorKk === keluarga.nomorKk) ||
-      (k.nikKepalaKeluarga && keluarga.nikKepalaKeluarga && k.nikKepalaKeluarga === keluarga.nikKepalaKeluarga)
+    (k) => {
+      if (k.id === keluarga.id) return true;
+      const kCleanKk = (k.nomorKk || '').replace(/[^0-9]/g, '');
+      if (inputCleanKk && kCleanKk && inputCleanKk.length >= 6 && inputCleanKk === kCleanKk) return true;
+      const kCleanNik = (k.nikKepalaKeluarga || '').replace(/[^0-9]/g, '');
+      if (inputCleanNik && kCleanNik && inputCleanNik.length >= 6 && inputCleanNik === kCleanNik) return true;
+      return false;
+    }
   );
 
   let updatedList: DataKeluarga[];
@@ -381,10 +401,16 @@ export async function saveDataKeluargaToFirestore(
 
     const mergedMembers: AnggotaKeluarga[] = [...existingMembers];
     for (const inc of incomingMembers) {
+      const incCleanNik = (inc.nik || '').replace(/[^0-9]/g, '');
+      const incCleanNama = (inc.nama || '').toLowerCase().trim();
       const mIdx = mergedMembers.findIndex(
-        (m) =>
-          (m.nik && inc.nik && m.nik === inc.nik) ||
-          (m.nama && inc.nama && m.nama.toLowerCase().trim() === inc.nama.toLowerCase().trim())
+        (m) => {
+          const mCleanNik = (m.nik || '').replace(/[^0-9]/g, '');
+          const mCleanNama = (m.nama || '').toLowerCase().trim();
+          if (incCleanNik && mCleanNik && incCleanNik.length >= 6 && incCleanNik === mCleanNik) return true;
+          if (incCleanNama && mCleanNama && incCleanNama === mCleanNama) return true;
+          return false;
+        }
       );
       if (mIdx >= 0) {
         mergedMembers[mIdx] = { ...mergedMembers[mIdx], ...inc };
@@ -393,10 +419,19 @@ export async function saveDataKeluargaToFirestore(
       }
     }
 
+    // Pertahankan Lingkungan yang sudah ada jika data yang ada sudah memiliki lingkungan valid
+    const existingHasLk = Boolean(existing.lingkunganNomor && existing.lingkunganNomor >= 1 && existing.lingkunganNomor <= 24 && existing.lingkunganId);
+    const chosenLkId = existingHasLk ? existing.lingkunganId : keluarga.lingkunganId;
+    const chosenLkNomor = existingHasLk ? existing.lingkunganNomor : keluarga.lingkunganNomor;
+    const chosenLkNama = existingHasLk ? existing.lingkunganNama : keluarga.lingkunganNama;
+
     mergedKeluarga = {
       ...existing,
       ...keluarga,
       id: existing.id || keluarga.id,
+      lingkunganId: chosenLkId,
+      lingkunganNomor: chosenLkNomor,
+      lingkunganNama: chosenLkNama,
       nomorKk: keluarga.nomorKk || existing.nomorKk,
       nikKepalaKeluarga: keluarga.nikKepalaKeluarga || existing.nikKepalaKeluarga,
       namaKepalaKeluarga: keluarga.namaKepalaKeluarga || existing.namaKepalaKeluarga,
@@ -557,6 +592,283 @@ export async function wipeAllFirestoreDataKeluarga(): Promise<{ success: boolean
     console.error('Fatal error in wipeAllFirestoreDataKeluarga:', error);
     return { success: false, message: error?.message || 'Gagal mereset Firebase Firestore' };
   }
+}
+
+export interface DeduplicateResult {
+  totalScanned: number;
+  duplicateGroupsFound: number;
+  deletedCount: number;
+  updatedCount: number;
+  message: string;
+}
+
+/**
+ * Otomatis membersihkan data Kartu Keluarga (KK) duplikat:
+ * 1. Prioritas mempertahankan data yang memiliki Lingkungan valid (1-24).
+ * 2. Menghapus data duplikat yang tidak memiliki lingkungan.
+ * 3. Jika sama-sama tidak memiliki atau sama-sama memiliki lingkungan, mempertahankan 1 data utama dan menyatukan seluruh anggota keluarga agar tidak ada data yang hilang.
+ * 4. Memastikan Nomor KK benar-benar unik dan tidak ada duplikasi sama sekali.
+ */
+export async function autoCleanDuplicateDataKeluarga(
+  onProgress?: (done: number, total: number) => void
+): Promise<DeduplicateResult> {
+  const current = getLocalDataKeluarga();
+  if (current.length === 0) {
+    return {
+      totalScanned: 0,
+      duplicateGroupsFound: 0,
+      deletedCount: 0,
+      updatedCount: 0,
+      message: 'Tidak ada data keluarga untuk dipindai.',
+    };
+  }
+
+  // Petakan entri berdasarkan Nomor KK dan NIK Kepala Keluarga yang dibersihkan
+  const keyToIds = new Map<string, Set<string>>();
+
+  for (const item of current) {
+    if (!item) continue;
+    const cleanKk = (item.nomorKk || '').replace(/[^0-9]/g, '');
+    const cleanNik = (item.nikKepalaKeluarga || '').replace(/[^0-9]/g, '');
+    const rawKk = (item.nomorKk || '').trim().toUpperCase();
+
+    if (cleanKk && cleanKk.length >= 6) {
+      const kkKey = `kk_${cleanKk}`;
+      if (!keyToIds.has(kkKey)) keyToIds.set(kkKey, new Set());
+      keyToIds.get(kkKey)!.add(item.id);
+    } else if (rawKk && rawKk.length >= 3 && rawKk !== '-' && rawKk !== '0') {
+      const rawKkKey = `raw_kk_${rawKk}`;
+      if (!keyToIds.has(rawKkKey)) keyToIds.set(rawKkKey, new Set());
+      keyToIds.get(rawKkKey)!.add(item.id);
+    }
+
+    if (cleanNik && cleanNik.length >= 6) {
+      const nikKey = `nik_${cleanNik}`;
+      if (!keyToIds.has(nikKey)) keyToIds.set(nikKey, new Set());
+      keyToIds.get(nikKey)!.add(item.id);
+    }
+  }
+
+  // Kelompokkan klaster duplikat yang tumpang tindih
+  const mergedClusters: Set<string>[] = [];
+  for (const [_, idSet] of keyToIds) {
+    if (idSet.size <= 1) continue;
+    
+    let matchedCluster: Set<string> | null = null;
+    for (const cluster of mergedClusters) {
+      for (const id of idSet) {
+        if (cluster.has(id)) {
+          matchedCluster = cluster;
+          break;
+        }
+      }
+      if (matchedCluster) break;
+    }
+
+    if (matchedCluster) {
+      for (const id of idSet) matchedCluster.add(id);
+    } else {
+      mergedClusters.push(new Set(idSet));
+    }
+  }
+
+  if (mergedClusters.length === 0) {
+    return {
+      totalScanned: current.length,
+      duplicateGroupsFound: 0,
+      deletedCount: 0,
+      updatedCount: 0,
+      message: 'Database bersih! Tidak ditemukan data KK atau NIK duplikat.',
+    };
+  }
+
+  const itemsMap = new Map<string, DataKeluarga>();
+  current.forEach((k) => itemsMap.set(k.id, k));
+
+  const toDeleteIds: string[] = [];
+  const toUpdateItems: DataKeluarga[] = [];
+
+  for (const cluster of mergedClusters) {
+    const clusterItems = Array.from(cluster)
+      .map((id) => itemsMap.get(id))
+      .filter((k): k is DataKeluarga => Boolean(k));
+
+    if (clusterItems.length <= 1) continue;
+
+    // Sortir kandidat untuk memilih 1 DATA UTAMA (Survivor):
+    // 1. Yang memiliki Lingkungan (lingkunganNomor 1-24 dan lingkunganId yang valid)
+    // 2. Yang memiliki jumlah anggota keluarga lebih banyak
+    // 3. Yang memiliki kelengkapan data (alamat, namaJalan)
+    // 4. Terakhir diperbarui
+    clusterItems.sort((a, b) => {
+      const aHasLk = Boolean(a.lingkunganNomor && a.lingkunganNomor >= 1 && a.lingkunganNomor <= 24 && a.lingkunganId && a.lingkunganId !== 'all');
+      const bHasLk = Boolean(b.lingkunganNomor && b.lingkunganNomor >= 1 && b.lingkunganNomor <= 24 && b.lingkunganId && b.lingkunganId !== 'all');
+      if (aHasLk && !bHasLk) return -1;
+      if (!aHasLk && bHasLk) return 1;
+
+      const aMembers = a.anggotaKeluarga?.length || 0;
+      const bMembers = b.anggotaKeluarga?.length || 0;
+      if (aMembers !== bMembers) return bMembers - aMembers;
+
+      const aAddress = (a.namaJalan || '').length + (a.alamatLengkap || '').length;
+      const bAddress = (b.namaJalan || '').length + (b.alamatLengkap || '').length;
+      if (aAddress !== bAddress) return bAddress - aAddress;
+
+      const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    const primary = clusterItems[0];
+    const duplicates = clusterItems.slice(1);
+
+    // Satukan anggota keluarga dari duplikat ke dalam primary agar tidak ada anggota keluarga yang hilang
+    const mergedMembers: AnggotaKeluarga[] = [...(primary.anggotaKeluarga || [])];
+    const existingMemberKeys = new Set<string>();
+    mergedMembers.forEach((m) => {
+      const cleanMnik = (m.nik || '').replace(/[^0-9]/g, '');
+      if (cleanMnik && cleanMnik.length >= 6) {
+        existingMemberKeys.add(`nik_${cleanMnik}`);
+      }
+      if (m.nama) {
+        existingMemberKeys.add(`nama_${m.nama.trim().toUpperCase()}`);
+      }
+    });
+
+    for (const dup of duplicates) {
+      toDeleteIds.push(dup.id);
+      if (dup.anggotaKeluarga && Array.isArray(dup.anggotaKeluarga)) {
+        for (const m of dup.anggotaKeluarga) {
+          const cleanMnik = (m.nik || '').replace(/[^0-9]/g, '');
+          const cleanNama = (m.nama || '').trim().toUpperCase();
+          if (cleanMnik && cleanMnik.length >= 6 && existingMemberKeys.has(`nik_${cleanMnik}`)) {
+            continue;
+          }
+          if (cleanNama && existingMemberKeys.has(`nama_${cleanNama}`)) {
+            continue;
+          }
+          if (cleanMnik && cleanMnik.length >= 6) existingMemberKeys.add(`nik_${cleanMnik}`);
+          if (cleanNama) existingMemberKeys.add(`nama_${cleanNama}`);
+          mergedMembers.push(m);
+        }
+      }
+    }
+
+    // Perkaya data primary jika ada atribut yang kosong tapi terisi di duplicate
+    let primaryNamaJalan = primary.namaJalan || '';
+    let primaryNomorRumah = primary.nomorRumah || '';
+    let primaryTelepon = primary.telepon || '';
+    let primaryNop = primary.nopPbb || '';
+    let primaryDesil = primary.desilKesejahteraan || '';
+    const primaryBansos = [...(primary.bantuanDiterima || [])];
+    let primaryJamban = primary.jambanKeluarga || '';
+    let primaryAirMinum = primary.sumberAirMinum || '';
+    let primaryAirBersih = primary.sumberAirBersih || '';
+    let primaryStunting = primary.statusStuntingRentan || '';
+
+    for (const dup of duplicates) {
+      if (!primaryNamaJalan && dup.namaJalan) primaryNamaJalan = dup.namaJalan;
+      if (!primaryNomorRumah && dup.nomorRumah) primaryNomorRumah = dup.nomorRumah;
+      if (!primaryTelepon && dup.telepon) primaryTelepon = dup.telepon;
+      if (!primaryNop && dup.nopPbb) primaryNop = dup.nopPbb;
+      if (!primaryDesil && dup.desilKesejahteraan) primaryDesil = dup.desilKesejahteraan;
+      if (dup.bantuanDiterima && Array.isArray(dup.bantuanDiterima)) {
+        dup.bantuanDiterima.forEach((b) => {
+          if (!primaryBansos.includes(b)) primaryBansos.push(b);
+        });
+      }
+      if (!primaryJamban && dup.jambanKeluarga) primaryJamban = dup.jambanKeluarga;
+      if (!primaryAirMinum && dup.sumberAirMinum) primaryAirMinum = dup.sumberAirMinum;
+      if (!primaryAirBersih && dup.sumberAirBersih) primaryAirBersih = dup.sumberAirBersih;
+      if (!primaryStunting && dup.statusStuntingRentan) primaryStunting = dup.statusStuntingRentan;
+    }
+
+    // Hitung ulang demografi pada primary
+    const updatedPrimary: DataKeluarga = {
+      ...primary,
+      namaJalan: primaryNamaJalan,
+      nomorRumah: primaryNomorRumah,
+      telepon: primaryTelepon,
+      nopPbb: primaryNop,
+      desilKesejahteraan: primaryDesil,
+      bantuanDiterima: primaryBansos,
+      jambanKeluarga: primaryJamban,
+      sumberAirMinum: primaryAirMinum,
+      sumberAirBersih: primaryAirBersih,
+      statusStuntingRentan: primaryStunting,
+      anggotaKeluarga: mergedMembers,
+      jumlahAnggotaKeluarga: Math.max(1, mergedMembers.length),
+      jumlahLakiLaki: mergedMembers.filter((m) => m.jenisKelamin === 'L').length,
+      jumlahPerempuan: mergedMembers.filter((m) => m.jenisKelamin === 'P').length,
+      jumlahBalita: mergedMembers.filter((m) => (m.usia || 0) <= 5).length,
+      jumlahLansia: mergedMembers.filter((m) => (m.usia || 0) >= 60).length,
+      jumlahUsiaSekolah: mergedMembers.filter((m) => (m.usia || 0) >= 6 && (m.usia || 0) <= 18).length,
+      jumlahUsiaProduktif: mergedMembers.filter((m) => (m.usia || 0) >= 19 && (m.usia || 0) <= 59).length,
+      updatedAt: new Date().toISOString(),
+    };
+
+    toUpdateItems.push(updatedPrimary);
+  }
+
+  // Simpan data bersih ke Local Storage & Broadcast secara instan
+  const deleteIdSet = new Set(toDeleteIds);
+  let updatedList = current.filter((k) => !deleteIdSet.has(k.id));
+
+  for (const up of toUpdateItems) {
+    const idx = updatedList.findIndex((k) => k.id === up.id);
+    if (idx >= 0) {
+      updatedList[idx] = up;
+    } else {
+      updatedList.push(up);
+    }
+  }
+
+  saveLocalDataKeluarga(updatedList);
+  broadcastDataKeluargaChange(undefined, updatedList);
+
+  // Sinkronkan ke API buffer
+  for (const delId of toDeleteIds) {
+    deleteDataKeluargaFromApi(delId).catch(() => {});
+  }
+  batchSaveDataKeluargaToApi(toUpdateItems).catch(() => {});
+
+  // Hapus data duplikat dari Firestore (chunked batch 400)
+  for (let i = 0; i < toDeleteIds.length; i += 400) {
+    const chunk = toDeleteIds.slice(i, i + 400);
+    try {
+      const batch = writeBatch(db);
+      for (const id of chunk) {
+        batch.delete(doc(db, COLLECTION_NAME, id));
+      }
+      await batch.commit();
+    } catch (err) {
+      console.warn('Batch delete error in deduplication:', err);
+    }
+    if (onProgress) onProgress(i + chunk.length, toDeleteIds.length + toUpdateItems.length);
+  }
+
+  // Update data primer di Firestore
+  for (let i = 0; i < toUpdateItems.length; i += 400) {
+    const chunk = toUpdateItems.slice(i, i + 400);
+    try {
+      const batch = writeBatch(db);
+      for (const item of chunk) {
+        batch.set(doc(db, COLLECTION_NAME, item.id), cleanFirestoreData(item), { merge: true });
+      }
+      await batch.commit();
+    } catch (err) {
+      console.warn('Batch update error in deduplication:', err);
+    }
+    if (onProgress) onProgress(toDeleteIds.length + i + chunk.length, toDeleteIds.length + toUpdateItems.length);
+  }
+
+  return {
+    totalScanned: current.length,
+    duplicateGroupsFound: mergedClusters.length,
+    deletedCount: toDeleteIds.length,
+    updatedCount: toUpdateItems.length,
+    message: `Berhasil membersihkan ${toDeleteIds.length} data duplikat! KK dengan lingkungan dipertahankan dan anggota keluarga disatukan secara rapi.`,
+  };
 }
 
 // ==========================================
