@@ -3580,6 +3580,72 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
   const [tempAnggotaAgama, setTempAnggotaAgama] = useState<AgamaType>('Islam');
   const [tempAnggotaPekerjaan, setTempAnggotaPekerjaan] = useState<string>('Pelajar');
 
+  // Removal reason & Pecah KK Modal state
+  const [isRemovalModalOpen, setIsRemovalModalOpen] = useState<boolean>(false);
+  const [targetAnggotaToRemove, setTargetAnggotaToRemove] = useState<AnggotaKeluarga | null>(null);
+  const [removalReason, setRemovalReason] = useState<'PINDAH' | 'MENINGGAL' | 'PECAH_KK' | 'SALAH_INPUT'>('PINDAH');
+  const [newKkNumberInput, setNewKkNumberInput] = useState<string>('');
+
+  const promptRemoveAnggota = (ang: AnggotaKeluarga) => {
+    setTargetAnggotaToRemove(ang);
+    setRemovalReason('PINDAH');
+    setNewKkNumberInput(`127101${Math.floor(1000000000 + Math.random() * 9000000000)}`);
+    setIsRemovalModalOpen(true);
+  };
+
+  const confirmRemoval = async () => {
+    if (!targetAnggotaToRemove) return;
+
+    if (removalReason === 'PECAH_KK') {
+      if (!newKkNumberInput.trim() || newKkNumberInput.trim().length < 10) {
+        setFormError('Nomor KK Baru wajib diisi minimal 10 digit untuk Pecah KK.');
+        setIsRemovalModalOpen(false);
+        return;
+      }
+      const newFamilyRecord: DataKeluarga = {
+        id: 'fam_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        nomorKk: newKkNumberInput.trim(),
+        nikKepalaKeluarga: targetAnggotaToRemove.nik || '1271010000000000',
+        namaKepalaKeluarga: targetAnggotaToRemove.nama,
+        lingkunganId: lingkunganId,
+        nomorLingkungan: Number(lingkunganId.replace('kepling_', '')) || 1,
+        lingkungan: KEPLING_ACCOUNTS.find(k => k.id === lingkunganId)?.lingkungan || 'Lingkungan I',
+        kelurahan: 'Kelurahan Mangga',
+        kecamatan: 'Kecamatan Medan Tuntungan',
+        namaJalan: namaJalan || 'Jl. Utama',
+        rt: '001',
+        rw: '001',
+        jumlahAnggotaKeluarga: 1,
+        anggotaKeluarga: [
+          {
+            ...targetAnggotaToRemove,
+            hubunganKeluarga: 'Kepala Keluarga',
+            statusPerkawinan: 'Kawin',
+          }
+        ],
+        statusEkonomi: 'Mampu',
+        bantuanDiterima: [],
+        sumberAirMinum: airMinum || 'PDAM',
+        jambanKeluarga: jamban || 'Milik Sendiri',
+        statusRumah: 'Milik Sendiri',
+        latitude: 3.48,
+        longitude: 98.62,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      try {
+        await saveDataKeluargaToFirestore(newFamilyRecord, true);
+      } catch (e) {
+        console.error('Failed to save new family record for Pecah KK', e);
+      }
+    }
+
+    setAnggotaList(anggotaList.filter(a => a.id !== targetAnggotaToRemove.id));
+    setIsRemovalModalOpen(false);
+    setTargetAnggotaToRemove(null);
+  };
+
   // Debounced input states for instant duplicate checks
   const [debouncedNik, setDebouncedNik] = useState<string>(initialData?.nikKepalaKeluarga || '');
   const [debouncedNomorKk, setDebouncedNomorKk] = useState<string>(initialData?.nomorKk || '');
@@ -4180,9 +4246,9 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                         </div>
                         <button
                           type="button"
-                          onClick={() => removeAnggota(ang.id)}
+                          onClick={() => promptRemoveAnggota(ang)}
                           className="p-2 rounded-xl text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
-                          title="Hapus Anggota"
+                          title="Hapus Anggota / Alasan Perubahan"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -4537,6 +4603,127 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ALASAN PENGHAPUSAN / PECAH KK MODAL */}
+      {isRemovalModalOpen && targetAnggotaToRemove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-black text-slate-900 uppercase">
+                  Alasan Penghapusan / Perubahan Anggota
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRemovalModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Anda akan menghapus <strong className="text-slate-900">{targetAnggotaToRemove.nama}</strong> dari Kartu Keluarga ini. Pilih alasan kependudukan yang sesuai:
+            </p>
+
+            <div className="space-y-2.5">
+              <label className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${removalReason === 'PINDAH' ? 'border-blue-600 bg-blue-50/50' : 'border-slate-200 hover:border-slate-300'}`}>
+                <input
+                  type="radio"
+                  name="removalReason"
+                  checked={removalReason === 'PINDAH'}
+                  onChange={() => setRemovalReason('PINDAH')}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="block text-xs font-black text-slate-900">Pindah Domisili (Pindah Keluar / Kota Lain)</span>
+                  <span className="text-[10px] text-slate-500">Anggota pindah tempat tinggal keluar dari lingkungan.</span>
+                </div>
+              </label>
+
+              <label className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${removalReason === 'MENINGGAL' ? 'border-blue-600 bg-blue-50/50' : 'border-slate-200 hover:border-slate-300'}`}>
+                <input
+                  type="radio"
+                  name="removalReason"
+                  checked={removalReason === 'MENINGGAL'}
+                  onChange={() => setRemovalReason('MENINGGAL')}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="block text-xs font-black text-slate-900">Meninggal Dunia</span>
+                  <span className="text-[10px] text-slate-500">Anggota keluarga telah berpulang.</span>
+                </div>
+              </label>
+
+              <label className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${removalReason === 'PECAH_KK' ? 'border-blue-600 bg-blue-50/50' : 'border-slate-200 hover:border-slate-300'}`}>
+                <input
+                  type="radio"
+                  name="removalReason"
+                  checked={removalReason === 'PECAH_KK'}
+                  onChange={() => setRemovalReason('PECAH_KK')}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="block text-xs font-black text-slate-900">Membuat KK Baru (Pecah KK)</span>
+                  <span className="text-[10px] text-slate-500">Anggota membentuk KK mandiri/baru (otomatis dibuatkan data Kartu Keluarga baru).</span>
+                </div>
+              </label>
+
+              <label className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${removalReason === 'SALAH_INPUT' ? 'border-blue-600 bg-blue-50/50' : 'border-slate-200 hover:border-slate-300'}`}>
+                <input
+                  type="radio"
+                  name="removalReason"
+                  checked={removalReason === 'SALAH_INPUT'}
+                  onChange={() => setRemovalReason('SALAH_INPUT')}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="block text-xs font-black text-slate-900">Kesalahan Input / Data Ganda</span>
+                  <span className="text-[10px] text-slate-500">Koreksi kesalahan ketik atau duplikasi data.</span>
+                </div>
+              </label>
+            </div>
+
+            {removalReason === 'PECAH_KK' && (
+              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-2">
+                <label className="block text-[11px] font-bold text-amber-900">Nomor KK Baru (16 Digit):</label>
+                <input
+                  type="text"
+                  value={newKkNumberInput}
+                  onChange={(e) => setNewKkNumberInput(e.target.value)}
+                  placeholder="Masukkan Nomor KK Baru..."
+                  className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-amber-500"
+                />
+                <p className="text-[10px] text-amber-700">
+                  💡 Anggota ini akan otomatis didaftarkan sebagai Kepala Keluarga pada Kartu Keluarga baru di lingkungan yang sama.
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsRemovalModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold cursor-pointer transition-all"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmRemoval}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer shadow-md transition-all flex items-center gap-2"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Konfirmasi Hapus / Pecah KK</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
