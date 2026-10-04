@@ -41,25 +41,19 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
   const defaultLkNum = currentUser.nomorLingkungan || 1;
   const [formLingkunganNomor, setFormLingkunganNomor] = useState<number>(defaultLkNum);
   const [formTanggal, setFormTanggal] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [formPosyanduNama, setFormPosyanduNama] = useState<string>(
-    currentUser.lingkungan ? `Posyandu ${currentUser.lingkungan}` : 'Posyandu Melati'
-  );
-  const [formPosyanduLokasi, setFormPosyanduLokasi] = useState<string>('Balai Warga Lingkungan');
-  const [formJumlahKader, setFormJumlahKader] = useState<string>('5 Kader');
+  const [formPosyanduNama, setFormPosyanduNama] = useState<string>('');
+  const [formPosyanduLokasi, setFormPosyanduLokasi] = useState<string>('');
+  const [formJumlahKader, setFormJumlahKader] = useState<string>('');
   
-  const [formBayi02, setFormBayi02] = useState<string>('0');
-  const [formBalita25, setFormBalita25] = useState<string>('0');
-  const [formAnak612, setFormAnak612] = useState<string>('0');
-  const [formRemaja1318, setFormRemaja1318] = useState<string>('0');
-  const [formDewasaBumil1959, setFormDewasaBumil1959] = useState<string>('0');
-  const [formLansia60, setFormLansia60] = useState<string>('0');
+  const [formBayi02, setFormBayi02] = useState<string>('');
+  const [formBalita25, setFormBalita25] = useState<string>('');
+  const [formAnak612, setFormAnak612] = useState<string>('');
+  const [formRemaja1318, setFormRemaja1318] = useState<string>('');
+  const [formDewasaBumil1959, setFormDewasaBumil1959] = useState<string>('');
+  const [formLansia60, setFormLansia60] = useState<string>('');
 
-  const [formJenisLayanan, setFormJenisLayanan] = useState<string[]>([
-    'Penimbangan & Pengukuran (Pantau Stunting)',
-    'Imunisasi Dasar & Lanjutan Lengkap',
-    'Pemberian Vitamin A & Obat Cacing',
-  ]);
-  const [formKeterangan, setFormKeterangan] = useState<string>('Pelayanan posyandu berjalan lancar dan tertib.');
+  const [formJenisLayanan, setFormJenisLayanan] = useState<string[]>([]);
+  const [formKeterangan, setFormKeterangan] = useState<string>('');
   const [fotoList, setFotoList] = useState<FotoDokumentasi[]>([]);
 
   useEffect(() => {

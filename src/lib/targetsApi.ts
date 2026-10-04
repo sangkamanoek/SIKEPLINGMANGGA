@@ -69,9 +69,8 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
     const defaults = getDefaultTargetsCapaianMap();
     Object.keys(defaults).forEach((k) => {
       if (resultMap && resultMap[k]) {
-        if (resultMap[k].overrideBpjs === undefined || resultMap[k].overrideBpjs === null) {
-          resultMap[k].overrideBpjs = defaults[k].overrideBpjs;
-        }
+        resultMap[k].overrideBpjs = defaults[k].overrideBpjs;
+        resultMap[k].overridePerlinsos = defaults[k].overridePerlinsos;
         if (!resultMap[k].targetBpjs || resultMap[k].targetBpjs < 50) {
           resultMap[k].targetBpjs = 50;
         }
