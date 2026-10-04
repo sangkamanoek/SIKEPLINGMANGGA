@@ -230,6 +230,7 @@ export default function App() {
     | 'keuangan_pkk'
     | 'kegiatan_pkk'
     | 'dasa_wisma'
+    | 'posyandu_pkk'
     | 'surat_kedinasan'
     | 'buku_pkk'
   >('hub');
@@ -263,7 +264,7 @@ export default function App() {
     // 0a. PKK ROLES: ONLY allowed tabs: hub, kegiatan_pkk, keuangan_pkk, dasa_wisma, buku_pkk
     // Strict isolation: PKK CANNOT access Kelurahan features (form, monitoring, capaian, pemetaan, etc.)
     if (isPkkRole(activeAccount.role)) {
-      const pkkAllowedTabs = ['hub', 'kegiatan_pkk', 'keuangan_pkk', 'dasa_wisma', 'buku_pkk'];
+      const pkkAllowedTabs = ['hub', 'kegiatan_pkk', 'keuangan_pkk', 'dasa_wisma', 'posyandu_pkk', 'buku_pkk'];
       if (!pkkAllowedTabs.includes(activeTab)) {
         setActiveTab('hub');
         showToast('Akses Dibatasi: Akun PKK hanya berwenang mengakses modul Tim Penggerak PKK.', 'error');
@@ -273,7 +274,7 @@ export default function App() {
 
     // 0b. KELURAHAN ROLES: CANNOT access PKK features (keuangan_pkk, kegiatan_pkk, dasa_wisma, buku_pkk)
     // Strict isolation: Kelurahan accounts cannot access PKK financial, activity, or dasa wisma tabs
-    const pkkOnlyTabs = ['keuangan_pkk', 'kegiatan_pkk', 'dasa_wisma', 'buku_pkk'];
+    const pkkOnlyTabs = ['keuangan_pkk', 'kegiatan_pkk', 'dasa_wisma', 'posyandu_pkk', 'buku_pkk'];
     if (pkkOnlyTabs.includes(activeTab)) {
       const fallbackTab =
         activeAccount.role === 'kepling'

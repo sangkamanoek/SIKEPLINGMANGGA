@@ -36,6 +36,7 @@ export type AppTabType =
   | 'keuangan_pkk'
   | 'kegiatan_pkk'
   | 'dasa_wisma'
+  | 'posyandu_pkk'
   | 'surat_kedinasan'
   | 'buku_pkk';
 

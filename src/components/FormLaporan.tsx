@@ -425,7 +425,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    kategori: 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'poskamling' | 'posyandu' | 'lainnya' | 'infrastruktur' | 'umum' = 'umum'
+    kategori: 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'poskamling' | 'lainnya' | 'infrastruktur' | 'umum' = 'umum'
   ) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -445,7 +445,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
         else if (kategori === 'ikd') categoryPrefix = '[IKD] ';
         else if (kategori === 'bpjs') categoryPrefix = '[BPJS] ';
         else if (kategori === 'poskamling') categoryPrefix = '[POSKAMLING] ';
-        else if (kategori === 'posyandu') categoryPrefix = '[POSYANDU] ';
         else if (kategori === 'lainnya') categoryPrefix = '[KEGIATAN LAINNYA] ';
         else if (kategori === 'infrastruktur') categoryPrefix = '[INFRASTRUKTUR] ';
 
@@ -2117,8 +2116,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                             ? 'perlinsos'
                             : foto.name.includes('[POSKAMLING]')
                             ? 'poskamling'
-                            : foto.name.includes('[POSYANDU]')
-                            ? 'posyandu'
                             : foto.name.includes('[IKD]')
                             ? 'ikd'
                             : foto.name.includes('[BPJS]')
@@ -2133,8 +2130,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                             ? 'bg-emerald-700 text-white border-emerald-400'
                             : foto.kategori === 'poskamling' || foto.name.includes('[POSKAMLING]')
                             ? 'bg-amber-500 text-slate-950 border-amber-300'
-                            : foto.kategori === 'posyandu' || foto.name.includes('[POSYANDU]')
-                            ? 'bg-rose-600 text-white border-rose-400'
                             : 'bg-black/75 text-white border-white/20'
                         }`}
                         title="Klik untuk mengubah kategori foto ini"
@@ -2142,7 +2137,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                         <option value="pbb" className="text-slate-900 bg-white">PBB</option>
                         <option value="perlinsos" className="text-slate-900 bg-white">Perlinsos</option>
                         <option value="poskamling" className="text-slate-900 bg-white">Poskamling</option>
-                        <option value="posyandu" className="text-slate-900 bg-white">Posyandu</option>
                         <option value="ikd" className="text-slate-900 bg-white">IKD</option>
                         <option value="bpjs" className="text-slate-900 bg-white">BPJS</option>
                         <option value="lainnya" className="text-slate-900 bg-white">Keg. Lain</option>
