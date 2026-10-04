@@ -5,12 +5,15 @@ import fs from 'fs';
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-// Anti-Cache Headers: Ensure 100% online operation and zero client-side caching
+// Performance-Optimized Cache Headers: Cache hashed static assets, keep API and HTML fresh
 app.use((req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.setHeader('Surrogate-Control', 'no-store');
+  if (req.path.startsWith('/assets/') || req.path.match(/\.(png|jpg|jpeg|svg|ico|webp|woff2?)$/i)) {
+    res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+  } else {
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
   next();
 });
 

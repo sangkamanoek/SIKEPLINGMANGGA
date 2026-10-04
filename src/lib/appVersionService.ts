@@ -11,16 +11,46 @@ export interface VersionRelease {
   }[];
 }
 
-export const CURRENT_APP_VERSION = 'v2.4.2';
-export const CURRENT_RELEASE_DATE = '26 September 2026';
+export const CURRENT_APP_VERSION = 'v2.5.0';
+export const CURRENT_RELEASE_DATE = '4 Oktober 2026';
 
 export const APP_VERSION_HISTORY: VersionRelease[] = [
+  {
+    version: 'v2.5.0',
+    releaseDate: '4 Oktober 2026',
+    title: 'Pembaruan Si-Mangga: Optimasi Performa, Fitur Edit Kunjungan & Pilar TP-PKK Terpadu',
+    badge: 'TERBARU',
+    isImportant: true,
+    highlights: [
+      'Pembaruan Identitas Resmi Aplikasi SI-MANGGA Kelurahan Mangga',
+      'Tombol Edit & Koreksi Data Kunjungan Warga (Door-to-Door)',
+      'Pilar Kegiatan & 6 Buku Wajib Administrasi TP-PKK Terpadu',
+      'Optimasi Kecepatan Loading & Splash Screen Instan'
+    ],
+    changes: [
+      {
+        category: 'FITUR BARU',
+        description: 'Penambahan tombol Edit pada tabel dan kartu Kunjungan Warga untuk mengoreksi entri door-to-door yang keliru.'
+      },
+      {
+        category: 'FITUR BARU',
+        description: 'Integrasi penuh modul TP-PKK: Laporan Pokja I-IV, Rekapitulasi Dasa Wisma 24 Lingkungan, Buku Kas Umum Keuangan, dan 6 Buku Administrasi Wajib.'
+      },
+      {
+        category: 'PENINGKATAN',
+        description: 'Penerapan Code-Splitting, Lazy Loading modul berat, dan Instant Splash Screen berlogo Pemko Medan.'
+      },
+      {
+        category: 'PENINGKATAN',
+        description: 'Pembaruan Buku Panduan Operasional Resmi (PPTX) SI-MANGGA edisi terbaru.'
+      }
+    ]
+  },
   {
     version: 'v2.4.2',
     releaseDate: '26 September 2026',
     title: 'Pembaruan Fitur Perlinsos, WebGIS & Info Update Aplikasi',
-    badge: 'TERBARU',
-    isImportant: true,
+    isImportant: false,
     highlights: [
       'Pilihan status "MENOLAK" pada Perlinsos Kunjungan Warga',
       'Perbaikan klasifikasi WebGIS (Puskesmas & Faskes terpisah dari Sekolah)',

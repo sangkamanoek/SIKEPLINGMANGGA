@@ -19,16 +19,7 @@ import {
   ShieldAlert,
   BookOpen,
 } from 'lucide-react';
-import ViewImagesPage from './components/ViewImagesPage';
-import { KunjunganHarianView } from './components/KunjunganHarianView';
-import { LaporanKeuanganPkkView } from './components/LaporanKeuanganPkkView';
-import { PkkHubDashboard } from './components/PkkHubDashboard';
-import { PkkKegiatanView } from './components/PkkKegiatanView';
-import { PkkDasaWismaView } from './components/PkkDasaWismaView';
-import { PkkBukuAdministrasiView } from './components/PkkBukuAdministrasiView';
-import { SuratKedinasanView } from './components/SuratKedinasanView';
 import { subscribeKunjunganWarga } from './lib/kunjunganService';
-import { RealisasiPembangunanView } from './components/RealisasiPembangunanView';
 import { syncInfraReportToPembangunan } from './lib/pembangunanService';
 import {
   GoogleUser,
@@ -58,34 +49,55 @@ import { uploadMakalahToGoogleDrive } from './lib/driveService';
 import { SUPER_ADMIN_ACCOUNT, getAccountById, syncPasswordsWithServer, syncProfilesWithServer, syncAccountsWithServer } from './data/keplingList';
 import { HeaderBanner } from './components/HeaderBanner';
 import { FormLaporan } from './components/FormLaporan';
-import { RangkumanLaporanKelurahan } from './components/RangkumanLaporanKelurahan';
-import { RiwayatLaporan } from './components/RiwayatLaporan';
-import { DetailLaporanModal } from './components/DetailLaporanModal';
-import { AccountSelectorModal } from './components/AccountSelectorModal';
-import { MonitoringSuperAdmin } from './components/MonitoringSuperAdmin';
-import { DashboardCapaianKepling } from './components/DashboardCapaianKepling';
-import { DashboardPbbKasi } from './components/DashboardPbbKasi';
-import { DashboardPerlinsosKasi } from './components/DashboardPerlinsosKasi';
-import { DashboardTrantibumKasi } from './components/DashboardTrantibumKasi';
-import { getDefaultTargetsCapaianMap } from './data/targetsData';
-import { fetchTargetsCapaian, subscribeTargetsFromFirestore } from './lib/targetsApi';
-import { PWAInstallModal } from './components/PWAInstallModal';
-import { PanduanPPTModal } from './components/PanduanPPTModal';
-import { AppUpdateModal } from './components/AppUpdateModal';
+import { SmartHubDashboard } from './components/SmartHubDashboard';
+import { DeadlineNotifAlert } from './components/DeadlineNotifAlert';
+import { LoginPage } from './components/LoginPage';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppUpdateToastBanner } from './components/AppUpdateToastBanner';
 import { CURRENT_APP_VERSION } from './lib/appVersionService';
 import { customFetch } from './lib/fetchInterceptor';
-import { AbsenKegiatanKhusus } from './components/AbsenKegiatanKhusus';
-import { SmartHubDashboard } from './components/SmartHubDashboard';
-import { DeadlineNotifAlert } from './components/DeadlineNotifAlert';
-import { RekapPbbView } from './components/RekapPbbView';
-import { PemetaanWilayahView } from './components/PemetaanWilayahView';
-import { DatabaseKeluargaView } from './components/DatabaseKeluargaView';
+import { getDefaultTargetsCapaianMap } from './data/targetsData';
+import { fetchTargetsCapaian, subscribeTargetsFromFirestore } from './lib/targetsApi';
 import { fetchAllDataKeluarga } from './lib/dataKeluargaService';
-import { LoginPage } from './components/LoginPage';
-import { UbahPasswordModal } from './components/UbahPasswordModal';
-import { EditProfileModal } from './components/EditProfileModal';
-import { AbsenApelModal } from './components/AbsenApelModal';
+
+// Code-Splitting: Lazy load heavy modules to guarantee fast initial startup
+const ViewImagesPage = React.lazy(() => import('./components/ViewImagesPage'));
+const KunjunganHarianView = React.lazy(() => import('./components/KunjunganHarianView').then(m => ({ default: m.KunjunganHarianView })));
+const LaporanKeuanganPkkView = React.lazy(() => import('./components/LaporanKeuanganPkkView').then(m => ({ default: m.LaporanKeuanganPkkView })));
+const PkkHubDashboard = React.lazy(() => import('./components/PkkHubDashboard').then(m => ({ default: m.PkkHubDashboard })));
+const PkkKegiatanView = React.lazy(() => import('./components/PkkKegiatanView').then(m => ({ default: m.PkkKegiatanView })));
+const PkkDasaWismaView = React.lazy(() => import('./components/PkkDasaWismaView').then(m => ({ default: m.PkkDasaWismaView })));
+const PkkBukuAdministrasiView = React.lazy(() => import('./components/PkkBukuAdministrasiView').then(m => ({ default: m.PkkBukuAdministrasiView })));
+const SuratKedinasanView = React.lazy(() => import('./components/SuratKedinasanView').then(m => ({ default: m.SuratKedinasanView })));
+const RealisasiPembangunanView = React.lazy(() => import('./components/RealisasiPembangunanView').then(m => ({ default: m.RealisasiPembangunanView })));
+const RangkumanLaporanKelurahan = React.lazy(() => import('./components/RangkumanLaporanKelurahan').then(m => ({ default: m.RangkumanLaporanKelurahan })));
+const RiwayatLaporan = React.lazy(() => import('./components/RiwayatLaporan').then(m => ({ default: m.RiwayatLaporan })));
+const DetailLaporanModal = React.lazy(() => import('./components/DetailLaporanModal').then(m => ({ default: m.DetailLaporanModal })));
+const AccountSelectorModal = React.lazy(() => import('./components/AccountSelectorModal').then(m => ({ default: m.AccountSelectorModal })));
+const MonitoringSuperAdmin = React.lazy(() => import('./components/MonitoringSuperAdmin').then(m => ({ default: m.MonitoringSuperAdmin })));
+const DashboardCapaianKepling = React.lazy(() => import('./components/DashboardCapaianKepling').then(m => ({ default: m.DashboardCapaianKepling })));
+const DashboardPbbKasi = React.lazy(() => import('./components/DashboardPbbKasi').then(m => ({ default: m.DashboardPbbKasi })));
+const DashboardPerlinsosKasi = React.lazy(() => import('./components/DashboardPerlinsosKasi').then(m => ({ default: m.DashboardPerlinsosKasi })));
+const DashboardTrantibumKasi = React.lazy(() => import('./components/DashboardTrantibumKasi').then(m => ({ default: m.DashboardTrantibumKasi })));
+const PWAInstallModal = React.lazy(() => import('./components/PWAInstallModal').then(m => ({ default: m.PWAInstallModal })));
+const PanduanPPTModal = React.lazy(() => import('./components/PanduanPPTModal').then(m => ({ default: m.PanduanPPTModal })));
+const AppUpdateModal = React.lazy(() => import('./components/AppUpdateModal').then(m => ({ default: m.AppUpdateModal })));
+const AbsenKegiatanKhusus = React.lazy(() => import('./components/AbsenKegiatanKhusus').then(m => ({ default: m.AbsenKegiatanKhusus })));
+const RekapPbbView = React.lazy(() => import('./components/RekapPbbView').then(m => ({ default: m.RekapPbbView })));
+const PemetaanWilayahView = React.lazy(() => import('./components/PemetaanWilayahView').then(m => ({ default: m.PemetaanWilayahView })));
+const DatabaseKeluargaView = React.lazy(() => import('./components/DatabaseKeluargaView').then(m => ({ default: m.DatabaseKeluargaView })));
+const UbahPasswordModal = React.lazy(() => import('./components/UbahPasswordModal').then(m => ({ default: m.UbahPasswordModal })));
+const EditProfileModal = React.lazy(() => import('./components/EditProfileModal').then(m => ({ default: m.EditProfileModal })));
+const AbsenApelModal = React.lazy(() => import('./components/AbsenApelModal').then(m => ({ default: m.AbsenApelModal })));
+
+const ViewLoadingFallback = () => (
+  <div className="flex flex-col items-center justify-center min-h-[300px] p-8 text-center animate-fade-in">
+    <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mb-3"></div>
+    <p className="text-sm font-bold text-slate-700">Memuat Modul...</p>
+    <p className="text-xs text-slate-400 mt-1">SI-MANGGA Kelurahan Mangga</p>
+  </div>
+);
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AbsenApelItem, CustomEvent, EventAttendance, StatusAbsenApel } from './types';
@@ -128,7 +140,11 @@ export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const viewImagesId = urlParams.get('view-images');
   if (viewImagesId) {
-    return <ViewImagesPage reportId={viewImagesId} />;
+    return (
+      <React.Suspense fallback={<ViewLoadingFallback />}>
+        <ViewImagesPage reportId={viewImagesId} />
+      </React.Suspense>
+    );
   }
 
   const [user, setUser] = useState<GoogleUser | null>(null);
@@ -480,48 +496,18 @@ export default function App() {
     const hasForceUpdated = localStorage.getItem(FORCE_UPDATE_KEY);
 
     if (!hasForceUpdated) {
-      // Clean all old caches immediately
       if ('caches' in window) {
         caches.keys().then((names) => {
-          Promise.all(names.map((name) => caches.delete(name))).then(() => {
-            localStorage.setItem(FORCE_UPDATE_KEY, 'true');
-            // If service worker is active, unregister it so it installs fresh with new metadata
-            if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.getRegistrations().then((registrations) => {
-                Promise.all(registrations.map((reg) => reg.unregister())).then(() => {
-                  window.location.reload();
-                });
-              });
-            } else {
-              window.location.reload();
-            }
-          });
-        }).catch(() => {
-          localStorage.setItem(FORCE_UPDATE_KEY, 'true');
-        });
-      } else {
-        localStorage.setItem(FORCE_UPDATE_KEY, 'true');
+          Promise.all(names.map((name) => caches.delete(name))).catch(() => {});
+        }).catch(() => {});
       }
+      localStorage.setItem(FORCE_UPDATE_KEY, 'true');
     }
 
     // Register aggressive cache-clearing service worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
-        // Automatically check for updates on load
         registration.update();
-
-        // Listen for new service worker and reload automatically on install
-        registration.addEventListener('updatefound', () => {
-          const installingWorker = registration.installing;
-          if (installingWorker) {
-            installingWorker.addEventListener('statechange', () => {
-              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[SW] New version found and installed. Reloading...');
-                window.location.reload();
-              }
-            });
-          }
-        });
       }).catch((err) => {
         console.error('[App] Service worker registration failed:', err);
       });
@@ -530,33 +516,32 @@ export default function App() {
     // Instantly load cached local reports to populate the UI in 10ms (Buttery-smooth startup)
     loadLocalReports();
 
-    // Load family database from high-capacity IndexedDB into memory map for fast lookup
-    getKeluargaFromIndexedDB().then((data) => {
-      if (data && data.length > 0) {
-        populateMemoryCache('sikepling_database_keluarga_v1', JSON.stringify(data));
-      }
-    });
+    // Defer heavy database memory caching by 1000ms so the initial UI paints at 60fps immediately
+    const idbTimer = setTimeout(() => {
+      getKeluargaFromIndexedDB().then((data) => {
+        if (data && data.length > 0) {
+          populateMemoryCache('sikepling_database_keluarga_v1', JSON.stringify(data));
+        }
+      });
 
-    // Load PBB database from IndexedDB to ensure no quota crashes
-    getPbbFromIndexedDB().then((data) => {
-      if (data && data.length > 0) {
-        populateMemoryCache('sikepling_sppt_pbb_records_2026_v3', JSON.stringify(data));
-      }
-    });
+      getPbbFromIndexedDB().then((data) => {
+        if (data && data.length > 0) {
+          populateMemoryCache('sikepling_sppt_pbb_records_2026_v3', JSON.stringify(data));
+        }
+      });
 
-    // Load visits database from IndexedDB
-    getVisitsFromIndexedDB().then((data) => {
-      if (data && data.length > 0) {
-        populateMemoryCache('sikepling_kunjungan_harian_list_v1', JSON.stringify(data));
-      }
-    });
+      getVisitsFromIndexedDB().then((data) => {
+        if (data && data.length > 0) {
+          populateMemoryCache('sikepling_kunjungan_harian_list_v1', JSON.stringify(data));
+        }
+      });
 
-    // Load history database from IndexedDB
-    getHistoryFromIndexedDB().then((data) => {
-      if (data && data.length > 0) {
-        populateMemoryCache('kepling_local_laporan_history_v2', JSON.stringify(data));
-      }
-    });
+      getHistoryFromIndexedDB().then((data) => {
+        if (data && data.length > 0) {
+          populateMemoryCache('kepling_local_laporan_history_v2', JSON.stringify(data));
+        }
+      });
+    }, 1000);
 
     // Stagger secondary background syncs to ensure first UI frame paints at 60fps
     const timer1 = setTimeout(() => {
@@ -1739,6 +1724,7 @@ export default function App() {
 
         {/* Animated Container for Active Tab Content */}
         <div key={activeTab} className="animate-tab-fade">
+          <React.Suspense fallback={<ViewLoadingFallback />}>
           {/* Smart Hub Dashboard Tab */}
           {activeTab === 'hub' && (
             isPkkRole(activeAccount.role) ? (
@@ -2160,6 +2146,7 @@ export default function App() {
             <PkkBukuAdministrasiView currentUser={activeAccount} onShowToast={showToast} />
           </ErrorBoundary>
         )}
+          </React.Suspense>
         </div>
       </main>
 
@@ -2178,101 +2165,104 @@ export default function App() {
         hasLaporToday={hasLaporToday}
       />
 
-      {/* Account Selector Modal */}
-      <AccountSelectorModal
-        isOpen={isAccountModalOpen}
-        onClose={() => setIsAccountModalOpen(false)}
-        activeAccount={activeAccount}
-        sheetMeta={sheetMeta}
-        onSelectAccount={(acc) => {
-          setActiveAccount(acc);
-          setPreselectedKepling(acc);
-          try {
-            localStorage.setItem('kepling_active_account_id', acc.id);
-          } catch (e) {
-            console.warn(e);
-          }
-          if (acc.role === 'super_admin') {
-            showToast('Beralih ke akun SUPER ADMIN (Kelurahan Mangga)', 'success');
-            setActiveTab('monitoring');
-          } else if (
-            acc.role === 'kasi_pemerintahan' ||
-            acc.role === 'kasi_pembangunan' ||
-            acc.role === 'kasi_trantibum'
-          ) {
-            showToast(`Beralih ke akun ${acc.jabatan}: ${acc.nama}`, 'success');
-            setActiveTab('dashboard_kasi');
-          } else {
-            showToast(`Beralih ke akun ${acc.lingkungan}: ${acc.nama}`, 'success');
-            setActiveTab('form');
-          }
-        }}
-      />
-
-      {/* PWA / APK Install Modal */}
-      <PWAInstallModal
-        isOpen={isInstallModalOpen}
-        onClose={() => setIsInstallModalOpen(false)}
-      />
-
-      {/* Ubah Password Modal */}
-      <UbahPasswordModal
-        isOpen={isUbahPasswordOpen}
-        onClose={() => setIsUbahPasswordOpen(false)}
-        activeAccount={activeAccount}
-        onSuccess={(msg) => showToast(msg, 'success')}
-      />
-
-      {/* Edit Profil Modal */}
-      <EditProfileModal
-        isOpen={isEditProfileOpen}
-        onClose={() => setIsEditProfileOpen(false)}
-        activeAccount={activeAccount}
-        onProfileUpdated={(updatedAccount) => {
-          setActiveAccount(updatedAccount);
-          showToast(`Profil ${updatedAccount.nama} berhasil diperbarui.`, 'success');
-        }}
-      />
-
-      {/* Detail Laporan Modal (No WhatsApp) */}
-      <ErrorBoundary fallbackTitle="Gagal Memuat Detail Laporan">
-        <DetailLaporanModal
-          item={selectedReport}
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+      {/* Modals with Lazy Loading */}
+      <React.Suspense fallback={null}>
+        {/* Account Selector Modal */}
+        <AccountSelectorModal
+          isOpen={isAccountModalOpen}
+          onClose={() => setIsAccountModalOpen(false)}
+          activeAccount={activeAccount}
           sheetMeta={sheetMeta}
-          hasGoogleAuth={Boolean(token)}
-          isAdmin={isKelurahanAdmin(activeAccount.role)}
-          attendanceList={attendanceList}
-          onUpdateReport={handleUpdateReport}
-          onDeleteReport={handleDeleteReport}
+          onSelectAccount={(acc) => {
+            setActiveAccount(acc);
+            setPreselectedKepling(acc);
+            try {
+              localStorage.setItem('kepling_active_account_id', acc.id);
+            } catch (e) {
+              console.warn(e);
+            }
+            if (acc.role === 'super_admin') {
+              showToast('Beralih ke akun SUPER ADMIN (Kelurahan Mangga)', 'success');
+              setActiveTab('monitoring');
+            } else if (
+              acc.role === 'kasi_pemerintahan' ||
+              acc.role === 'kasi_pembangunan' ||
+              acc.role === 'kasi_trantibum'
+            ) {
+              showToast(`Beralih ke akun ${acc.jabatan}: ${acc.nama}`, 'success');
+              setActiveTab('dashboard_kasi');
+            } else {
+              showToast(`Beralih ke akun ${acc.lingkungan}: ${acc.nama}`, 'success');
+              setActiveTab('form');
+            }
+          }}
         />
-      </ErrorBoundary>
 
-      {/* Panduan PPT Kepling Modal */}
-      <PanduanPPTModal
-        isOpen={isPPTModalOpen}
-        onClose={() => setIsPPTModalOpen(false)}
-      />
+        {/* PWA / APK Install Modal */}
+        <PWAInstallModal
+          isOpen={isInstallModalOpen}
+          onClose={() => setIsInstallModalOpen(false)}
+        />
 
-      {/* Absen Apel Pagi Modal */}
-      <AbsenApelModal
-        isOpen={isAbsenApelModalOpen}
-        onClose={() => setIsAbsenApelModalOpen(false)}
-        activeAccount={activeAccount}
-        attendanceList={attendanceList}
-        onRefreshAttendance={async () => {
-          const fresh = await loadAllAttendance();
-          setAttendanceList(fresh);
-        }}
-        showToast={showToast}
-      />
+        {/* Ubah Password Modal */}
+        <UbahPasswordModal
+          isOpen={isUbahPasswordOpen}
+          onClose={() => setIsUbahPasswordOpen(false)}
+          activeAccount={activeAccount}
+          onSuccess={(msg) => showToast(msg, 'success')}
+        />
 
-      {/* App Update / What's New Modal */}
-      <AppUpdateModal
-        isOpen={isUpdateModalOpen}
-        onClose={() => setIsUpdateModalOpen(false)}
-      />
+        {/* Edit Profil Modal */}
+        <EditProfileModal
+          isOpen={isEditProfileOpen}
+          onClose={() => setIsEditProfileOpen(false)}
+          activeAccount={activeAccount}
+          onProfileUpdated={(updatedAccount) => {
+            setActiveAccount(updatedAccount);
+            showToast(`Profil ${updatedAccount.nama} berhasil diperbarui.`, 'success');
+          }}
+        />
+
+        {/* Detail Laporan Modal (No WhatsApp) */}
+        <ErrorBoundary fallbackTitle="Gagal Memuat Detail Laporan">
+          <DetailLaporanModal
+            item={selectedReport}
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            sheetMeta={sheetMeta}
+            hasGoogleAuth={Boolean(token)}
+            isAdmin={isKelurahanAdmin(activeAccount.role)}
+            attendanceList={attendanceList}
+            onUpdateReport={handleUpdateReport}
+            onDeleteReport={handleDeleteReport}
+          />
+        </ErrorBoundary>
+
+        {/* Panduan PPT Kepling Modal */}
+        <PanduanPPTModal
+          isOpen={isPPTModalOpen}
+          onClose={() => setIsPPTModalOpen(false)}
+        />
+
+        {/* Absen Apel Pagi Modal */}
+        <AbsenApelModal
+          isOpen={isAbsenApelModalOpen}
+          onClose={() => setIsAbsenApelModalOpen(false)}
+          activeAccount={activeAccount}
+          attendanceList={attendanceList}
+          onRefreshAttendance={async () => {
+            const fresh = await loadAllAttendance();
+            setAttendanceList(fresh);
+          }}
+          showToast={showToast}
+        />
+
+        {/* App Update / What's New Modal */}
+        <AppUpdateModal
+          isOpen={isUpdateModalOpen}
+          onClose={() => setIsUpdateModalOpen(false)}
+        />
+      </React.Suspense>
 
       {/* Floating App Update Notification Toast Banner */}
       <AppUpdateToastBanner
