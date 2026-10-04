@@ -427,59 +427,90 @@ export function subscribeWebgisData(
 ): () => void {
   const unsubList: Unsubscribe[] = [];
 
+  let u1: Unsubscribe | null = null;
+  let u2: Unsubscribe | null = null;
+  let u3: Unsubscribe | null = null;
+
   try {
-    const u1 = onSnapshot(collection(db, COLLECTION_POLYGONS), (snap) => {
-      if (!snap.empty) {
-        const list: LingkunganPolygon[] = [];
-        snap.forEach((d) => list.push(d.data() as LingkunganPolygon));
-        list.sort((a, b) => a.lingkunganNomor - b.lingkunganNomor);
-        saveLocalPolygons(list);
-        onPolygonsUpdate(list);
+    u1 = onSnapshot(
+      collection(db, COLLECTION_POLYGONS),
+      (snap) => {
+        if (!snap.empty) {
+          const list: LingkunganPolygon[] = [];
+          snap.forEach((d) => list.push(d.data() as LingkunganPolygon));
+          list.sort((a, b) => a.lingkunganNomor - b.lingkunganNomor);
+          saveLocalPolygons(list);
+          onPolygonsUpdate(list);
+        }
+      },
+      (err: any) => {
+        if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota exceeded') || err?.message?.includes('resource-exhausted')) {
+          console.warn('Firestore quota exhausted for polygons, detaching listener.');
+          if (u1) { try { u1(); } catch {} }
+        }
       }
-    });
-    unsubList.push(u1);
+    );
+    if (u1) unsubList.push(u1);
   } catch (e) {
     console.warn('Error subscribing to polygons:', e);
   }
 
   try {
-    const u2 = onSnapshot(collection(db, COLLECTION_HOUSES), (snap) => {
-      const map = new Map<string, TitikRumahBangunan>();
+    u2 = onSnapshot(
+      collection(db, COLLECTION_HOUSES),
+      (snap) => {
+        const map = new Map<string, TitikRumahBangunan>();
 
-      // 1. Always seed with default landmarks
-      DEFAULT_TITIK_RUMAH.forEach((def) => {
-        if (def && def.id) map.set(def.id, def);
-      });
-
-      // 2. Overlay live snapshot from Firestore
-      if (!snap.empty) {
-        snap.forEach((d) => {
-          const item = { ...(d.data() as TitikRumahBangunan), id: d.id };
-          if (item && item.id) map.set(item.id, item);
+        // 1. Always seed with default landmarks
+        DEFAULT_TITIK_RUMAH.forEach((def) => {
+          if (def && def.id) map.set(def.id, def);
         });
-      }
 
-      const list = Array.from(map.values());
-      list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      saveLocalHouses(list);
-      onHousesUpdate(list);
-    });
-    unsubList.push(u2);
+        // 2. Overlay live snapshot from Firestore
+        if (!snap.empty) {
+          snap.forEach((d) => {
+            const item = { ...(d.data() as TitikRumahBangunan), id: d.id };
+            if (item && item.id) map.set(item.id, item);
+          });
+        }
+
+        const list = Array.from(map.values());
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        saveLocalHouses(list);
+        onHousesUpdate(list);
+      },
+      (err: any) => {
+        if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota exceeded') || err?.message?.includes('resource-exhausted')) {
+          console.warn('Firestore quota exhausted for houses, detaching listener.');
+          if (u2) { try { u2(); } catch {} }
+        }
+      }
+    );
+    if (u2) unsubList.push(u2);
   } catch (e) {
     console.warn('Error subscribing to houses:', e);
   }
 
   try {
-    const u3 = onSnapshot(collection(db, COLLECTION_ROADS), (snap) => {
-      if (!snap.empty) {
-        const list: RuasJalanLingkungan[] = [];
-        snap.forEach((d) => list.push({ ...(d.data() as RuasJalanLingkungan), id: d.id }));
-        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        saveLocalRoads(list);
-        onRoadsUpdate(list);
+    u3 = onSnapshot(
+      collection(db, COLLECTION_ROADS),
+      (snap) => {
+        if (!snap.empty) {
+          const list: RuasJalanLingkungan[] = [];
+          snap.forEach((d) => list.push({ ...(d.data() as RuasJalanLingkungan), id: d.id }));
+          list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          saveLocalRoads(list);
+          onRoadsUpdate(list);
+        }
+      },
+      (err: any) => {
+        if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota exceeded') || err?.message?.includes('resource-exhausted')) {
+          console.warn('Firestore quota exhausted for roads, detaching listener.');
+          if (u3) { try { u3(); } catch {} }
+        }
       }
-    });
-    unsubList.push(u3);
+    );
+    if (u3) unsubList.push(u3);
   } catch (e) {
     console.warn('Error subscribing to roads:', e);
   }

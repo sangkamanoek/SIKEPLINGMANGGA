@@ -253,8 +253,18 @@ export function subscribeKunjunganWarga(
             onSuccess(list);
           }
         },
-        (err) => {
+        (err: any) => {
           console.warn('Firestore snapshot error for kunjungan_warga:', err);
+          if (
+            err?.code === 'resource-exhausted' ||
+            err?.message?.includes('Quota exceeded') ||
+            err?.message?.includes('resource-exhausted')
+          ) {
+            console.warn('Firestore quota exhausted for kunjungan_warga, detaching listener.');
+            if (unsubFirestore) {
+              try { unsubFirestore(); } catch {}
+            }
+          }
           if (onError) onError(err);
         }
       );
