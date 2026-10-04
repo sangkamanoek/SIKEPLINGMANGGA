@@ -61,6 +61,7 @@ import {
 } from 'lucide-react';
 import {
   UserAccount,
+  DataKeluarga,
   LingkunganPolygon,
   TitikRumahBangunan,
   RuasJalanLingkungan,
@@ -104,6 +105,7 @@ import {
   fetchPbbSpptFromFirestore,
 } from '../lib/pbbService';
 import { SpptPbbItem } from '../data/pbbSampleData';
+import { getLocalDataKeluarga } from '../lib/dataKeluargaService';
 import { TabulasiWilayahView } from './TabulasiWilayahView';
 import * as XLSX from 'xlsx';
 
@@ -141,6 +143,7 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
   const [houses, setHouses] = useState<TitikRumahBangunan[]>([]);
   const [roads, setRoads] = useState<RuasJalanLingkungan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dataKeluargaList, setDataKeluargaList] = useState<DataKeluarga[]>(() => getLocalDataKeluarga());
 
   // Map UI Settings
   const [baseMapType, setBaseMapType] = useState<'satellite' | 'streets'>('satellite');
@@ -3830,6 +3833,42 @@ export const PemetaanWilayahView: React.FC<PemetaanWilayahViewProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* PANGGIL DATA WARGA BERDASARKAN NO KK (HANYA UNTUK RUMAH TINGGAL) */}
+              {houseForm.kategoriBangunan === 'RUMAH_TINGGAL' && (
+                <div className="mb-3 p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-2">
+                  <label className="block text-[11px] font-black text-emerald-900 uppercase flex items-center justify-between">
+                    <span>🔍 Panggil Data Warga Berdasarkan No. KK / Nama KK</span>
+                    <span className="text-[10px] text-emerald-700 font-normal">Opsional (bisa diisi manual juga)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Ketik 16 digit No. KK atau Nama Kepala Keluarga..."
+                      onChange={(e) => {
+                        const val = e.target.value.toLowerCase().trim();
+                        if (!val || val.length < 3) return;
+                        const found = dataKeluargaList.find(
+                          k => (k.nomorKk || '').toLowerCase().includes(val) ||
+                               (k.namaKepalaKeluarga || '').toLowerCase().includes(val) ||
+                               (k.nikKepalaKeluarga || '').toLowerCase().includes(val)
+                        );
+                        if (found) {
+                          setHouseForm(prev => ({
+                            ...prev,
+                            namaKepalaKeluarga: found.namaKepalaKeluarga,
+                            nikKk: found.nikKepalaKeluarga || found.nomorKk || '',
+                            namaJalan: found.namaJalan || prev.namaJalan,
+                            jambanKeluarga: found.jambanKeluarga || prev.jambanKeluarga,
+                          }));
+                          onShowToast?.(`Berhasil memanggil data warga: ${found.namaKepalaKeluarga} (No. KK: ${found.nomorKk})`, 'success');
+                        }
+                      }}
+                      className="w-full p-2.5 rounded-xl border border-emerald-300 bg-white text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Nama KK atau Nama Bangunan / Fasilitas */}
               <div className={houseForm.kategoriBangunan === 'RUMAH_TINGGAL' ? "grid grid-cols-2 gap-2" : "block"}>

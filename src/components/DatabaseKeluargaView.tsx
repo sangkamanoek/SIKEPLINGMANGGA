@@ -3574,11 +3574,11 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
   // Temporary State for Adding Anggota
   const [tempAnggotaNama, setTempAnggotaNama] = useState<string>('');
   const [tempAnggotaNik, setTempAnggotaNik] = useState<string>('');
-  const [tempAnggotaHub, setTempAnggotaHub] = useState<HubunganKeluargaType>('Anak');
-  const [tempAnggotaJk, setTempAnggotaJk] = useState<'L' | 'P'>('L');
-  const [tempAnggotaUsia, setTempAnggotaUsia] = useState<number>(10);
+  const [tempAnggotaHub, setTempAnggotaHub] = useState<HubunganKeluargaType | ''>('');
+  const [tempAnggotaJk, setTempAnggotaJk] = useState<'' | 'L' | 'P'>('');
+  const [tempAnggotaUsia, setTempAnggotaUsia] = useState<number | ''>('');
   const [tempAnggotaAgama, setTempAnggotaAgama] = useState<AgamaType>('Islam');
-  const [tempAnggotaPekerjaan, setTempAnggotaPekerjaan] = useState<string>('Pelajar');
+  const [tempAnggotaPekerjaan, setTempAnggotaPekerjaan] = useState<string>('');
 
   // Removal reason & Pecah KK Modal state
   const [isRemovalModalOpen, setIsRemovalModalOpen] = useState<boolean>(false);
@@ -3753,27 +3753,39 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
       setFormError('Nama anggota keluarga wajib diisi.');
       return;
     }
+    if (!tempAnggotaHub) {
+      setFormError('Hubungan keluarga wajib dipilih.');
+      return;
+    }
+    if (!tempAnggotaJk) {
+      setFormError('Jenis kelamin wajib dipilih.');
+      return;
+    }
+    const ageNum = Number(tempAnggotaUsia) || 0;
     const newAnggota: AnggotaKeluarga = {
       id: `ang_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       nik: tempAnggotaNik.trim() || `127101${String(Date.now()).substring(0, 10)}`,
       nama: tempAnggotaNama.trim().toUpperCase(),
-      hubunganKeluarga: tempAnggotaHub,
-      jenisKelamin: tempAnggotaJk,
-      usia: Number(tempAnggotaUsia) || 0,
+      hubunganKeluarga: tempAnggotaHub as HubunganKeluargaType,
+      jenisKelamin: tempAnggotaJk as 'L' | 'P',
+      usia: ageNum,
       agama: tempAnggotaAgama || (agama as AgamaType) || 'Islam',
       pendidikanTerakhir: 'SMA/SMK/Sederajat',
-      pekerjaan: tempAnggotaPekerjaan.trim() || 'Pelajar',
+      pekerjaan: tempAnggotaPekerjaan.trim() || '-',
       statusPerkawinan: tempAnggotaHub === 'Kepala Keluarga' || tempAnggotaHub === 'Istri' ? 'Kawin' : 'Belum Kawin',
-      memilikiKtpIkd: tempAnggotaUsia >= 17,
+      memilikiKtpIkd: ageNum >= 17,
       memilikiAktaKelahiran: true,
       statusBpjsKesehatan: 'PBI-JK (Bansos APBD/APBN)',
-      terdaftarBpjsKetenagakerjaan: tempAnggotaUsia >= 18,
+      terdaftarBpjsKetenagakerjaan: ageNum >= 18,
     };
 
     setAnggotaList([...anggotaList, newAnggota]);
     setTempAnggotaNama('');
     setTempAnggotaNik('');
-    setTempAnggotaUsia(10);
+    setTempAnggotaHub('');
+    setTempAnggotaJk('');
+    setTempAnggotaUsia('');
+    setTempAnggotaPekerjaan('');
   };
 
   const removeAnggota = (id: string) => {
@@ -4302,12 +4314,13 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                       onChange={(e) => setTempAnggotaHub(e.target.value as HubunganKeluargaType)}
                       className="w-full px-3 py-2.5 rounded-xl bg-blue-950/50 border border-blue-700 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
                     >
-                      <option value="Kepala Keluarga">Kepala Keluarga</option>
-                      <option value="Istri">Istri</option>
-                      <option value="Anak">Anak</option>
-                      <option value="Orang Tua">Orang Tua</option>
-                      <option value="Mertua">Mertua</option>
-                      <option value="Famili Lain">Famili Lain</option>
+                      <option value="" className="text-slate-400 bg-blue-950">-- Pilih Hubungan --</option>
+                      <option value="Kepala Keluarga" className="text-slate-900 bg-white">Kepala Keluarga</option>
+                      <option value="Istri" className="text-slate-900 bg-white">Istri</option>
+                      <option value="Anak" className="text-slate-900 bg-white">Anak</option>
+                      <option value="Orang Tua" className="text-slate-900 bg-white">Orang Tua</option>
+                      <option value="Mertua" className="text-slate-900 bg-white">Mertua</option>
+                      <option value="Famili Lain" className="text-slate-900 bg-white">Famili Lain</option>
                     </select>
                   </div>
                   <div className="space-y-1">
@@ -4317,8 +4330,9 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
                       onChange={(e) => setTempAnggotaJk(e.target.value as 'L' | 'P')}
                       className="w-full px-3 py-2.5 rounded-xl bg-blue-950/50 border border-blue-700 text-xs font-bold text-white"
                     >
-                      <option value="L">Laki-Laki</option>
-                      <option value="P">Perempuan</option>
+                      <option value="" className="text-slate-400 bg-blue-950">-- Pilih J.K. --</option>
+                      <option value="L" className="text-slate-900 bg-white">Laki-Laki</option>
+                      <option value="P" className="text-slate-900 bg-white">Perempuan</option>
                     </select>
                   </div>
                   <div className="space-y-1">

@@ -250,9 +250,9 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
             <div className="bg-rose-50 p-3 rounded-2xl border border-rose-300">
               <div className="flex items-center gap-1.5 font-black text-rose-950 text-xs mb-1">
                 <Trash2 className="w-4 h-4 text-rose-700" />
-                <span>3. Izin Hapus Data</span>
+                <span>3. Alasan Hapus &amp; Pecah KK</span>
               </div>
-              <p className="text-[10.5px] text-slate-600">Kepling berhak menghapus data keluarga yang telah pindah domisili, meninggal dunia, atau data tidak valid.</p>
+              <p className="text-[10.5px] text-slate-600">Pilih alasan: Pindah, Meninggal, atau Pecah KK baru (otomatis buat data KK baru untuk warga bersangkutan).</p>
             </div>
           </div>
 
@@ -260,8 +260,8 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
             <p className="font-bold text-emerald-300 text-xs">Cara Mengedit &amp; Menghapus Data Keluarga:</p>
             <ol className="text-[11px] text-slate-300 space-y-1 list-decimal pl-4">
               <li>Buka menu <strong>"Database Keluarga"</strong> &gt; Cari nama Kepala Keluarga atau Nomor KK.</li>
-              <li>Untuk mengubah data: Klik tombol <strong className="text-amber-400">Kuning (Pensil / Edit)</strong> &gt; Perbarui isian &gt; Klik Simpan.</li>
-              <li>Untuk menghapus data tidak valid: Klik tombol <strong className="text-rose-400">Merah (Tong Sampah / Hapus)</strong> &gt; Konfirmasi penghapusan pada layar.</li>
+              <li>Untuk mengubah data: Klik tombol <strong className="text-amber-400">Kuning (Pensil / Edit)</strong> &gt; Perbarui isian &gt; Simpan.</li>
+              <li>Untuk menghapus/pecah KK: Klik tombol <strong className="text-rose-400">Merah (Hapus)</strong> &gt; Pilih alasan (Pindah/Meninggal/Pecah KK dengan No. KK baru) &gt; Konfirmasi.</li>
             </ol>
           </div>
         </div>
