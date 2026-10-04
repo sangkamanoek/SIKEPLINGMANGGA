@@ -37,7 +37,7 @@ import {
 
 interface PkkHubDashboardProps {
   currentUser: UserAccount;
-  onNavigateTab: (tab: 'keuangan_pkk' | 'kegiatan_pkk' | 'dasa_wisma') => void;
+  onNavigateTab: (tab: 'keuangan_pkk' | 'kegiatan_pkk' | 'dasa_wisma' | 'posyandu_pkk') => void;
 }
 
 export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
@@ -224,7 +224,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
           </div>
         </div>
 
-        {/* Module 3: Dasa Wisma & Posyandu */}
+        {/* Module 3: Dasa Wisma */}
         <div
           onClick={() => onNavigateTab('dasa_wisma')}
           className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-tosca-500 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
@@ -248,6 +248,34 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
           </div>
           <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-tosca-700 group-hover:translate-x-1 transition-transform">
             <span>Buka Data Dasa Wisma</span>
+            <ChevronRight className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Module 4: Laporan Posyandu (Pokja IV) */}
+        <div
+          onClick={() => onNavigateTab('posyandu_pkk')}
+          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-rose-500 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
+          <div>
+            <div className="w-12 h-12 rounded-xl bg-rose-100 text-rose-800 flex items-center justify-center mb-4 group-hover:bg-rose-700 group-hover:text-white transition-colors">
+              <Baby className="w-6 h-6" />
+            </div>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base font-bold text-slate-900 group-hover:text-rose-800 transition-colors">
+                Laporan Posyandu
+              </h2>
+              <span className="text-[10px] font-black text-rose-800 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                Pokja IV
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              Pencatatan kegiatan pelayanan kesehatan Posyandu balita dan lansia di 24 lingkungan. Pemantauan stunting dan kesehatan ibu & anak.
+            </p>
+          </div>
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-rose-700 group-hover:translate-x-1 transition-transform">
+            <span>Buka Laporan Posyandu</span>
             <ChevronRight className="w-4 h-4" />
           </div>
         </div>

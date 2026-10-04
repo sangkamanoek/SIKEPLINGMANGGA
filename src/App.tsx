@@ -18,6 +18,7 @@ import {
   Building,
   ShieldAlert,
   BookOpen,
+  Baby,
 } from 'lucide-react';
 import { subscribeKunjunganWarga } from './lib/kunjunganService';
 import { syncInfraReportToPembangunan } from './lib/pembangunanService';
@@ -68,6 +69,7 @@ const LaporanKeuanganPkkView = React.lazy(() => import('./components/LaporanKeua
 const PkkHubDashboard = React.lazy(() => import('./components/PkkHubDashboard').then(m => ({ default: m.PkkHubDashboard })));
 const PkkKegiatanView = React.lazy(() => import('./components/PkkKegiatanView').then(m => ({ default: m.PkkKegiatanView })));
 const PkkDasaWismaView = React.lazy(() => import('./components/PkkDasaWismaView').then(m => ({ default: m.PkkDasaWismaView })));
+const PkkPosyanduView = React.lazy(() => import('./components/PkkPosyanduView').then(m => ({ default: m.PkkPosyanduView })));
 const PkkBukuAdministrasiView = React.lazy(() => import('./components/PkkBukuAdministrasiView').then(m => ({ default: m.PkkBukuAdministrasiView })));
 const SuratKedinasanView = React.lazy(() => import('./components/SuratKedinasanView').then(m => ({ default: m.SuratKedinasanView })));
 const RealisasiPembangunanView = React.lazy(() => import('./components/RealisasiPembangunanView').then(m => ({ default: m.RealisasiPembangunanView })));
@@ -1162,6 +1164,24 @@ export default function App() {
                   </span>
                 </button>
 
+                {/* PKK Tab 4b: Laporan Posyandu */}
+                <button
+                  id="tab-posyandu-pkk"
+                  type="button"
+                  onClick={() => setActiveTab('posyandu_pkk')}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                    activeTab === 'posyandu_pkk'
+                      ? 'bg-rose-700 text-white shadow-md shadow-rose-700/10 scale-[1.02] font-black'
+                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                  }`}
+                >
+                  <Baby className={`w-4 h-4 ${activeTab === 'posyandu_pkk' ? 'text-white' : 'text-rose-600'}`} />
+                  <span>Laporan Posyandu</span>
+                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'posyandu_pkk' ? 'bg-rose-900 text-rose-100' : 'bg-rose-100 text-rose-800'}`}>
+                    POKJA IV
+                  </span>
+                </button>
+
                 {/* PKK Tab 5: 6 Buku Wajib PKK Kelurahan */}
                 <button
                   id="tab-buku-pkk"
@@ -2127,6 +2147,13 @@ export default function App() {
         {activeTab === 'dasa_wisma' && (
           <ErrorBoundary fallbackTitle="Gagal Memuat Buku Rekap Dasa Wisma">
             <PkkDasaWismaView currentUser={activeAccount} />
+          </ErrorBoundary>
+        )}
+
+        {/* Tab Laporan Posyandu PKK */}
+        {activeTab === 'posyandu_pkk' && (
+          <ErrorBoundary fallbackTitle="Gagal Memuat Laporan Posyandu">
+            <PkkPosyanduView currentUser={activeAccount} onShowToast={showToast} />
           </ErrorBoundary>
         )}
 

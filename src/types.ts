@@ -37,7 +37,6 @@ export interface KinerjaHarian {
   posyanduLansia60TahunKeatas?: number | string; // Usia 60+ Tahun (Lansia / Lanjut Usia & PTM)
   posyanduJenisLayanan?: string[]; // ['Penimbangan & Pengukuran Stunting', 'Imunisasi Lengkap', 'Pemberian Vitamin A & Obat Cacing', 'PMT Balita/Bumil', 'Pemeriksaan ANC Bumil', 'Skrining Lansia & PTM', 'Integrasi Layanan Primer (ILP)']
   posyanduKeterangan?: string; // Catatan hasil posyandu
-
   kegiatanLainnya?: string;
   // Poin 6: Kegiatan Pemantauan Kondisi Infrastruktur Wilayah
   infrastrukturAdaGiat?: boolean;
@@ -91,6 +90,30 @@ export interface LaporanHarianItem {
   updatedAt?: string;
   sheetRowIndex?: number;
   spreadsheetUrl?: string;
+}
+
+export interface PosyanduReport {
+  id: string;
+  pkkLingkunganId: string; // ID of the PKK Lingkungan account
+  namaPetugas: string;
+  lingkungan: string;
+  nomorLingkungan: number;
+  tanggal: string; // ISO date YYYY-MM-DD
+  posyanduNama: string;
+  posyanduLokasi: string;
+  posyanduJumlahPetugasKader: number | string;
+  posyanduJumlahWargaTotal: number;
+  posyanduBayi02Tahun: number;
+  posyanduBalita25Tahun: number;
+  posyanduAnak612Tahun: number;
+  posyanduRemaja1318Tahun: number;
+  posyanduDewasaIbuHamil1959Tahun: number;
+  posyanduLansia60TahunKeatas: number;
+  posyanduJenisLayanan: string[];
+  posyanduKeterangan: string;
+  dokumentasiFoto?: FotoDokumentasi[];
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface GoogleUser {
