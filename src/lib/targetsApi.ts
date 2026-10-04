@@ -81,6 +81,9 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
   }
 
   safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(resultMap));
+  try {
+    saveAllTargetsToFirestore(resultMap).catch(() => {});
+  } catch {}
   return resultMap;
 }
 
