@@ -161,198 +161,31 @@ export const CONTOH_FOTO_SESUDAH_LIST = [
   },
 ];
 
-// Initial realistic seed data for Kelurahan Mangga (24 Lingkungan) with 3-4-3 Multi-Photo Documentation
-const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [
-  {
-    id: 'pemb_1',
-    lingkunganId: 'kepling_1',
-    lingkunganNomor: 1,
-    jenisPembangunan: 'PERBAIKAN_JALAN',
-    namaProyek: 'Pengaspalan Hotmix & Patching Jl. Bunga Raya Gg. Melati',
-    lokasiDetail: 'Jl. Bunga Raya Gg. Melati Lingkungan I',
-    sumberDana: 'Dinas SDABMBK Kota Medan',
-    statusRealisasi: 'SELESAI_100%',
-    volumeRealisasi: '280 Meter',
-    biayaEstimasiRp: 145000000,
-    tanggalMulai: '2026-08-10',
-    tanggalSelesai: '2026-08-25',
-    pelaksanaTeknis: 'Dinas SDABMBK & Pokmas Lingk. I',
-    fotoSebelumUrl: '/src/assets/images/awal_rusak_jalan_1790856694359.jpg',
-    fotoSebelumList: [
-      '/src/assets/images/awal_rusak_jalan_1790856694359.jpg',
-      '/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg',
-      'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=1600&auto=format&fit=crop&q=90',
-    ],
-    fotoProsesUrl: '/src/assets/images/proses_hotmix_roller_1790856748105.jpg',
-    fotoProsesList: [
-      '/src/assets/images/proses_hotmix_roller_1790856748105.jpg',
-      '/src/assets/images/proses_aspal_jalan_1790846460460.jpg',
-      '/src/assets/images/proses_galian_uditch_1790856763018.jpg',
-      '/src/assets/images/proses_susun_paving_1790856780731.jpg',
-    ],
-    fotoSesudahUrl: '/src/assets/images/selesai_aspal_mulus_1790856816426.jpg',
-    fotoSesudahList: [
-      '/src/assets/images/selesai_aspal_mulus_1790856816426.jpg',
-      'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=1600&auto=format&fit=crop&q=90',
-      'https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=1600&auto=format&fit=crop&q=90',
-    ],
-    keterangan: 'Akses jalan utama Lingkungan I sudah mulus dan lancar dilalui kendaraan warga.',
-    createdAt: '2026-08-26T10:00:00.000Z',
-    createdByName: 'M. Syafi’i (Kepling I)',
-  },
-  {
-    id: 'pemb_2_paving',
-    lingkunganId: 'kepling_2',
-    lingkunganNomor: 2,
-    jenisPembangunan: 'PEMASANGAN_PAVING_BLOK',
-    namaProyek: 'Pemasangan Paving Blok Jl. Irigasi Gang Warga',
-    lokasiDetail: 'Jl. Irigasi Lk II Gang Damai',
-    sumberDana: 'Dinas SDABMBK Kota Medan',
-    statusRealisasi: 'SELESAI_100%',
-    volumeRealisasi: '120 Meter',
-    biayaEstimasiRp: 45000000,
-    tanggalMulai: '2026-08-20',
-    tanggalSelesai: '2026-08-24',
-    pelaksanaTeknis: 'Pokmas Lingkungan II',
-    fotoSebelumUrl: '/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg',
-    fotoSebelumList: [
-      '/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg',
-      '/src/assets/images/awal_rusak_jalan_1790856694359.jpg',
-      'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?w=1600&auto=format&fit=crop&q=90',
-    ],
-    fotoProsesUrl: '/src/assets/images/proses_susun_paving_1790856780731.jpg',
-    fotoProsesList: [
-      '/src/assets/images/proses_susun_paving_1790856780731.jpg',
-      '/src/assets/images/proses_paving_block_1790846485222.jpg',
-      '/src/assets/images/proses_hotmix_roller_1790856748105.jpg',
-      '/src/assets/images/proses_galian_uditch_1790856763018.jpg',
-    ],
-    fotoSesudahUrl: '/src/assets/images/selesai_paving_cantik_1790856850675.jpg',
-    fotoSesudahList: [
-      '/src/assets/images/selesai_paving_cantik_1790856850675.jpg',
-      'https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=1600&auto=format&fit=crop&q=90',
-      'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=1600&auto=format&fit=crop&q=90',
-    ],
-    keterangan: 'Pemasangan paving block rapi dan kokoh di jalan lingkungan warga.',
-    createdAt: '2026-08-24T11:08:38.000Z',
-    createdByName: 'Zulkarnaen Tarigan (Kepling II)',
-  },
-  {
-    id: 'pemb_2',
-    lingkunganId: 'kepling_3',
-    lingkunganNomor: 3,
-    jenisPembangunan: 'PERBAIKAN_DRAINASE',
-    namaProyek: 'Normalisasi Parit & Pemasangan U-Ditch Beton Precast',
-    lokasiDetail: 'Jl. Bunga Mawar Gg. Sejahtera Lingkungan III',
-    sumberDana: 'APBD Kota Medan',
-    statusRealisasi: 'SELESAI_100%',
-    volumeRealisasi: '150 Meter',
-    biayaEstimasiRp: 98000000,
-    tanggalMulai: '2026-07-01',
-    tanggalSelesai: '2026-07-20',
-    pelaksanaTeknis: 'Dinas SDABMBK',
-    fotoSebelumUrl: '/src/assets/images/awal_parit_tersumbat_1790856713835.jpg',
-    fotoSebelumList: [
-      '/src/assets/images/awal_parit_tersumbat_1790856713835.jpg',
-      '/src/assets/images/awal_rusak_jalan_1790856694359.jpg',
-      'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?w=1600&auto=format&fit=crop&q=90',
-    ],
-    fotoProsesUrl: '/src/assets/images/proses_galian_uditch_1790856763018.jpg',
-    fotoProsesList: [
-      '/src/assets/images/proses_galian_uditch_1790856763018.jpg',
-      '/src/assets/images/proses_drainase_uditch_1790846472119.jpg',
-      '/src/assets/images/proses_hotmix_roller_1790856748105.jpg',
-      '/src/assets/images/proses_susun_paving_1790856780731.jpg',
-    ],
-    fotoSesudahUrl: '/src/assets/images/selesai_drainase_rapi_1790856831691.jpg',
-    fotoSesudahList: [
-      '/src/assets/images/selesai_drainase_rapi_1790856831691.jpg',
-      'https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?w=1600&auto=format&fit=crop&q=90',
-      'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=1600&auto=format&fit=crop&q=90',
-    ],
-    keterangan: 'Saluran drainase bebas genangan air saat hujan deras tiba.',
-    createdAt: '2026-07-21T09:00:00.000Z',
-    createdByName: 'Rahmat Hidayat (Kepling III)',
-  },
-  {
-    id: 'pemb_3',
-    lingkunganId: 'kepling_5',
-    lingkunganNomor: 5,
-    jenisPembangunan: 'PENAMBAHAN_TIANG_LPJU',
-    namaProyek: 'Pemasangan Tiang LPJU Baru & Ornamen Lampu LED 60W',
-    lokasiDetail: 'Jl. Bunga Flamboyan Rawan Gelap Lingkungan V',
-    sumberDana: 'Dinas Perkim Kota Medan',
-    statusRealisasi: 'SELESAI_100%',
-    volumeRealisasi: '6 Unit Tiang Baru',
-    biayaEstimasiRp: 42000000,
-    tanggalMulai: '2026-09-01',
-    tanggalSelesai: '2026-09-08',
-    pelaksanaTeknis: 'Dinas Perkim & Dishub',
-    fotoSebelumUrl: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=1600&auto=format&fit=crop&q=90',
-    fotoSebelumList: [
-      'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=1600&auto=format&fit=crop&q=90',
-      '/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg',
-      '/src/assets/images/awal_rusak_jalan_1790856694359.jpg',
-    ],
-    fotoProsesUrl: '/src/assets/images/proses_instalasi_lpju_1790856798909.jpg',
-    fotoProsesList: [
-      '/src/assets/images/proses_instalasi_lpju_1790856798909.jpg',
-      '/src/assets/images/proses_lampu_lpju_1790846499280.jpg',
-      '/src/assets/images/proses_hotmix_roller_1790856748105.jpg',
-      '/src/assets/images/proses_galian_uditch_1790856763018.jpg',
-    ],
-    fotoSesudahUrl: 'https://images.unsplash.com/photo-1517685352821-92cf88aee5a5?w=1600&auto=format&fit=crop&q=90',
-    fotoSesudahList: [
-      'https://images.unsplash.com/photo-1517685352821-92cf88aee5a5?w=1600&auto=format&fit=crop&q=90',
-      'https://images.unsplash.com/photo-1508873696983-2df515122519?w=1600&auto=format&fit=crop&q=90',
-      '/src/assets/images/selesai_aspal_mulus_1790856816426.jpg',
-    ],
-    keterangan: 'Jalanan lingkungan terang benderang pada malam hari, meningkatkan keamanan warga.',
-    createdAt: '2026-09-09T08:30:00.000Z',
-    createdByName: 'Bambang S. (Kepling V)',
-  },
-  {
-    id: 'pemb_5',
-    lingkunganId: 'kepling_12',
-    lingkunganNomor: 12,
-    jenisPembangunan: 'PERBAIKAN_JALAN',
-    namaProyek: 'Pengecoran Rabat Beton Gang Pemukiman Warga',
-    lokasiDetail: 'Gg. Anggrek I Lingkungan XII',
-    sumberDana: 'Swadaya Masyarakat & Pokir DPRD',
-    statusRealisasi: 'PROSES_PENGERJAAN',
-    volumeRealisasi: '120 Meter',
-    biayaEstimasiRp: 65000000,
-    tanggalMulai: '2026-09-20',
-    pelaksanaTeknis: 'Gotong Royong Warga Lingkungan XII',
-    fotoSebelumUrl: '/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg',
-    fotoSebelumList: [
-      '/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg',
-      '/src/assets/images/awal_rusak_jalan_1790856694359.jpg',
-      'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=1600&auto=format&fit=crop&q=90',
-    ],
-    fotoProsesUrl: '/src/assets/images/proses_hotmix_roller_1790856748105.jpg',
-    fotoProsesList: [
-      '/src/assets/images/proses_hotmix_roller_1790856748105.jpg',
-      '/src/assets/images/proses_aspal_jalan_1790846460460.jpg',
-      '/src/assets/images/proses_susun_paving_1790856780731.jpg',
-      '/src/assets/images/proses_galian_uditch_1790856763018.jpg',
-    ],
-    fotoSesudahUrl: '',
-    fotoSesudahList: [],
-    keterangan: 'Pengerjaan rabat beton telah mencapai progres 65%.',
-    createdAt: '2026-09-21T14:00:00.000Z',
-    createdByName: 'Herman (Kepling XII)',
-  },
-];
+// Helper to identify generated sample dummy pembangunan items
+export const isDummyPembangunan = (item: Partial<RealisasiPembangunan> | null | undefined): boolean => {
+  if (!item) return false;
+  const idStr = String(item.id || '');
+  return /^pemb_[1-9](_.*)?$/.test(idStr);
+};
+
+// Initial realistic seed data for Kelurahan Mangga (Dikosongkan agar murni diisi data riil)
+const INITIAL_REALISASI_DATA: RealisasiPembangunan[] = [];
 
 export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> = ({ currentUser }) => {
   // Persistence state
   const [items, setItems] = useState<RealisasiPembangunan[]>(() => {
-    return safeGetLocalStorage<RealisasiPembangunan[]>(STORAGE_KEY, INITIAL_REALISASI_DATA);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('sikepling_realisasi_pembangunan_v1');
+      }
+    } catch {}
+    const stored = safeGetLocalStorage<RealisasiPembangunan[]>(STORAGE_KEY, []);
+    return Array.isArray(stored) ? stored.filter((x) => !isDummyPembangunan(x)) : [];
   });
 
   useEffect(() => {
-    safeSetLocalStorage(STORAGE_KEY, JSON.stringify(items));
+    const cleaned = items.filter((x) => !isDummyPembangunan(x));
+    safeSetLocalStorage(STORAGE_KEY, JSON.stringify(cleaned));
   }, [items]);
 
   const [isCloudSynced, setIsCloudSynced] = useState(true);
@@ -367,21 +200,19 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       .then((cloudItems) => {
         if (!isMounted) return;
         setIsSyncing(false);
-        if (Array.isArray(cloudItems) && cloudItems.length > 0) {
+        const cleaned = (cloudItems || []).filter((c) => !isDummyPembangunan(c));
+        if (cleaned.length > 0) {
           setItems((prev) => {
             const map = new Map<string, RealisasiPembangunan>();
-            cloudItems.forEach((c) => map.set(c.id, c));
-            prev.forEach((p) => {
+            cleaned.forEach((c) => map.set(c.id, c));
+            prev.filter((p) => !isDummyPembangunan(p)).forEach((p) => {
               if (!map.has(p.id)) map.set(p.id, p);
             });
             return Array.from(map.values());
           });
           setIsCloudSynced(true);
-        } else if (items.length > 0) {
-          // If central database is empty, automatically seed existing local data into central DB
-          batchSyncPembangunan(items).catch((err) => {
-            console.warn('Initial central sync notice:', err);
-          });
+        } else {
+          setItems((prev) => prev.filter((p) => !isDummyPembangunan(p)));
         }
       })
       .catch((err) => {
@@ -393,11 +224,12 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     // Realtime Firestore subscriber
     const unsubscribe = subscribeToPembangunan((fsItems) => {
       if (!isMounted) return;
-      if (Array.isArray(fsItems) && fsItems.length > 0) {
+      const cleaned = (fsItems || []).filter((c) => !isDummyPembangunan(c));
+      if (cleaned.length > 0) {
         setItems((prev) => {
           const map = new Map<string, RealisasiPembangunan>();
-          fsItems.forEach((c) => map.set(c.id, c));
-          prev.forEach((p) => {
+          cleaned.forEach((c) => map.set(c.id, c));
+          prev.filter((p) => !isDummyPembangunan(p)).forEach((p) => {
             if (!map.has(p.id)) map.set(p.id, p);
           });
           return Array.from(map.values());
@@ -482,12 +314,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
   const confirmClearAll = () => {
     setItems([]);
     setIsClearAllModalOpen(false);
-    showToast('Seluruh contoh laporan pembangunan berhasil dibersihkan.');
-  };
-
-  const handleRestoreSamples = () => {
-    setItems(INITIAL_REALISASI_DATA);
-    showToast('Data contoh laporan pembangunan berhasil dimuat kembali.');
+    safeSetLocalStorage(STORAGE_KEY, JSON.stringify([]));
+    showToast('Seluruh laporan pembangunan berhasil dikosongkan.');
   };
 
   // Form States
@@ -1194,7 +1022,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
           </h3>
           <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
             {items.length === 0
-              ? 'Seluruh data contoh telah dibersihkan. Anda dapat langsung menginput data realisasi baru dari lapangan atau memuat kembali contoh data kapan saja.'
+              ? 'Data laporan pembangunan siap diinput secara manual sesuai progres di masing-masing lingkungan.'
               : 'Tidak ditemukan data pembangunan yang sesuai dengan kriteria filter atau pencarian Anda. Silakan ubah filter atau tambah data baru.'}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
@@ -1206,15 +1034,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               <Plus className="w-4 h-4" />
               <span>+ Tambah Realisasi Baru</span>
             </button>
-            {items.length === 0 && (
-              <button
-                type="button"
-                onClick={handleRestoreSamples}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-              >
-                <span>🔄 Muat Kembali Data Contoh</span>
-              </button>
-            )}
           </div>
         </div>
       ) : viewMode === 'card' ? (

@@ -171,19 +171,19 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
         {/* Brand & Identity (Left) */}
         <div className="flex items-center gap-3.5 sm:gap-4 shrink-0 min-w-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-2.5 shadow-md shrink-0 border border-white/20 overflow-hidden">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-1 shadow-md shrink-0 border border-white/20 overflow-hidden">
               <img
                 src="/logo_pemko_medan.svg"
                 alt="Logo Pemko Medan"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain scale-[1.05]"
               />
             </div>
             {isPkk && (
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-1.5 shadow-md shrink-0 border border-white/20 animate-fade-in overflow-hidden">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-1 shadow-md shrink-0 border border-white/20 animate-fade-in overflow-hidden">
                 <img
                   src="/logo_pkk.jpg"
                   alt="Logo PKK"
-                  className="w-full h-full object-cover scale-[1.75] transform"
+                  className="w-full h-full object-cover scale-[0.94] transform"
                 />
               </div>
             )}

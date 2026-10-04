@@ -13,79 +13,53 @@ import {
 } from 'firebase/firestore';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 
-export const SURAT_STORAGE_KEY = 'si_mangga_surat_kedinasan_list';
+export const SURAT_STORAGE_KEY = 'si_mangga_surat_kedinasan_list_v2';
 export const SURAT_COLLECTION = 'surat_kedinasan';
 export const SURAT_CHANNEL = 'si_mangga_surat_channel';
 
-export const INITIAL_SURAT_LIST: SuratKedinasanItem[] = [
-  {
-    id: 'surat_1',
-    nomorSurat: '005 / 421 / X / 2026',
-    tanggalSurat: '2026-10-01',
-    jenisSurat: 'UNDANGAN',
-    perihal: 'Undangan Rapat Koordinasi Bulanan Kepala Lingkungan & PKK',
-    tujuanSurat: 'Seluruh Kepling I s/d XXIV & Pengurus TP-PKK',
-    sifat: 'PENTING',
-    status: 'DISETUJUI',
-    isiRingkas: 'Rapat koordinasi evaluasi realisasi PBB-P2, ketertiban umum poskamling, dan persiapan kegiatan bulan bakti gotong royong.',
-    penandatangan: 'Lurah Kelurahan Mangga',
-    dibuatOlehNama: 'Kasi Pemerintahan',
-    dibuatOlehRole: 'kasi_pemerintahan',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'surat_2',
-    nomorSurat: '400.10.2 / 115 / X / 2026',
-    tanggalSurat: '2026-10-02',
-    jenisSurat: 'SURAT_KELUAR',
-    perihal: 'Pengantar Verifikasi Data Kesejahteraan Sosial (DTKS)',
-    tujuanSurat: 'Kepala Dinas Sosial Kota Medan',
-    sifat: 'BIASA',
-    status: 'DIARSIPKAN',
-    isiRingkas: 'Penyampaian hasil musyawarah kelurahan terkait usulan verifikasi dan validasi data warga kurang mampu di 24 Lingkungan.',
-    penandatangan: 'Lurah Kelurahan Mangga',
-    dibuatOlehNama: 'Kasi Pembangunan',
-    dibuatOlehRole: 'kasi_pembangunan',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'surat_3',
-    nomorSurat: '800 / 088 / SK / X / 2026',
-    tanggalSurat: '2026-10-03',
-    jenisSurat: 'SK_LURAH',
-    perihal: 'Keputusan Lurah Mangga tentang Penetapan Kader Posyandu & Dasa Wisma 2026',
-    asalSurat: 'Kecamatan Medan Tuntungan',
-    sifat: 'PENTING',
-    status: 'DISETUJUI',
-    isiRingkas: 'Penetapan nama-nama pengurus posyandu dan kelompok dasa wisma di seluruh lingkungan Kelurahan Mangga.',
-    penandatangan: 'Lurah Kelurahan Mangga',
-    dibuatOlehNama: 'Super Admin',
-    dibuatOlehRole: 'super_admin',
-    createdAt: new Date().toISOString(),
-  },
-];
+// Helper to identify generated dummy sample surat items
+export const isDummySurat = (item: Partial<SuratKedinasanItem> | null | undefined): boolean => {
+  if (!item) return false;
+  const idStr = String(item.id || '');
+  return /^surat_[1-9]$/.test(idStr);
+};
+
+// Initial surat list is strictly empty for real official correspondence
+export const INITIAL_SURAT_LIST: SuratKedinasanItem[] = [];
 
 let memorySurat: SuratKedinasanItem[] = [];
 
 export const getLocalSuratList = (): SuratKedinasanItem[] => {
-  if (memorySurat.length > 0) return memorySurat;
-  const stored = safeGetLocalStorage<SuratKedinasanItem[]>(SURAT_STORAGE_KEY, []);
-  if (stored && stored.length > 0) {
-    memorySurat = stored;
-    return stored;
+  if (memorySurat.length > 0) {
+    return memorySurat.filter((x) => !isDummySurat(x));
   }
-  memorySurat = INITIAL_SURAT_LIST;
-  safeSetLocalStorage(SURAT_STORAGE_KEY, JSON.stringify(INITIAL_SURAT_LIST));
-  return INITIAL_SURAT_LIST;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('si_mangga_surat_kedinasan_list');
+    }
+  } catch {}
+
+  const stored = safeGetLocalStorage<SuratKedinasanItem[]>(SURAT_STORAGE_KEY, []);
+  if (stored && Array.isArray(stored)) {
+    const cleaned = stored.filter((x) => !isDummySurat(x));
+    memorySurat = cleaned;
+    if (cleaned.length !== stored.length) {
+      safeSetLocalStorage(SURAT_STORAGE_KEY, JSON.stringify(cleaned));
+    }
+    return cleaned;
+  }
+  memorySurat = [];
+  return [];
 };
 
 export const setLocalSuratList = (items: SuratKedinasanItem[]): void => {
-  memorySurat = items;
-  safeSetLocalStorage(SURAT_STORAGE_KEY, JSON.stringify(items));
+  const cleaned = items.filter((x) => !isDummySurat(x));
+  memorySurat = cleaned;
+  safeSetLocalStorage(SURAT_STORAGE_KEY, JSON.stringify(cleaned));
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(SURAT_CHANNEL);
-      bc.postMessage({ type: 'SYNC_SURAT', items });
+      bc.postMessage({ type: 'SYNC_SURAT', items: cleaned });
       bc.close();
     }
   } catch (e) {
@@ -99,14 +73,25 @@ export async function fetchSuratFromServer(): Promise<SuratKedinasanItem[]> {
     const q = query(collection(db, SURAT_COLLECTION), orderBy('tanggalSurat', 'desc'));
     const snap = await getDocs(q);
     const items: SuratKedinasanItem[] = [];
+    const dummyIdsToDelete: string[] = [];
     snap.forEach((d) => {
-      items.push(d.data() as SuratKedinasanItem);
+      const itm = d.data() as SuratKedinasanItem;
+      if (isDummySurat(itm)) {
+        dummyIdsToDelete.push(d.id);
+      } else {
+        items.push(itm);
+      }
     });
-    if (items.length > 0) {
-      memorySurat = items;
-      safeSetLocalStorage(SURAT_STORAGE_KEY, JSON.stringify(items));
-      return items;
+
+    if (dummyIdsToDelete.length > 0) {
+      for (const dId of dummyIdsToDelete) {
+        deleteDoc(doc(db, SURAT_COLLECTION, dId)).catch(() => {});
+      }
     }
+
+    memorySurat = items;
+    safeSetLocalStorage(SURAT_STORAGE_KEY, JSON.stringify(items));
+    return items;
   } catch (err) {
     console.warn('Failed fetching surat from server:', err);
   }
@@ -198,13 +183,14 @@ export function subscribeSurat(
         (snapshot) => {
           const items: SuratKedinasanItem[] = [];
           snapshot.forEach((d) => {
-            items.push(d.data() as SuratKedinasanItem);
+            const itm = d.data() as SuratKedinasanItem;
+            if (!isDummySurat(itm)) {
+              items.push(itm);
+            }
           });
-          if (items.length > 0) {
-            memorySurat = items;
-            safeSetLocalStorage(SURAT_STORAGE_KEY, JSON.stringify(items));
-            onSuccess(items);
-          }
+          memorySurat = items;
+          safeSetLocalStorage(SURAT_STORAGE_KEY, JSON.stringify(items));
+          onSuccess(items);
         },
         (err) => {
           console.warn('Firestore snapshot error on surat_kedinasan:', err);

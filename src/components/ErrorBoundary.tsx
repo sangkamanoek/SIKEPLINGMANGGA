@@ -24,9 +24,23 @@ class RawErrorBoundary extends (React.Component as any) {
   }
 
   static getDerivedStateFromError(error: Error): State {
+    const msg = error?.message || '';
+    if (
+      msg.includes('Importing a module script failed') ||
+      msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('error loading dynamically imported module')
+    ) {
+      try {
+        const hasAutoReloaded = sessionStorage.getItem('chunk_load_auto_reload');
+        if (!hasAutoReloaded) {
+          sessionStorage.setItem('chunk_load_auto_reload', 'true');
+          window.location.reload();
+        }
+      } catch {}
+    }
     return {
       hasError: true,
-      errorMessage: error?.message || 'Terjadi kesalahan sistem yang tidak terduga.',
+      errorMessage: msg || 'Terjadi kesalahan sistem yang tidak terduga.',
     };
   }
 

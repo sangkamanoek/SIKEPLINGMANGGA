@@ -169,12 +169,16 @@ let profilesCache = loadStoredProfiles();
 // Pembangunan & Infrastruktur Data File
 const PEMBANGUNAN_FILE = path.join(DATA_DIR, 'pembangunan.json');
 
+const isDummyPembangunan = (id: string) => /^pemb_[1-9](_.*)?$/.test(String(id || ''));
+
 const loadStoredPembangunan = (): any[] => {
   try {
     if (fs.existsSync(PEMBANGUNAN_FILE)) {
       const content = fs.readFileSync(PEMBANGUNAN_FILE, 'utf-8');
       const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item) => item && item.id && !isDummyPembangunan(item.id));
+      }
     }
   } catch (err) {
     console.error('Error reading pembangunan file:', err);
@@ -184,7 +188,8 @@ const loadStoredPembangunan = (): any[] => {
 
 const saveStoredPembangunan = (items: any[]) => {
   try {
-    fs.writeFileSync(PEMBANGUNAN_FILE, JSON.stringify(items, null, 2), 'utf-8');
+    const cleaned = (items || []).filter((item) => item && item.id && !isDummyPembangunan(item.id));
+    fs.writeFileSync(PEMBANGUNAN_FILE, JSON.stringify(cleaned, null, 2), 'utf-8');
   } catch (err) {
     console.error('Error saving pembangunan file:', err);
   }
@@ -1699,7 +1704,7 @@ app.use('/api', (_req, res) => {
 
 async function startServer() {
   const distPath = path.join(process.cwd(), 'dist');
-  const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.join(distPath, 'index.html'));
+  const isProd = process.env.NODE_ENV === 'production';
 
   if (!isProd) {
     console.log('Running in development mode with Vite middleware...');

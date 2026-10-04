@@ -113,7 +113,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                 <img
                   src="/logo_pkk.jpg"
                   alt="Logo PKK"
-                  className="w-full h-full object-contain scale-110"
+                  className="w-full h-full object-cover scale-[0.94] transform"
                 />
               </div>
               <span>TIM PENGGERAK PKK KELURAHAN MANGGA</span>

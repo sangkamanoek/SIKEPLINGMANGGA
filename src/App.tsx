@@ -98,8 +98,6 @@ const ViewLoadingFallback = () => (
     <p className="text-xs text-slate-400 mt-1">SI-MANGGA Kelurahan Mangga</p>
   </div>
 );
-import { MobileBottomNav } from './components/MobileBottomNav';
-import { ErrorBoundary } from './components/ErrorBoundary';
 import { AbsenApelItem, CustomEvent, EventAttendance, StatusAbsenApel } from './types';
 import { loadAllAttendance, getTodayAbsenForKepling } from './lib/attendanceApi';
 import {
@@ -121,7 +119,6 @@ import {
   subscribeReportsFromFirestore,
   getLocalDeletedReportIds,
   isReportDeleted,
-  seedInitialReports,
 } from './lib/reportsApi';
 import {
   getReportsFromIndexedDB,

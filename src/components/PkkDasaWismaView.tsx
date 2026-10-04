@@ -23,6 +23,7 @@ import {
   saveDasaWisma,
   deleteDasaWisma,
   exportDasaWismaToExcel,
+  clearSampleDasaWismaData,
 } from '../lib/pkkDasaWismaService';
 
 interface PkkDasaWismaViewProps {
@@ -38,21 +39,21 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<KelompokDasaWisma | null>(null);
 
-  // Form State
+  // Form State - initialized empty for manual user entry
   const [formNama, setFormNama] = useState<string>('');
   const [formLingkunganNomor, setFormLingkunganNomor] = useState<number>(
     currentUser.nomorLingkungan || 1
   );
   const [formNamaKetua, setFormNamaKetua] = useState<string>('');
   const [formTelepon, setFormTelepon] = useState<string>('');
-  const [formJumlahKk, setFormJumlahKk] = useState<string>('15');
-  const [formJumlahJiwa, setFormJumlahJiwa] = useState<string>('55');
-  const [formJumlahBalita, setFormJumlahBalita] = useState<string>('4');
-  const [formJumlahIbuHamil, setFormJumlahIbuHamil] = useState<string>('1');
-  const [formJumlahLansia, setFormJumlahLansia] = useState<string>('5');
-  const [formJambanSehat, setFormJambanSehat] = useState<string>('15');
-  const [formSpal, setFormSpal] = useState<string>('14');
-  const [formToga, setFormToga] = useState<string>('10');
+  const [formJumlahKk, setFormJumlahKk] = useState<string>('');
+  const [formJumlahJiwa, setFormJumlahJiwa] = useState<string>('');
+  const [formJumlahBalita, setFormJumlahBalita] = useState<string>('0');
+  const [formJumlahIbuHamil, setFormJumlahIbuHamil] = useState<string>('0');
+  const [formJumlahLansia, setFormJumlahLansia] = useState<string>('0');
+  const [formJambanSehat, setFormJambanSehat] = useState<string>('0');
+  const [formSpal, setFormSpal] = useState<string>('0');
+  const [formToga, setFormToga] = useState<string>('0');
   const [formKegiatan, setFormKegiatan] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [alertMsg, setAlertMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -125,15 +126,15 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
     setFormLingkunganNomor(currentUser.nomorLingkungan || 1);
     setFormNamaKetua('');
     setFormTelepon('');
-    setFormJumlahKk('15');
-    setFormJumlahJiwa('55');
-    setFormJumlahBalita('4');
-    setFormJumlahIbuHamil('1');
-    setFormJumlahLansia('5');
-    setFormJambanSehat('15');
-    setFormSpal('14');
-    setFormToga('10');
-    setFormKegiatan('Pertemuan bulanan, arisan Dasa Wisma, pemeriksaan jentik & pemanfaatan toga.');
+    setFormJumlahKk('');
+    setFormJumlahJiwa('');
+    setFormJumlahBalita('0');
+    setFormJumlahIbuHamil('0');
+    setFormJumlahLansia('0');
+    setFormJambanSehat('0');
+    setFormSpal('0');
+    setFormToga('0');
+    setFormKegiatan('');
     setIsModalOpen(true);
   };
 
@@ -346,92 +347,114 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
         </div>
       </div>
 
-      {/* Dasa Wisma Cards List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredList.map((item) => (
-          <div
-            key={item.id}
-            className="bg-white rounded-2xl border border-slate-200 hover:border-blue-400 shadow-xs hover:shadow-md transition-all p-5 flex flex-col justify-between"
-          >
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-tosca-800 text-[11px] font-black">
-                  {item.lingkunganNama}
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {item.id}
-                </span>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 leading-snug">
-                  {item.namaKelompok}
-                </h3>
-                <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
-                  <span className="font-semibold text-slate-800">
-                    Ketua: {item.namaKetuaDawis}
-                  </span>
-                  {item.teleponKetua && (
-                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                      <Phone className="w-3 h-3" />
-                      <span>{item.teleponKetua}</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Data Grid per Kelompok */}
-              <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-400 block">KK Binaan</span>
-                  <span className="font-bold text-slate-800">{item.jumlahKk} KK</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Balita</span>
-                  <span className="font-bold text-tosca-700">{item.jumlahBalita} Anak</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Ibu Hamil</span>
-                  <span className="font-bold text-amber-700">{item.jumlahIbuHamil} Bumil</span>
-                </div>
-              </div>
-
-              {/* Sanitasi & HATINYA PKK */}
-              <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1">
-                <span>Jamban Sehat: <strong>{item.punyaJambanSehat} KK</strong></span>
-                <span>Pekarangan Toga: <strong>{item.punyaToga} KK</strong></span>
-              </div>
-
-              {item.kegiatanUtama && (
-                <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">
-                  {item.kegiatanUtama}
-                </p>
-              )}
-            </div>
-
-            {/* Card Footer Actions */}
-            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => handleOpenEdit(item)}
-                className="text-xs font-bold text-tosca-700 hover:text-tosca-900 flex items-center gap-1 cursor-pointer"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>Ubah Data</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDelete(item.id, item.namaKelompok)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                title="Hapus Dasa Wisma"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
+      {/* Dasa Wisma Cards List or Clean Empty State */}
+      {filteredList.length === 0 ? (
+        <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-10 sm:p-14 text-center max-w-xl mx-auto shadow-2xs">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-tosca-50 border border-tosca-200 flex items-center justify-center text-tosca-600 shadow-2xs">
+            <Users className="w-8 h-8" />
           </div>
-        ))}
-      </div>
+          <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-1">
+            Data Dasa Wisma Masih Kosong
+          </h3>
+          <p className="text-xs text-slate-500 mb-6 leading-relaxed max-w-md mx-auto">
+            Data contoh Dasa Wisma telah berhasil dikosongkan. Silakan tambahkan data kelompok Dasa Wisma binaan PKK secara manual per lingkungan.
+          </p>
+          <button
+            type="button"
+            onClick={handleOpenAdd}
+            className="px-5 py-2.5 rounded-xl bg-tosca-700 hover:bg-tosca-800 text-white font-bold text-xs inline-flex items-center gap-2 shadow-md shadow-tosca-700/20 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tambah Kelompok Dasa Wisma Baru</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredList.map((item) => (
+            <div
+              key={item.id}
+              className="bg-white rounded-2xl border border-slate-200 hover:border-blue-400 shadow-xs hover:shadow-md transition-all p-5 flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-tosca-800 text-[11px] font-black">
+                    {item.lingkunganNama}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {item.id}
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 leading-snug">
+                    {item.namaKelompok}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
+                    <span className="font-semibold text-slate-800">
+                      Ketua: {item.namaKetuaDawis}
+                    </span>
+                    {item.teleponKetua && (
+                      <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                        <Phone className="w-3 h-3" />
+                        <span>{item.teleponKetua}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Data Grid per Kelompok */}
+                <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">KK Binaan</span>
+                    <span className="font-bold text-slate-800">{item.jumlahKk} KK</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Balita</span>
+                    <span className="font-bold text-tosca-700">{item.jumlahBalita} Anak</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Ibu Hamil</span>
+                    <span className="font-bold text-amber-700">{item.jumlahIbuHamil} Bumil</span>
+                  </div>
+                </div>
+
+                {/* Sanitasi & HATINYA PKK */}
+                <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1">
+                  <span>Jamban Sehat: <strong>{item.punyaJambanSehat} KK</strong></span>
+                  <span>Pekarangan Toga: <strong>{item.punyaToga} KK</strong></span>
+                </div>
+
+                {item.kegiatanUtama && (
+                  <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    {item.kegiatanUtama}
+                  </p>
+                )}
+              </div>
+
+              {/* Card Footer Actions */}
+              <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEdit(item)}
+                  className="text-xs font-bold text-tosca-700 hover:text-tosca-900 flex items-center gap-1 cursor-pointer"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Ubah Data</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDelete(item.id, item.namaKelompok)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                  title="Hapus Dasa Wisma"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Modal Add / Edit Dasa Wisma */}
       {isModalOpen && (

@@ -91,22 +91,9 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
 };
 
 /**
- * Seed initial reports on the online server
+ * Seed initial reports - disabled for 100% clean production operation
  */
 export const seedInitialReports = async (): Promise<LaporanHarianItem[]> => {
-  try {
-    const res = await fetch('/api/reports/seed-initial', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (res.ok) {
-      const json = await res.json();
-      const serverReports = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
-      return serverReports;
-    }
-  } catch (err) {
-    console.warn('Error in seedInitialReports:', err);
-  }
   return [];
 };
 

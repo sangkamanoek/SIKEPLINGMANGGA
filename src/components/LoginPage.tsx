@@ -230,11 +230,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           {/* Logo & Header */}
           <div className="p-6 sm:p-7 text-center bg-linear-to-b from-emerald-50 to-white border-b border-slate-100">
             {/* Logo Pemko Medan */}
-            <div className="w-20 h-20 mx-auto mb-3.5 bg-white rounded-2xl shadow-md p-3.5 flex items-center justify-center border border-emerald-100/90 overflow-hidden">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto mb-3.5 bg-white rounded-3xl shadow-md p-1.5 flex items-center justify-center border border-emerald-100/90 overflow-hidden">
               <img
                 src="/logo_pemko_medan.svg"
                 alt="Logo Pemko Medan"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain scale-[1.08] transform transition-transform"
               />
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-emerald-950 tracking-tight leading-tight uppercase">

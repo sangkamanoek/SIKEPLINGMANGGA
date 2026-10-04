@@ -14,58 +14,64 @@ import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import * as XLSX from 'xlsx';
 
 export const PKK_DASA_WISMA_COLLECTION = 'pkk_dasa_wisma';
-export const PKK_DASA_WISMA_STORAGE_KEY = 'sikepling_pkk_dasa_wisma_v1';
+export const PKK_DASA_WISMA_STORAGE_KEY = 'sikepling_pkk_dasa_wisma_v2';
 export const PKK_DASA_WISMA_CHANNEL = 'sikepling_pkk_dasa_wisma_channel';
 
-// 24 Initial Dasa Wisma groups for 24 Lingkungan in Kelurahan Mangga
-const INITIAL_DASA_WISMA: KelompokDasaWisma[] = Array.from({ length: 24 }, (_, i) => {
-  const num = i + 1;
-  const roman = [
-    'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
-    'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX',
-    'XXI', 'XXII', 'XXIII', 'XXIV'
-  ][i];
-  return {
-    id: `dawis_lk_${num}_01`,
-    namaKelompok: `Dasa Wisma Melati ${roman} (Kelompok 1)`,
-    lingkunganNomor: num,
-    lingkunganNama: `Lingkungan ${roman}`,
-    namaKetuaDawis: `Kader Dawis Lk ${roman}`,
-    teleponKetua: '081260000' + String(num).padStart(2, '0'),
-    jumlahKk: 15 + ((num * 3) % 7),
-    jumlahJiwa: 52 + ((num * 5) % 25),
-    jumlahBalita: 4 + (num % 5),
-    jumlahIbuHamil: 1 + (num % 3),
-    jumlahLansia: 6 + (num % 6),
-    punyaJambanSehat: 15 + ((num * 3) % 7) - (num % 2),
-    punyaSpal: 14 + ((num * 3) % 7) - (num % 3),
-    punyaToga: 10 + (num % 5),
-    kegiatanUtama: 'Pemeriksaan jentik berkala, arisan dasawisma, senam sehat lansia & pemanfaatan pekarangan toga.',
-    updatedAt: '2026-10-01T08:00:00.000Z',
-  };
-});
+// Helper to check if an item is a generated dummy sample item
+export const isSampleDawis = (item: Partial<KelompokDasaWisma> | null | undefined): boolean => {
+  if (!item) return false;
+  const idStr = String(item.id || '');
+  const namaStr = String(item.namaKelompok || '');
+  const ketuaStr = String(item.namaKetuaDawis || '');
+  const kegiatanStr = String(item.kegiatanUtama || '');
+
+  const idMatch = /^dawis_lk_\d+_01$/.test(idStr);
+  const nameMatch = namaStr.includes('Dasa Wisma Melati') && namaStr.includes('(Kelompok 1)');
+  const ketuaMatch = ketuaStr.startsWith('Kader Dawis Lk');
+  const kegiatanMatch = kegiatanStr.includes('Pemeriksaan jentik berkala, arisan dasawisma');
+
+  return Boolean(idMatch || (nameMatch && ketuaMatch) || (nameMatch && kegiatanMatch));
+};
+
+// Initial Dasa Wisma is strictly empty so users can fill it manually
+const INITIAL_DASA_WISMA: KelompokDasaWisma[] = [];
 
 let memoryDawis: KelompokDasaWisma[] = [];
 
-export const getLocalDasaWismaList = (): KelompokDasaWisma[] => {
-  if (memoryDawis.length > 0) return memoryDawis;
-  const stored = safeGetLocalStorage<KelompokDasaWisma[]>(PKK_DASA_WISMA_STORAGE_KEY, []);
-  if (stored && stored.length > 0) {
-    memoryDawis = stored;
-    return stored;
+// Clean legacy localStorage keys containing dummy sample data
+try {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('sikepling_pkk_dasa_wisma_v1');
   }
-  memoryDawis = INITIAL_DASA_WISMA;
-  safeSetLocalStorage(PKK_DASA_WISMA_STORAGE_KEY, JSON.stringify(INITIAL_DASA_WISMA));
-  return INITIAL_DASA_WISMA;
+} catch (e) {
+  // Ignore
+}
+
+export const getLocalDasaWismaList = (): KelompokDasaWisma[] => {
+  if (memoryDawis.length > 0) {
+    return memoryDawis.filter((it) => !isSampleDawis(it));
+  }
+  const stored = safeGetLocalStorage<KelompokDasaWisma[]>(PKK_DASA_WISMA_STORAGE_KEY, []);
+  if (stored && Array.isArray(stored)) {
+    const cleaned = stored.filter((it) => !isSampleDawis(it));
+    memoryDawis = cleaned;
+    if (cleaned.length !== stored.length) {
+      safeSetLocalStorage(PKK_DASA_WISMA_STORAGE_KEY, JSON.stringify(cleaned));
+    }
+    return cleaned;
+  }
+  memoryDawis = [];
+  return [];
 };
 
 export const setLocalDasaWismaList = (items: KelompokDasaWisma[]): void => {
-  memoryDawis = items;
-  safeSetLocalStorage(PKK_DASA_WISMA_STORAGE_KEY, JSON.stringify(items));
+  const cleaned = items.filter((it) => !isSampleDawis(it));
+  memoryDawis = cleaned;
+  safeSetLocalStorage(PKK_DASA_WISMA_STORAGE_KEY, JSON.stringify(cleaned));
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(PKK_DASA_WISMA_CHANNEL);
-      bc.postMessage({ type: 'SYNC_DAWIS', items });
+      bc.postMessage({ type: 'SYNC_DAWIS', items: cleaned });
       bc.close();
     }
   } catch (e) {
@@ -85,8 +91,9 @@ export const subscribeDasaWisma = (
       bc = new BroadcastChannel(PKK_DASA_WISMA_CHANNEL);
       bc.onmessage = (ev) => {
         if (ev.data?.items && Array.isArray(ev.data.items)) {
-          memoryDawis = ev.data.items;
-          callback(ev.data.items);
+          const cleaned = ev.data.items.filter((it: KelompokDasaWisma) => !isSampleDawis(it));
+          memoryDawis = cleaned;
+          callback(cleaned);
         }
       };
     }
@@ -106,22 +113,32 @@ export const subscribeDasaWisma = (
         (snapshot) => {
           if (!snapshot.empty) {
             const remote: KelompokDasaWisma[] = [];
+            const dummyDocIdsToDelete: string[] = [];
             snapshot.forEach((docSnap) => {
               const d = docSnap.data();
-              remote.push({
+              const itm: KelompokDasaWisma = {
                 ...(d as KelompokDasaWisma),
                 id: docSnap.id,
-              });
+              };
+              if (isSampleDawis(itm)) {
+                dummyDocIdsToDelete.push(docSnap.id);
+              } else {
+                remote.push(itm);
+              }
             });
+
+            // Asynchronously delete lingering dummy sample documents from Firestore
+            if (dummyDocIdsToDelete.length > 0) {
+              for (const docId of dummyDocIdsToDelete) {
+                deleteDoc(doc(db, PKK_DASA_WISMA_COLLECTION, docId)).catch(() => {});
+              }
+            }
+
             setLocalDasaWismaList(remote);
             callback(remote);
           } else {
-            const current = getLocalDasaWismaList();
-            if (current.length === 0) {
-              for (const itm of INITIAL_DASA_WISMA) {
-                saveDasaWisma(itm).catch(console.warn);
-              }
-            }
+            setLocalDasaWismaList([]);
+            callback([]);
           }
         },
         (err) => {
@@ -138,6 +155,39 @@ export const subscribeDasaWisma = (
     firestoreUnsub();
   };
 };
+
+export const clearSampleDasaWismaData = async (): Promise<void> => {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('sikepling_pkk_dasa_wisma_v1');
+    }
+  } catch (e) {
+    // Ignore
+  }
+
+  const current = getLocalDasaWismaList();
+  const cleaned = current.filter((it) => !isSampleDawis(it));
+  memoryDawis = cleaned;
+  safeSetLocalStorage(PKK_DASA_WISMA_STORAGE_KEY, JSON.stringify(cleaned));
+
+  if (db) {
+    try {
+      for (let i = 1; i <= 24; i++) {
+        const dummyId = `dawis_lk_${i}_01`;
+        deleteDoc(doc(db, PKK_DASA_WISMA_COLLECTION, dummyId)).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('[clearSampleDasaWismaData error]:', err);
+    }
+  }
+};
+
+// Automatically run sample cleanup on load
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    clearSampleDasaWismaData().catch(() => {});
+  }, 100);
+}
 
 export const saveDasaWisma = async (
   item: KelompokDasaWisma

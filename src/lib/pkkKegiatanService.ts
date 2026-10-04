@@ -100,12 +100,8 @@ export const subscribePkkKegiatan = (
             setLocalPkkKegiatanList(remote);
             callback(remote);
           } else {
-            const current = getLocalPkkKegiatanList();
-            if (current.length === 0) {
-              for (const itm of INITIAL_PKK_KEGIATAN) {
-                savePkkKegiatan(itm).catch(console.warn);
-              }
-            }
+            setLocalPkkKegiatanList([]);
+            callback([]);
           }
         },
         (err) => {
