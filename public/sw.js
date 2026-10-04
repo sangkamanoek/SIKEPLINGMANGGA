@@ -1,9 +1,9 @@
 /**
- * PWA Service Worker for SiKeplingMangga
+ * PWA Service Worker for SI-MANGGA
  * Complies with Google Chrome offline requirements by listening to 'fetch'.
  */
 
-const CACHE_NAME = 'sikepling-mangga-cache-v5';
+const CACHE_NAME = 'si-mangga-cache-v6';
 const ASSETS = [
   '/',
   '/?utm_source=pwa',

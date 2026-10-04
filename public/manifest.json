@@ -1,8 +1,8 @@
 {
   "id": "/sikeplingmangga-v3",
-  "name": "SiKeplingMangga",
-  "short_name": "SiKeplingMangga",
-  "description": "SI-KEPLING MANGGA - Sistem Informasi & Pelaporan Kegiatan Harian Kepala Lingkungan Kelurahan Mangga Kecamatan Medan Tuntungan.",
+  "name": "SI-MANGGA",
+  "short_name": "SI-MANGGA",
+  "description": "SI-MANGGA - Sistem Informasi & Administrasi Kelurahan Mangga Kecamatan Medan Tuntungan.",
   "start_url": "/?utm_source=pwa",
   "scope": "/",
   "display": "standalone",

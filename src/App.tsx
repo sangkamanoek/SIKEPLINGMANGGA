@@ -475,9 +475,53 @@ export default function App() {
 
   // Initialization: Load reports from server, sync offline cache, and set auto-sync interval
   useEffect(() => {
+    // Force automatic cache clearing and PWA metadata update for non-tech-savvy users
+    const FORCE_UPDATE_KEY = 'simangga_cache_force_update_v6';
+    const hasForceUpdated = localStorage.getItem(FORCE_UPDATE_KEY);
+
+    if (!hasForceUpdated) {
+      // Clean all old caches immediately
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          Promise.all(names.map((name) => caches.delete(name))).then(() => {
+            localStorage.setItem(FORCE_UPDATE_KEY, 'true');
+            // If service worker is active, unregister it so it installs fresh with new metadata
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then((registrations) => {
+                Promise.all(registrations.map((reg) => reg.unregister())).then(() => {
+                  window.location.reload();
+                });
+              });
+            } else {
+              window.location.reload();
+            }
+          });
+        }).catch(() => {
+          localStorage.setItem(FORCE_UPDATE_KEY, 'true');
+        });
+      } else {
+        localStorage.setItem(FORCE_UPDATE_KEY, 'true');
+      }
+    }
+
     // Register aggressive cache-clearing service worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
+        // Automatically check for updates on load
+        registration.update();
+
+        // Listen for new service worker and reload automatically on install
+        registration.addEventListener('updatefound', () => {
+          const installingWorker = registration.installing;
+          if (installingWorker) {
+            installingWorker.addEventListener('statechange', () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('[SW] New version found and installed. Reloading...');
+                window.location.reload();
+              }
+            });
+          }
+        });
       }).catch((err) => {
         console.error('[App] Service worker registration failed:', err);
       });
