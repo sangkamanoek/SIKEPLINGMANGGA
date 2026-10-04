@@ -19,6 +19,7 @@ import {
   Image as ImageIcon,
   Sparkles,
   RefreshCw,
+  Edit3,
 } from 'lucide-react';
 import { UserAccount, isKelurahanAdmin, LaporanHarianItem } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
@@ -64,6 +65,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const [selectedLingkungan, setSelectedLingkungan] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showAddForm, setShowAddForm] = useState<boolean>(true);
+  const [editingItem, setEditingItem] = useState<KunjunganWargaData | null>(null);
   const [copiedWA, setCopiedWA] = useState<boolean>(false);
   const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false);
   const [isSharingExcel, setIsSharingExcel] = useState<boolean>(false);
@@ -416,26 +418,60 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 self-stretch sm:self-auto">
+          {editingItem && (
+            <button
+              type="button"
+              onClick={() => setEditingItem(null)}
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs transition-all cursor-pointer"
+              title="Batalkan mode koreksi"
+            >
+              <X className="w-4 h-4" />
+              <span>Batal Koreksi</span>
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setShowAddForm(!showAddForm)}
+            onClick={() => {
+              if (showAddForm && editingItem) {
+                setEditingItem(null);
+              } else {
+                setShowAddForm(!showAddForm);
+              }
+            }}
             className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>{showAddForm ? 'Tutup Form Input' : '+ Input Kunjungan'}</span>
+            <span>
+              {showAddForm
+                ? editingItem
+                  ? 'Batal Edit & Tutup'
+                  : 'Tutup Form Input'
+                : '+ Input Kunjungan'}
+            </span>
           </button>
         </div>
       </div>
 
-      {/* Komponen Form Kunjungan Warga */}
+      {/* Komponen Form Kunjungan Warga (Tambah / Edit) */}
       {showAddForm && (
-        <FormKunjunganWarga
-          currentUser={currentUser}
-          tanggalLaporan={selectedDate}
-          onSuccess={() => {
-            showToast('Catatan kunjungan baru berhasil disimpan!');
-          }}
-        />
+        <div id="form-kunjungan-container" className="scroll-mt-6">
+          <FormKunjunganWarga
+            currentUser={currentUser}
+            tanggalLaporan={selectedDate}
+            initialData={editingItem}
+            onSuccess={(saved) => {
+              showToast(
+                editingItem
+                  ? `Perubahan data "${saved.namaWarga}" berhasil disimpan!`
+                  : 'Catatan kunjungan baru berhasil disimpan!'
+              );
+              setEditingItem(null);
+            }}
+            onCancel={() => {
+              setEditingItem(null);
+            }}
+          />
+        </div>
       )}
 
       {/* Filter & Action Controls */}
@@ -770,14 +806,32 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                       )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item.id, item.namaWarga)}
-                      className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-rose-200"
-                      title="Hapus Kunjungan"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingItem(item);
+                          setShowAddForm(true);
+                          setTimeout(() => {
+                            const el = document.getElementById('form-kunjungan-container');
+                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }, 50);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-colors cursor-pointer"
+                        title="Edit / Koreksi Data Kunjungan"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id, item.namaWarga)}
+                        className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-rose-200"
+                        title="Hapus Kunjungan"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -880,6 +934,21 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                       </td>
                       <td className="py-3 px-3 text-center whitespace-nowrap">
                         <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingItem(item);
+                              setShowAddForm(true);
+                              setTimeout(() => {
+                                const el = document.getElementById('form-kunjungan-container');
+                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }, 50);
+                            }}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                            title="Edit / Koreksi Data Kunjungan"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
                           {item.fotoDokumentasi && (
                             <button
                               type="button"
@@ -971,6 +1040,24 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const itemToEdit = previewPhotoItem;
+                    setPreviewPhotoItem(null);
+                    setEditingItem(itemToEdit);
+                    setShowAddForm(true);
+                    setTimeout(() => {
+                      const el = document.getElementById('form-kunjungan-container');
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 50);
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-3 px-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer"
+                  title="Koreksi / Edit data kunjungan ini"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  <span>Edit Data</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => {

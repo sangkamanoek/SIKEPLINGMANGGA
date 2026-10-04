@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Users,
   Camera,
@@ -7,6 +7,8 @@ import {
   Save,
   CheckCircle2,
   AlertCircle,
+  Edit3,
+  X,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -37,6 +39,7 @@ export interface KunjunganWargaData {
 interface FormKunjunganWargaProps {
   currentUser: UserAccount;
   tanggalLaporan?: string;
+  initialData?: KunjunganWargaData | null;
   onSuccess?: (savedData: KunjunganWargaData) => void;
   onCancel?: () => void;
   compact?: boolean;
@@ -49,27 +52,49 @@ const IMAGE_JPEG_QUALITY = 0.45;
 export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   currentUser,
   tanggalLaporan,
+  initialData,
   onSuccess,
   onCancel,
   compact = false,
 }) => {
   const isSuperAdmin = currentUser.role === 'super_admin';
+  const isEditing = !!initialData;
   const defaultDate = tanggalLaporan || new Date().toISOString().split('T')[0];
 
   // State Management
-  const [tanggal, setTanggal] = useState<string>(defaultDate);
-  const [namaWarga, setNamaWarga] = useState<string>('');
-  const [alamat, setAlamat] = useState<string>('');
+  const [tanggal, setTanggal] = useState<string>(initialData?.tanggal || defaultDate);
+  const [namaWarga, setNamaWarga] = useState<string>(initialData?.namaWarga || '');
+  const [alamat, setAlamat] = useState<string>(initialData?.alamat || '');
   const [targetKeplingId, setTargetKeplingId] = useState<string>(
-    isSuperAdmin ? '' : currentUser.id
+    initialData?.keplingId || (isSuperAdmin ? '' : currentUser.id)
   );
-  const [perlinsos, setPerlinsos] = useState<'Sudah' | 'Belum' | 'Menolak'>('Belum');
-  const [ikd, setIkd] = useState<'Sudah' | 'Belum'>('Belum');
-  const [pbb, setPbb] = useState<'Sudah' | 'Belum'>('Belum');
-  const [fotoDokumentasi, setFotoDokumentasi] = useState<string>('');
+  const [perlinsos, setPerlinsos] = useState<'Sudah' | 'Belum' | 'Menolak'>(
+    initialData?.perlinsos || 'Belum'
+  );
+  const [ikd, setIkd] = useState<'Sudah' | 'Belum'>(initialData?.ikd || 'Belum');
+  const [pbb, setPbb] = useState<'Sudah' | 'Belum'>(initialData?.pbb || 'Belum');
+  const [fotoDokumentasi, setFotoDokumentasi] = useState<string>(
+    initialData?.fotoDokumentasi || ''
+  );
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
+
+  // Sync state when initialData changes
+  useEffect(() => {
+    if (initialData) {
+      setTanggal(initialData.tanggal || defaultDate);
+      setNamaWarga(initialData.namaWarga || '');
+      setAlamat(initialData.alamat || '');
+      setTargetKeplingId(initialData.keplingId || (isSuperAdmin ? '' : currentUser.id));
+      setPerlinsos(initialData.perlinsos || 'Belum');
+      setIkd(initialData.ikd || 'Belum');
+      setPbb(initialData.pbb || 'Belum');
+      setFotoDokumentasi(initialData.fotoDokumentasi || '');
+      setSuccessMessage('');
+      setErrorMessage('');
+    }
+  }, [initialData, defaultDate, isSuperAdmin, currentUser.id]);
 
   // AI Photo Verification States
   const [isVerifyingPhoto, setIsVerifyingPhoto] = useState<boolean>(false);
@@ -223,8 +248,10 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
     const activeKepling = selectedKepling || currentUser;
 
     setIsSaving(true);
-    const id = `kunjungan_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const isEdit = !!initialData?.id;
+    const id = isEdit ? initialData.id : `kunjungan_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const nowIso = new Date().toISOString();
+    const createdAt = isEdit && initialData.createdAt ? initialData.createdAt : nowIso;
 
     const data: KunjunganWargaData = {
       id,
@@ -240,44 +267,30 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       pbb,
       keterangan: perlinsos,
       fotoDokumentasi: fotoDokumentasi || '',
-      createdAt: nowIso,
+      createdAt,
     };
-
-    const firestorePayload: Record<string, any> = {
-      id,
-      tanggal: cleanTanggal || defaultDate,
-      namaWarga: cleanNama,
-      alamat: cleanAlamat,
-      lingkungan: activeKepling.lingkungan,
-      lingkunganNomor: activeKepling.nomorLingkungan || 1,
-      namaKepling: activeKepling.nama,
-      keplingId: activeKepling.id,
-      perlinsos,
-      ikd,
-      pbb,
-      keterangan: perlinsos,
-      createdAt: nowIso,
-    };
-
-    if (fotoDokumentasi) {
-      firestorePayload.fotoDokumentasi = fotoDokumentasi;
-    }
 
     try {
       // 1. Dual-tier saving & broadcasting (0ms local + Server Buffer + Firestore)
       await saveKunjunganWargaToFirestore(data);
 
-      setSuccessMessage('Data kunjungan warga berhasil disimpan secara online!');
+      setSuccessMessage(
+        isEdit
+          ? 'Perubahan data kunjungan warga berhasil disimpan!'
+          : 'Data kunjungan warga berhasil disimpan secara online!'
+      );
 
-      // Reset form fields
-      setNamaWarga('');
-      setAlamat('');
-      setPerlinsos('Belum');
-      setIkd('Belum');
-      setPbb('Belum');
-      setFotoDokumentasi('');
-      if (isSuperAdmin) {
-        setTargetKeplingId('');
+      if (!isEdit) {
+        // Reset form fields only on new creation
+        setNamaWarga('');
+        setAlamat('');
+        setPerlinsos('Belum');
+        setIkd('Belum');
+        setPbb('Belum');
+        setFotoDokumentasi('');
+        if (isSuperAdmin) {
+          setTargetKeplingId('');
+        }
       }
 
       if (onSuccess) {
@@ -292,21 +305,40 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   };
 
   return (
-    <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm ${compact ? 'p-4' : 'p-6'}`}>
+    <div className={`bg-white rounded-2xl border ${isEditing ? 'border-amber-300 ring-2 ring-amber-400/20 shadow-md' : 'border-slate-200 shadow-sm'} ${compact ? 'p-4' : 'p-6'}`}>
       <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
         <div className="flex items-center gap-2.5">
-          <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200">
-            <Users className="w-5 h-5" />
+          <div className={`p-2.5 ${isEditing ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'} rounded-xl`}>
+            {isEditing ? <Edit3 className="w-5 h-5 text-amber-700" /> : <Users className="w-5 h-5" />}
           </div>
           <div>
-            <h3 className="font-black text-slate-900 text-sm sm:text-base">
-              Form Kunjungan Warga (Door-to-Door)
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-black text-slate-900 text-sm sm:text-base">
+                {isEditing ? 'Edit Catatan Kunjungan Warga' : 'Form Kunjungan Warga (Door-to-Door)'}
+              </h3>
+              {isEditing && (
+                <span className="px-2 py-0.5 rounded-md bg-amber-500 text-white font-extrabold text-[10px] uppercase tracking-wider">
+                  Mode Koreksi Data
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500">
-              Tersimpan langsung ke Database Cloud Firestore (Koleksi: <code>kunjungan_warga</code>)
+              {isEditing
+                ? `Mengoreksi data kunjungan atas nama ${initialData.namaWarga || 'Warga'}`
+                : 'Tersimpan langsung ke Database Cloud Firestore (Koleksi: kunjungan_warga)'}
             </p>
           </div>
         </div>
+        {isEditing && onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Tutup mode edit"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {successMessage && (
@@ -566,16 +598,24 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
               onClick={onCancel}
               className="px-4 py-2 rounded-xl border border-slate-300 font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
             >
-              Batal
+              {isEditing ? 'Batal Edit' : 'Batal'}
             </button>
           )}
           <button
             type="submit"
             disabled={isSaving}
-            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+            className={`px-5 py-2.5 rounded-xl ${isEditing ? 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800' : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'} text-white font-black shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50`}
           >
-            <Save className="w-4 h-4" />
-            <span>{isSaving ? 'Menyimpan ke Firestore...' : 'Simpan Kunjungan Warga'}</span>
+            {isEditing ? <Edit3 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            <span>
+              {isSaving
+                ? isEditing
+                  ? 'Menyimpan Perubahan...'
+                  : 'Menyimpan ke Firestore...'
+                : isEditing
+                ? 'Simpan Perubahan Data'
+                : 'Simpan Kunjungan Warga'}
+            </span>
           </button>
         </div>
       </form>
