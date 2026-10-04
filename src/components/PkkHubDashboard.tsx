@@ -537,11 +537,11 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                         <ArrowUpRight className="w-4 h-4" />
                       )}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-900 truncate">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-900 line-clamp-2 leading-snug">
                         {tx.uraian}
                       </p>
-                      <p className="text-[10px] text-slate-500">
+                      <p className="text-[10px] text-slate-500 mt-0.5">
                         {tx.tanggal} • {POS_ANGGARAN_LABELS[tx.posAnggaran as keyof typeof POS_ANGGARAN_LABELS] || tx.posAnggaran}
                       </p>
                     </div>

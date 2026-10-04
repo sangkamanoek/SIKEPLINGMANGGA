@@ -26,7 +26,7 @@ import {
   AlertCircle,
   File,
 } from 'lucide-react';
-import { UserAccount, SuratKedinasanItem, JenisSuratKedinasan } from '../types';
+import { UserAccount, SuratKedinasanItem, JenisSuratKedinasan, isPkkRole } from '../types';
 import {
   subscribeSurat,
   saveSuratItem,
@@ -34,6 +34,7 @@ import {
 } from '../lib/suratService';
 import { getTodayLocalIso, formatTanggalIndonesia } from '../lib/formatter';
 import { KopSuratResmi } from './KopSuratResmi';
+import { KopSuratPkk } from './KopSuratPkk';
 
 interface SuratKedinasanViewProps {
   currentUser: UserAccount;
@@ -937,7 +938,12 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
 
             <div className="p-8 overflow-y-auto flex-1 bg-slate-100 flex justify-center">
               <div className="bg-white w-full max-w-2xl p-8 shadow-lg rounded-xl border border-slate-200 text-slate-900 font-serif space-y-6">
-                <KopSuratResmi />
+                {/* Kop Surat Berdasarkan Role Pembuat */}
+                {isPkkRole(previewSurat.dibuatOlehRole || '') ? (
+                  <KopSuratPkk />
+                ) : (
+                  <KopSuratResmi />
+                )}
 
                 <div className="text-center space-y-1">
                   <h4 className="font-bold underline uppercase text-sm tracking-wide">{previewSurat.perihal}</h4>

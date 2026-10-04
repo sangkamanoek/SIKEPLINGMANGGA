@@ -1035,6 +1035,7 @@ export default function App() {
         onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
         onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
         onLogout={handleLogout}
+        portalMode={adminPortalMode}
       />
 
       {/* Floating Toast Notification */}

@@ -681,6 +681,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
           })(),
       jumlahDokumentasi: fotoList.length,
       dokumentasiFoto: fotoList,
+      petugasRole: activeAccount?.role,
       createdAt: rawDate ? `${rawDate}T12:00:00.000Z` : new Date().toISOString(),
     };
   };

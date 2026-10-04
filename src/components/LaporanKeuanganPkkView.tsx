@@ -33,11 +33,12 @@ import {
   saveTransaksiPkk,
   deleteTransaksiPkk,
   subscribeTransaksiPkk,
+  clearPkkKeuanganData,
   exportPkkKeuanganToExcel,
   POS_ANGGARAN_LABELS,
 } from '../lib/pkkKeuanganService';
 import { getTodayLocalIso, formatTanggalIndonesia } from '../lib/formatter';
-import { KopSuratResmi } from './KopSuratResmi';
+import { KopSuratPkk } from './KopSuratPkk';
 
 interface LaporanKeuanganPkkViewProps {
   currentUser: UserAccount;
@@ -362,6 +363,20 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
   }, [filteredChronologicalTransactions]);
 
   // Trigger Excel Export
+  // Handle Reset Data
+  const handleResetData = async () => {
+    if (!window.confirm('PERINGATAN: Seluruh data keuangan PKK akan di-RESET ke NOL (Dihapus Permanen). Apakah Anda yakin?')) return;
+    try {
+      setIsSaving(true);
+      await clearPkkKeuanganData();
+      showToast('Seluruh data keuangan PKK telah berhasil di-NOL-kan.');
+    } catch (err) {
+      alert('Gagal meriset data: ' + err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleExportExcel = () => {
     exportPkkKeuanganToExcel(filteredChronologicalTransactions, periodBounds.label);
     showToast('Buku Kas Umum PKK berhasil diekspor ke Excel!');
@@ -428,6 +443,15 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
             >
               <Download className="w-4 h-4" />
               <span>Ekspor Excel</span>
+            </button>
+
+            <button
+              onClick={handleResetData}
+              className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-all cursor-pointer active:scale-95 shadow-sm"
+              title="Reset Semua Data Keuangan ke NOL"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Kosongkan Kas (Reset)</span>
             </button>
 
             <button
@@ -1148,7 +1172,7 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
 
             {/* Print Document Content */}
             <div className="printable-document space-y-4 text-black font-sans">
-              <KopSuratResmi />
+              <KopSuratPkk />
 
               <div className="text-center space-y-1 mb-6">
                 <h2 className="text-base font-black uppercase tracking-wider underline">

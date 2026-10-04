@@ -30,111 +30,39 @@ export const POS_ANGGARAN_LABELS: Record<PosAnggaranPkk, string> = {
   LAINNYA: 'Lainnya',
 };
 
-// Data Inisial Pembuka Buku Kas Umum PKK Kelurahan Mangga TA 2026
-const INITIAL_PKK_TRANSACTIONS: TransaksiKeuanganPkk[] = [
-  {
-    id: 'pkk_tx_init_01',
-    tanggal: '2026-10-01',
-    nomorBukti: 'BKM-01/PKK/X/2026',
-    jenis: 'PENERIMAAN',
-    posAnggaran: 'BANTUAN_PEMERINTAH',
-    uraian: 'Penerimaan Saldo Awal Kas PKK Kelurahan Mangga Bulan Oktober 2026',
-    jumlah: 5500000,
-    sumberDana: 'Saldo Awal Kas',
-    penerimaPenyetor: 'Bendahara TP PKK',
-    lingkunganNomor: 0,
-    lingkunganNama: 'TP PKK Kelurahan Mangga',
-    catatan: 'Saldo kas tunai & bank awal bulan Oktober 2026',
-    dibuatOlehNama: 'Bendahara PKK',
-    dibuatOlehRole: 'bendahara_pkk',
-    createdAt: '2026-10-01T08:00:00.000Z',
-  },
-  {
-    id: 'pkk_tx_init_02',
-    tanggal: '2026-10-01',
-    nomorBukti: 'BKM-02/PKK/X/2026',
-    jenis: 'PENERIMAAN',
-    posAnggaran: 'IURAN_KAS',
-    uraian: 'Iuran Kas Pertemuan Rutin Bulanan Pengurus TP PKK Kelurahan',
-    jumlah: 600000,
-    sumberDana: 'Iuran Rutin Pengurus',
-    penerimaPenyetor: 'Sekretaris PKK',
-    lingkunganNomor: 0,
-    lingkunganNama: 'TP PKK Kelurahan Mangga',
-    catatan: '24 Lingkungan & Tim Penggerak Kelurahan',
-    dibuatOlehNama: 'Bendahara PKK',
-    dibuatOlehRole: 'bendahara_pkk',
-    createdAt: '2026-10-01T10:00:00.000Z',
-  },
-  {
-    id: 'pkk_tx_init_03',
-    tanggal: '2026-10-02',
-    nomorBukti: 'BKK-01/PKK/X/2026',
-    jenis: 'PENGELUARAN',
-    posAnggaran: 'SEKRETARIAT',
-    uraian: 'Pembelian ATK, Kertas HVS, Tinta Printer, dan Penggandaan Buku Administrasi 6 PKK',
-    jumlah: 375000,
-    sumberDana: 'Kas Operasional',
-    penerimaPenyetor: 'Toko Alat Tulis Bersama',
-    lingkunganNomor: 0,
-    lingkunganNama: 'TP PKK Kelurahan Mangga',
-    catatan: 'Kuitansi No. 102/ATK/2026',
-    dibuatOlehNama: 'Bendahara PKK',
-    dibuatOlehRole: 'bendahara_pkk',
-    createdAt: '2026-10-02T09:30:00.000Z',
-  },
-  {
-    id: 'pkk_tx_init_04',
-    tanggal: '2026-10-02',
-    nomorBukti: 'BKK-02/PKK/X/2026',
-    jenis: 'PENGELUARAN',
-    posAnggaran: 'POKJA_IV',
-    uraian: 'Bantuan Pengadaan Paket Makanan Tambahan (PMT) Balita & Lansia Posyandu Melati',
-    jumlah: 850000,
-    sumberDana: 'Kas Pokja IV',
-    penerimaPenyetor: 'Kader Posyandu Lingkungan IV & VI',
-    lingkunganNomor: 4,
-    lingkunganNama: 'Lingkungan IV',
-    catatan: 'Untuk 45 balita dan 20 lansia',
-    dibuatOlehNama: 'Ketua Pokja IV',
-    dibuatOlehRole: 'pokja_iv',
-    createdAt: '2026-10-02T14:15:00.000Z',
-  },
-  {
-    id: 'pkk_tx_init_05',
-    tanggal: '2026-10-03',
-    nomorBukti: 'BKM-03/PKK/X/2026',
-    jenis: 'PENERIMAAN',
-    posAnggaran: 'UP2K',
-    uraian: 'Setoran Hasil Penjualan Produk Olahan Keripik Kelompok UP2K PKK Lingkungan XI',
-    jumlah: 450000,
-    sumberDana: 'Bagi Hasil UP2K',
-    penerimaPenyetor: 'Kelompok UP2K Lingkungan XI',
-    lingkunganNomor: 11,
-    lingkunganNama: 'Lingkungan XI',
-    catatan: 'Pemberdayaan ekonomi keluarga binaan PKK',
-    dibuatOlehNama: 'Ketua Pokja II',
-    dibuatOlehRole: 'pokja_ii',
-    createdAt: '2026-10-03T11:00:00.000Z',
-  },
-  {
-    id: 'pkk_tx_init_06',
-    tanggal: '2026-10-03',
-    nomorBukti: 'BKK-03/PKK/X/2026',
-    jenis: 'PENGELUARAN',
-    posAnggaran: 'POKJA_III',
-    uraian: 'Pengadaan Bibit Tanaman Obat Keluarga (TOGA) & Sayuran untuk Program HATINYA PKK',
-    jumlah: 520000,
-    sumberDana: 'Kas Pokja III',
-    penerimaPenyetor: 'Kelompok Tani Bunga Rinte',
-    lingkunganNomor: 0,
-    lingkunganNama: 'TP PKK Kelurahan Mangga',
-    catatan: 'Distribusi bibit cabai, tomat, dan jahe merah',
-    dibuatOlehNama: 'Ketua Pokja III',
-    dibuatOlehRole: 'pokja_iii',
-    createdAt: '2026-10-03T13:45:00.000Z',
-  },
-];
+// Data Inisial Pembuka Buku Kas Umum PKK (Dikosongkan agar diisi manual oleh sekretaris)
+const INITIAL_PKK_TRANSACTIONS: TransaksiKeuanganPkk[] = [];
+
+/**
+ * Menghapus seluruh data keuangan PKK (Reset ke Nol)
+ */
+export async function clearPkkKeuanganData(): Promise<void> {
+  // 1. Clear Local Storage
+  safeSetLocalStorage(PKK_KEUANGAN_STORAGE_KEY, JSON.stringify([]));
+  
+  // 2. Clear Firestore (if available)
+  if (db) {
+    try {
+      const { getDocs, deleteDoc, doc, collection } = await import('firebase/firestore');
+      const q = query(collection(db, PKK_KEUANGAN_COLLECTION));
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map(d => deleteDoc(doc(db, PKK_KEUANGAN_COLLECTION, d.id)));
+      await Promise.all(deletePromises);
+    } catch (err) {
+      console.warn('Error clearing Firestore pkk_keuangan:', err);
+    }
+  }
+
+  // 3. Broadcast update
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('pkk-keuangan-updated', { detail: [] }));
+    try {
+      const bc = new BroadcastChannel(PKK_KEUANGAN_CHANNEL);
+      bc.postMessage({ type: 'PKK_TX_CLEARED', timestamp: Date.now() });
+      setTimeout(() => bc.close(), 200);
+    } catch {}
+  }
+}
 
 /**
  * Mengambil transaksi PKK instan dari Local Storage (0ms)

@@ -32,8 +32,9 @@ import {
   Camera,
   Info,
 } from 'lucide-react';
-import { LaporanHarianItem, SheetMetadata, AbsenApelItem, FotoDokumentasi } from '../types';
+import { LaporanHarianItem, SheetMetadata, AbsenApelItem, FotoDokumentasi, isPkkRole } from '../types';
 import { KopSuratResmi } from './KopSuratResmi';
+import { KopSuratPkk } from './KopSuratPkk';
 import {
   formatTanggalIndonesia,
   generateReportPdfFileName,
@@ -1133,8 +1134,12 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               {/* Tampilan Visual Lembar A4 di dalam Modal */}
               <div className="bg-slate-200 p-2 sm:p-4 rounded-xl overflow-x-auto flex flex-col items-center gap-4">
                 <div className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300">
-                  {/* Kop Surat Pemko Medan */}
-                  <KopSuratResmi />
+                  {/* Kop Surat Berdasarkan Role Petugas */}
+                  {isPkkRole(item.petugasRole || '') ? (
+                    <KopSuratPkk />
+                  ) : (
+                    <KopSuratResmi />
+                  )}
 
                   {/* Judul Laporan */}
                   <div className="text-center my-2.5">
@@ -2959,8 +2964,12 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         {/* ================= HALAMAN 1 : LAPORAN UTAMA ================= */}
         <div className="page-print-single" style={{ minHeight: 'auto', display: 'flex', flexDirection: 'column' }}>
           <div>
-            {/* KOP SURAT RESMI PEMERINTAH KOTA MEDAN */}
-            <KopSuratResmi />
+            {/* Kop Surat Berdasarkan Role Petugas */}
+            {isPkkRole(item.petugasRole || '') ? (
+              <KopSuratPkk />
+            ) : (
+              <KopSuratResmi />
+            )}
 
             {/* JUDUL LAPORAN */}
             <div className="text-center my-2.5" style={{ textAlign: 'center', margin: '8px 0' }}>

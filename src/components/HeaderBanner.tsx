@@ -33,6 +33,7 @@ interface HeaderBannerProps {
   onOpenPPTModal?: () => void;
   onOpenAbsenApel?: () => void;
   onOpenUpdateModal?: () => void;
+  portalMode?: 'kelurahan' | 'pkk';
 }
 
 export const HeaderBanner: React.FC<HeaderBannerProps> = ({
@@ -50,8 +51,9 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   onOpenPPTModal,
   onOpenAbsenApel,
   onOpenUpdateModal,
+  portalMode,
 }) => {
-  const isPkk = isPkkRole(activeAccount.role);
+  const isPkk = isPkkRole(activeAccount.role) || portalMode === 'pkk';
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -169,19 +171,19 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
         {/* Brand & Identity (Left) */}
         <div className="flex items-center gap-3.5 sm:gap-4 shrink-0 min-w-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-0 shadow-md shrink-0 border border-white/20 overflow-hidden">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-2.5 shadow-md shrink-0 border border-white/20 overflow-hidden">
               <img
                 src="/logo_pemko_medan.svg"
                 alt="Logo Pemko Medan"
-                className="w-full h-full object-contain scale-[1.4]"
+                className="w-full h-full object-contain"
               />
             </div>
             {isPkk && (
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-0 shadow-md shrink-0 border border-white/20 animate-fade-in overflow-hidden">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-2.5 shadow-md shrink-0 border border-white/20 animate-fade-in overflow-hidden">
                 <img
                   src="/logo_pkk.jpg"
                   alt="Logo PKK"
-                  className="w-full h-full object-contain scale-[1.8]"
+                  className="w-full h-full object-contain"
                 />
               </div>
             )}

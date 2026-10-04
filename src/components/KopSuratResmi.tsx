@@ -20,48 +20,48 @@ export const KopSuratResmi: React.FC<{ className?: string }> = ({ className = ''
       crossOrigin="anonymous"
       className="shrink-0"
       style={{
-        width: '96px',
-        height: '115px',
-        minWidth: '96px',
-        maxWidth: '96px',
+        width: '85px',
+        height: '105px',
+        minWidth: '85px',
+        maxWidth: '85px',
         objectFit: 'contain',
         display: 'block',
-        marginLeft: '18px',
+        marginLeft: '15px',
       }}
       onError={(e) => {
         (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/e/eb/Lambang_Kota_Medan.png';
       }}
     />
-    <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '114px' }}>
+    <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '100px' }}>
       <div
-        className="text-[13pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
-        style={{ fontSize: '13pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2', marginBottom: '1px' }}
+        className="text-[14pt] uppercase font-sans text-black font-bold tracking-[0.05em]"
+        style={{ fontSize: '14pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2', marginBottom: '1px' }}
       >
         PEMERINTAH KOTA MEDAN
       </div>
       <div
-        className="text-[13pt] uppercase font-sans text-black font-bold tracking-[0.04em]"
-        style={{ fontSize: '13pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2', marginBottom: '2px' }}
+        className="text-[14pt] uppercase font-sans text-black font-bold tracking-[0.05em]"
+        style={{ fontSize: '14pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2', marginBottom: '2px' }}
       >
         KECAMATAN MEDAN TUNTUNGAN
       </div>
       <div
-        className="text-[17pt] font-black uppercase font-sans text-black tracking-[0.05em]"
-        style={{ fontSize: '17pt', fontWeight: '900', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1', marginBottom: '2px' }}
+        className="text-[18pt] font-black uppercase font-sans text-black tracking-[0.06em]"
+        style={{ fontSize: '18pt', fontWeight: '900', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.1', marginBottom: '3px' }}
       >
         KELURAHAN MANGGA
+      </div>
+      <div
+        className="text-[9pt] font-sans text-black italic"
+        style={{ fontSize: '9pt', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2' }}
+      >
+        Jalan Tembakau Raya No.35 A Perumnas Simalingkar, Medan 20141
       </div>
       <div
         className="text-[8.5pt] font-sans text-black"
         style={{ fontSize: '8.5pt', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2' }}
       >
-        Jalan Tembakau Raya No.35 A Medan Tuntungan, Medan, Sumatera Utara 20141
-      </div>
-      <div
-        className="text-[8pt] font-sans text-black"
-        style={{ fontSize: '8pt', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2' }}
-      >
-        Laman kel.mangga@pemkomedan.go.id
+        Surat Elektronik: kel.mangga@pemkomedan.go.id
       </div>
     </div>
   </div>

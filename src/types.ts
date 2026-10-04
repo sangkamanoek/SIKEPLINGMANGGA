@@ -80,6 +80,7 @@ export interface LaporanHarianItem {
   jumlahDokumentasi: number;
   dokumentasiFoto?: FotoDokumentasi[];
   petugasNama?: string;
+  petugasRole?: string;
   tanggalLaporan?: string;
   lingkungan?: string | number;
   uraianTugas?: string;
