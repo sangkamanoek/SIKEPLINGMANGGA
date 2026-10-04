@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Target,
   Edit3,
@@ -10,6 +10,7 @@ import {
   CreditCard,
   Smartphone,
   Shield,
+  Building,
   CheckCircle2,
   Sliders,
   Sparkles,
@@ -45,7 +46,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
   onResetDefaults,
 }) => {
   const [activeTab, setActiveTab] = useState<'single' | 'bulk'>('single');
-  const [bulkCategory, setBulkCategory] = useState<'bpjs' | 'perlinsos'>('bpjs');
+  const [bulkCategory, setBulkCategory] = useState<'perlinsos' | 'pbb' | 'bpjs' | 'ikd'>('perlinsos');
   const [currentKeplingId, setCurrentKeplingId] = useState<string>('kepling_1');
   const [isSaving, setIsSaving] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -73,6 +74,9 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
   // Bulk Edit Form State
   const [bulkTargets, setBulkTargets] = useState<TargetsCapaianMap>({});
 
+  const prevOpenRef = useRef<boolean>(false);
+  const prevKeplingIdRef = useRef<string>('');
+
   // Sync state when modal opens or selectedKeplingAccount changes
   useEffect(() => {
     if (selectedKeplingAccount) {
@@ -83,60 +87,76 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
     }
   }, [selectedKeplingAccount, isOpen]);
 
-  // Sync single form whenever currentKeplingId changes or targetsMap changes
+  // Sync single form & bulk form ONLY when modal opens or kepling selection changes
+  // to avoid background poll ticks wiping out user input!
   useEffect(() => {
-    const config = targetsMap[currentKeplingId];
-    const reported = reportedStatsMap[currentKeplingId] || {
-      pbb: 0,
-      perlinsos: 0,
-      ikd: 0,
-      bpjs: 0,
-      reportCount: 0,
-    };
-
-    if (config) {
-      setTargetPerlinsos(config.targetPerlinsos ?? 300);
-      setTargetPbb(config.targetPbb ?? 100);
-      setTargetIkd(config.targetIkd ?? 50);
-      setTargetBpjs(config.targetBpjs ?? 50);
-
-      if (config.overridePerlinsos !== null && config.overridePerlinsos !== undefined) {
-        setUseOverridePerlinsos(true);
-        setOverridePerlinsos(String(config.overridePerlinsos));
-      } else {
-        setUseOverridePerlinsos(false);
-        setOverridePerlinsos(String(reported.perlinsos));
-      }
-
-      if (config.overridePbb !== null && config.overridePbb !== undefined) {
-        setUseOverridePbb(true);
-        setOverridePbb(String(config.overridePbb));
-      } else {
-        setUseOverridePbb(false);
-        setOverridePbb(String(reported.pbb));
-      }
-
-      if (config.overrideIkd !== null && config.overrideIkd !== undefined) {
-        setUseOverrideIkd(true);
-        setOverrideIkd(String(config.overrideIkd));
-      } else {
-        setUseOverrideIkd(false);
-        setOverrideIkd(String(reported.ikd));
-      }
-
-      if (config.overrideBpjs !== null && config.overrideBpjs !== undefined) {
-        setUseOverrideBpjs(true);
-        setOverrideBpjs(String(config.overrideBpjs));
-      } else {
-        setUseOverrideBpjs(false);
-        setOverrideBpjs(String(reported.bpjs));
-      }
-
-      setCatatanPenyesuaian(config.catatanPenyesuaian || '');
+    if (!isOpen) {
+      prevOpenRef.current = false;
+      return;
     }
 
-    setBulkTargets(JSON.parse(JSON.stringify(targetsMap)));
-  }, [currentKeplingId, targetsMap, reportedStatsMap, isOpen]);
+    const isNewlyOpened = !prevOpenRef.current;
+    const isKeplingChanged = prevKeplingIdRef.current !== currentKeplingId;
+
+    if (isNewlyOpened || isKeplingChanged) {
+      prevOpenRef.current = true;
+      prevKeplingIdRef.current = currentKeplingId;
+
+      const config = targetsMap[currentKeplingId];
+      const reported = reportedStatsMap[currentKeplingId] || {
+        pbb: 0,
+        perlinsos: 0,
+        ikd: 0,
+        bpjs: 0,
+        reportCount: 0,
+      };
+
+      if (config) {
+        setTargetPerlinsos(config.targetPerlinsos ?? 300);
+        setTargetPbb(config.targetPbb ?? 100);
+        setTargetIkd(config.targetIkd ?? 50);
+        setTargetBpjs(config.targetBpjs ?? 50);
+
+        if (config.overridePerlinsos !== null && config.overridePerlinsos !== undefined) {
+          setUseOverridePerlinsos(true);
+          setOverridePerlinsos(String(config.overridePerlinsos));
+        } else {
+          setUseOverridePerlinsos(false);
+          setOverridePerlinsos(String(reported.perlinsos));
+        }
+
+        if (config.overridePbb !== null && config.overridePbb !== undefined) {
+          setUseOverridePbb(true);
+          setOverridePbb(String(config.overridePbb));
+        } else {
+          setUseOverridePbb(false);
+          setOverridePbb(String(reported.pbb));
+        }
+
+        if (config.overrideIkd !== null && config.overrideIkd !== undefined) {
+          setUseOverrideIkd(true);
+          setOverrideIkd(String(config.overrideIkd));
+        } else {
+          setUseOverrideIkd(false);
+          setOverrideIkd(String(reported.ikd));
+        }
+
+        if (config.overrideBpjs !== null && config.overrideBpjs !== undefined) {
+          setUseOverrideBpjs(true);
+          setOverrideBpjs(String(config.overrideBpjs));
+        } else {
+          setUseOverrideBpjs(false);
+          setOverrideBpjs(String(reported.bpjs));
+        }
+
+        setCatatanPenyesuaian(config.catatanPenyesuaian || '');
+      }
+
+      if (isNewlyOpened) {
+        setBulkTargets(JSON.parse(JSON.stringify(targetsMap)));
+      }
+    }
+  }, [currentKeplingId, isOpen, targetsMap, reportedStatsMap]);
 
   if (!isOpen) return null;
 
@@ -700,30 +720,54 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
           {activeTab === 'bulk' && (
             <div className="space-y-4">
               {/* Category Selector Bar */}
-              <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-                <button
-                  type="button"
-                  onClick={() => setBulkCategory('bpjs')}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
-                    bulkCategory === 'bpjs'
-                      ? 'bg-teal-800 text-white shadow-md ring-2 ring-teal-600'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  <Shield className="w-4 h-4 text-amber-300" />
-                  <span>Daftar Target BPJS Ketenagakerjaan (50 Orang / Kepling)</span>
-                </button>
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
                 <button
                   type="button"
                   onClick={() => setBulkCategory('perlinsos')}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
                     bulkCategory === 'perlinsos'
                       ? 'bg-blue-800 text-white shadow-md ring-2 ring-blue-600'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
                   <CreditCard className="w-4 h-4 text-blue-300" />
-                  <span>Daftar Target PERLINSOS (8.539 KK)</span>
+                  <span>PERLINSOS (KK)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkCategory('pbb')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                    bulkCategory === 'pbb'
+                      ? 'bg-emerald-800 text-white shadow-md ring-2 ring-emerald-600'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <Building className="w-4 h-4 text-emerald-300" />
+                  <span>PBB (Wajib Pajak)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkCategory('bpjs')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                    bulkCategory === 'bpjs'
+                      ? 'bg-teal-800 text-white shadow-md ring-2 ring-teal-600'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <Shield className="w-4 h-4 text-amber-300" />
+                  <span>BPJS TK (Orang)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkCategory('ikd')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                    bulkCategory === 'ikd'
+                      ? 'bg-purple-800 text-white shadow-md ring-2 ring-purple-600'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <Smartphone className="w-4 h-4 text-purple-300" />
+                  <span>IKD (Orang)</span>
                 </button>
               </div>
 
@@ -732,39 +776,54 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                 className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border rounded-2xl p-4 ${
                   bulkCategory === 'bpjs'
                     ? 'bg-teal-50/80 border-teal-200'
+                    : bulkCategory === 'pbb'
+                    ? 'bg-emerald-50/80 border-emerald-200'
+                    : bulkCategory === 'ikd'
+                    ? 'bg-purple-50/80 border-purple-200'
                     : 'bg-amber-50 border-amber-200'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
                   <Target
                     className={`w-5 h-5 shrink-0 ${
-                      bulkCategory === 'bpjs' ? 'text-teal-700' : 'text-amber-700'
+                      bulkCategory === 'bpjs'
+                        ? 'text-teal-700'
+                        : bulkCategory === 'pbb'
+                        ? 'text-emerald-700'
+                        : bulkCategory === 'ikd'
+                        ? 'text-purple-700'
+                        : 'text-amber-700'
                     }`}
                   />
                   <div>
                     <h5 className="font-black text-slate-900 text-sm">
-                      {bulkCategory === 'bpjs'
-                        ? 'Daftar Target BPJS TK 24 Kepala Lingkungan'
-                        : 'Daftar Target PERLINSOS 24 Kepala Lingkungan'}
+                      {bulkCategory === 'bpjs' && 'Daftar Target & Override BPJS TK 24 Kepala Lingkungan'}
+                      {bulkCategory === 'pbb' && 'Daftar Target & Override PBB (Wajib Pajak) 24 Kepala Lingkungan'}
+                      {bulkCategory === 'ikd' && 'Daftar Target & Override IKD 24 Kepala Lingkungan'}
+                      {bulkCategory === 'perlinsos' && 'Daftar Target & Override PERLINSOS 24 Kepala Lingkungan'}
                     </h5>
                     <p
                       className={`text-xs ${
-                        bulkCategory === 'bpjs' ? 'text-teal-900' : 'text-amber-900'
+                        bulkCategory === 'bpjs'
+                          ? 'text-teal-900'
+                          : bulkCategory === 'pbb'
+                          ? 'text-emerald-900'
+                          : bulkCategory === 'ikd'
+                          ? 'text-purple-900'
+                          : 'text-amber-900'
                       }`}
                     >
-                      {bulkCategory === 'bpjs' ? (
-                        <>
-                          Target resmi setiap Kepling Tahun 2026 adalah{' '}
-                          <strong className="text-slate-950">50 Orang</strong> (Total Kelurahan:{' '}
-                          <strong className="text-slate-950">1.200 Orang</strong>). Total Capaian Saat Ini:{' '}
-                          <strong className="text-slate-950">173 Orang</strong>.
-                        </>
-                      ) : (
-                        <>
-                          Total Target Kelurahan Mangga:{' '}
-                          <strong className="text-slate-950">8.539 KK</strong>. Anda dapat mengedit
-                          target atau override capaian langsung di tabel di bawah.
-                        </>
+                      {bulkCategory === 'bpjs' && (
+                        <>Target resmi standar: <strong className="text-slate-950">50 Orang / Kepling</strong> (Total: 1.200 Orang). Anda dapat menyesuaikan target atau override capaian riil.</>
+                      )}
+                      {bulkCategory === 'pbb' && (
+                        <>Target resmi standar: <strong className="text-slate-950">100 WP / Kepling</strong> (atau disesuaikan dengan data SPPT). Anda dapat menetapkan target dan override capaian lunas.</>
+                      )}
+                      {bulkCategory === 'ikd' && (
+                        <>Target resmi standar: <strong className="text-slate-950">50 Orang / Kepling</strong> (Total: 1.200 Orang aktivasi IKD).</>
+                      )}
+                      {bulkCategory === 'perlinsos' && (
+                        <>Total Target Kelurahan Mangga: <strong className="text-slate-950">8.539 KK</strong>. Anda dapat mengedit target dan override capaian per lingkungan.</>
                       )}
                     </p>
                   </div>
@@ -775,15 +834,11 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                     type="button"
                     onClick={handleResetToOfficialDefaults}
                     disabled={isSaving}
-                    className={`px-3 py-1.5 rounded-xl bg-white border font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer ${
-                      bulkCategory === 'bpjs'
-                        ? 'border-teal-300 text-teal-900 hover:bg-teal-100'
-                        : 'border-amber-300 text-amber-900 hover:bg-amber-100'
-                    }`}
+                    className="px-3 py-1.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                     title="Kembalikan target ke standar resmi"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Reset Target Resmi</span>
+                    <span>Reset Standar</span>
                   </button>
                   <button
                     type="button"
@@ -806,17 +861,22 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                         <th className="p-3 text-center w-12">No</th>
                         <th className="p-3">Lingkungan & Nama</th>
                         <th className="p-3 text-center w-36">
-                          {bulkCategory === 'bpjs'
-                            ? 'Target BPJS TK (Orang)'
-                            : 'Target PERLINSOS (KK)'}
+                          {bulkCategory === 'bpjs' && 'Target BPJS TK (Orang)'}
+                          {bulkCategory === 'pbb' && 'Target PBB (WP)'}
+                          {bulkCategory === 'ikd' && 'Target IKD (Orang)'}
+                          {bulkCategory === 'perlinsos' && 'Target PERLINSOS (KK)'}
                         </th>
                         <th className="p-3 text-center w-32">
-                          {bulkCategory === 'bpjs' ? 'Laporan (Orang)' : 'Laporan (KK)'}
+                          {bulkCategory === 'bpjs' && 'Laporan (Orang)'}
+                          {bulkCategory === 'pbb' && 'Laporan (WP)'}
+                          {bulkCategory === 'ikd' && 'Laporan (Orang)'}
+                          {bulkCategory === 'perlinsos' && 'Laporan (KK)'}
                         </th>
                         <th className="p-3 text-center w-40">
-                          {bulkCategory === 'bpjs'
-                            ? 'Override Capaian (Orang)'
-                            : 'Override Capaian (KK)'}
+                          {bulkCategory === 'bpjs' && 'Override Capaian (Orang)'}
+                          {bulkCategory === 'pbb' && 'Override Capaian (WP)'}
+                          {bulkCategory === 'ikd' && 'Override Capaian (Orang)'}
+                          {bulkCategory === 'perlinsos' && 'Override Capaian (KK)'}
                         </th>
                         <th className="p-3 text-center w-24">Aksi</th>
                       </tr>
@@ -826,9 +886,13 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                         const rowConfig = bulkTargets[k.id] || {
                           keplingId: k.id,
                           targetPerlinsos: DEFAULT_PERLINSOS_TARGETS[index] ?? 300,
+                          targetPbb: 100,
                           targetBpjs: 50,
+                          targetIkd: 50,
                           overridePerlinsos: null,
+                          overridePbb: null,
                           overrideBpjs: DEFAULT_BPJS_BASELINES[index] ?? null,
+                          overrideIkd: null,
                         };
                         const reported = reportedStatsMap[k.id] || {
                           pbb: 0,
@@ -838,14 +902,49 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                           reportCount: 0,
                         };
 
-                        const isBpjs = bulkCategory === 'bpjs';
-                        const currentTarget = isBpjs
-                          ? rowConfig.targetBpjs ?? 50
-                          : rowConfig.targetPerlinsos ?? DEFAULT_PERLINSOS_TARGETS[index];
-                        const reportedVal = isBpjs ? reported.bpjs : reported.perlinsos;
-                        const currentOverride = isBpjs
-                          ? rowConfig.overrideBpjs
-                          : rowConfig.overridePerlinsos;
+                        const targetKey: keyof KeplingTargetCapaian =
+                          bulkCategory === 'bpjs'
+                            ? 'targetBpjs'
+                            : bulkCategory === 'pbb'
+                            ? 'targetPbb'
+                            : bulkCategory === 'ikd'
+                            ? 'targetIkd'
+                            : 'targetPerlinsos';
+
+                        const overrideKey: keyof KeplingTargetCapaian =
+                          bulkCategory === 'bpjs'
+                            ? 'overrideBpjs'
+                            : bulkCategory === 'pbb'
+                            ? 'overridePbb'
+                            : bulkCategory === 'ikd'
+                            ? 'overrideIkd'
+                            : 'overridePerlinsos';
+
+                        const unit =
+                          bulkCategory === 'bpjs' || bulkCategory === 'ikd'
+                            ? 'Orang'
+                            : bulkCategory === 'pbb'
+                            ? 'WP'
+                            : 'KK';
+
+                        const currentTarget =
+                          (rowConfig[targetKey] as number | undefined) ??
+                          (bulkCategory === 'perlinsos'
+                            ? DEFAULT_PERLINSOS_TARGETS[index] ?? 300
+                            : bulkCategory === 'pbb'
+                            ? 100
+                            : 50);
+
+                        const reportedVal =
+                          bulkCategory === 'bpjs'
+                            ? reported.bpjs
+                            : bulkCategory === 'pbb'
+                            ? reported.pbb
+                            : bulkCategory === 'ikd'
+                            ? reported.ikd
+                            : reported.perlinsos;
+
+                        const currentOverride = rowConfig[overrideKey] as number | null | undefined;
                         const isOverridden =
                           currentOverride !== null && currentOverride !== undefined;
 
@@ -874,20 +973,24 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                                         lingkungan: k.lingkungan,
                                         nama: k.nama,
                                       }),
-                                      [isBpjs ? 'targetBpjs' : 'targetPerlinsos']: val,
+                                      [targetKey]: val,
                                     },
                                   }));
                                 }}
                                 className={`w-28 px-2.5 py-1.5 text-center font-black text-sm border rounded-lg focus:outline-emerald-600 ${
-                                  isBpjs
+                                  bulkCategory === 'bpjs'
                                     ? 'bg-teal-50/60 border-teal-300 text-teal-950'
+                                    : bulkCategory === 'pbb'
+                                    ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950'
+                                    : bulkCategory === 'ikd'
+                                    ? 'bg-purple-50/60 border-purple-300 text-purple-950'
                                     : 'bg-blue-50/60 border-blue-300 text-blue-950'
                                 }`}
                               />
                             </td>
                             <td className="p-3 text-center font-bold text-slate-700">
                               <span className="px-2 py-1 bg-slate-100 rounded-lg">
-                                {reportedVal} {isBpjs ? 'Orang' : 'KK'}
+                                {reportedVal} {unit}
                               </span>
                             </td>
                             <td className="p-3 text-center">
@@ -913,7 +1016,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                                           lingkungan: k.lingkungan,
                                           nama: k.nama,
                                         }),
-                                        [isBpjs ? 'overrideBpjs' : 'overridePerlinsos']: val,
+                                        [overrideKey]: val,
                                       },
                                     }));
                                   }}
@@ -931,11 +1034,11 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
                                         ...prev,
                                         [k.id]: {
                                           ...(prev[k.id] || {}),
-                                          [isBpjs ? 'overrideBpjs' : 'overridePerlinsos']: null,
+                                          [overrideKey]: null,
                                         },
                                       }));
                                     }}
-                                    className="text-slate-400 hover:text-red-600 p-1"
+                                    className="text-slate-400 hover:text-red-600 p-1 cursor-pointer"
                                     title="Hapus override, gunakan hitungan laporan asli"
                                   >
                                     <X className="w-3.5 h-3.5" />

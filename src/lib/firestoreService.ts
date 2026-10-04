@@ -344,10 +344,10 @@ export async function saveTargetToFirestore(
 ): Promise<boolean> {
   try {
     const docRef = doc(db, TARGETS_COLLECTION, item.keplingId);
-    const payload = {
+    const payload = cleanFirestoreData({
       ...item,
       updatedAt: new Date().toISOString(),
-    };
+    });
     await setDoc(docRef, payload, { merge: true });
     return true;
   } catch (error) {

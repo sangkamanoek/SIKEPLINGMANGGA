@@ -49,6 +49,7 @@ import {
   saveKeplingTargetCapaian,
   saveAllTargetsCapaian,
   resetTargetsCapaianToDefaults,
+  subscribeTargetsFromFirestore,
 } from '../lib/targetsApi';
 import { ModalEditTargetCapaian } from './ModalEditTargetCapaian';
 import { GrafikTrenBulanan } from './GrafikTrenBulanan';
@@ -412,7 +413,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
   };
 
-  // Load targets & capaian from server / local on mount
+  // Load targets & capaian from server / local on mount, and listen to real-time updates
   useEffect(() => {
     let isMounted = true;
     fetchTargetsCapaian().then((data) => {
@@ -420,8 +421,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         setTargetsMap(data);
       }
     });
+    const unsub = subscribeTargetsFromFirestore((data) => {
+      if (isMounted && data && Object.keys(data).length > 0) {
+        setTargetsMap((prev) => ({ ...prev, ...data }));
+      }
+    });
     return () => {
       isMounted = false;
+      unsub();
     };
   }, []);
 

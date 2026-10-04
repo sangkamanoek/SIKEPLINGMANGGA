@@ -960,6 +960,34 @@ export async function downloadImportTemplateExcel(): Promise<void> {
 }
 
 /**
+ * Extracts pure digits from any cell value, safely handling BigInt, Numbers, and exponential notation (e.g. 1.20103E+15)
+ */
+function extractCellDigits(val: any): string {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'number') {
+    try {
+      return BigInt(Math.round(val)).toString();
+    } catch {
+      return Number(val).toFixed(0);
+    }
+  }
+  const str = String(val).trim();
+  if (/^[0-9.]+[eE]\+[0-9]+$/.test(str)) {
+    try {
+      return BigInt(Math.round(Number(str))).toString();
+    } catch {}
+  }
+  return str.replace(/\D/g, '');
+}
+
+/**
+ * Normalizes header string to clean uppercase alphanumeric representation
+ */
+function normalizeHeaderStr(s: any): string {
+  return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/**
  * Parses uploaded Excel (.xlsx, .xls) or CSV file into DataKeluarga records with validation
  */
 export async function parseDataKeluargaFile(file: File): Promise<ImportParsedResult> {
@@ -968,8 +996,8 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
 
-  // Convert sheet to json matrix
-  const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+  // Convert sheet to json matrix with raw: false to preserve formatted cell text
+  const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', raw: false });
 
   if (!rows || rows.length === 0) {
     throw new Error('Berkas Excel / CSV kosong.');
@@ -978,19 +1006,21 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
   // Find header row (usually contains NOMOR_KK, KK, NIK, or NAMA, and must NOT contain actual 16-digit NIK/KK)
   let headerIndex = -1;
   for (let i = 0; i < Math.min(10, rows.length); i++) {
-    const rowStr = (rows[i] || []).map((c: any) => String(c).toUpperCase().trim()).join(' ');
-    // If the row contains actual 16-digit numbers, it is data, not a header!
-    if (/\b\d{16}\b/.test(rowStr)) {
+    const rowCells = rows[i] || [];
+    // If the row contains actual 16-digit numbers in cells, it is data, not a header!
+    const hasDataDigits = rowCells.some((c: any) => extractCellDigits(c).length === 16);
+    if (hasDataDigits) {
       continue;
     }
+    const rowStr = rowCells.map((c: any) => normalizeHeaderStr(c)).join(' ');
     if (
-      rowStr.includes('NOMOR_KK') ||
-      rowStr.includes('NOMOR KK') ||
-      rowStr.includes('NO KK') ||
-      rowStr.includes('NO. KK') ||
-      rowStr.includes('NIK_KEPALA') ||
-      rowStr.includes('NAMA_KEPALA') ||
-      rowStr.includes('NAMA LENGKAP')
+      rowStr.includes('NOMORKK') ||
+      rowStr.includes('NOKK') ||
+      rowStr.includes('KARTUKELUARGA') ||
+      rowStr.includes('NIKKEPALA') ||
+      rowStr.includes('NAMAKEPALA') ||
+      rowStr.includes('NAMALENGKAP') ||
+      rowStr.includes('NAMALGKP')
     ) {
       headerIndex = i;
       break;
@@ -998,40 +1028,96 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
   }
 
   // If no explicit header row was detected, process from index 0
-  const headers = headerIndex !== -1
-    ? (rows[headerIndex] || []).map((h: any) => String(h).toUpperCase().trim())
-    : [];
+  const rawHeaders = headerIndex !== -1 ? rows[headerIndex] || [] : [];
+  const normalizedHeaders = rawHeaders.map((h: any) => normalizeHeaderStr(h));
 
-  const getColIdx = (possibleNames: string[]) => {
-    return headers.findIndex((h) => possibleNames.some((p) => h.includes(p)));
+  const getColIdx = (keywords: string[]) => {
+    const normKeywords = keywords.map((k) => normalizeHeaderStr(k));
+    return normalizedHeaders.findIndex((h) => normKeywords.some((k) => h.includes(k)));
   };
 
-  const idxKk = getColIdx(['NOMOR_KK', 'NOMOR KK', 'NO KK', 'NO. KK', 'NO_KK']);
-  const idxNik = getColIdx(['NIK_KEPALA', 'NIK KEPALA', 'NIK', 'NIK_WARGA', 'NO_NIK']);
-  const idxNama = getColIdx(['NAMA_KEPALA', 'NAMA KEPALA', 'NAMA', 'NAMA_LENGKAP', 'WARGA']);
-  const idxHp = getColIdx(['TELEPON', 'WA', 'HP', 'NO. TELP', 'NO_HP']);
-  const idxLk = getColIdx(['LINGKUNGAN_NOMOR', 'LINGKUNGAN', 'LK', 'KEPLING']);
-  const idxJalan = getColIdx(['NAMA_JALAN', 'JALAN', 'ALAMAT']);
-  const idxNoRumah = getColIdx(['NOMOR_RUMAH', 'NO. RUMAH', 'RUMAH']);
+  const idxKk = getColIdx([
+    'NOMOR_KK', 'NOMOR KK', 'NO KK', 'NO. KK', 'NO_KK', 'NOKK', 'NO.KK',
+    'KARTU KELUARGA', 'KARTU_KELUARGA', 'NO KARTU KELUARGA', 'NO. KARTU KELUARGA',
+    'NO_KARTU_KELUARGA', 'NOMOR_KARTU_KELUARGA', 'NOMOR KARTU KELUARGA'
+  ]);
+  const idxNik = getColIdx([
+    'NIK', 'NO_NIK', 'NO. NIK', 'NO.NIK', 'NONIK', 'NOMOR INDUK KEPENDUDUKAN',
+    'NOMOR_INDUK_KEPENDUDUKAN', 'NIK_KEPALA', 'NIK KEPALA', 'NIK_WARGA', 'NIK WARGA',
+    'KTP', 'NO_KTP', 'NO. KTP'
+  ]);
+  const idxNama = getColIdx([
+    'NAMA', 'NAMA LENGKAP', 'NAMA_LENGKAP', 'NAMA_LGKP', 'NAMALENGKAP',
+    'NAMA KEPALA KELUARGA', 'NAMA_KEPALA_KELUARGA', 'NAMA_KEPALA', 'NAMA KEPALA', 'WARGA'
+  ]);
+  const idxHp = getColIdx(['TELEPON', 'WA', 'HP', 'NO. TELP', 'NO_HP', 'TELP']);
+  const idxLk = getColIdx(['LINGKUNGAN_NOMOR', 'LINGKUNGAN', 'LK', 'KEPLING', 'DUSUN_LINGKUNGAN', 'DUSUN']);
+  const idxJalan = getColIdx(['NAMA_JALAN', 'JALAN', 'ALAMAT', 'ALAMAT_LENGKAP', 'ALAMAT_SEKARANG']);
+  const idxNoRumah = getColIdx(['NOMOR_RUMAH', 'NO. RUMAH', 'RUMAH', 'NO_RUMAH']);
   const idxAgama = getColIdx(['AGAMA', 'AGAMA_KEPALA', 'AGAMA KEPALA', 'AGAMA_KK', 'RELIGION']);
   const idxDomisili = getColIdx(['STATUS_DOMISILI', 'DOMISILI']);
-  const idxDesil = getColIdx(['DESIL', 'KESEJAHTERAAN']);
-  const idxBansos = getColIdx(['BANTUAN', 'BANSOS']);
-  const idxJamban = getColIdx(['JAMBAN', 'SANITASI']);
-  const idxAirMinum = getColIdx(['AIR_MINUM', 'AIR MINUM']);
-  const idxAirBersih = getColIdx(['AIR_BERSIH', 'AIR BERSIH']);
-  const idxSampah = getColIdx(['SAMPAH', 'PEMBUANGAN']);
-  const idxStunting = getColIdx(['STUNTING', 'RISIKO']);
-  const idxNop = getColIdx(['NOP_PBB', 'NOP']);
-  const idxPbb = getColIdx(['STATUS_PBB', 'PBB']);
-  const idxJiwa = getColIdx(['JUMLAH_JIWA', 'JIWA']);
+  const idxDesil = getColIdx(['DESIL', 'KESEJAHTERAAN', 'DESIL_KESEJAHTERAAN']);
+  const idxBansos = getColIdx(['BANTUAN', 'BANSOS', 'PROGRAM_BANSOS']);
+  const idxJamban = getColIdx(['JAMBAN', 'SANITASI', 'BAB']);
+  const idxAirMinum = getColIdx(['AIR_MINUM', 'AIR MINUM', 'SUMBER_AIR_MINUM']);
+  const idxAirBersih = getColIdx(['AIR_BERSIH', 'AIR BERSIH', 'SUMBER_AIR_BERSIH']);
+  const idxSampah = getColIdx(['SAMPAH', 'PEMBUANGAN', 'PEMBUANGAN_SAMPAH']);
+  const idxStunting = getColIdx(['STUNTING', 'RISIKO', 'STATUS_STUNTING']);
+  const idxNop = getColIdx(['NOP_PBB', 'NOP', 'NOP_SPPT']);
+  const idxPbb = getColIdx(['STATUS_PBB', 'PBB', 'PAJAK']);
+  const idxJiwa = getColIdx(['JUMLAH_JIWA', 'JIWA', 'ANGGOTA']);
   const idxL = getColIdx(['JUMLAH_LAKI', 'LAKI', 'L']);
   const idxP = getColIdx(['JUMLAH_PEREMPUAN', 'PEREMPUAN', 'P']);
   const idxLansia = getColIdx(['LANSIA']);
   const idxBalita = getColIdx(['BALITA']);
 
-  const idxHubungan = getColIdx(['HUBUNGAN_KELUARGA', 'HUBUNGAN', 'STATUS_HUBUNGAN', 'SHDK']);
-  const idxKelamin = getColIdx(['JENIS_KELAMIN', 'KELAMIN', 'JK', 'SEX']);
+  const idxHubungan = getColIdx([
+    'HUBUNGAN_KELUARGA', 'HUBUNGAN KELUARGA', 'HUBUNGAN', 'STATUS_HUBUNGAN',
+    'STATUS HUBUNGAN', 'SHDK', 'STATUS DALAM KELUARGA', 'STATUS_DALAM_KELUARGA'
+  ]);
+  const idxKelamin = getColIdx([
+    'JENIS_KELAMIN', 'JENIS KELAMIN', 'KELAMIN', 'JK', 'SEX', 'GENDER'
+  ]);
+
+  // Frequency-based detection for No. KK vs NIK:
+  // In family data with multiple members per row, No KK repeats across multiple rows,
+  // whereas NIK is unique for each person.
+  let detectedKkCol = idxKk;
+  let detectedNikCol = idxNik;
+
+  if (detectedKkCol === -1 || detectedNikCol === -1 || detectedKkCol === detectedNikCol) {
+    const col16Counts: Record<number, { total: number; duplicates: number; seen: Set<string> }> = {};
+    const sampleLimit = Math.min(rows.length, 250);
+    for (let r = headerIndex + 1; r < sampleLimit; r++) {
+      const row = rows[r];
+      if (!row) continue;
+      for (let c = 0; c < row.length; c++) {
+        const digits = extractCellDigits(row[c]);
+        if (digits.length === 16) {
+          if (!col16Counts[c]) {
+            col16Counts[c] = { total: 0, duplicates: 0, seen: new Set() };
+          }
+          col16Counts[c].total++;
+          if (col16Counts[c].seen.has(digits)) {
+            col16Counts[c].duplicates++;
+          } else {
+            col16Counts[c].seen.add(digits);
+          }
+        }
+      }
+    }
+
+    const candidateCols = Object.keys(col16Counts).map(Number);
+    if (candidateCols.length >= 2) {
+      // Sort: column with more duplicates is the NOMOR KK; column with fewer/0 duplicates is NIK
+      candidateCols.sort((a, b) => col16Counts[b].duplicates - col16Counts[a].duplicates);
+      if (detectedKkCol === -1 || detectedKkCol === detectedNikCol) detectedKkCol = candidateCols[0];
+      if (detectedNikCol === -1 || detectedNikCol === detectedKkCol) detectedNikCol = candidateCols[1];
+    } else if (candidateCols.length === 1) {
+      if (detectedKkCol === -1) detectedKkCol = candidateCols[0];
+      if (detectedNikCol === -1) detectedNikCol = candidateCols[0];
+    }
+  }
 
   const familyMap = new Map<string, DataKeluarga>();
   const errors: { row: number; nomorKk?: string; message: string }[] = [];
@@ -1040,8 +1126,8 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
     const row = rows[i];
     if (!row || row.every((c) => !c || String(c).trim() === '')) continue;
 
-    let rawKk = idxKk !== -1 ? String(row[idxKk] || '').trim().replace(/['"\s]/g, '') : '';
-    let rawNik = idxNik !== -1 ? String(row[idxNik] || '').trim().replace(/['"\s]/g, '') : '';
+    let rawKk = detectedKkCol !== -1 ? extractCellDigits(row[detectedKkCol]) : '';
+    let rawNik = detectedNikCol !== -1 ? extractCellDigits(row[detectedNikCol]) : '';
     let rawNama = idxNama !== -1 ? String(row[idxNama] || '').trim() : '';
     let rawAlamat = idxJalan !== -1 ? String(row[idxJalan] || '').trim() : '';
     let rawLk = idxLk !== -1 ? String(row[idxLk] || '').trim() : '';
@@ -1051,30 +1137,27 @@ export async function parseDataKeluargaFile(file: File): Promise<ImportParsedRes
     let rawGender: 'L' | 'P' = 'L';
     let hasExplicitGender = false;
 
-    // 1. Detect all 16-digit numbers in row (in order of appearance)
-    const digits16List: string[] = [];
-    for (const cell of row) {
-      const val = String(cell || '').trim();
-      const matches = val.match(/\b\d{16}\b/g);
-      if (matches) {
-        for (const m of matches) {
-          if (!digits16List.includes(m)) digits16List.push(m);
+    // Detect all 16-digit numbers in row (if column index resolution wasn't exact)
+    if (rawKk.length !== 16 || rawNik.length !== 16) {
+      const digits16List: string[] = [];
+      for (const cell of row) {
+        const d = extractCellDigits(cell);
+        if (d.length === 16 && !digits16List.includes(d)) {
+          digits16List.push(d);
         }
       }
-    }
-
-    // Two 16-digit numbers: 1st is No. KK, 2nd is NIK (as standard Disdukcapil / user requirement)
-    if (digits16List.length >= 2) {
-      if (!rawKk) rawKk = digits16List[0];
-      if (!rawNik) rawNik = digits16List[1];
-    } else if (digits16List.length === 1) {
-      if (!rawKk && !rawNik) {
-        rawKk = digits16List[0];
-        rawNik = digits16List[0];
-      } else if (!rawKk) {
-        rawKk = rawNik || digits16List[0];
-      } else if (!rawNik) {
-        rawNik = rawKk || digits16List[0];
+      if (digits16List.length >= 2) {
+        if (rawKk.length !== 16) rawKk = digits16List[0];
+        if (rawNik.length !== 16) rawNik = digits16List[1];
+      } else if (digits16List.length === 1) {
+        if (rawKk.length !== 16 && rawNik.length !== 16) {
+          rawKk = digits16List[0];
+          rawNik = digits16List[0];
+        } else if (rawKk.length !== 16) {
+          rawKk = rawNik || digits16List[0];
+        } else if (rawNik.length !== 16) {
+          rawNik = rawKk || digits16List[0];
+        }
       }
     }
 
