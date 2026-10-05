@@ -12,6 +12,8 @@ import {
   MapPin,
   Users,
   Sparkles,
+  Printer,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { UserAccount, PosyanduReport, FotoDokumentasi } from '../types';
 import {
@@ -20,6 +22,8 @@ import {
   deletePosyanduReport,
 } from '../lib/pkkPosyanduService';
 import { KETUA_PKK_LINGKUNGAN_ACCOUNTS } from '../data/keplingList';
+import { KopSuratPkk } from './KopSuratPkk';
+import { printOfficialDocument } from '../utils/printHelper';
 
 interface PkkPosyanduViewProps {
   currentUser: UserAccount;
@@ -172,6 +176,11 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300 max-w-7xl mx-auto">
+      {/* Hidden Kop Surat Template for printing */}
+      <div id="kop-pkk-template" className="hidden">
+        <KopSuratPkk />
+      </div>
+
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-rose-800 via-rose-700 to-pink-800 text-white rounded-3xl p-6 sm:p-8 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-2">
@@ -309,16 +318,51 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                 <span className="text-slate-500 font-semibold text-[11px]">
                   Petugas: {report.namaPetugas}
                 </span>
-                {(currentUser.role === 'super_admin' || currentUser.id === report.pkkLingkunganId) && (
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => handleDelete(report.id)}
-                    className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                    title="Hapus laporan"
+                    onClick={() => {
+                      const printContainer = document.createElement('div');
+                      printContainer.id = 'temp-print-posyandu';
+                      printContainer.style.display = 'none';
+                      printContainer.innerHTML = `
+                        <div id="lembar-cetak-posyandu-single" class="p-6 bg-white text-slate-900 font-serif">
+                          <div class="mb-4">${document.getElementById('kop-pkk-template')?.innerHTML || ''}</div>
+                          <div class="text-center my-3 pb-2 border-b-2 border-black">
+                            <h2 class="text-base font-black uppercase">LAPORAN PELAYANAN POSYANDU & KESEHATAN</h2>
+                            <p class="text-xs font-bold">${report.posyanduNama} — ${report.lingkungan}</p>
+                            <p class="text-xs">Tanggal: ${report.tanggal}</p>
+                          </div>
+                          <table class="w-full text-xs border-collapse border border-black my-4">
+                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Nama Posyandu</td><td class="p-2 border border-black">${report.posyanduNama}</td></tr>
+                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Lokasi / Lingkungan</td><td class="p-2 border border-black">${report.posyanduLokasi} (${report.lingkungan})</td></tr>
+                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Total Warga Dilayani</td><td class="p-2 border border-black font-bold">${report.posyanduJumlahWargaTotal} Orang</td></tr>
+                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Keterangan / Catatan</td><td class="p-2 border border-black">${report.posyanduKeterangan || '-'}</td></tr>
+                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Petugas Pelapor</td><td class="p-2 border border-black">${report.namaPetugas}</td></tr>
+                          </table>
+                        </div>
+                      `;
+                      document.body.appendChild(printContainer);
+                      printOfficialDocument('lembar-cetak-posyandu-single', `POSYANDU_${report.posyanduNama.replace(/[^a-zA-Z0-9]/g, '_')}`);
+                      setTimeout(() => document.body.removeChild(printContainer), 1000);
+                    }}
+                    className="px-2.5 py-1 bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold rounded-lg text-[10px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                    title="Cetak Surat Resmi Posyandu"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Printer className="w-3 h-3" />
+                    <span>Cetak</span>
                   </button>
-                )}
+                  {(currentUser.role === 'super_admin' || currentUser.id === report.pkkLingkunganId) && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(report.id)}
+                      className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      title="Hapus laporan"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))

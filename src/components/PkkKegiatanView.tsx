@@ -17,6 +17,7 @@ import {
   Check,
   AlertCircle,
   Eye,
+  Printer,
 } from 'lucide-react';
 import { UserAccount, LaporanKegiatanPkk, PokjaPkkType } from '../types';
 import {
@@ -26,6 +27,8 @@ import {
   exportPkkKegiatanToExcel,
   POKJA_LABELS,
 } from '../lib/pkkKegiatanService';
+import { KopSuratPkk } from './KopSuratPkk';
+import { printOfficialDocument } from '../utils/printHelper';
 
 interface PkkKegiatanViewProps {
   currentUser: UserAccount;
@@ -437,14 +440,20 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
               </button>
             </div>
 
-            <div className="p-6 space-y-4 overflow-y-auto">
-              <div>
-                <span className="text-[11px] font-bold text-tosca-800 bg-tosca-50 px-2.5 py-0.5 rounded-full border border-tosca-200">
-                  {selectedDetail.kategoriProgram}
+            <div className="p-6 space-y-4 overflow-y-auto" id="lembar-cetak-pkk-kegiatan">
+              {/* Kop Surat Resmi PKK */}
+              <KopSuratPkk />
+
+              <div className="text-center pb-2 border-b border-slate-200">
+                <span className="text-[11px] font-bold text-tosca-800 bg-tosca-50 px-2.5 py-0.5 rounded-full border border-tosca-200 uppercase tracking-wider">
+                  LAPORAN KEGIATAN {POKJA_LABELS[selectedDetail.pokja]}
                 </span>
                 <h2 className="text-lg font-black text-slate-900 mt-2">
                   {selectedDetail.namaKegiatan}
                 </h2>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Kategori Program: {selectedDetail.kategoriProgram}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
@@ -515,13 +524,23 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
               <span className="text-[11px] text-slate-500">
                 Dilaporkan oleh: <strong>{selectedDetail.pelaporNama}</strong>
               </span>
-              <button
-                type="button"
-                onClick={() => setSelectedDetail(null)}
-                className="px-4 py-2 bg-tosca-800 hover:bg-tosca-700 text-white font-bold rounded-xl text-xs cursor-pointer"
-              >
-                Tutup
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => printOfficialDocument('lembar-cetak-pkk-kegiatan', `LAPORAN_PKK_${selectedDetail.namaKegiatan.replace(/[^a-zA-Z0-9]/g, '_')}`)}
+                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak Surat Resmi</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDetail(null)}
+                  className="px-4 py-2 bg-tosca-800 hover:bg-tosca-700 text-white font-bold rounded-xl text-xs cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
         </div>

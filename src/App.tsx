@@ -1974,50 +1974,54 @@ export default function App() {
 
         {/* Dashboard Capaian Kepling Pribadi */}
         {activeTab === 'capaian' && (
-          <DashboardCapaianKepling
-            reports={reports}
-            activeAccount={activeAccount}
-            mode="kepling"
-            onSelectKeplingRiwayat={(keplingName) => {
-              setRiwayatFilterPetugas(keplingName);
-              setActiveTab('riwayat');
-            }}
-            onOpenReportDetail={(report) => {
-              setSelectedReport(report);
-              setIsModalOpen(true);
-            }}
-            onNavigateToForm={() => setActiveTab('form')}
-            onNavigateToPemetaan={handleNavigateToPemetaan}
-            onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
-            attendanceList={attendanceList}
-            eventAttendanceList={eventAttendanceList}
-            customEvents={customEvents}
-            kunjunganList={kunjunganList}
-          />
+          <ErrorBoundary fallbackTitle="Gagal Memuat Dashboard Capaian Kepling">
+            <DashboardCapaianKepling
+              reports={reports}
+              activeAccount={activeAccount}
+              mode="kepling"
+              onSelectKeplingRiwayat={(keplingName) => {
+                setRiwayatFilterPetugas(keplingName);
+                setActiveTab('riwayat');
+              }}
+              onOpenReportDetail={(report) => {
+                setSelectedReport(report);
+                setIsModalOpen(true);
+              }}
+              onNavigateToForm={() => setActiveTab('form')}
+              onNavigateToPemetaan={handleNavigateToPemetaan}
+              onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
+              attendanceList={attendanceList}
+              eventAttendanceList={eventAttendanceList}
+              customEvents={customEvents}
+              kunjunganList={kunjunganList}
+            />
+          </ErrorBoundary>
         )}
 
         {/* Dashboard Capaian 24 Kepling Super Admin */}
         {activeTab === 'capaian_admin' && (
-          <DashboardCapaianKepling
-            reports={reports}
-            activeAccount={activeAccount}
-            mode="super_admin"
-            onSelectKeplingRiwayat={(keplingName) => {
-              setRiwayatFilterPetugas(keplingName);
-              setActiveTab('riwayat');
-            }}
-            onOpenReportDetail={(report) => {
-              setSelectedReport(report);
-              setIsModalOpen(true);
-            }}
-            onNavigateToForm={() => setActiveTab('form')}
-            onNavigateToPemetaan={handleNavigateToPemetaan}
-            onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
-            attendanceList={attendanceList}
-            eventAttendanceList={eventAttendanceList}
-            customEvents={customEvents}
-            kunjunganList={kunjunganList}
-          />
+          <ErrorBoundary fallbackTitle="Gagal Memuat Dashboard Capaian Admin">
+            <DashboardCapaianKepling
+              reports={reports}
+              activeAccount={activeAccount}
+              mode="super_admin"
+              onSelectKeplingRiwayat={(keplingName) => {
+                setRiwayatFilterPetugas(keplingName);
+                setActiveTab('riwayat');
+              }}
+              onOpenReportDetail={(report) => {
+                setSelectedReport(report);
+                setIsModalOpen(true);
+              }}
+              onNavigateToForm={() => setActiveTab('form')}
+              onNavigateToPemetaan={handleNavigateToPemetaan}
+              onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
+              attendanceList={attendanceList}
+              eventAttendanceList={eventAttendanceList}
+              customEvents={customEvents}
+              kunjunganList={kunjunganList}
+            />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'monitoring' && (

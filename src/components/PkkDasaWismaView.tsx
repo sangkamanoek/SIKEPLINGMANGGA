@@ -16,6 +16,8 @@ import {
   Home,
   Sparkles,
   Phone,
+  Printer,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { UserAccount, KelompokDasaWisma } from '../types';
 import {
@@ -25,6 +27,8 @@ import {
   exportDasaWismaToExcel,
   clearSampleDasaWismaData,
 } from '../lib/pkkDasaWismaService';
+import { KopSuratPkk } from './KopSuratPkk';
+import { printOfficialDocument } from '../utils/printHelper';
 
 interface PkkDasaWismaViewProps {
   currentUser: UserAccount;
@@ -257,6 +261,16 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
             type="button"
+            onClick={() => printOfficialDocument('lembar-cetak-dasa-wisma', `REKAP_DASA_WISMA_PKK_${new Date().toISOString().split('T')[0]}`)}
+            className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            title="Cetak Rekap Dasa Wisma dengan Kop Surat Resmi"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Cetak Rekap</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => exportDasaWismaToExcel(filteredList)}
             className="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-2xs"
           >
@@ -348,6 +362,17 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
       </div>
 
       {/* Dasa Wisma Cards List or Clean Empty State */}
+      <div id="lembar-cetak-dasa-wisma">
+        <div className="hidden print:block mb-4">
+          <KopSuratPkk />
+          <div className="text-center my-2">
+            <h2 className="text-sm font-black uppercase text-slate-900 underline">
+              REKAPITULASI KELOMPOK BINAAN DASA WISMA TP-PKK KELURAHAN MANGGA
+            </h2>
+            <p className="text-[10px] text-slate-600 font-medium">Kecamatan Medan Tuntungan • Kota Medan</p>
+          </div>
+        </div>
+
       {filteredList.length === 0 ? (
         <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-10 sm:p-14 text-center max-w-xl mx-auto shadow-2xs">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-tosca-50 border border-tosca-200 flex items-center justify-center text-tosca-600 shadow-2xs">
@@ -455,6 +480,7 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
           ))}
         </div>
       )}
+      </div>
 
       {/* Modal Add / Edit Dasa Wisma */}
       {isModalOpen && (
