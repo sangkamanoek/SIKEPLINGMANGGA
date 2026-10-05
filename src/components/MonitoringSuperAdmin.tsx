@@ -1758,8 +1758,8 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
         <div className="space-y-6">
           {/* Header Banner */}
           <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 rounded-2xl p-5 sm:p-6 text-white border border-emerald-800/50 shadow-xl relative overflow-hidden">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5 flex-1 min-w-0">
                 <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center font-bold shadow-inner shrink-0">
                   <MapIcon className="w-6 h-6" />
                 </div>
@@ -2257,8 +2257,8 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           {/* Header Banner */}
           <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-violet-950 rounded-2xl p-5 sm:p-6 text-white border border-indigo-800/50 shadow-xl relative overflow-hidden">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5 flex-1 min-w-0">
                 <div className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 flex items-center justify-center font-bold shadow-inner shrink-0">
                   <ShieldCheck className="w-6 h-6" />
                 </div>

@@ -20,19 +20,19 @@ export const KopSuratResmi: React.FC<{ className?: string }> = ({ className = ''
       crossOrigin="anonymous"
       className="shrink-0"
       style={{
-        width: '85px',
-        height: '105px',
-        minWidth: '85px',
-        maxWidth: '85px',
+        width: '110px',
+        height: '135px',
+        minWidth: '110px',
+        maxWidth: '110px',
         objectFit: 'contain',
         display: 'block',
-        marginLeft: '15px',
+        marginLeft: '10px',
       }}
       onError={(e) => {
         (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/e/eb/Lambang_Kota_Medan.png';
       }}
     />
-    <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '100px' }}>
+    <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '120px' }}>
       <div
         className="text-[14pt] uppercase font-sans text-black font-bold tracking-[0.05em]"
         style={{ fontSize: '14pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2', marginBottom: '1px' }}

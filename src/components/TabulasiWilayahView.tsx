@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { printOfficialDocument } from '../utils/printHelper';
 import {
   Users,
   Home,
@@ -829,11 +830,11 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
 
   // Print Tabulation Handler
   const handlePrintTabulation = () => {
-    window.print();
+    printOfficialDocument('lembar-cetak-tabulasi-wilayah', 'Tabulasi_Wilayah_A4');
   };
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div id="lembar-cetak-tabulasi-wilayah" className="space-y-5 animate-fade-in">
       {/* TABULATION TOP MASTER CONTROLLER & NAVIGATION */}
       <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { printOfficialDocument } from '../utils/printHelper';
 import {
   FileSpreadsheet,
   Building2,
@@ -1599,7 +1600,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               )}
 
               <button
-                onClick={() => window.print()}
+                onClick={() => printOfficialDocument('lembar-cetak-rekap-pbb', `Rekap_PBB_${selectedYear}_A4`)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-xs transition-colors cursor-pointer border border-white/20"
               >
                 <Printer className="w-3.5 h-3.5" />
@@ -1944,7 +1945,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
       {/* SUB-TAB 1: REKAPITULASI LINGKUNGAN */}
       {activeSubTab === 'rekap_lingkungan' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-5 space-y-4">
+        <div id="lembar-cetak-rekap-pbb" className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
             <div className="flex items-center gap-2">
               <SlidersHorizontal className="w-4 h-4 text-slate-500" />

@@ -1023,15 +1023,15 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   return (
     <div id="lembar-cetak-rekap-capaian" className="space-y-6">
       {/* Top Title & Header Card - Deep Emerald Executive Theme */}
-      <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-emerald-700/60 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl border border-emerald-700/60 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-xs font-extrabold uppercase tracking-wider shadow-inner">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA • Dashboard Capaian Kinerja</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-[10px] sm:text-xs font-extrabold uppercase tracking-wider shadow-inner max-w-full">
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span className="truncate">SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-xs">
+            <h2 className="text-xl sm:text-3xl font-black tracking-tight text-white drop-shadow-xs">
               {mode === 'kepling' ? (
                 <span>Capaian Kinerja {activeAccount.lingkungan}</span>
               ) : (
@@ -1046,13 +1046,13 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           </div>
 
           {/* Period Filter Buttons - Perminggu, Perbulan, Pertahun, Hari Ini */}
-          <div className="flex flex-col gap-2 bg-emerald-950/90 p-2.5 rounded-2xl border border-emerald-600/60 shrink-0 print:hidden shadow-lg max-w-full">
+          <div className="flex flex-col gap-2 bg-emerald-950/90 p-2 sm:p-2.5 rounded-2xl border border-emerald-600/60 w-full md:w-auto shrink-0 print:hidden shadow-lg max-w-full overflow-hidden">
             {/* Primary Category Selector */}
-            <div className="flex items-center gap-1 bg-emerald-900/90 p-1 rounded-xl border border-emerald-700/70 overflow-x-auto">
+            <div className="flex items-center gap-1 bg-emerald-900/90 p-1 rounded-xl border border-emerald-700/70 overflow-x-auto w-full no-scrollbar">
               <button
                 type="button"
                 onClick={() => setPeriod('THIS_WEEK')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
                   period === 'THIS_WEEK' || period === 'LAST_WEEK' || period === '7_DAYS' || period.startsWith('WEEK_')
                     ? 'bg-amber-400 text-slate-950 shadow-md scale-102'
                     : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
@@ -1065,7 +1065,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               <button
                 type="button"
                 onClick={() => setPeriod('THIS_MONTH')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
                   period === 'THIS_MONTH' || period.startsWith('MONTH_')
                     ? 'bg-amber-400 text-slate-950 shadow-md scale-102'
                     : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
@@ -1078,7 +1078,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               <button
                 type="button"
                 onClick={() => setPeriod('THIS_YEAR')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
                   period === 'THIS_YEAR' || period.startsWith('YEAR_') || period === 'ALL'
                     ? 'bg-amber-400 text-slate-950 shadow-md scale-102'
                     : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
@@ -1091,7 +1091,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               <button
                 type="button"
                 onClick={() => setPeriod('TODAY')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 ${
                   period === 'TODAY'
                     ? 'bg-white text-emerald-950 shadow-md'
                     : 'text-emerald-200 hover:text-white hover:bg-white/10 font-bold'
@@ -1103,11 +1103,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </div>
 
             {/* Secondary Sub-Period Dropdown & Quick Selection */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full min-w-0">
               <select
                 value={period}
                 onChange={(e) => setPeriod(e.target.value)}
-                className="flex-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-900 text-white border border-emerald-500/80 focus:outline-amber-400 cursor-pointer shadow-inner"
+                className="flex-1 min-w-0 w-0 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-900 text-white border border-emerald-500/80 focus:outline-amber-400 cursor-pointer shadow-inner truncate"
               >
                 <optgroup label="📅 Peringkat Per Minggu">
                   <option value="THIS_WEEK">🌟 Minggu Ini (Berjalan)</option>

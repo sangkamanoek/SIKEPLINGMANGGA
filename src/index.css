@@ -75,24 +75,40 @@
   input,
   textarea,
   select,
-  .modal-backdrop {
+  .modal-backdrop,
+  .bg-black\/50,
+  .bg-black\/60,
+  .bg-slate-900\/60,
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  [role="dialog"] > div:first-child:not([id*="lembar-cetak"]) {
     display: none !important;
   }
 
   /* Tampilkan lembar cetak standar jika dipanggil langsung */
   #lembar-cetak-laporan-kepling,
+  #lembar-cetak-laporan-pembangunan,
+  #lembar-cetak-surat-kedinasan,
   #lembar-cetak-rekap-absensi,
   #lembar-cetak-rekap-pbb,
   #lembar-cetak-rekap-perlinsos,
   #lembar-cetak-rekap-trantibum,
   #lembar-cetak-kunjungan-harian,
   #lembar-cetak-rekap-capaian,
+  #lembar-cetak-keuangan-pkk,
+  #lembar-cetak-tabulasi-wilayah,
+  #lembar-cetak-kegiatan-pkk,
+  #lembar-cetak-database-keluarga,
   .print\:block {
     display: block !important;
     visibility: visible !important;
     width: 100% !important;
     max-width: 198mm !important;
     margin: 0 auto !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
   }
 
   /* Hilangkan overflow clipping pada semua kontainer pembungkus tabel saat dicetak */

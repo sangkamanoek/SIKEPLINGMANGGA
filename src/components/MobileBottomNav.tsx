@@ -84,7 +84,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     return (
       <aside
         aria-label="Menu Navigasi Cepat PKK"
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-teal-200 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-2 pt-1.5 pb-safe"
+        className="md:hidden print:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-teal-200 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-2 pt-1.5 pb-safe"
       >
         <nav className="flex items-center justify-around max-w-lg mx-auto">
           {/* Tab 1: Beranda / Hub PKK */}
@@ -154,7 +154,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <aside
       aria-label="Menu Navigasi Cepat Ponsel"
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-2 pt-1.5 pb-safe"
+      className="md:hidden print:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-2 pt-1.5 pb-safe"
     >
       <nav className="flex items-center justify-around max-w-lg mx-auto">
         {/* Tab 1: Beranda / Hub */}

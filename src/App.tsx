@@ -1094,7 +1094,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans max-w-full overflow-x-hidden">
       {/* Header Banner */}
       <HeaderBanner
         user={user}
@@ -1785,7 +1785,7 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <main className={`flex-1 max-w-6xl w-full mx-auto p-3.5 sm:p-6 pb-24 md:pb-8 ${isModalOpen ? 'print:hidden' : ''}`}>
+      <main className={`flex-1 max-w-6xl w-full mx-auto p-3.5 sm:p-6 pb-24 md:pb-8 max-w-full overflow-x-hidden ${isModalOpen ? 'print:hidden' : ''}`}>
         {/* Global Compact Deadline Alert Bar for Kepling when outside dashboard */}
         {activeTab !== 'hub' && !isPkkRole(activeAccount.role) && (
           <div className="mb-4">

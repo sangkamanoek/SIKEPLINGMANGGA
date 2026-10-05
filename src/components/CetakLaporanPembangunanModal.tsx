@@ -3,6 +3,7 @@ import { RealisasiPembangunan, UserAccount } from '../types';
 import { Printer, Download, X, CheckCircle2, MapPin, Calendar, Building, Sparkles, FileText, Layers } from 'lucide-react';
 import { downloadProjectPhotosAsZip, downloadImage, getHighResImageUrl } from '../lib/imageDownloader';
 import { KopSuratResmi } from './KopSuratResmi';
+import { printOfficialDocument } from '../utils/printHelper';
 
 interface CetakLaporanPembangunanModalProps {
   isOpen: boolean;
@@ -44,7 +45,7 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
   const totalProses = filteredItems.filter((i) => i.statusRealisasi === 'PROSES_PENGERJAAN').length;
 
   const handlePrint = () => {
-    window.print();
+    printOfficialDocument('lembar-cetak-laporan-pembangunan', 'Laporan_Realisasi_Infrastruktur_A4');
   };
 
   const handleDownloadAllZip = async () => {
@@ -240,7 +241,7 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
       )}
 
       {/* PRINT CONTAINER WITH EXACT 1-PAGE A4 ENFORCEMENT */}
-      <div className="w-full max-w-5xl bg-slate-200 p-2 sm:p-6 space-y-6 print:p-0 print:m-0 print:bg-white print:w-full print:space-y-0">
+      <div id="lembar-cetak-laporan-pembangunan" className="w-full max-w-5xl bg-slate-200 p-2 sm:p-6 space-y-6 print:p-0 print:m-0 print:bg-white print:w-full print:space-y-0">
         
         {/* ========================================================================= */}
         {/* MODE A: 1 HALAMAN A4 PER LAPORAN PROYEK                                  */}

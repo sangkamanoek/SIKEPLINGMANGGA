@@ -33,14 +33,12 @@ const INITIAL_PKK_KEGIATAN: LaporanKegiatanPkk[] = [];
 let memoryKegiatan: LaporanKegiatanPkk[] = [];
 
 export const getLocalPkkKegiatanList = (): LaporanKegiatanPkk[] => {
-  if (memoryKegiatan.length > 0) return memoryKegiatan;
   const stored = safeGetLocalStorage<LaporanKegiatanPkk[]>(PKK_KEGIATAN_STORAGE_KEY, []);
-  if (stored && stored.length > 0) {
+  if (stored && Array.isArray(stored) && stored.length > 0) {
     memoryKegiatan = stored;
     return stored;
   }
-  memoryKegiatan = INITIAL_PKK_KEGIATAN;
-  safeSetLocalStorage(PKK_KEGIATAN_STORAGE_KEY, JSON.stringify(INITIAL_PKK_KEGIATAN));
+  if (memoryKegiatan.length > 0) return memoryKegiatan;
   return INITIAL_PKK_KEGIATAN;
 };
 
@@ -70,7 +68,9 @@ export const smartMergePkkKegiatan = (
     if (item && item.id) map.set(item.id, item);
   }
   return Array.from(map.values()).sort((a, b) => {
-    if (b.tanggal !== a.tanggal) return b.tanggal.localeCompare(a.tanggal);
+    const dateA = a.tanggal || a.createdAt || '';
+    const dateB = b.tanggal || b.createdAt || '';
+    if (dateB !== dateA) return dateB.localeCompare(dateA);
     return (b.createdAt || '').localeCompare(a.createdAt || '');
   });
 };
@@ -99,20 +99,19 @@ export const subscribePkkKegiatan = (
   let firestoreUnsub: Unsubscribe = () => {};
   if (db) {
     try {
-      const q = query(
-        collection(db, PKK_KEGIATAN_COLLECTION),
-        orderBy('tanggal', 'desc')
-      );
+      const colRef = collection(db, PKK_KEGIATAN_COLLECTION);
       firestoreUnsub = onSnapshot(
-        q,
+        colRef,
         (snapshot) => {
           const remote: LaporanKegiatanPkk[] = [];
           snapshot.forEach((docSnap) => {
             const d = docSnap.data();
-            remote.push({
-              ...(d as LaporanKegiatanPkk),
-              id: docSnap.id,
-            });
+            if (d) {
+              remote.push({
+                ...(d as LaporanKegiatanPkk),
+                id: docSnap.id,
+              });
+            }
           });
 
           const local = getLocalPkkKegiatanList();
@@ -143,6 +142,47 @@ export const subscribePkkKegiatan = (
     if (bc) bc.close();
     firestoreUnsub();
   };
+};
+
+export const syncPkkKegiatanDirectly = async (): Promise<LaporanKegiatanPkk[]> => {
+  const local = getLocalPkkKegiatanList();
+  if (!db) return local;
+
+  try {
+    const { getDocs } = await import('firebase/firestore');
+    const snapshot = await getDocs(collection(db, PKK_KEGIATAN_COLLECTION));
+    const remote: LaporanKegiatanPkk[] = [];
+    snapshot.forEach((docSnap) => {
+      const d = docSnap.data();
+      if (d) {
+        remote.push({
+          ...(d as LaporanKegiatanPkk),
+          id: docSnap.id,
+        });
+      }
+    });
+
+    const merged = smartMergePkkKegiatan(local, remote);
+    setLocalPkkKegiatanList(merged);
+
+    // Push local unsynced items to Firestore
+    const remoteIds = new Set(remote.map((r) => r.id));
+    for (const item of merged) {
+      if (!remoteIds.has(item.id)) {
+        try {
+          const cleaned = cleanFirestoreData(item);
+          await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, item.id), cleaned, { merge: true });
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    return merged;
+  } catch (err) {
+    console.warn('Manual sync PKK kegiatan failed:', err);
+    return local;
+  }
 };
 
 export const savePkkKegiatan = async (

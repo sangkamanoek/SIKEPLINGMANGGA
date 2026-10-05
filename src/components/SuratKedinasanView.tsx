@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { printOfficialDocument } from '../utils/printHelper';
 import {
   FileText,
   Plus,
@@ -271,77 +272,8 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
   };
 
   const handlePrintSurat = (item: SuratKedinasanItem) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      onShowToast('Pop-up diblokir browser. Izinkan pop-up untuk mencetak.', 'error');
-      return;
-    }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Cetak Surat - ${item.nomorSurat}</title>
-          <style>
-            body { font-family: 'Times New Roman', serif; margin: 20px; color: #000; }
-            .kop { border-bottom: 3px double #000; padding-bottom: 10px; margin-bottom: 20px; display: flex; align-items: center; }
-            .kop img { width: 85px; height: 100px; object-fit: contain; }
-            .kop-text { text-align: center; flex: 1; }
-            .kop-text h2, .kop-text h3, .kop-text h4 { margin: 0; text-transform: uppercase; }
-            .surat-header { text-align: center; margin-bottom: 25px; }
-            .surat-header h3 { text-decoration: underline; margin-bottom: 5px; text-transform: uppercase; }
-            .info-table { width: 100%; margin-bottom: 20px; font-size: 11pt; }
-            .info-table td { padding: 3px 0; vertical-align: top; }
-            .content { font-size: 12pt; line-height: 1.6; text-align: justify; margin-bottom: 40px; }
-            .sign-area { float: right; text-align: center; width: 250px; margin-top: 30px; font-size: 11pt; }
-            .sign-space { height: 75px; }
-            @media print { body { margin: 0; } }
-          </style>
-        </head>
-        <body>
-          <div style="display: flex; align-items: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 20px;">
-            <div style="text-align: center; flex: 1;">
-              <h3 style="margin:0; font-size: 14pt;">PEMERINTAH KOTA MEDAN</h3>
-              <h3 style="margin:0; font-size: 13pt;">KECAMATAN MEDAN TUNTUNGAN</h3>
-              <h2 style="margin:0; font-size: 16pt; font-weight: bold;">KELURAHAN MANGGA</h2>
-              <p style="margin:2px 0 0 0; font-size: 9pt;">Jl. Tembakau Raya No. 35 A Medan Tuntungan, Medan 20141</p>
-            </div>
-          </div>
-
-          <div class="surat-header">
-            <h3>${item.perihal}</h3>
-            <p>Nomor: ${item.nomorSurat}</p>
-          </div>
-
-          <table class="info-table">
-            <tr><td style="width: 100px;">Sifat</td><td style="width: 15px;">:</td><td><strong>${item.sifat}</strong></td></tr>
-            <tr><td>Lampiran</td><td>:</td><td>${item.fileName ? `1 Berkas PDF (${item.fileName})` : '1 (Satu) Berkas'}</td></tr>
-            <tr><td>Perihal</td><td>:</td><td>${item.perihal}</td></tr>
-            <tr><td colspan="3">&nbsp;</td></tr>
-            <tr><td>Kepada Yth.</td><td>:</td><td><strong>${item.tujuanSurat || item.asalSurat || 'Para Pihak Terkait'}</strong></td></tr>
-            <tr><td>di</td><td>-</td><td><u>Tempat</u></td></tr>
-          </table>
-
-          <div class="content">
-            <p>Dengan hormat,</p>
-            <p>${item.isiRingkas}</p>
-            <p>Demikian disampaikan atas perhatian dan kerjasamanya diucapkan terima kasih.</p>
-          </div>
-
-          <div class="sign-area">
-            <p>Medan, ${formatTanggalIndonesia(new Date(item.tanggalSurat))}</p>
-            <p><strong>${item.penandatangan || 'Lurah Kelurahan Mangga'}</strong></p>
-            <div class="sign-space"></div>
-            <p><u>Kelurahan Mangga</u></p>
-          </div>
-
-          <script>
-            window.onload = function() { window.print(); }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    const docTitle = `Surat_${item.nomorSurat || 'Kedinasan'}_${item.perihal || 'Dokumen'}`;
+    printOfficialDocument('lembar-cetak-surat-kedinasan', docTitle);
   };
 
   return (
@@ -937,7 +869,7 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
             </div>
 
             <div className="p-8 overflow-y-auto flex-1 bg-slate-100 flex justify-center">
-              <div className="bg-white w-full max-w-2xl p-8 shadow-lg rounded-xl border border-slate-200 text-slate-900 font-serif space-y-6">
+              <div id="lembar-cetak-surat-kedinasan" className="bg-white w-full max-w-2xl p-8 shadow-lg rounded-xl border border-slate-200 text-slate-900 font-serif space-y-6">
                 {/* Kop Surat Berdasarkan Role Pembuat */}
                 {isPkkRole(previewSurat.dibuatOlehRole || '') ? (
                   <KopSuratPkk />

@@ -427,8 +427,8 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       {/* Welcome Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-tosca-800 via-tosca-700 to-tosca-800 text-white shadow-xl p-6 sm:p-8 border border-tosca-600/30">
         <div className="absolute right-0 top-0 translate-x-10 -translate-y-8 w-72 h-72 rounded-full bg-white/10 blur-2xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-2 flex-1 min-w-0">
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-tosca-100 text-xs font-bold tracking-wide shadow-xs">
               <div className="w-6 h-6 rounded-full bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
                 <img src="/logo_pkk.jpg" alt="Logo PKK" className="w-full h-full object-cover scale-[0.94] transform" />

@@ -429,7 +429,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
 
               {/* Mobile Dropdown Popover */}
               {isMobileMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-2 z-50 text-left">
+                <div className="absolute right-0 top-full mt-2 w-56 max-w-[calc(100vw-2rem)] rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-2 z-50 text-left">
                   <div className="px-3 py-2 border-b border-slate-800 mb-1">
                     <p className="text-[10px] font-black uppercase text-amber-400 flex items-center justify-between">
                       <span>{activeAccount.role === 'super_admin' ? 'SUPER ADMIN' : activeAccount.lingkungan}</span>

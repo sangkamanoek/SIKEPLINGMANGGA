@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, UserAccount, KinerjaHarian } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
-import { isReportMatchingKepling, isReportMatchingDate } from '../lib/formatter';
+import { isReportMatchingKepling, isReportMatchingDate, getReportIsoDate, getTodayLocalIso } from '../lib/formatter';
 import { VirtualList } from './VirtualList';
 
 interface RiwayatLaporanProps {
@@ -40,6 +40,16 @@ interface RiwayatLaporanProps {
   activeAccount?: UserAccount;
   onDeleteReport?: (id: string) => Promise<void>;
 }
+
+export type DateFilterMode =
+  | 'ALL'
+  | 'TODAY'
+  | 'LAST_7_DAYS'
+  | 'LAST_30_DAYS'
+  | 'THIS_MONTH'
+  | 'LAST_MONTH'
+  | 'THIS_YEAR'
+  | 'CUSTOM_RANGE';
 
 type FilterKegiatanType = 'ALL' | 'PBB' | 'PERLINSOS' | 'IKD' | 'BPJS' | 'POSKAMLING' | 'INFRASTRUKTUR' | 'POSYANDU' | 'LAINNYA';
 type FilterKategoriIsuType = 'ALL' | 'KEAMANAN' | 'KEBERSIHAN' | 'INFRASTRUKTUR' | 'PELAYANAN_SOSIAL' | 'PBB_PAJAK';
@@ -124,6 +134,9 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   const [selectedPetugas, setSelectedPetugas] = useState(initialPetugasFilter || 'ALL');
   const [selectedKegiatan, setSelectedKegiatan] = useState<FilterKegiatanType>('ALL');
   const [selectedKategoriIsu, setSelectedKategoriIsu] = useState<FilterKategoriIsuType>('ALL');
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('ALL');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
@@ -138,6 +151,51 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   const isKasiTrantib = activeAccount?.role === 'kasi_trantibum';
   const isAnyKasi = isKasiPem || isKasiBang || isKasiTrantib;
   const isSuperAdminOnly = activeAccount?.role === 'super_admin';
+
+  // Boundary dates for intelligent fast range filtering
+  const {
+    todayIso,
+    sevenDaysAgoIso,
+    thirtyDaysAgoIso,
+    thisMonthPrefix,
+    thisMonthName,
+    lastMonthPrefix,
+    lastMonthName,
+    thisYearPrefix,
+  } = useMemo(() => {
+    const today = new Date();
+    const todayIso = getTodayLocalIso();
+
+    const d7 = new Date();
+    d7.setDate(d7.getDate() - 6);
+    const sevenDaysAgoIso = d7.toISOString().split('T')[0];
+
+    const d30 = new Date();
+    d30.setDate(d30.getDate() - 29);
+    const thirtyDaysAgoIso = d30.toISOString().split('T')[0];
+
+    const thisMonthPrefix = todayIso.slice(0, 7);
+    const thisMonthName = today.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+
+    const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const prevMonthYear = prevMonthDate.getFullYear();
+    const prevMonthNum = String(prevMonthDate.getMonth() + 1).padStart(2, '0');
+    const lastMonthPrefix = `${prevMonthYear}-${prevMonthNum}`;
+    const lastMonthName = prevMonthDate.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+
+    const thisYearPrefix = String(today.getFullYear());
+
+    return {
+      todayIso,
+      sevenDaysAgoIso,
+      thirtyDaysAgoIso,
+      thisMonthPrefix,
+      thisMonthName,
+      lastMonthPrefix,
+      lastMonthName,
+      thisYearPrefix,
+    };
+  }, []);
 
   const handleExecuteDelete = async (id: string) => {
     if (!onDeleteReport) return;
@@ -230,8 +288,33 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
         }
       }
 
-      // 3. Filter by Specific Date
-      if (selectedDate) {
+      // 3. Filter by Date Range Mode
+      if (dateFilterMode !== 'ALL') {
+        const reportIso = getReportIsoDate(item);
+        if (!reportIso) return false;
+
+        if (dateFilterMode === 'TODAY') {
+          if (reportIso !== todayIso) return false;
+        } else if (dateFilterMode === 'LAST_7_DAYS') {
+          if (reportIso < sevenDaysAgoIso || reportIso > todayIso) return false;
+        } else if (dateFilterMode === 'LAST_30_DAYS') {
+          if (reportIso < thirtyDaysAgoIso || reportIso > todayIso) return false;
+        } else if (dateFilterMode === 'THIS_MONTH') {
+          if (!reportIso.startsWith(thisMonthPrefix)) return false;
+        } else if (dateFilterMode === 'LAST_MONTH') {
+          if (!reportIso.startsWith(lastMonthPrefix)) return false;
+        } else if (dateFilterMode === 'THIS_YEAR') {
+          if (!reportIso.startsWith(thisYearPrefix)) return false;
+        } else if (dateFilterMode === 'CUSTOM_RANGE') {
+          if (startDate && reportIso < startDate) return false;
+          if (endDate && reportIso > endDate) return false;
+        }
+      } else if (startDate || endDate) {
+        const reportIso = getReportIsoDate(item);
+        if (!reportIso) return false;
+        if (startDate && reportIso < startDate) return false;
+        if (endDate && reportIso > endDate) return false;
+      } else if (selectedDate) {
         if (!isReportMatchingDate(item, selectedDate)) {
           return false;
         }
@@ -325,7 +408,23 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
 
       return true;
     });
-  }, [domainScopedItems, searchTerm, selectedPetugas, selectedDate, selectedKegiatan, selectedKategoriIsu]);
+  }, [
+    domainScopedItems,
+    searchTerm,
+    selectedPetugas,
+    dateFilterMode,
+    startDate,
+    endDate,
+    selectedDate,
+    selectedKegiatan,
+    selectedKategoriIsu,
+    todayIso,
+    sevenDaysAgoIso,
+    thirtyDaysAgoIso,
+    thisMonthPrefix,
+    lastMonthPrefix,
+    thisYearPrefix,
+  ]);
 
   // Aggregate stats across the filtered view
   const stats = useMemo(() => {
@@ -361,6 +460,9 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     setSelectedPetugas('ALL');
     setSelectedKegiatan('ALL');
     setSelectedKategoriIsu('ALL');
+    setDateFilterMode('ALL');
+    setStartDate('');
+    setEndDate('');
     setSelectedDate('');
   };
 
@@ -369,12 +471,15 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     selectedPetugas !== 'ALL' ||
     selectedKegiatan !== 'ALL' ||
     selectedKategoriIsu !== 'ALL' ||
+    dateFilterMode !== 'ALL' ||
+    startDate !== '' ||
+    endDate !== '' ||
     selectedDate !== '';
 
   // Reset pagination to page 1 on filter/search change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedPetugas, selectedKegiatan, selectedKategoriIsu, selectedDate, pageSize]);
+  }, [searchTerm, selectedPetugas, selectedKegiatan, selectedKategoriIsu, dateFilterMode, startDate, endDate, selectedDate, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / (pageSize === -1 ? filtered.length || 1 : pageSize)));
   const paginatedItems = useMemo(() => {
@@ -566,47 +671,171 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
             </select>
           </div>
 
-          {/* Filter by Petugas Kepling - HANYA UNTUK ADMIN */}
-          {isAdmin ? (
-            <div>
-              <select
-                id="filter-petugas"
-                value={selectedPetugas}
-                onChange={(e) => setSelectedPetugas(e.target.value)}
-                className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
-              >
-                <option value="ALL">Semua Petugas Kepling</option>
-                {listPetugas.map((petugas) => (
-                  <option key={petugas.nama} value={petugas.nama}>
-                    👤 {petugas.label || petugas.nama}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div>
-              <input
-                id="filter-tanggal"
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
-                title="Pilih tanggal spesifik"
-              />
-            </div>
-          )}
+          {/* Filter by Petugas Kepling (Tersedia untuk Admin & Tampilan Bersama) */}
+          <div>
+            <select
+              id="filter-petugas"
+              value={selectedPetugas}
+              onChange={(e) => setSelectedPetugas(e.target.value)}
+              className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
+            >
+              <option value="ALL">👤 Semua Petugas Kepling</option>
+              {listPetugas.map((petugas) => (
+                <option key={petugas.nama} value={petugas.nama}>
+                  👤 {petugas.label || petugas.nama}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          {/* Filter by Date if Admin */}
-          {isAdmin && (
-            <div>
-              <input
-                id="filter-tanggal"
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
-                title="Pilih tanggal spesifik"
-              />
+          {/* Filter by Periode Rentang Tanggal */}
+          <div>
+            <select
+              id="filter-periode-tanggal"
+              value={dateFilterMode}
+              onChange={(e) => {
+                const mode = e.target.value as DateFilterMode;
+                setDateFilterMode(mode);
+                if (mode !== 'CUSTOM_RANGE') {
+                  setStartDate('');
+                  setEndDate('');
+                }
+              }}
+              className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-bold"
+            >
+              <option value="ALL">📅 Semua Rentang Waktu</option>
+              <option value="TODAY">⚡ Hari Ini ({todayIso})</option>
+              <option value="LAST_7_DAYS">⏱️ 7 Hari Terakhir</option>
+              <option value="LAST_30_DAYS">📆 30 Hari Terakhir</option>
+              <option value="THIS_MONTH">🗓️ Bulan Ini ({thisMonthName})</option>
+              <option value="LAST_MONTH">⏪ Bulan Lalu ({lastMonthName})</option>
+              <option value="THIS_YEAR">🏛️ Tahun Ini ({thisYearPrefix})</option>
+              <option value="CUSTOM_RANGE">🎯 Rentang Tanggal Kustom...</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Dedicated Date Range Filter Pills & Custom Range Inputs */}
+        <div className="pt-2 border-t border-slate-100 space-y-2.5">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-slate-500 text-[11px] font-extrabold uppercase mr-1 flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Rentang Tanggal:</span>
+            </span>
+
+            {[
+              { id: 'ALL', label: 'Semua Waktu', icon: '📅' },
+              { id: 'TODAY', label: 'Hari Ini', icon: '⚡' },
+              { id: 'LAST_7_DAYS', label: '7 Hari Terakhir', icon: '⏱️' },
+              { id: 'LAST_30_DAYS', label: '30 Hari', icon: '📆' },
+              { id: 'THIS_MONTH', label: `Bulan Ini (${thisMonthName})`, icon: '🗓️' },
+              { id: 'LAST_MONTH', label: `Bulan Lalu (${lastMonthName})`, icon: '⏪' },
+              { id: 'THIS_YEAR', label: `Tahun ${thisYearPrefix}`, icon: '🏛️' },
+              { id: 'CUSTOM_RANGE', label: 'Rentang Kustom', icon: '🎯' },
+            ].map((preset) => {
+              const isActive = dateFilterMode === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => {
+                    setDateFilterMode(preset.id as DateFilterMode);
+                    if (preset.id !== 'CUSTOM_RANGE') {
+                      setStartDate('');
+                      setEndDate('');
+                    }
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    isActive
+                      ? 'bg-emerald-700 text-white shadow-2xs scale-105'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
+                  }`}
+                >
+                  <span>{preset.icon}</span>
+                  <span>{preset.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Custom Date Range Picker Box */}
+          {(dateFilterMode === 'CUSTOM_RANGE' || startDate || endDate) && (
+            <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-emerald-950 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Dari Tanggal:</span>
+                  </span>
+                  <input
+                    id="filter-rentang-mulai"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      setDateFilterMode('CUSTOM_RANGE');
+                    }}
+                    className="px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-emerald-950 flex items-center gap-1">
+                    <span>Sampai Tanggal:</span>
+                  </span>
+                  <input
+                    id="filter-rentang-selesai"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      setDateFilterMode('CUSTOM_RANGE');
+                    }}
+                    className="px-2.5 py-1.5 text-xs bg-white border border-emerald-300 rounded-lg text-slate-800 font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                </div>
+
+                {/* Quick shortcut helper inside custom box */}
+                <div className="flex items-center gap-1 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate(sevenDaysAgoIso);
+                      setEndDate(todayIso);
+                      setDateFilterMode('CUSTOM_RANGE');
+                    }}
+                    className="px-2 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md font-bold transition-colors cursor-pointer"
+                  >
+                    7 Hari Lalu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate(`${thisMonthPrefix}-01`);
+                      setEndDate(todayIso);
+                      setDateFilterMode('CUSTOM_RANGE');
+                    }}
+                    className="px-2 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md font-bold transition-colors cursor-pointer"
+                  >
+                    Bulan Berjalan
+                  </button>
+                </div>
+              </div>
+
+              {(startDate || endDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                    setDateFilterMode('ALL');
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Hapus Rentang</span>
+                </button>
+              )}
             </div>
           )}
         </div>

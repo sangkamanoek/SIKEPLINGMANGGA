@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Eye,
   Printer,
+  RefreshCw,
 } from 'lucide-react';
 import { UserAccount, LaporanKegiatanPkk, PokjaPkkType } from '../types';
 import {
@@ -25,6 +26,7 @@ import {
   savePkkKegiatan,
   deletePkkKegiatan,
   exportPkkKegiatanToExcel,
+  syncPkkKegiatanDirectly,
   POKJA_LABELS,
 } from '../lib/pkkKegiatanService';
 import { KopSuratPkk } from './KopSuratPkk';
@@ -40,6 +42,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
   const [filterPokja, setFilterPokja] = useState<string>('ALL');
   const [filterLingkungan, setFilterLingkungan] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Modals
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -78,6 +81,19 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
     });
     return () => unsub();
   }, []);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const synced = await syncPkkKegiatanDirectly();
+      setKegiatanList(synced);
+      showAlert(`Sinkronisasi berhasil! ${synced.length} kegiatan PKK termuat dari Cloud.`, 'success');
+    } catch (err) {
+      showAlert('Gagal menyinkronkan data kegiatan PKK.', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const showAlert = (text: string, type: 'success' | 'error' = 'success') => {
     setAlertMsg({ text, type });
@@ -208,8 +224,8 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
       )}
 
       {/* Header Banner */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-7 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-tosca-50 border border-tosca-200 text-tosca-800 text-xs font-black tracking-wide mb-2">
             <Flower2 className="w-3.5 h-3.5 text-tosca-600" />
             <span>AGENDA & DOKUMENTASI KEGIATAN TP-PKK</span>
@@ -223,6 +239,17 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="px-3.5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+            title="Sinkronisasi data langsung dengan Cloud Firestore"
+          >
+            <RefreshCw className={`w-4 h-4 text-tosca-700 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Data'}</span>
+          </button>
+
           <button
             type="button"
             onClick={() => exportPkkKegiatanToExcel(filteredList)}
@@ -296,16 +323,41 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
 
       {/* Activities Grid */}
       {filteredList.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-3">
+        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-4">
           <div className="w-14 h-14 rounded-2xl bg-tosca-50 text-tosca-700 flex items-center justify-center mx-auto">
             <FileText className="w-7 h-7" />
           </div>
-          <h3 className="text-base font-bold text-slate-800">
-            Belum ada kegiatan PKK yang sesuai filter
-          </h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Silakan sesuaikan filter pencarian atau klik tombol "Catat Kegiatan Baru" untuk menambahkan laporan dokumentasi kegiatan.
-          </p>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-slate-800">
+              Belum ada kegiatan PKK yang sesuai filter
+            </h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Silakan sesuaikan filter pencarian, klik tombol sinkronisasi untuk memuat dari cloud, atau catat kegiatan baru.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+            <button
+              type="button"
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-tosca-700 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan dari Cloud'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterPokja('ALL');
+                setFilterLingkungan('ALL');
+                setSearchQuery('');
+              }}
+              className="inline-flex items-center gap-1 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold border border-slate-200 transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5 text-slate-400" />
+              <span>Reset Filter</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

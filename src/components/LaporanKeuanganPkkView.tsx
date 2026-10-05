@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { printOfficialDocument } from '../utils/printHelper';
 import {
   Wallet,
   ArrowDownLeft,
@@ -374,7 +375,7 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
 
   // Trigger Print Document
   const handlePrint = () => {
-    window.print();
+    printOfficialDocument('lembar-cetak-keuangan-pkk', 'Laporan_Kas_PKK_A4');
   };
 
   return (
@@ -388,65 +389,65 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
       )}
 
       {/* Header Banner Tim Penggerak PKK */}
-      <div className="bg-gradient-to-r from-tosca-900 via-tosca-900 to-tosca-950 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-tosca-700/50 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-tosca-900 via-tosca-900 to-tosca-950 text-white p-5 sm:p-7 rounded-3xl shadow-xl border border-tosca-700/50 relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-tosca-500/10 to-transparent pointer-events-none" />
         
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-          <div className="flex items-start gap-4">
-            <div className="p-3.5 bg-gradient-to-br from-tosca-500 to-tosca-600 rounded-2xl shadow-lg border border-tosca-300/30 text-white shrink-0">
-              <Wallet className="w-8 h-8" />
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+          <div className="flex items-start gap-3.5 flex-1 min-w-0">
+            <div className="p-3 bg-gradient-to-br from-tosca-500 to-tosca-600 rounded-2xl shadow-lg border border-tosca-300/30 text-white shrink-0">
+              <Wallet className="w-7 h-7" />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-tosca-400/20 text-tosca-200 border border-tosca-400/30">
                   Buku Administrasi III PKK
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-tosca-500/20 text-tosca-200 border border-tosca-400/30">
-                  Permendagri & TP PKK Kota Medan
+                  Permendagri &amp; TP PKK Kota Medan
                 </span>
               </div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+              <h1 className="text-lg sm:text-2xl font-black tracking-tight text-white leading-tight">
                 Buku Kas Umum (BKU) Tim Penggerak PKK
               </h1>
               <p className="text-xs sm:text-sm text-tosca-200/90 mt-1 max-w-2xl leading-relaxed">
-                Pencatatan transparan seluruh arus penerimaan & pengeluaran kas keuangan PKK Kelurahan Mangga,
+                Pencatatan transparan seluruh arus penerimaan &amp; pengeluaran kas keuangan PKK Kelurahan Mangga,
                 bantuan operasional, iuran pengurus, usaha UP2K, dan realisasi program Pokja I - IV.
               </p>
             </div>
           </div>
 
           {/* Action Header Buttons */}
-          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto shrink-0 pt-2 lg:pt-0 border-t border-tosca-800/80 lg:border-t-0">
             <button
               onClick={() => setIsPrintModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition-all cursor-pointer shadow-sm active:scale-95"
+              className="flex items-center gap-1.5 px-3.5 py-2 sm:px-4 sm:py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition-all cursor-pointer shadow-xs active:scale-95 whitespace-nowrap"
               title="Cetak Buku Kas Format Resmi PKK"
             >
-              <Printer className="w-4 h-4 text-tosca-300" />
-              <span>Cetak BKU Resmi</span>
+              <Printer className="w-3.5 h-3.5 text-tosca-300" />
+              <span>Cetak BKU</span>
             </button>
 
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-2 px-4 py-2.5 bg-tosca-600 hover:bg-tosca-500 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer active:scale-95"
+              className="flex items-center gap-1.5 px-3.5 py-2 sm:px-4 sm:py-2.5 bg-tosca-600 hover:bg-tosca-500 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer active:scale-95 whitespace-nowrap"
               title="Ekspor ke Excel .xlsx"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
               <span>Ekspor Excel</span>
             </button>
 
             <button
               onClick={handleResetData}
-              className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-all cursor-pointer active:scale-95 shadow-sm"
+              className="flex items-center gap-1.5 px-3.5 py-2 sm:px-4 sm:py-2.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-white font-bold text-xs rounded-xl border border-rose-400/40 transition-all cursor-pointer active:scale-95 shadow-xs whitespace-nowrap"
               title="Reset Semua Data Keuangan ke NOL"
             >
-              <Trash2 className="w-4 h-4" />
-              <span>Kosongkan Kas (Reset)</span>
+              <Trash2 className="w-3.5 h-3.5 text-rose-300" />
+              <span>Reset Kas</span>
             </button>
 
             <button
               onClick={handleOpenAdd}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-tosca-500 to-tosca-500 hover:from-tosca-400 hover:to-tosca-400 text-white font-black text-xs rounded-xl shadow-lg shadow-tosca-950/40 transition-all cursor-pointer active:scale-95 border border-tosca-300/30"
+              className="flex items-center gap-1.5 px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xs rounded-xl shadow-lg shadow-tosca-950/40 transition-all cursor-pointer active:scale-95 border border-emerald-300/30 whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               <span>+ Catat Transaksi Baru</span>
@@ -671,7 +672,7 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
       </div>
 
       {/* Main Table: Buku Kas Umum PKK */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div id="lembar-cetak-keuangan-pkk" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-tosca-50 text-tosca-700 rounded-xl border border-tosca-200">
@@ -1133,8 +1134,8 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
 
       {/* Print Document Modal (Format Buku Kas Umum TP PKK) */}
       {isPrintModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-10 shadow-2xl my-8 relative print:m-0 print:p-0 print:border-none print:shadow-none">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-4xl w-full p-4 sm:p-10 shadow-2xl my-4 sm:my-8 relative overflow-hidden max-w-[calc(100vw-1rem)] print:m-0 print:p-0 print:border-none print:shadow-none">
             {/* Modal Header for on-screen controls */}
             <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-200 print:hidden">
               <div className="flex items-center gap-2">
@@ -1161,7 +1162,7 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
             </div>
 
             {/* Print Document Content */}
-            <div className="printable-document space-y-4 text-black font-sans">
+            <div className="printable-document space-y-4 text-black font-sans overflow-x-auto w-full">
               <KopSuratPkk />
 
               <div className="text-center space-y-1 mb-6">
@@ -1177,7 +1178,8 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
               </div>
 
               {/* Official BKU Table */}
-              <table className="w-full text-[10pt] border-collapse border border-black">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-[10pt] border-collapse border border-black min-w-[600px] sm:min-w-full">
                 <thead>
                   <tr className="bg-gray-100 text-center font-bold">
                     <th className="border border-black p-1.5 w-8">No</th>
@@ -1227,6 +1229,7 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
                   </tr>
                 </tbody>
               </table>
+              </div>
 
               {/* Official Signatures */}
               <div className="pt-8 grid grid-cols-2 text-center text-xs font-semibold gap-6 break-inside-avoid">

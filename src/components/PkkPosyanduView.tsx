@@ -176,8 +176,8 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
       </div>
 
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-rose-800 via-rose-700 to-pink-800 text-white rounded-3xl p-6 sm:p-8 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-2">
+      <div className="bg-gradient-to-r from-rose-800 via-rose-700 to-pink-800 text-white rounded-3xl p-5 sm:p-7 shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="space-y-2 flex-1 min-w-0">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/25 backdrop-blur-md text-rose-100 text-xs font-black tracking-wide">
             <Baby className="w-4 h-4 text-amber-300" />
             <span>POKJA IV PKK — POSYANDU & KESEHATAN KELUARGA</span>

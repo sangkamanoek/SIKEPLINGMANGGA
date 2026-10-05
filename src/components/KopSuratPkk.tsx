@@ -18,15 +18,15 @@ export const KopSuratPkk: React.FC<{ className?: string }> = ({ className = '' }
       alt="Logo PKK"
       className="shrink-0"
       style={{
-        width: '100px',
-        height: '100px',
-        minWidth: '100px',
-        maxWidth: '100px',
+        width: '140px',
+        height: '140px',
+        minWidth: '140px',
+        maxWidth: '140px',
         objectFit: 'contain',
         display: 'block',
       }}
     />
-    <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '100px' }}>
+    <div className="text-center flex-1" style={{ flex: 1, textAlign: 'center', paddingRight: '140px' }}>
       <div
         className="text-[12pt] font-sans text-black font-bold tracking-tight"
         style={{ fontSize: '12pt', fontWeight: 'bold', fontFamily: 'sans-serif', color: '#000000', lineHeight: '1.2' }}
