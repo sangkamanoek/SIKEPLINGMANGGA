@@ -401,7 +401,7 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto">
         {/* Modal Header */}
-        <div className="px-5 py-4 bg-linear-to-r from-emerald-800 via-emerald-900 to-teal-900 text-white flex items-center justify-between shrink-0">
+        <div className="px-5 py-4 bg-gradient-to-r from-emerald-800 via-emerald-900 to-teal-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-amber-300 shadow-inner">
               <UserCheck className="w-5 h-5" />

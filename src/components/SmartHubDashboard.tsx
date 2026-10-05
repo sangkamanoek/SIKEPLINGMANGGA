@@ -291,7 +291,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           iconBg: 'bg-teal-50 text-teal-700',
           badge: 'UTAMA PEMERINTAHAN',
           badgeColor: 'bg-teal-100 text-teal-900',
-          bgGradient: 'bg-linear-to-r from-teal-950 via-emerald-950 to-slate-900 text-white border-teal-600/60',
+          bgGradient: 'bg-gradient-to-r from-teal-950 via-emerald-950 to-slate-900 text-white border-teal-600/60',
           action: () => onNavigate('dashboard_kasi'),
         },
         {
@@ -353,7 +353,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           iconBg: 'bg-blue-50 text-blue-700',
           badge: 'UTAMA PEMBANGUNAN',
           badgeColor: 'bg-blue-100 text-blue-900',
-          bgGradient: 'bg-linear-to-r from-blue-950 via-indigo-950 to-slate-900 text-white border-blue-600/60',
+          bgGradient: 'bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 text-white border-blue-600/60',
           action: () => onNavigate('dashboard_kasi'),
         },
         {
@@ -426,7 +426,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           iconBg: 'bg-amber-50 text-amber-700',
           badge: '7 BIDANG TRANTIBUM',
           badgeColor: 'bg-amber-100 text-amber-900',
-          bgGradient: 'bg-linear-to-r from-amber-950 via-orange-950 to-slate-900 text-white border-amber-600/60',
+          bgGradient: 'bg-gradient-to-r from-amber-950 via-orange-950 to-slate-900 text-white border-amber-600/60',
           action: () => onNavigate('dashboard_kasi'),
         },
         {
@@ -437,7 +437,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           icon: '🛡️',
           badge: 'WEBGIS POSKAMLING',
           badgeColor: 'bg-amber-400 text-slate-950',
-          bgGradient: 'bg-linear-to-r from-amber-950 to-slate-900 text-white border-amber-600/60',
+          bgGradient: 'bg-gradient-to-r from-amber-950 to-slate-900 text-white border-amber-600/60',
           action: () => onNavigate('pemetaan'),
         },
         {

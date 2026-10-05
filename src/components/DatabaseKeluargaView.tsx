@@ -1017,7 +1017,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
   return (
     <div id="lembar-cetak-data-keluarga" className="space-y-6 pb-12">
       {/* Banner Header Database Data Keluarga */}
-      <div className="bg-linear-to-r from-blue-950 via-indigo-950 to-slate-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -1356,7 +1356,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
 
       {/* BANNER NOTIFIKASI DUPLIKASI KK & TOMBOL PEMBERSIHAN */}
       {duplicateKkCount > 0 && activeTab === 'daftar' && (
-        <div className="p-4 bg-linear-to-r from-rose-50 via-amber-50 to-rose-50 border-2 border-rose-300 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm animate-in fade-in">
+        <div className="p-4 bg-gradient-to-r from-rose-50 via-amber-50 to-rose-50 border-2 border-rose-300 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm animate-in fade-in">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-md">
               <ShieldAlert className="w-5 h-5" />
@@ -2350,7 +2350,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
       {isAdmin && activeTab === 'pindah_lingkungan' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           {/* Header Banner */}
-          <div className="bg-linear-to-r from-rose-950 via-slate-900 to-indigo-950 p-6 sm:p-8 rounded-[2.5rem] border border-rose-900/40 text-white shadow-xl relative overflow-hidden">
+          <div className="bg-gradient-to-r from-rose-950 via-slate-900 to-indigo-950 p-6 sm:p-8 rounded-[2.5rem] border border-rose-900/40 text-white shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
             <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-2">
@@ -2482,7 +2482,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
               ) : (
                 <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-6 sm:p-8 space-y-6">
                   {/* Warning & 1-Click Fix All Action Card */}
-                  <div className="bg-linear-to-r from-amber-500 via-amber-600 to-orange-600 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 rounded-2xl p-6 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-slate-950 font-black text-xs uppercase tracking-wider bg-amber-300 px-2.5 py-0.5 rounded-full w-fit">
                         <AlertTriangle className="w-3.5 h-3.5" />
@@ -3234,7 +3234,7 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                 <div className="text-sm font-black">{bulkExecuteMessage || 'Sedang memproses pemindahan data...'}</div>
                 <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
                   <div
-                    className="bg-linear-to-r from-amber-400 to-rose-500 h-full transition-all duration-300"
+                    className="bg-gradient-to-r from-amber-400 to-rose-500 h-full transition-all duration-300"
                     style={{
                       width: `${bulkExecuteProgress.total > 0 ? (bulkExecuteProgress.done / bulkExecuteProgress.total) * 100 : 0}%`,
                     }}
@@ -4365,7 +4365,7 @@ const FormKeluargaModal: React.FC<FormKeluargaModalProps> = ({
 
                 {/* SMART BANNER: No KK / NIK Sudah Terdaftar */}
                 {matchedExistingKk && !initialData && (
-                  <div className="p-4 bg-linear-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-300 rounded-2xl space-y-2.5 shadow-sm animate-in fade-in">
+                  <div className="p-4 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-300 rounded-2xl space-y-2.5 shadow-sm animate-in fade-in">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
                         <Users className="w-5 h-5" />

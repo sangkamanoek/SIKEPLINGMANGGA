@@ -261,7 +261,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl max-w-4xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Modal Header */}
-        <div className="bg-linear-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white p-5 sm:p-6 flex items-center justify-between relative shrink-0">
+        <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white p-5 sm:p-6 flex items-center justify-between relative shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md">
               <Sliders className="w-6 h-6" />
@@ -274,7 +274,7 @@ export const ModalEditTargetCapaian: React.FC<ModalEditTargetCapaianProps> = ({
               <h3 className="text-lg sm:text-xl font-black text-white mt-0.5">
                 Kelola Target & Edit Capaian Kepling
               </h3>
-              <p className="text-xs text-emerald-100/90">
+              <p className="text-xs text-white/95 font-medium leading-relaxed">
                 Atur target resmi PERLINSOS (KK) dan lakukan penyesuaian total capaian realisasi lapangan.
               </p>
             </div>

@@ -885,7 +885,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
               Rangkuman Laporan Kelurahan (24 Kepling)
             </h1>
-            <p className="text-emerald-100 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
+            <p className="text-white/95 font-medium text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
               Rangkuman seluruh laporan kinerja harian 24 Kepala Lingkungan, presensi apel pagi, dan kegiatan kunjungan sambang warga. Bagi kepling yang tidak melapor ditampilkan berstatus <strong>NIHIL</strong> secara transparan.
             </p>
           </div>

@@ -479,7 +479,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
   return (
     <div id="lembar-cetak-rekap-trantibum" className="space-y-6 pb-12">
       {/* Header Banner Khusus Seksi Ketentraman & Ketertiban Umum */}
-      <div className="bg-linear-to-r from-amber-800 via-orange-900 to-amber-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-amber-800 via-orange-900 to-amber-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -944,7 +944,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                         </span>
                       </>
                     ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-linear-to-b from-slate-100 to-amber-50/30 text-slate-400">
+                      <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-gradient-to-b from-slate-100 to-amber-50/30 text-slate-400">
                         <Camera className="w-8 h-8 text-slate-300 mb-1" />
                         <span className="text-[11px] font-bold text-slate-500">Foto Belum Diunggah</span>
                         <span className="text-[10px] text-slate-400 mt-0.5">Siskamling Terpantau Kondusif</span>

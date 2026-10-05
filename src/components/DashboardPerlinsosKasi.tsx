@@ -345,7 +345,7 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
   return (
     <div id="lembar-cetak-rekap-perlinsos" className="space-y-6 pb-12">
       {/* Header Banner Khusus Seksi Pembangunan */}
-      <div className="bg-linear-to-r from-blue-900 via-indigo-900 to-blue-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -658,7 +658,7 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
             </div>
 
             {/* Juara 1 */}
-            <div className="p-5 rounded-2xl bg-linear-to-b from-blue-50/80 to-indigo-50/50 border-2 border-blue-400 text-center relative overflow-hidden shadow-sm flex flex-col justify-between">
+            <div className="p-5 rounded-2xl bg-gradient-to-b from-blue-50/80 to-indigo-50/50 border-2 border-blue-400 text-center relative overflow-hidden shadow-sm flex flex-col justify-between">
               <div>
                 <span className="inline-block px-3.5 py-1 rounded-full bg-blue-600 text-white text-xs font-black mb-3 shadow-xs">
                   🥇 PERINGKAT 1 TERTINGGI

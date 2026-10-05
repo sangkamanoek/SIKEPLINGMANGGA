@@ -370,7 +370,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   return (
     <div id="lembar-cetak-rekap-pbb" className="space-y-6 pb-12">
       {/* Header Banner Khusus Seksi Pemerintahan */}
-      <div className="bg-linear-to-r from-emerald-800 via-teal-800 to-emerald-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -381,7 +381,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
               Dashboard Laporan Pajak Bumi & Bangunan (PBB)
             </h2>
-            <p className="text-emerald-100/90 text-sm mt-1 max-w-2xl">
+            <p className="text-white/95 font-medium text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
               Monitoring realisasi opsir PBB, pelaporan penyampaian SPPT, dan penagihan Wajib Pajak (WP) oleh 24 Kepala Lingkungan.
             </p>
           </div>
@@ -766,7 +766,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
                 </div>
 
                 {/* Juara 1 */}
-                <div className="p-5 rounded-2xl bg-linear-to-b from-amber-50/70 to-emerald-50/40 border-2 border-amber-300 text-center relative overflow-hidden shadow-sm flex flex-col justify-between">
+                <div className="p-5 rounded-2xl bg-gradient-to-b from-amber-50/70 to-emerald-50/40 border-2 border-amber-300 text-center relative overflow-hidden shadow-sm flex flex-col justify-between">
                   <div>
                     <span className="inline-block px-3.5 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black mb-3 shadow-xs">
                       🥇 PERINGKAT 1 TERBAIK
@@ -1058,7 +1058,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
                 </div>
 
                 {/* Juara 1 */}
-                <div className="p-5 rounded-2xl bg-linear-to-b from-purple-50/70 to-emerald-50/40 border-2 border-purple-300 text-center relative overflow-hidden shadow-sm flex flex-col justify-between">
+                <div className="p-5 rounded-2xl bg-gradient-to-b from-purple-50/70 to-emerald-50/40 border-2 border-purple-300 text-center relative overflow-hidden shadow-sm flex flex-col justify-between">
                   <div>
                     <span className="inline-block px-3.5 py-1 rounded-full bg-purple-400 text-slate-950 text-xs font-black mb-3 shadow-xs">
                       🥇 PERINGKAT 1 TERBAIK

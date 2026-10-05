@@ -318,7 +318,7 @@ export const KasiProfileManagerModal: React.FC<KasiProfileManagerProps> = ({
       <div id="lembar-cetak-tupoksi-kasi" className="space-y-6">
         {/* Banner Profil Kepala Seksi Terpilih */}
         <div
-          className={`bg-linear-to-r ${currentTheme.bgHeader} rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden`}
+          className={`bg-gradient-to-r ${currentTheme.bgHeader} rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden`}
         >
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">

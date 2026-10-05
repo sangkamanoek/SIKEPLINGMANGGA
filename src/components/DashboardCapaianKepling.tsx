@@ -2671,7 +2671,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             {sortedLeaderboard.length >= 3 && !searchQuery && (
               <div className="my-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Juara 2 */}
-                <div className="p-4 bg-linear-to-b from-slate-50 to-slate-100/70 rounded-2xl border border-slate-200 text-center relative overflow-hidden order-2 md:order-1 flex flex-col justify-between shadow-2xs">
+                <div className="p-4 bg-gradient-to-b from-slate-50 to-slate-100/70 rounded-2xl border border-slate-200 text-center relative overflow-hidden order-2 md:order-1 flex flex-col justify-between shadow-2xs">
                   <div>
                     <span className="inline-block px-3 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-black uppercase mb-2 shadow-2xs">
                       🥈 Peringkat 2
@@ -2730,7 +2730,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 </div>
 
                 {/* Juara 1 (Podium Tertinggi) */}
-                <div className="p-5 bg-linear-to-b from-amber-50 to-amber-100/70 rounded-2xl border-2 border-amber-400 text-center relative overflow-hidden shadow-md order-1 md:order-2 flex flex-col justify-between">
+                <div className="p-5 bg-gradient-to-b from-amber-50 to-amber-100/70 rounded-2xl border-2 border-amber-400 text-center relative overflow-hidden shadow-md order-1 md:order-2 flex flex-col justify-between">
                   <div>
                     <span className="inline-block px-3.5 py-1 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black uppercase mb-2 shadow-xs">
                       🥇 Peringkat 1 Terbaik
@@ -2789,7 +2789,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 </div>
 
                 {/* Juara 3 */}
-                <div className="p-4 bg-linear-to-b from-amber-50/40 to-orange-50/50 rounded-2xl border border-amber-200 text-center relative overflow-hidden order-3 flex flex-col justify-between shadow-2xs">
+                <div className="p-4 bg-gradient-to-b from-amber-50/40 to-orange-50/50 rounded-2xl border border-amber-200 text-center relative overflow-hidden order-3 flex flex-col justify-between shadow-2xs">
                   <div>
                     <span className="inline-block px-3 py-0.5 rounded-full bg-amber-200 text-amber-950 text-[10px] font-black uppercase mb-2 shadow-2xs">
                       🥉 Peringkat 3

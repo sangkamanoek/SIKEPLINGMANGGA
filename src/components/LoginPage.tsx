@@ -187,7 +187,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-b from-emerald-900 via-emerald-800 to-slate-900 text-slate-900 flex flex-col justify-between font-sans">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-900 via-emerald-800 to-slate-900 text-slate-900 flex flex-col justify-between font-sans">
       {/* Top Banner Tagline */}
       <div className="max-w-4xl mx-auto w-full px-4 pt-4 sm:pt-6 flex items-center justify-between">
         <div className="inline-flex items-center rounded-md overflow-hidden shadow-xs text-[11px] font-black tracking-wider uppercase">
@@ -228,7 +228,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       <div className="w-full max-w-md mx-auto px-4 py-6 sm:py-10">
         <div className="bg-white rounded-3xl shadow-2xl border border-emerald-700/30 overflow-hidden">
           {/* Logo & Header */}
-          <div className="p-6 sm:p-7 text-center bg-linear-to-b from-emerald-50 to-white border-b border-slate-100">
+          <div className="p-6 sm:p-7 text-center bg-gradient-to-b from-emerald-50 to-white border-b border-slate-100">
             {/* Logo Pemko Medan */}
             <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto mb-3.5 bg-white rounded-3xl shadow-md p-1.5 flex items-center justify-center border border-emerald-100/90 overflow-hidden">
               <img
