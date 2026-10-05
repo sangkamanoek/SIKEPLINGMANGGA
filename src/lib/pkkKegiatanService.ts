@@ -16,6 +16,7 @@ import * as XLSX from 'xlsx';
 
 export const PKK_KEGIATAN_COLLECTION = 'pkk_kegiatan';
 export const PKK_KEGIATAN_STORAGE_KEY = 'sikepling_pkk_kegiatan_v1';
+export const PKK_DELETED_STORAGE_KEY = 'sikepling_pkk_deleted_v1';
 export const PKK_KEGIATAN_CHANNEL = 'sikepling_pkk_kegiatan_channel';
 
 export const POKJA_LABELS: Record<PokjaPkkType, string> = {
@@ -31,14 +32,35 @@ export const POKJA_LABELS: Record<PokjaPkkType, string> = {
 const INITIAL_PKK_KEGIATAN: LaporanKegiatanPkk[] = [];
 
 let memoryKegiatan: LaporanKegiatanPkk[] = [];
+let deletedPkkIdsCache: string[] = safeGetLocalStorage<string[]>(PKK_DELETED_STORAGE_KEY, []);
+
+export const getDeletedPkkIds = (): string[] => {
+  if (!Array.isArray(deletedPkkIdsCache)) deletedPkkIdsCache = [];
+  return deletedPkkIdsCache;
+};
+
+export const markPkkDeleted = (id: string): void => {
+  const current = getDeletedPkkIds();
+  if (!current.includes(id)) {
+    current.push(id);
+    deletedPkkIdsCache = current;
+    safeSetLocalStorage(PKK_DELETED_STORAGE_KEY, JSON.stringify(current));
+  }
+};
 
 export const getLocalPkkKegiatanList = (): LaporanKegiatanPkk[] => {
+  const deletedSet = new Set(getDeletedPkkIds());
   const stored = safeGetLocalStorage<LaporanKegiatanPkk[]>(PKK_KEGIATAN_STORAGE_KEY, []);
   if (stored && Array.isArray(stored) && stored.length > 0) {
-    memoryKegiatan = stored;
-    return stored;
+    const cleaned = stored.filter((x) => x && x.id && !deletedSet.has(x.id));
+    memoryKegiatan = cleaned;
+    return cleaned;
   }
-  if (memoryKegiatan.length > 0) return memoryKegiatan;
+  if (memoryKegiatan.length > 0) {
+    const cleaned = memoryKegiatan.filter((x) => x && x.id && !deletedSet.has(x.id));
+    memoryKegiatan = cleaned;
+    return cleaned;
+  }
   return INITIAL_PKK_KEGIATAN;
 };
 
@@ -60,12 +82,13 @@ export const smartMergePkkKegiatan = (
   local: LaporanKegiatanPkk[],
   remote: LaporanKegiatanPkk[]
 ): LaporanKegiatanPkk[] => {
+  const deletedSet = new Set(getDeletedPkkIds());
   const map = new Map<string, LaporanKegiatanPkk>();
   for (const item of local) {
-    if (item && item.id) map.set(item.id, item);
+    if (item && item.id && !deletedSet.has(item.id)) map.set(item.id, item);
   }
   for (const item of remote) {
-    if (item && item.id) map.set(item.id, item);
+    if (item && item.id && !deletedSet.has(item.id)) map.set(item.id, item);
   }
   return Array.from(map.values()).sort((a, b) => {
     const dateA = a.tanggal || a.createdAt || '';
@@ -87,8 +110,10 @@ export const subscribePkkKegiatan = (
       bc = new BroadcastChannel(PKK_KEGIATAN_CHANNEL);
       bc.onmessage = (ev) => {
         if (ev.data?.items && Array.isArray(ev.data.items)) {
-          memoryKegiatan = ev.data.items;
-          callback(ev.data.items);
+          const deletedSet = new Set(getDeletedPkkIds());
+          const cleaned = ev.data.items.filter((x: LaporanKegiatanPkk) => x && x.id && !deletedSet.has(x.id));
+          memoryKegiatan = cleaned;
+          callback(cleaned);
         }
       };
     }
@@ -103,10 +128,11 @@ export const subscribePkkKegiatan = (
       firestoreUnsub = onSnapshot(
         colRef,
         (snapshot) => {
+          const deletedSet = new Set(getDeletedPkkIds());
           const remote: LaporanKegiatanPkk[] = [];
           snapshot.forEach((docSnap) => {
             const d = docSnap.data();
-            if (d) {
+            if (d && !deletedSet.has(docSnap.id)) {
               remote.push({
                 ...(d as LaporanKegiatanPkk),
                 id: docSnap.id,
@@ -119,11 +145,11 @@ export const subscribePkkKegiatan = (
           setLocalPkkKegiatanList(merged);
           callback(merged);
 
-          // Auto-sync local items that are missing in remote
+          // Auto-sync local items that are missing in remote ONLY if they are NOT deleted
           if (remote.length < merged.length) {
             const remoteIds = new Set(remote.map((r) => r.id));
             merged.forEach((item) => {
-              if (!remoteIds.has(item.id)) {
+              if (!remoteIds.has(item.id) && !deletedSet.has(item.id)) {
                 savePkkKegiatan(item).catch(() => {});
               }
             });
@@ -149,12 +175,13 @@ export const syncPkkKegiatanDirectly = async (): Promise<LaporanKegiatanPkk[]> =
   if (!db) return local;
 
   try {
+    const deletedSet = new Set(getDeletedPkkIds());
     const { getDocs } = await import('firebase/firestore');
     const snapshot = await getDocs(collection(db, PKK_KEGIATAN_COLLECTION));
     const remote: LaporanKegiatanPkk[] = [];
     snapshot.forEach((docSnap) => {
       const d = docSnap.data();
-      if (d) {
+      if (d && !deletedSet.has(docSnap.id)) {
         remote.push({
           ...(d as LaporanKegiatanPkk),
           id: docSnap.id,
@@ -165,10 +192,10 @@ export const syncPkkKegiatanDirectly = async (): Promise<LaporanKegiatanPkk[]> =
     const merged = smartMergePkkKegiatan(local, remote);
     setLocalPkkKegiatanList(merged);
 
-    // Push local unsynced items to Firestore
+    // Push local unsynced items to Firestore ONLY if not marked deleted
     const remoteIds = new Set(remote.map((r) => r.id));
     for (const item of merged) {
-      if (!remoteIds.has(item.id)) {
+      if (!remoteIds.has(item.id) && !deletedSet.has(item.id)) {
         try {
           const cleaned = cleanFirestoreData(item);
           await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, item.id), cleaned, { merge: true });
@@ -207,6 +234,7 @@ export const savePkkKegiatan = async (
 };
 
 export const deletePkkKegiatan = async (id: string): Promise<void> => {
+  markPkkDeleted(id);
   const current = getLocalPkkKegiatanList();
   const updated = current.filter((x) => x.id !== id);
   setLocalPkkKegiatanList(updated);
