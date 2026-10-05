@@ -29,6 +29,7 @@ import {
 } from '../lib/pkkKegiatanService';
 import { KopSuratPkk } from './KopSuratPkk';
 import { printOfficialDocument } from '../utils/printHelper';
+import { compressMultipleFiles } from '../lib/imageCompressor';
 
 interface PkkKegiatanViewProps {
   currentUser: UserAccount;
@@ -103,29 +104,19 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
     });
   }, [kegiatanList, filterPokja, filterLingkungan, searchQuery]);
 
-  // Handle Foto Upload
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Foto Upload with automatic high-speed compression for older devices
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onload = (uploadEv) => {
-        const base64 = uploadEv.target?.result as string;
-        if (base64) {
-          setFormFotos((prev) => [
-            ...prev,
-            {
-              id: 'foto_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-              url: base64,
-              name: file.name,
-              timestamp: new Date().toISOString(),
-            },
-          ]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    try {
+      const compressedList = await compressMultipleFiles(files, 720, 0.45);
+      if (compressedList.length > 0) {
+        setFormFotos((prev) => [...prev, ...compressedList]);
+      }
+    } catch (err) {
+      console.warn('Gagal memproses foto:', err);
+    }
     e.target.value = '';
   };
 

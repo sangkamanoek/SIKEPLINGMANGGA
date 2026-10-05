@@ -257,40 +257,41 @@ export function subscribeReportsFromFirestore(
   onError?: (err: any) => void
 ): Unsubscribe {
   const colRef = collection(db, REPORTS_COLLECTION);
+  let debounceTimer: any = null;
+
   return onSnapshot(
     colRef,
     (snapshot) => {
-      const reports: LaporanHarianItem[] = [];
-      const isFromCache = snapshot.metadata.fromCache;
-      console.log(`[Firestore Sync] Received ${snapshot.size} reports from Firestore. isFromCache: ${isFromCache}`);
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data() as LaporanHarianItem;
-        const reportId = docSnap.id || data.id;
-        const report: LaporanHarianItem = {
-          ...data,
-          id: reportId,
-        };
-        if (deletedReportIdsMemory.has(reportId) || deletedReportIdsMemory.has(data.id)) {
-          // If deleted, ignore and clean up in background
-          console.log(`[Firestore Sync] Filtering out deleted report: ${reportId}`);
-          deleteDoc(docSnap.ref).catch(() => {});
-          return;
-        }
-        if (!shouldFilterReport(report)) {
-          reports.push(report);
-        } else {
-          console.log(`[Firestore Sync] Filtering out report due to shouldFilterReport: ${reportId}`);
-        }
-      });
+      if (debounceTimer) clearTimeout(debounceTimer);
 
-      console.log(`[Firestore Sync] Final merged count after filtering: ${reports.length}`);
-      reports.sort((a, b) => {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return timeB - timeA;
-      });
+      debounceTimer = setTimeout(() => {
+        const reports: LaporanHarianItem[] = [];
+        const isFromCache = snapshot.metadata.fromCache;
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as LaporanHarianItem;
+          const reportId = docSnap.id || data.id;
+          const report: LaporanHarianItem = {
+            ...data,
+            id: reportId,
+          };
+          if (deletedReportIdsMemory.has(reportId) || deletedReportIdsMemory.has(data.id)) {
+            // If deleted, ignore and clean up in background
+            deleteDoc(docSnap.ref).catch(() => {});
+            return;
+          }
+          if (!shouldFilterReport(report)) {
+            reports.push(report);
+          }
+        });
 
-      onData(reports, isFromCache);
+        reports.sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+
+        onData(reports, isFromCache);
+      }, 60);
     },
     (err) => {
       handleFirestoreError(err, OperationType.LIST, REPORTS_COLLECTION);

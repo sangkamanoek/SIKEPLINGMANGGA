@@ -405,7 +405,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
+            ctx.imageSmoothingQuality = 'medium';
             ctx.drawImage(img, 0, 0, width, height);
             // Kualitas 0.42 menghasilkan foto jernih, tajam, dan ukuran super ringan tanpa resiko kuota Firestore / Vercel
             resolve(canvas.toDataURL('image/jpeg', 0.42));

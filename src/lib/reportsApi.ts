@@ -42,7 +42,7 @@ export const isReportDeleted = (r: LaporanHarianItem): boolean => {
 export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   const map = new Map<string, LaporanHarianItem>();
 
-  // 1. Fetch online directly from Server API buffer (/api/reports)
+  // 1. Fetch online directly from Server API buffer (/api/reports) - fastest, lightweight for low-end mobile
   try {
     const res = await fetch(`/api/reports?light=true&_t=${Date.now()}`, {
       cache: 'no-store',
@@ -66,18 +66,20 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     console.warn('[Online API] Error reading /api/reports:', e);
   }
 
-  // 2. Fetch online from Firebase Firestore
-  try {
-    const firestoreReports = await fetchReportsFromFirestore();
-    if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
-      firestoreReports.forEach((r) => {
-        if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
-          map.set(r.id, r);
-        }
-      });
+  // 2. Only if Server API returned 0 reports, fallback to Firebase Firestore getDocs to conserve mobile RAM/bandwidth
+  if (map.size === 0) {
+    try {
+      const firestoreReports = await fetchReportsFromFirestore();
+      if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
+        firestoreReports.forEach((r) => {
+          if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
+            map.set(r.id, r);
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('[Online Firestore] Error reading Firestore reports:', err);
     }
-  } catch (err) {
-    console.warn('[Online Firestore] Error reading Firestore reports:', err);
   }
 
   const merged = Array.from(map.values());

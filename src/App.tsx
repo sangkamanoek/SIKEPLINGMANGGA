@@ -380,14 +380,13 @@ export default function App() {
     setTimeout(() => setToastMsg(null), 4000);
   };
 
-  // Centralized report & attendance fetcher: reads from server and Firestore in parallel
+  // Centralized report & attendance fetcher: reads from server and Firestore in parallel (lightweight)
   const refreshAllReports = useCallback(async (showNotification = false) => {
     setIsRefreshingReports(true);
     try {
-      const [serverReports, freshAttendance, freshDataKeluarga] = await Promise.all([
+      const [serverReports, freshAttendance] = await Promise.all([
         fetchAllReports().catch(() => null),
         loadAllAttendance().catch(() => null),
-        fetchAllDataKeluarga().catch(() => null),
       ]);
       if (serverReports) {
         setReports(serverReports);
@@ -397,7 +396,7 @@ export default function App() {
       }
       if (showNotification) {
         showToast(
-          `Sinkronisasi berhasil (${serverReports?.length || 0} laporan, ${freshAttendance?.length || 0} apel, ${freshDataKeluarga?.length || 0} KK)`,
+          `Sinkronisasi berhasil (${serverReports?.length || 0} laporan, ${freshAttendance?.length || 0} apel)`,
           'success'
         );
       }
@@ -516,32 +515,49 @@ export default function App() {
     // Instantly load cached local reports to populate the UI in 10ms (Buttery-smooth startup)
     loadLocalReports();
 
-    // Defer heavy database memory caching by 1000ms so the initial UI paints at 60fps immediately
-    const idbTimer = setTimeout(() => {
-      getKeluargaFromIndexedDB().then((data) => {
-        if (data && data.length > 0) {
-          populateMemoryCache('sikepling_database_keluarga_v1', JSON.stringify(data));
-        }
-      });
+    // Stagger heavy database memory caching across idle intervals so older phones don't freeze or drop frames
+    const runIdle = (fn: () => void, timeoutMs: number) => {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(fn, { timeout: timeoutMs });
+      } else {
+        setTimeout(fn, timeoutMs);
+      }
+    };
 
-      getPbbFromIndexedDB().then((data) => {
-        if (data && data.length > 0) {
-          populateMemoryCache('sikepling_sppt_pbb_records_2026_v3', JSON.stringify(data));
-        }
-      });
+    const tVisit = setTimeout(() => {
+      runIdle(() => {
+        getVisitsFromIndexedDB().then((data) => {
+          if (data && data.length > 0) {
+            populateMemoryCache('sikepling_kunjungan_harian_list_v1', JSON.stringify(data));
+          }
+        });
+        getHistoryFromIndexedDB().then((data) => {
+          if (data && data.length > 0) {
+            populateMemoryCache('kepling_local_laporan_history_v2', JSON.stringify(data));
+          }
+        });
+      }, 1200);
+    }, 800);
 
-      getVisitsFromIndexedDB().then((data) => {
-        if (data && data.length > 0) {
-          populateMemoryCache('sikepling_kunjungan_harian_list_v1', JSON.stringify(data));
-        }
-      });
+    const tPbb = setTimeout(() => {
+      runIdle(() => {
+        getPbbFromIndexedDB().then((data) => {
+          if (data && data.length > 0) {
+            populateMemoryCache('sikepling_sppt_pbb_records_2026_v3', JSON.stringify(data));
+          }
+        });
+      }, 2500);
+    }, 2000);
 
-      getHistoryFromIndexedDB().then((data) => {
-        if (data && data.length > 0) {
-          populateMemoryCache('kepling_local_laporan_history_v2', JSON.stringify(data));
-        }
-      });
-    }, 1000);
+    const tKeluarga = setTimeout(() => {
+      runIdle(() => {
+        getKeluargaFromIndexedDB().then((data) => {
+          if (data && data.length > 0) {
+            populateMemoryCache('sikepling_database_keluarga_v1', JSON.stringify(data));
+          }
+        });
+      }, 4000);
+    }, 3500);
 
     // Stagger secondary background syncs to ensure first UI frame paints at 60fps
     const timer1 = setTimeout(() => {
@@ -680,10 +696,12 @@ export default function App() {
       });
     }, 60000); // Poll every minute
 
-    // Fast background sync interval every 10s to guarantee real-time data sync across Super Admin, Admin, and Kepling
+    // Background polling: Firestore onSnapshot already provides INSTANT realtime push updates.
+    // Periodic fallback refresh every 30s only when tab is visible prevents battery/CPU thrashing on older phones.
     const fastSyncInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       refreshAllReports(false);
-    }, 10000);
+    }, 30000);
 
     const unsubscribe = initAuth(
       async (firebaseUser, accessToken) => {
@@ -705,6 +723,11 @@ export default function App() {
     );
 
     return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(tVisit);
+      clearTimeout(tPbb);
+      clearTimeout(tKeluarga);
       unsubscribeTargets();
       unsubscribeFirestoreReports();
       unsubscribeAttendance();

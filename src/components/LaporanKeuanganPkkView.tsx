@@ -39,6 +39,7 @@ import {
 } from '../lib/pkkKeuanganService';
 import { getTodayLocalIso, formatTanggalIndonesia } from '../lib/formatter';
 import { KopSuratPkk } from './KopSuratPkk';
+import { compressImageFile } from '../lib/imageCompressor';
 
 interface LaporanKeuanganPkkViewProps {
   currentUser: UserAccount;
@@ -148,30 +149,19 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
     setIsModalOpen(true);
   };
 
-  // Compress & attach receipt photo
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Compress & attach receipt photo with high efficiency for low-end phones
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_DIM = 900;
-        const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const compressed = canvas.toDataURL('image/jpeg', 0.75);
-          setFormBuktiFotoUrl(compressed);
-        }
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImageFile(file, 720, 0.45);
+      if (compressed) {
+        setFormBuktiFotoUrl(compressed);
+      }
+    } catch (err) {
+      console.warn('Gagal kompresi bukti kas:', err);
+    }
     e.target.value = '';
   };
 

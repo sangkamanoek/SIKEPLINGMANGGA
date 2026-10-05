@@ -24,6 +24,7 @@ import {
 import { KETUA_PKK_LINGKUNGAN_ACCOUNTS } from '../data/keplingList';
 import { KopSuratPkk } from './KopSuratPkk';
 import { printOfficialDocument } from '../utils/printHelper';
+import { compressMultipleFiles } from '../lib/imageCompressor';
 
 interface PkkPosyanduViewProps {
   currentUser: UserAccount;
@@ -94,26 +95,19 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
     });
   }, [reports, filterLingkungan, searchQuery]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        if (base64) {
-          const newFoto: FotoDokumentasi = {
-            id: 'foto_' + Date.now() + Math.random().toString(36).substring(2, 7),
-            url: base64,
-            name: file.name,
-            timestamp: new Date().toISOString(),
-            kategori: 'posyandu',
-          };
-          setFotoList((prev) => [...prev, newFoto]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+
+    try {
+      const compressedList = await compressMultipleFiles(files, 720, 0.45, 'posyandu');
+      if (compressedList.length > 0) {
+        setFotoList((prev) => [...prev, ...compressedList]);
+      }
+    } catch (err) {
+      console.warn('Gagal memproses foto posyandu:', err);
+    }
+    e.target.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

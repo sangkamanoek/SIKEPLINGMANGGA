@@ -330,12 +330,13 @@ export async function fetchAllDataKeluarga(): Promise<DataKeluarga[]> {
     if (apiItems.length > 0) {
       currentList = smartMergeDataKeluarga(currentList, apiItems);
       saveLocalDataKeluarga(currentList);
+      return currentList;
     }
   } catch (err) {
     console.warn('Notice reading Data Keluarga server buffer:', err);
   }
 
-  // 2. Fetch from Firebase Firestore
+  // 2. Fetch from Firebase Firestore only if server buffer was empty
   try {
     const colRef = collection(db, COLLECTION_NAME);
     const snap = await getDocs(colRef);
