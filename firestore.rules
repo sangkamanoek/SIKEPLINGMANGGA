@@ -119,34 +119,37 @@ service cloud.firestore {
 
     // Laporan Keuangan & Buku Kas Umum Tim Penggerak PKK
     match /pkk_keuangan/{docId} {
-      allow read: if true;
-      allow create, update: if request.resource.data.keys().hasAll(['id', 'tanggal', 'jenis', 'jumlah'])
-                            && isValidString(request.resource.data.id, 1, 100);
-      allow delete: if true;
+      allow read, write: if true;
     }
 
     // Laporan Kegiatan & Dokumentasi 4 Pokja PKK & PKK Lingkungan
     match /pkk_kegiatan/{docId} {
-      allow read: if true;
-      allow create, update: if request.resource.data.keys().hasAll(['id', 'tanggal', 'namaKegiatan'])
-                            && isValidString(request.resource.data.id, 1, 120);
-      allow delete: if true;
+      allow read, write: if true;
     }
 
     // Kelompok Dasa Wisma & Posyandu PKK
     match /pkk_dasa_wisma/{docId} {
-      allow read: if true;
-      allow create, update: if request.resource.data.keys().hasAll(['id', 'namaKelompok', 'lingkunganNomor'])
-                            && isValidString(request.resource.data.id, 1, 120);
-      allow delete: if true;
+      allow read, write: if true;
+    }
+
+    match /pkk_posyandu/{docId} {
+      allow read, write: if true;
+    }
+
+    // Buku Administrasi TP PKK (Buku 1, 4, 5)
+    match /pkk_buku_1_anggota/{docId} {
+      allow read, write: if true;
+    }
+    match /pkk_buku_4_notulen/{docId} {
+      allow read, write: if true;
+    }
+    match /pkk_buku_5_inventaris/{docId} {
+      allow read, write: if true;
     }
 
     // Arsip Surat Kedinasan & Persuratan Kelurahan
     match /surat_kedinasan/{docId} {
-      allow read: if true;
-      allow create, update: if request.resource.data.keys().hasAll(['id', 'nomorSurat', 'perihal'])
-                            && isValidString(request.resource.data.id, 1, 120);
-      allow delete: if true;
+      allow read, write: if true;
     }
 
     // Default Fallback Match

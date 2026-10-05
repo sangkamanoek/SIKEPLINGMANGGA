@@ -1,5 +1,6 @@
 import { LaporanKegiatanPkk, PokjaPkkType } from '../types';
 import { db } from './firebase';
+import { cleanFirestoreData } from './firestoreService';
 import {
   collection,
   query,
@@ -57,6 +58,23 @@ export const setLocalPkkKegiatanList = (items: LaporanKegiatanPkk[]): void => {
   }
 };
 
+export const smartMergePkkKegiatan = (
+  local: LaporanKegiatanPkk[],
+  remote: LaporanKegiatanPkk[]
+): LaporanKegiatanPkk[] => {
+  const map = new Map<string, LaporanKegiatanPkk>();
+  for (const item of local) {
+    if (item && item.id) map.set(item.id, item);
+  }
+  for (const item of remote) {
+    if (item && item.id) map.set(item.id, item);
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    if (b.tanggal !== a.tanggal) return b.tanggal.localeCompare(a.tanggal);
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
+  });
+};
+
 export const subscribePkkKegiatan = (
   callback: (items: LaporanKegiatanPkk[]) => void
 ): Unsubscribe => {
@@ -88,20 +106,28 @@ export const subscribePkkKegiatan = (
       firestoreUnsub = onSnapshot(
         q,
         (snapshot) => {
-          if (!snapshot.empty) {
-            const remote: LaporanKegiatanPkk[] = [];
-            snapshot.forEach((docSnap) => {
-              const d = docSnap.data();
-              remote.push({
-                ...(d as LaporanKegiatanPkk),
-                id: docSnap.id,
-              });
+          const remote: LaporanKegiatanPkk[] = [];
+          snapshot.forEach((docSnap) => {
+            const d = docSnap.data();
+            remote.push({
+              ...(d as LaporanKegiatanPkk),
+              id: docSnap.id,
             });
-            setLocalPkkKegiatanList(remote);
-            callback(remote);
-          } else {
-            setLocalPkkKegiatanList([]);
-            callback([]);
+          });
+
+          const local = getLocalPkkKegiatanList();
+          const merged = smartMergePkkKegiatan(local, remote);
+          setLocalPkkKegiatanList(merged);
+          callback(merged);
+
+          // Auto-sync local items that are missing in remote
+          if (remote.length < merged.length) {
+            const remoteIds = new Set(remote.map((r) => r.id));
+            merged.forEach((item) => {
+              if (!remoteIds.has(item.id)) {
+                savePkkKegiatan(item).catch(() => {});
+              }
+            });
           }
         },
         (err) => {
@@ -132,7 +158,8 @@ export const savePkkKegiatan = async (
 
   if (db) {
     try {
-      await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, item.id), item, { merge: true });
+      const cleaned = cleanFirestoreData(item);
+      await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, item.id), cleaned, { merge: true });
     } catch (err) {
       console.warn('[savePkkKegiatan to firestore error]:', err);
     }

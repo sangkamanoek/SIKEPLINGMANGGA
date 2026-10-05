@@ -996,23 +996,23 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
   return (
     <div id="lembar-cetak-rekap-capaian" className="space-y-6">
-      {/* Top Title & Header Card */}
-      <div className="bg-linear-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+      {/* Top Title & Header Card - Deep Emerald Executive Theme */}
+      <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-emerald-700/60 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-700/80 border border-emerald-500/40 text-emerald-100 text-xs font-bold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-xs font-extrabold uppercase tracking-wider shadow-inner">
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
               <span>SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA • Dashboard Capaian Kinerja</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-xs">
               {mode === 'kepling' ? (
                 <span>Capaian Kinerja {activeAccount.lingkungan}</span>
               ) : (
                 <span>Rekapitulasi Capaian 24 Kepala Lingkungan</span>
               )}
             </h2>
-            <p className="text-xs sm:text-sm text-emerald-100/90 max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-emerald-100/90 max-w-2xl leading-relaxed font-medium">
               {mode === 'kepling'
                 ? `Pantau akumulasi pencapaian 4 pilar kinerja harian Anda (PBB, Perlinsos, IKD, dan BPJS Ketenagakerjaan) sebagai wujud pelayanan prima warga.`
                 : `Monitoring evaluasi pencapaian 4 pilar kinerja seluruh 24 Lingkungan di Kelurahan Mangga Kecamatan Medan Tuntungan.`}
@@ -1020,9 +1020,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           </div>
 
           {/* Period Filter Buttons - Perminggu, Perbulan, Pertahun, Hari Ini */}
-          <div className="flex flex-col gap-2 bg-emerald-950/90 p-2.5 rounded-2xl border border-emerald-600/50 shrink-0 print:hidden shadow-lg max-w-full">
+          <div className="flex flex-col gap-2 bg-emerald-950/90 p-2.5 rounded-2xl border border-emerald-600/60 shrink-0 print:hidden shadow-lg max-w-full">
             {/* Primary Category Selector */}
-            <div className="flex items-center gap-1 bg-emerald-900/80 p-1 rounded-xl border border-emerald-700/60 overflow-x-auto">
+            <div className="flex items-center gap-1 bg-emerald-900/90 p-1 rounded-xl border border-emerald-700/70 overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setPeriod('THIS_WEEK')}
@@ -1629,29 +1629,29 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           {/* REALISASI PBB-P2 (DATABASE SPPT RESMI)                                   */}
           {/* ========================================================================= */}
           {isPbbAllowed && myPbbStats && (
-            <div className="bg-gradient-to-br from-slate-900 to-emerald-950 rounded-3xl p-6 text-white border border-emerald-800/60 shadow-xl space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <div className="bg-white rounded-3xl p-6 text-slate-900 border border-slate-200 shadow-sm space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-black shadow-2xs shrink-0">
                     <Coins className="w-6 h-6" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase tracking-wider">
+                      <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-black uppercase tracking-wider">
                         Realisasi PBB-P2 Resmi
                       </span>
-                      <span className="text-xs text-emerald-300 font-bold">Database SPPT {pbbYear}</span>
+                      <span className="text-xs text-emerald-800 font-bold">Database SPPT {pbbYear}</span>
                     </div>
-                    <h3 className="text-lg font-black text-white mt-0.5">
+                    <h3 className="text-lg font-black text-slate-900 mt-0.5">
                       Status Capaian Ketetapan PBB {activeAccount.lingkungan}
                     </h3>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 bg-emerald-900/80 border border-emerald-500/50 px-3 py-1.5 rounded-xl">
-                    <Calendar className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs font-bold text-amber-300">Tahun:</span>
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                    <Calendar className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-slate-700">Tahun:</span>
                     <select
                       value={pbbYear}
                       onChange={(e) => {
@@ -1661,10 +1661,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                           localStorage.setItem('sikepling_pbb_selected_year', String(yr));
                         } catch {}
                       }}
-                      className="bg-transparent text-amber-300 text-xs font-black focus:outline-none cursor-pointer"
+                      className="bg-transparent text-emerald-800 text-xs font-black focus:outline-none cursor-pointer"
                     >
                       {AVAILABLE_PBB_YEARS.map((yr) => (
-                        <option key={yr} value={yr} className="bg-slate-900 text-white font-bold">
+                        <option key={yr} value={yr} className="bg-white text-slate-900 font-bold">
                           {yr}
                         </option>
                       ))}
@@ -1676,49 +1676,49 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     onClick={handleManualSyncPbb}
                     disabled={isSyncingPbb}
                     title="Sinkronkan data PBB dari Server Buffer & Cloud Firestore"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-800/80 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold border border-emerald-500/50 transition-all cursor-pointer shadow-xs"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-2xs"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPbb ? 'animate-spin text-amber-300' : 'text-emerald-300'}`} />
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPbb ? 'animate-spin text-white' : 'text-white'}`} />
                     <span className="hidden sm:inline">{isSyncingPbb ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
                   </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Target Ketetapan</span>
-                  <span className="text-lg font-black text-white block mt-0.5">{formatRupiah(myPbbStats.targetNominal)}</span>
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Target Ketetapan</span>
+                  <span className="text-lg font-black text-slate-900 block mt-0.5">{formatRupiah(myPbbStats.targetNominal)}</span>
                 </div>
-                <div className="bg-emerald-800/40 p-4 rounded-2xl border border-emerald-500/30">
-                  <span className="text-[10px] font-bold text-emerald-200 uppercase tracking-widest block">Realisasi Lunas</span>
-                  <span className="text-lg font-black text-amber-300 block mt-0.5">{formatRupiah(myPbbStats.realisasiNominal)}</span>
-                  <div className="mt-2 w-full bg-emerald-950 h-1.5 rounded-full overflow-hidden">
+                <div className="bg-emerald-50/80 p-4 rounded-2xl border border-emerald-200">
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest block">Realisasi Lunas</span>
+                  <span className="text-lg font-black text-emerald-950 block mt-0.5">{formatRupiah(myPbbStats.realisasiNominal)}</span>
+                  <div className="mt-2 w-full bg-emerald-200 h-1.5 rounded-full overflow-hidden">
                     <div 
-                      className="bg-amber-400 h-full" 
+                      className="bg-emerald-600 h-full" 
                       style={{ width: `${Math.min(myPbbStats.persentaseRealisasi, 100)}%` }}
                     />
                   </div>
                 </div>
-                <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">WP Lunas</span>
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">WP Lunas</span>
                   <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="text-lg font-black text-white">{myPbbStats.wpLunas}</span>
-                    <span className="text-xs text-slate-400">/ {myPbbStats.totalWp} SPPT</span>
+                    <span className="text-lg font-black text-slate-900">{myPbbStats.wpLunas}</span>
+                    <span className="text-xs text-slate-500">/ {myPbbStats.totalWp} SPPT</span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-emerald-300 mt-2 font-bold">
+                  <div className="flex items-center justify-between text-[11px] text-emerald-800 mt-2 font-bold">
                     <span>Kepatuhan:</span>
                     <span>{myPbbStats.persentaseWpLunas.toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-white/10">
-                <p className="text-[11px] text-slate-400 italic">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                <p className="text-[11px] text-slate-500 italic">
                   * Data disinkronisasi langsung dari database SPPT resmi Kelurahan Mangga secara real-time.
                 </p>
                 <button
                   type="button"
-                  className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold transition-all border border-white/10 flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-[10px] font-bold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer"
                   onClick={() => onOpenRekapPbb?.()}
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" />

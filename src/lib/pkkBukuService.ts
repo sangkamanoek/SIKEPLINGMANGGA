@@ -1,4 +1,5 @@
 import { db } from './firebase';
+import { cleanFirestoreData } from './firestoreService';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 export interface PkkBuku1Anggota {
@@ -72,11 +73,11 @@ export function subscribeBuku1(
 export async function saveBuku1Item(item: PkkBuku1Anggota): Promise<void> {
   const id = item.id || 'b1_' + Date.now();
   const docRef = doc(db, BUKU_1_COLLECTION, id);
-  const payload = {
+  const payload = cleanFirestoreData({
     ...item,
     id,
     createdAt: item.createdAt || new Date().toISOString(),
-  };
+  });
   await setDoc(docRef, payload, { merge: true });
 }
 
@@ -114,11 +115,11 @@ export function subscribeBuku4(
 export async function saveBuku4Item(item: PkkBuku4Notulen): Promise<void> {
   const id = item.id || 'b4_' + Date.now();
   const docRef = doc(db, BUKU_4_COLLECTION, id);
-  const payload = {
+  const payload = cleanFirestoreData({
     ...item,
     id,
     createdAt: item.createdAt || new Date().toISOString(),
-  };
+  });
   await setDoc(docRef, payload, { merge: true });
 }
 
@@ -156,11 +157,11 @@ export function subscribeBuku5(
 export async function saveBuku5Item(item: PkkBuku5Inventaris): Promise<void> {
   const id = item.id || 'b5_' + Date.now();
   const docRef = doc(db, BUKU_5_COLLECTION, id);
-  const payload = {
+  const payload = cleanFirestoreData({
     ...item,
     id,
     createdAt: item.createdAt || new Date().toISOString(),
-  };
+  });
   await setDoc(docRef, payload, { merge: true });
 }
 
