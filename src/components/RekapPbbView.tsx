@@ -3176,39 +3176,54 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
       {/* MODAL EDIT / TAMBAH WAJIB PAJAK */}
       {isWpModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in print:hidden">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in print:hidden">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-emerald-900 to-teal-900 text-white px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-emerald-800/80 rounded-xl border border-emerald-600/50">
+            <div className="bg-gradient-to-r from-emerald-900 to-teal-900 text-white px-5 py-3.5 flex items-center justify-between shrink-0 shadow-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 bg-emerald-800/80 rounded-xl border border-emerald-600/50 shrink-0">
                   {editingWpItem ? <Edit3 className="w-5 h-5 text-emerald-300" /> : <UserPlus className="w-5 h-5 text-emerald-300" />}
                 </div>
-                <div>
-                  <h3 className="text-base font-black">
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-black truncate">
                     {editingWpItem ? 'Edit Data Wajib Pajak (SPPT PBB)' : 'Tambah Wajib Pajak Baru'}
                   </h3>
-                  <p className="text-[11px] text-emerald-200 font-medium">
-                    {editingWpItem ? `NOP: ${editingWpItem.nop}` : 'Superadmin & Kasi Pemerintahan Input Mode'}
+                  <p className="text-[11px] text-emerald-200 font-medium truncate">
+                    {editingWpItem ? `NOP: ${editingWpItem.nop}` : 'Superadmin & Kasi Input Mode'}
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setIsWpModalOpen(false)}
-                className="p-1 rounded-lg text-emerald-200 hover:text-white hover:bg-emerald-800/60 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="submit"
+                  form="form-wp-pbb"
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-black text-xs transition-all shadow-md cursor-pointer flex items-center gap-1.5 border border-emerald-300/40 active:scale-95"
+                  title="Simpan Data Wajib Pajak"
+                >
+                  <Save className="w-4 h-4" />
+                  <span className="hidden sm:inline">Simpan</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsWpModalOpen(false)}
+                  className="p-1.5 rounded-xl text-emerald-200 hover:text-white hover:bg-emerald-800/60 transition-colors cursor-pointer"
+                  title="Tutup Modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Form Body */}
-            <form onSubmit={handleSaveWpItem} className="p-6 space-y-4">
-              {formError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-800 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
+            <form id="form-wp-pbb" onSubmit={handleSaveWpItem} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+                {formError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-800 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                    <span>{formError}</span>
+                  </div>
+                )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* NOP */}
@@ -3453,22 +3468,24 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   </div>
                 )}
               </div>
+              </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+              {/* Sticky Action Footer */}
+              <div className="sticky bottom-0 bg-white border-t border-slate-200 px-5 py-3.5 flex items-center justify-between gap-3 shrink-0 shadow-lg z-20">
                 <button
                   type="button"
                   onClick={() => setIsWpModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200"
                 >
                   Batal
                 </button>
+
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition-colors cursor-pointer flex items-center gap-2 shadow-md"
+                  className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white font-black text-xs sm:text-sm transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-98 border border-emerald-500/30"
                 >
-                  <Save className="w-4 h-4" />
-                  <span>Simpan Data WP</span>
+                  <Save className="w-4 h-4 text-emerald-200 animate-pulse" />
+                  <span>SIMPAN DATA WP</span>
                 </button>
               </div>
             </form>
