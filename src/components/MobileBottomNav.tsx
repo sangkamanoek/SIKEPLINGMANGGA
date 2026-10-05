@@ -46,6 +46,7 @@ interface MobileBottomNavProps {
   activeAccount: UserAccount;
   hasAbsenToday?: boolean;
   hasLaporToday?: boolean;
+  unreadCounts?: Record<string, number>;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
@@ -54,6 +55,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeAccount,
   hasAbsenToday,
   hasLaporToday,
+  unreadCounts,
 }) => {
   const isKepling = activeAccount.role === 'kepling';
   const isAdmin = activeAccount.role === 'super_admin';
@@ -62,6 +64,16 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const isKasiTrantib = activeAccount.role === 'kasi_trantibum';
   const isBapenda = activeAccount.role === 'petugas_bapenda';
   const isPkk = isPkkRole(activeAccount.role);
+
+  const renderBadge = (key: string) => {
+    const count = unreadCounts?.[key] || 0;
+    if (count <= 0) return null;
+    return (
+      <span className="absolute -top-1.5 -right-2.5 min-w-[17px] h-4 px-1 rounded-full text-[9px] font-black bg-rose-600 text-white flex items-center justify-center shadow-xs animate-pulse">
+        {count > 99 ? '99+' : count}
+      </span>
+    );
+  };
 
   if (isBapenda) {
     return null;
@@ -95,7 +107,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               activeTab === 'kegiatan_pkk' ? 'text-emerald-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <FileText className={`w-5 h-5 ${activeTab === 'kegiatan_pkk' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+            <div className="relative">
+              <FileText className={`w-5 h-5 ${activeTab === 'kegiatan_pkk' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              {renderBadge('kegiatan_pkk')}
+            </div>
             <span className="text-[10px] mt-0.5 tracking-tight">Kegiatan</span>
           </button>
 
@@ -104,7 +119,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <button
               type="button"
               onClick={() => onSelectTab('keuangan_pkk')}
-              className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer border-2 border-white ${
+              className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer border-2 border-white relative ${
                 activeTab === 'keuangan_pkk'
                   ? 'bg-gradient-to-tr from-teal-800 to-emerald-700 text-white ring-2 ring-teal-500 ring-offset-2'
                   : 'bg-gradient-to-tr from-teal-700 to-emerald-600 text-white hover:brightness-105'
@@ -112,6 +127,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               title="Buku Kas Umum PKK"
             >
               <Wallet className="w-5 h-5 stroke-[2.5]" />
+              {renderBadge('keuangan_pkk')}
               <span className="sr-only">Kas PKK</span>
             </button>
           </div>
@@ -124,7 +140,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               activeTab === 'dasa_wisma' ? 'text-blue-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Users className={`w-5 h-5 ${activeTab === 'dasa_wisma' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+            <div className="relative">
+              <Users className={`w-5 h-5 ${activeTab === 'dasa_wisma' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              {renderBadge('dasa_wisma')}
+            </div>
             <span className="text-[10px] mt-0.5 tracking-tight">Dasa Wisma</span>
           </button>
         </nav>
@@ -211,7 +230,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 activeTab === 'riwayat' ? 'text-teal-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <FileText className={`w-5 h-5 ${activeTab === 'riwayat' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              <div className="relative">
+                <FileText className={`w-5 h-5 ${activeTab === 'riwayat' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                {renderBadge('riwayat')}
+              </div>
               <span className="text-[10px] mt-0.5 tracking-tight">Riwayat</span>
             </button>
           </>
@@ -238,7 +260,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 id="btn-mobile-nav-infra-center"
                 type="button"
                 onClick={() => onSelectTab('realisasi_pembangunan')}
-                className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer border-2 border-white ${
+                className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer border-2 border-white relative ${
                   activeTab === 'realisasi_pembangunan'
                     ? 'bg-gradient-to-tr from-blue-900 to-indigo-700 text-white ring-2 ring-blue-500 ring-offset-2'
                     : 'bg-gradient-to-tr from-blue-700 to-indigo-600 text-white hover:brightness-105'
@@ -246,6 +268,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 title="Realisasi Pembangunan Fisik & Sarpras"
               >
                 <Wrench className="w-5 h-5 stroke-[2.5]" />
+                {renderBadge('realisasi_pembangunan')}
                 <span className="sr-only">Infrastruktur</span>
               </button>
             </div>
@@ -258,7 +281,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 activeTab === 'kunjungan' ? 'text-emerald-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <Users className={`w-5 h-5 ${activeTab === 'kunjungan' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              <div className="relative">
+                <Users className={`w-5 h-5 ${activeTab === 'kunjungan' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                {renderBadge('kunjungan')}
+              </div>
               <span className="text-[10px] mt-0.5 tracking-tight">Sambang</span>
             </button>
 
@@ -270,7 +296,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 activeTab === 'riwayat' ? 'text-blue-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <FileText className={`w-5 h-5 ${activeTab === 'riwayat' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              <div className="relative">
+                <FileText className={`w-5 h-5 ${activeTab === 'riwayat' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                {renderBadge('riwayat')}
+              </div>
               <span className="text-[10px] mt-0.5 tracking-tight">Riwayat</span>
             </button>
           </>
@@ -317,7 +346,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 activeTab === 'kegiatan_khusus' ? 'text-emerald-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <UserCheck className={`w-5 h-5 ${activeTab === 'kegiatan_khusus' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              <div className="relative">
+                <UserCheck className={`w-5 h-5 ${activeTab === 'kegiatan_khusus' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                {renderBadge('kegiatan_khusus')}
+              </div>
               <span className="text-[10px] mt-0.5 tracking-tight">Patroli</span>
             </button>
 
@@ -329,7 +361,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 activeTab === 'riwayat' ? 'text-amber-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <FileText className={`w-5 h-5 ${activeTab === 'riwayat' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              <div className="relative">
+                <FileText className={`w-5 h-5 ${activeTab === 'riwayat' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                {renderBadge('riwayat')}
+              </div>
               <span className="text-[10px] mt-0.5 tracking-tight">Riwayat</span>
             </button>
           </>
@@ -349,7 +384,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Users className={`w-5 h-5 ${activeTab === 'kunjungan' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                <div className="relative">
+                  <Users className={`w-5 h-5 ${activeTab === 'kunjungan' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                  {renderBadge('kunjungan')}
+                </div>
                 <span className="text-[10px] mt-0.5 tracking-tight">Sambang</span>
               </button>
             )}
@@ -365,7 +403,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <ShieldCheck className={`w-5 h-5 ${activeTab === 'monitoring' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                <div className="relative">
+                  <ShieldCheck className={`w-5 h-5 ${activeTab === 'monitoring' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                  {renderBadge('monitoring')}
+                </div>
                 <span className="text-[10px] mt-0.5 tracking-tight">Monitoring</span>
               </button>
             )}

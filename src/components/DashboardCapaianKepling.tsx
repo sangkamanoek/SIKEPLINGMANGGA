@@ -81,6 +81,7 @@ import {
   computeKelurahanPemetaanOverview,
 } from '../lib/pemetaanStatsHelper';
 import { TitikRumahBangunan, RuasJalanLingkungan, LingkunganPolygon } from '../types';
+import { VirtualList } from './VirtualList';
 import {
   AVAILABLE_PBB_YEARS,
   DEFAULT_PBB_YEAR,
@@ -314,6 +315,8 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedKeplingCard, setSelectedKeplingCard] = useState<string | null>(null);
   const [leaderboardSort, setLeaderboardSort] = useState<LeaderboardSortCriterion>('KOMPOSIT');
+  const [adminReportSearch, setAdminReportSearch] = useState<string>('');
+  const [adminReportKeplingFilter, setAdminReportKeplingFilter] = useState<string>('ALL');
 
   const isPbbAllowed = useMemo(() => {
     return (
@@ -507,6 +510,29 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     if (mode !== 'kepling') return [];
     return filteredReportsByPeriod.filter((r) => isReportMatchingKepling(r, activeAccount));
   }, [filteredReportsByPeriod, activeAccount, mode]);
+
+  // Admin filtered reports for Virtual Windowing feed
+  const adminFilteredReports = useMemo(() => {
+    if (mode !== 'super_admin') return [];
+    return filteredReportsByPeriod.filter((rep) => {
+      if (adminReportKeplingFilter !== 'ALL') {
+        if (rep.namaKepling?.trim().toLowerCase() !== adminReportKeplingFilter.trim().toLowerCase()) {
+          return false;
+        }
+      }
+      if (!adminReportSearch) return true;
+      const term = adminReportSearch.toLowerCase();
+      return (
+        (rep.namaKepling || '').toLowerCase().includes(term) ||
+        (rep.jabatan || '').toLowerCase().includes(term) ||
+        (rep.tanggal || '').toLowerCase().includes(term) ||
+        (rep.hari || '').toLowerCase().includes(term) ||
+        (rep.kinerja?.kegiatanLainnya || '').toLowerCase().includes(term) ||
+        (rep.kinerja?.opsirPbbKeterangan || '').toLowerCase().includes(term) ||
+        (rep.kinerja?.perlinsosKeterangan || '').toLowerCase().includes(term)
+      );
+    });
+  }, [mode, filteredReportsByPeriod, adminReportKeplingFilter, adminReportSearch]);
 
   // All time Kepling reports (for calculating total days logged)
   const myAllTimeReports = useMemo(() => {
@@ -2087,22 +2113,33 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
           {/* Riwayat Capaian Harian Kepling Terbaru */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <div className="flex items-center gap-2.5">
                 <BarChart3 className="w-5 h-5 text-emerald-700" />
-                <h3 className="font-bold text-slate-900 text-sm sm:text-base">
-                  Rincian Capaian Laporan Terbaru ({myReports.length} Laporan Periode Ini)
-                </h3>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                    Rincian Capaian Laporan Terbaru ({myReports.length} Laporan Periode Ini)
+                  </h3>
+                  <p className="text-[11px] text-slate-500 hidden sm:block">
+                    Daftar laporan harian dengan sistem Virtual Windowing agar scroll lancar di HP
+                  </p>
+                </div>
               </div>
-              {onSelectKeplingRiwayat && (
-                <button
-                  type="button"
-                  onClick={() => onSelectKeplingRiwayat(activeAccount.nama)}
-                  className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
-                >
-                  Lihat Semua Riwayat →
-                </button>
-              )}
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>⚡ Virtual Windowing</span>
+                </span>
+                {onSelectKeplingRiwayat && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectKeplingRiwayat(activeAccount.nama)}
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+                  >
+                    Lihat Semua Riwayat →
+                  </button>
+                )}
+              </div>
             </div>
 
             {myReports.length === 0 ? (
@@ -2116,12 +2153,17 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {myReports.slice(0, 5).map((rep) => (
+              <VirtualList
+                items={myReports}
+                itemHeight={96}
+                overscan={4}
+                maxHeight="480px"
+                keyExtractor={(rep) => rep.id}
+                renderItem={(rep) => (
                   <div
                     key={rep.id}
                     onClick={() => onOpenReportDetail && onOpenReportDetail(rep)}
-                    className="p-4 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 rounded-xl transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                    className="mb-2.5 p-4 bg-slate-50 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 rounded-xl transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -2159,8 +2201,8 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 transition-transform group-hover:translate-x-0.5" />
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+              />
             )}
           </div>
         </div>
@@ -3129,6 +3171,139 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 );
               })}
             </div>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* RINCIAN SELURUH LAPORAN MASUK SE-KELURAHAN (VIRTUAL LIST WINDOWING)       */}
+          {/* ========================================================================= */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-7 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-center font-black shrink-0">
+                  <BarChart3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">
+                    Rincian Seluruh Laporan Masuk ({filteredReportsByPeriod.length} Laporan Periode Ini)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Sistem Virtual Windowing aktif agar performa HP berspesifikasi rendah tetap lancar & hemat RAM
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>⚡ Virtual Windowing</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar for Admin Reports */}
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2 border-t border-slate-100">
+              <div className="relative flex-1 w-full">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Cari nama kepling, lingkungan, tanggal, kegiatan..."
+                  value={adminReportSearch}
+                  onChange={(e) => setAdminReportSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:border-emerald-500 focus:outline-none transition-colors"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <select
+                  value={adminReportKeplingFilter}
+                  onChange={(e) => setAdminReportKeplingFilter(e.target.value)}
+                  className="w-full sm:w-48 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:bg-white focus:border-emerald-500 focus:outline-none transition-colors cursor-pointer"
+                >
+                  <option value="ALL">Semua 24 Lingkungan</option>
+                  {KEPLING_ACCOUNTS.map((k) => (
+                    <option key={k.id} value={k.nama}>
+                      {k.lingkungan} - {k.nama}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Virtual List Container */}
+            {adminFilteredReports.length === 0 ? (
+              <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-2xl text-slate-500 space-y-2">
+                <AlertCircle className="w-8 h-8 mx-auto text-slate-400" />
+                <p className="text-xs font-bold text-slate-700">
+                  Tidak ditemukan laporan yang sesuai dengan filter.
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Coba ganti kata kunci pencarian atau ubah filter lingkungan.
+                </p>
+              </div>
+            ) : (
+              <VirtualList
+                items={adminFilteredReports}
+                itemHeight={96}
+                overscan={4}
+                maxHeight="480px"
+                keyExtractor={(rep) => rep.id}
+                renderItem={(rep) => (
+                  <div
+                    key={rep.id}
+                    onClick={() => onOpenReportDetail && onOpenReportDetail(rep)}
+                    className="mb-2.5 p-3.5 sm:p-4 bg-slate-50/80 hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 rounded-2xl transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                          {rep.hari}
+                        </span>
+                        <span className="text-xs font-bold text-slate-800">
+                          {rep.tanggal}
+                        </span>
+                        <span className="text-xs font-black text-slate-900 bg-emerald-100/80 text-emerald-950 px-2 py-0.5 rounded">
+                          {rep.namaKepling}
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {rep.jabatan}
+                        </span>
+                        {rep.jumlahDokumentasi > 0 && (
+                          <span className="text-[10px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                            📷 {rep.jumlahDokumentasi} Foto
+                          </span>
+                        )}
+                      </div>
+                      {rep.kinerja?.kegiatanLainnya && (
+                        <p className="text-xs text-slate-600 line-clamp-1">
+                          {rep.kinerja.kegiatanLainnya}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 sm:gap-3 text-xs font-bold text-slate-700 shrink-0 self-end sm:self-auto">
+                      <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs text-center">
+                        <span className="text-[9px] text-slate-400 block font-normal uppercase">PBB</span>
+                        <span className="text-emerald-700 text-[11px] font-black">{rep.kinerja?.opsirPbbWp || '0'} WP</span>
+                      </div>
+                      <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs text-center">
+                        <span className="text-[9px] text-slate-400 block font-normal uppercase">Perlinsos</span>
+                        <span className="text-blue-700 text-[11px] font-black">{rep.kinerja?.perlinsosKk || '0'} KK</span>
+                      </div>
+                      <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs text-center">
+                        <span className="text-[9px] text-slate-400 block font-normal uppercase">IKD</span>
+                        <span className="text-purple-700 text-[11px] font-black">{rep.kinerja?.ikdOrang || '0'} Org</span>
+                      </div>
+                      <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs text-center">
+                        <span className="text-[9px] text-slate-400 block font-normal uppercase">BPJS</span>
+                        <span className="text-amber-700 text-[11px] font-black">{rep.kinerja?.bpjsKetenagakerjaanOrang || '0'} Org</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 transition-transform group-hover:translate-x-0.5" />
+                    </div>
+                  </div>
+                )}
+              />
+            )}
           </div>
         </div>
       )}

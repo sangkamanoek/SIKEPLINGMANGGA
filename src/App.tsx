@@ -61,6 +61,7 @@ import { customFetch } from './lib/fetchInterceptor';
 import { getDefaultTargetsCapaianMap } from './data/targetsData';
 import { fetchTargetsCapaian, subscribeTargetsFromFirestore } from './lib/targetsApi';
 import { fetchAllDataKeluarga } from './lib/dataKeluargaService';
+import { useFeatureNotifications } from './hooks/useFeatureNotifications';
 
 // Code-Splitting: Lazy load heavy modules to guarantee fast initial startup
 const ViewImagesPage = React.lazy(() => import('./components/ViewImagesPage'));
@@ -367,6 +368,29 @@ export default function App() {
   const [isLoadingReports, setIsLoadingReports] = useState(false);
   const [isRefreshingReports, setIsRefreshingReports] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Real-time unread/new reports counter across all features
+  const { unreadCounts, totalUnreadCount } = useFeatureNotifications({
+    activeAccount,
+    activeTab,
+    reports,
+    kunjunganList,
+    customEvents,
+  });
+
+  // Render notification badge on navigation tab menu buttons
+  const renderTabBadge = useCallback((featureKey: string) => {
+    const count = unreadCounts[featureKey] || 0;
+    if (count <= 0) return null;
+    return (
+      <span
+        className="ml-1.5 px-1.5 py-0.2 min-w-[18px] h-[18px] inline-flex items-center justify-center rounded-full text-[10px] font-black bg-rose-600 text-white shadow-xs animate-pulse ring-1 ring-white/60 tracking-tight"
+        title={`${count} laporan baru`}
+      >
+        {count > 99 ? '99+' : count}
+      </span>
+    );
+  }, [unreadCounts]);
 
   // Modal detail view
   const [selectedReport, setSelectedReport] = useState<LaporanHarianItem | null>(null);
@@ -1150,6 +1174,7 @@ export default function App() {
                   <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'kegiatan_pkk' ? 'bg-tosca-800 text-tosca-100' : 'bg-tosca-100 text-tosca-900'}`}>
                     POKJA
                   </span>
+                  {renderTabBadge('kegiatan_pkk')}
                 </button>
 
                 {/* PKK Tab 3: Laporan Keuangan BKU PKK */}
@@ -1168,6 +1193,7 @@ export default function App() {
                   <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'keuangan_pkk' ? 'bg-tosca-800 text-tosca-100' : 'bg-tosca-100 text-tosca-900'}`}>
                     BKU
                   </span>
+                  {renderTabBadge('keuangan_pkk')}
                 </button>
 
                 {/* PKK Tab 4: Rekap Dasa Wisma & Posyandu 24 Lingkungan */}
@@ -1186,6 +1212,7 @@ export default function App() {
                   <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'dasa_wisma' ? 'bg-tosca-800 text-tosca-100' : 'bg-tosca-100 text-tosca-900'}`}>
                     24 LINGK.
                   </span>
+                  {renderTabBadge('dasa_wisma')}
                 </button>
 
                 {/* PKK Tab 4b: Laporan Posyandu */}
@@ -1204,6 +1231,7 @@ export default function App() {
                   <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'posyandu_pkk' ? 'bg-rose-900 text-rose-100' : 'bg-rose-100 text-rose-800'}`}>
                     POKJA IV
                   </span>
+                  {renderTabBadge('posyandu_pkk')}
                 </button>
 
                 {/* PKK Tab 5: 6 Buku Wajib PKK Kelurahan */}
@@ -1222,6 +1250,7 @@ export default function App() {
                   <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'buku_pkk' ? 'bg-tosca-800 text-tosca-100' : 'bg-tosca-100 text-tosca-900'}`}>
                     BUKU I-VI
                   </span>
+                  {renderTabBadge('buku_pkk')}
                 </button>
               </>
             ) : activeAccount.role === 'kepling' ? (
@@ -1268,6 +1297,7 @@ export default function App() {
                 >
                   <UserCheck className={`w-4 h-4 ${activeTab === 'kegiatan_khusus' ? 'text-white' : 'text-emerald-600'}`} />
                   <span>Absen Kegiatan Khusus</span>
+                  {renderTabBadge('kegiatan_khusus')}
                 </button>
 
                 {/* Kepling Tab 1b: Kunjungan Harian Warga */}
@@ -1286,6 +1316,7 @@ export default function App() {
                   <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'kunjungan' ? 'bg-tosca-700 text-tosca-100' : 'bg-tosca-100 text-emerald-800'}`}>
                     WARGA
                   </span>
+                  {renderTabBadge('kunjungan')}
                 </button>
 
                 {/* Kepling Tab 1: Formulir Laporan */}
@@ -1337,6 +1368,7 @@ export default function App() {
                   <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'realisasi_pembangunan' ? 'bg-tosca-800 text-tosca-100' : 'bg-tosca-100 text-tosca-900'}`}>
                     INFRA
                   </span>
+                  {renderTabBadge('realisasi_pembangunan')}
                 </button>
 
                 {/* Kepling Tab 2: Dashboard Capaian Saya */}
@@ -1391,6 +1423,7 @@ export default function App() {
                 >
                   <History className={`w-4 h-4 ${activeTab === 'riwayat' ? 'text-white' : 'text-tosca-700'}`} />
                   <span>Riwayat Laporan Saya</span>
+                  {renderTabBadge('riwayat')}
                 </button>
               </>
             ) : (
@@ -1497,6 +1530,7 @@ export default function App() {
                     <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'realisasi_pembangunan' ? 'bg-tosca-800 text-tosca-100' : 'bg-tosca-100 text-tosca-900'}`}>
                       INFRA
                     </span>
+                    {renderTabBadge('realisasi_pembangunan')}
                   </button>
                 )}
 
@@ -1514,6 +1548,7 @@ export default function App() {
                   >
                     <Users className={`w-4 h-4 ${activeTab === 'kunjungan' ? 'text-white' : 'text-tosca-700'}`} />
                     <span>Kunjungan Warga</span>
+                    {renderTabBadge('kunjungan')}
                   </button>
                 )}
 
@@ -1556,6 +1591,7 @@ export default function App() {
                   >
                     <History className={`w-4 h-4 ${activeTab === 'riwayat' ? 'text-white' : 'text-tosca-700'}`} />
                     <span>Riwayat Laporan</span>
+                    {renderTabBadge('riwayat')}
                   </button>
                 )}
 
@@ -1613,11 +1649,7 @@ export default function App() {
                     >
                       <History className={`w-4 h-4 ${activeTab === 'riwayat' ? 'text-white' : 'text-tosca-700'}`} />
                       <span>Semua Riwayat</span>
-                      {reports.length > 0 && (
-                        <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${activeTab === 'riwayat' ? 'bg-tosca-700 text-tosca-100' : 'bg-slate-200 text-slate-800'}`}>
-                          {reports.length}
-                        </span>
-                      )}
+                      {renderTabBadge('riwayat')}
                     </button>
 
                     {/* Super Admin Tab 4: Kunjungan Harian 24 Kepling */}
@@ -1636,6 +1668,7 @@ export default function App() {
                       <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'kunjungan' ? 'bg-tosca-700 text-tosca-100' : 'bg-tosca-100 text-emerald-800'}`}>
                         24 LINGKUNGAN
                       </span>
+                      {renderTabBadge('kunjungan')}
                     </button>
 
                     {/* Super Admin Tab 4b: Pemetaan WebGIS 24 Lingkungan */}
@@ -1672,6 +1705,7 @@ export default function App() {
                       <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'realisasi_pembangunan' ? 'bg-tosca-800 text-tosca-100' : 'bg-tosca-100 text-tosca-900'}`}>
                         INFRA
                       </span>
+                      {renderTabBadge('realisasi_pembangunan')}
                     </button>
 
                     {/* Super Admin Tab Surat Kedinasan */}
@@ -1690,6 +1724,7 @@ export default function App() {
                       <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'surat_kedinasan' ? 'bg-tosca-800 text-tosca-100' : 'bg-tosca-100 text-tosca-900'}`}>
                         ARSIP
                       </span>
+                      {renderTabBadge('surat_kedinasan')}
                     </button>
 
                     {/* Super Admin Tab 5: Input Formulir / Rangkuman Laporan */}
@@ -1781,6 +1816,7 @@ export default function App() {
                   activeAccount={activeAccount}
                   reports={reports}
                   attendanceList={attendanceList}
+                  unreadCounts={unreadCounts}
                   isGoogleConnected={Boolean(user && token)}
                   googleUserEmail={user?.email}
                   spreadsheetTitle={sheetMeta?.title}
@@ -2215,6 +2251,7 @@ export default function App() {
         activeAccount={activeAccount}
         hasAbsenToday={hasAbsenToday}
         hasLaporToday={hasLaporToday}
+        unreadCounts={unreadCounts}
       />
 
       {/* Modals with Lazy Loading */}

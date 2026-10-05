@@ -41,6 +41,7 @@ interface SmartHubDashboardProps {
   activeAccount: UserAccount;
   reports: LaporanHarianItem[];
   attendanceList: AbsenApelItem[];
+  unreadCounts?: Record<string, number>;
   onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan') => void;
   onOpenAbsenApel: () => void;
   onOpenPPTModal: () => void;
@@ -55,6 +56,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
   activeAccount,
   reports,
   attendanceList,
+  unreadCounts = {},
   onNavigate,
   onOpenAbsenApel,
   onOpenPPTModal,
@@ -935,9 +937,16 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                   className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
                 >
                   <div className="space-y-1.5">
-                    <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
-                      🤝 Kesejahteraan Sosial
-                    </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                        🤝 Kesejahteraan Sosial
+                      </span>
+                      {unreadCounts?.['kunjungan'] && unreadCounts['kunjungan'] > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-xs animate-pulse ring-1 ring-white/50">
+                          {unreadCounts['kunjungan']} Baru
+                        </span>
+                      ) : null}
+                    </div>
                     <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
                       Kunjungan Warga Rentan
                     </h3>
@@ -1136,9 +1145,16 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                   className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
                 >
                   <div className="space-y-1.5">
-                    <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
-                      👤 Presensi &amp; Agenda
-                    </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                        👤 Presensi &amp; Agenda
+                      </span>
+                      {unreadCounts?.['riwayat'] && unreadCounts['riwayat'] > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-xs animate-pulse ring-1 ring-white/50">
+                          {unreadCounts['riwayat']} Laporan Baru
+                        </span>
+                      ) : null}
+                    </div>
                     <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
                       {isAdmin ? 'Radar Tugas & Kehadiran' : 'Riwayat Laporan Saya'}
                     </h3>
@@ -1490,6 +1506,11 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                     <span className={`text-[8px] px-1.5 py-0.5 rounded font-black tracking-wider ${menu.badgeColor}`}>
                       {menu.badge}
                     </span>
+                    {unreadCounts?.[menu.id] && unreadCounts[menu.id] > 0 ? (
+                      <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-rose-600 text-white shadow-xs animate-pulse ring-1 ring-white/50">
+                        {unreadCounts[menu.id]} Baru
+                      </span>
+                    ) : null}
                   </div>
                   <p className={`text-[11px] mt-1 line-clamp-2 leading-relaxed ${isSpecialGis ? 'text-slate-300' : 'text-slate-500'}`}>
                     {menu.desc}

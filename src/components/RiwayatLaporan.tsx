@@ -26,6 +26,7 @@ import {
 import { LaporanHarianItem, SheetMetadata, UserAccount, KinerjaHarian } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
 import { isReportMatchingKepling, isReportMatchingDate } from '../lib/formatter';
+import { VirtualList } from './VirtualList';
 
 interface RiwayatLaporanProps {
   items: LaporanHarianItem[];
@@ -763,14 +764,29 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
         </div>
       </div>
 
-      {/* List of Filtered Reports */}
+      {/* List of Filtered Reports with Virtual Windowing */}
       {filtered.length > 0 ? (
         <div className="space-y-4">
-          <div className="space-y-3">
-            {paginatedItems.map((item) => (
+          <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Memuat <strong>{paginatedItems.length}</strong> dari <strong>{filtered.length}</strong> laporan</span>
+            </span>
+            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span>⚡ Virtual Windowing</span>
+              <span className="hidden sm:inline font-normal text-emerald-700">• Ringan untuk HP</span>
+            </span>
+          </div>
+
+          <VirtualList
+            items={paginatedItems}
+            itemHeight={260}
+            overscan={5}
+            keyExtractor={(item) => item.id}
+            renderItem={(item) => (
             <div
               key={item.id}
-              className="p-5 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 hover:shadow-xs transition-all space-y-3"
+              className="mb-3 p-5 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 hover:shadow-xs transition-all space-y-3"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -988,77 +1004,87 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 </div>
               )}
             </div>
-          ))}
-          </div>
+            )}
+          />
 
           {/* Pagination Controls Bar */}
-          {totalPages > 1 && (
+          {(totalPages > 1 || pageSize === -1 || filtered.length > 10) && (
             <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-slate-600">
-                <span>Menampilkan halaman <strong className="text-emerald-700 font-bold">{currentPage}</strong> dari <strong>{totalPages}</strong></span>
-                <span className="text-slate-300">•</span>
-                <span>(Total {filtered.length} laporan)</span>
+                {pageSize === -1 ? (
+                  <span>Menampilkan <strong className="text-emerald-700 font-bold">Semua {filtered.length}</strong> laporan dengan Virtual Windowing</span>
+                ) : (
+                  <>
+                    <span>Menampilkan halaman <strong className="text-emerald-700 font-bold">{currentPage}</strong> dari <strong>{totalPages}</strong></span>
+                    <span className="text-slate-300">•</span>
+                    <span>(Total {filtered.length} laporan)</span>
+                  </>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 mr-2 text-slate-500">
-                  <span className="text-[11px]">Baris:</span>
+                  <span className="text-[11px]">Tampilkan:</span>
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
                     className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 cursor-pointer"
                   >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={-1}>Semua</option>
+                    <option value={10}>10 Baris</option>
+                    <option value={20}>20 Baris</option>
+                    <option value={50}>50 Baris</option>
+                    <option value={100}>100 Baris</option>
+                    <option value={-1}>Semua (Virtual Scroll ⚡)</option>
                   </select>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                  title="Halaman Sebelumnya"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
+                {pageSize !== -1 && totalPages > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="p-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                      title="Halaman Sebelumnya"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
 
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pNum = i + 1;
-                    if (totalPages > 5 && currentPage > 3) {
-                      pNum = currentPage - 2 + i;
-                      if (pNum > totalPages) pNum = totalPages - (4 - i);
-                    }
-                    return (
-                      <button
-                        key={pNum}
-                        type="button"
-                        onClick={() => setCurrentPage(pNum)}
-                        className={`w-8 h-8 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
-                          currentPage === pNum
-                            ? 'bg-emerald-700 text-white shadow-2xs'
-                            : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        {pNum}
-                      </button>
-                    );
-                  })}
-                </div>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pNum = i + 1;
+                        if (totalPages > 5 && currentPage > 3) {
+                          pNum = currentPage - 2 + i;
+                          if (pNum > totalPages) pNum = totalPages - (4 - i);
+                        }
+                        return (
+                          <button
+                            key={pNum}
+                            type="button"
+                            onClick={() => setCurrentPage(pNum)}
+                            className={`w-8 h-8 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
+                              currentPage === pNum
+                                ? 'bg-emerald-700 text-white shadow-2xs'
+                                : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            {pNum}
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                  title="Halaman Berikutnya"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="p-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                      title="Halaman Berikutnya"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
