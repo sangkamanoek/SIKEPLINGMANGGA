@@ -439,6 +439,32 @@ const saveStoredPkkKeuangan = (items: any[]) => {
 
 let pkkKeuanganCache = loadStoredPkkKeuangan();
 
+// Arsip Surat Kedinasan Data File
+const SURAT_FILE = path.join(DATA_DIR, 'surat.json');
+
+const loadStoredSurat = (): any[] => {
+  try {
+    if (fs.existsSync(SURAT_FILE)) {
+      const content = fs.readFileSync(SURAT_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.error('Error reading surat file:', err);
+  }
+  return [];
+};
+
+const saveStoredSurat = (items: any[]) => {
+  try {
+    fs.writeFileSync(SURAT_FILE, JSON.stringify(items, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving surat file:', err);
+  }
+};
+
+let suratCache = loadStoredSurat();
+
 // Strict Anti-Cache Headers Middleware for all /api calls
 app.use('/api', (_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -878,6 +904,96 @@ app.delete('/api/pkk/keuangan/:id', (req, res) => {
   }
 });
 
+// =========================================================================
+// ARSIP SURAT KEDINASAN CRUD ENDPOINTS
+// =========================================================================
+
+app.get('/api/surat', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  if (req.query.light === 'true') {
+    const lightSurat = suratCache.map((s) => {
+      const { fileUrl, ...rest } = s;
+      return {
+        ...rest,
+        hasPdf: Boolean(fileUrl),
+      };
+    });
+    return res.json({
+      success: true,
+      count: lightSurat.length,
+      data: lightSurat,
+    });
+  }
+
+  return res.json({
+    success: true,
+    count: suratCache.length,
+    data: suratCache,
+  });
+});
+
+app.post('/api/surat', (req, res) => {
+  try {
+    const rawBody = req.body;
+    const items = rawBody?.items || (Array.isArray(rawBody) ? rawBody : null);
+    const item = rawBody?.item || (!items && rawBody?.nomorSurat ? rawBody : null);
+
+    // Batch save
+    if (Array.isArray(items)) {
+      for (const it of items) {
+        if (!it || !it.id) continue;
+        const idx = suratCache.findIndex((s) => s.id === it.id);
+        if (idx >= 0) {
+          suratCache[idx] = { ...suratCache[idx], ...it, updatedAt: new Date().toISOString() };
+        } else {
+          suratCache.unshift({ ...it, updatedAt: new Date().toISOString() });
+        }
+      }
+      saveStoredSurat(suratCache);
+      return res.json({ success: true, count: suratCache.length, data: suratCache });
+    }
+
+    if (!item) {
+      return res.status(400).json({ success: false, message: 'Data surat tidak lengkap' });
+    }
+
+    if (!item.id) {
+      item.id = 'surat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    }
+    if (!item.createdAt) {
+      item.createdAt = new Date().toISOString();
+    }
+
+    const idx = suratCache.findIndex((s) => s.id === item.id);
+    if (idx >= 0) {
+      suratCache[idx] = { ...suratCache[idx], ...item, updatedAt: new Date().toISOString() };
+    } else {
+      suratCache.unshift({ ...item, updatedAt: new Date().toISOString() });
+    }
+
+    saveStoredSurat(suratCache);
+    return res.json({ success: true, data: item, count: suratCache.length });
+  } catch (err: any) {
+    console.error('Error saving surat:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/surat/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    suratCache = suratCache.filter((s) => s.id !== id);
+    saveStoredSurat(suratCache);
+    return res.json({ success: true, count: suratCache.length, message: `Surat ${id} dihapus` });
+  } catch (err: any) {
+    console.error('Error deleting surat:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET PBB SPPT records for given year (e.g. ?year=2026)
 app.get('/api/pbb', (req, res) => {
   const year = String(req.query.year || '2026');
@@ -1111,6 +1227,8 @@ app.post('/api/wipe-all-data', (_req, res) => {
     saveStoredAttendance(attendanceCache);
     deletedReportsCache = [];
     saveStoredDeletedReports(deletedReportsCache);
+    suratCache = [];
+    saveStoredSurat(suratCache);
     return res.json({ success: true, message: 'Seluruh data server berhasil dikosongkan untuk entri baru' });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });

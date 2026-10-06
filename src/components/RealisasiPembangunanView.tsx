@@ -6,7 +6,6 @@ import {
   Search,
   Filter,
   Download,
-  Printer,
   CheckCircle2,
   Clock,
   Sparkles,
@@ -55,7 +54,6 @@ import {
   batchSyncPembangunan,
   PEMBANGUNAN_STORAGE_KEY,
 } from '../lib/pembangunanService';
-import { CetakLaporanPembangunanModal } from './CetakLaporanPembangunanModal';
 import { FormLaporanMonitoringModal } from './FormLaporanMonitoringModal';
 import {
   subscribeMonitoringReports,
@@ -295,7 +293,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isCetakModalOpen, setIsCetakModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<RealisasiPembangunan | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<{
     title: string;
@@ -1064,15 +1061,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
               <span>Ekspor Excel</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setIsCetakModalOpen(true)}
-              className="px-3.5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title="Buka Lembar Cetak Resmi Standar Kedinasan Pemko Medan &amp; Dokumentasi Foto Lengkap"
-            >
-              <Printer className="w-3.5 h-3.5 text-white" />
-              <span>Cetak Laporan Resmi</span>
-            </button>
           </div>
 
           {items.length > 0 && (
@@ -1660,11 +1648,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                 </span>
                 <span aria-hidden="true">·</span>
                 <span>Kelurahan Mangga</span>
-                <span aria-hidden="true">·</span>
-                <span className="flex items-center gap-1 text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Format Resmi Kedinasan (3 Angle Foto)</span>
-                </span>
               </div>
 
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug">
@@ -2120,7 +2103,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                           type="button"
                           onClick={() => handleShareWhatsApp(mon)}
                           className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border border-emerald-400/30"
-                          title="Kirim Format Laporan Resmi ke WhatsApp"
+                          title="Kirim Format Laporan ke WhatsApp"
                         >
                           <Share2 className="w-3.5 h-3.5" />
                           <span>Laporan WA</span>
@@ -3210,13 +3193,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         </div>
       )}
 
-      {/* MODAL CETAK LAPORAN STANDAR RESMI PEMKO MEDAN */}
-      <CetakLaporanPembangunanModal
-        isOpen={isCetakModalOpen}
-        onClose={() => setIsCetakModalOpen(false)}
-        items={filteredItems}
-        currentUser={currentUser}
-      />
 
       {/* MODAL FORM INPUT/EDIT LAPORAN MONITORING INFRASTRUKTUR */}
       <FormLaporanMonitoringModal

@@ -56,6 +56,8 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   const isPkk = isPkkRole(activeAccount.role) || portalMode === 'pkk';
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
+  const [isHelperMenuOpen, setIsHelperMenuOpen] = useState(false);
+  const helperMenuRef = useRef<HTMLDivElement | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [hasNewUpdate, setHasNewUpdate] = useState(false);
@@ -118,12 +120,15 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
         setIsMobileMenuOpen(false);
       }
+      if (helperMenuRef.current && !helperMenuRef.current.contains(e.target as Node)) {
+        setIsHelperMenuOpen(false);
+      }
     };
-    if (isMobileMenuOpen) {
+    if (isMobileMenuOpen || isHelperMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isMobileMenuOpen]);
+  }, [isMobileMenuOpen, isHelperMenuOpen]);
   return (
     <header className={`${isPkk ? 'bg-tosca-700' : 'bg-emerald-800'} text-white shadow-lg print:hidden transition-colors duration-500`}>
       {/* Top Banner with Medan Logo Replica and Tagline */}
@@ -226,9 +231,9 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                   : 'KEPALA LINGKUNGAN'}
               </span>
             </div>
-            <p className={`${isPkk ? 'text-tosca-100/90' : 'text-emerald-100/90'} text-[11px] sm:text-xs uppercase tracking-wider font-semibold mt-0.5 truncate max-w-xl`}>
+            <p className={`${isPkk ? 'text-tosca-100' : 'text-emerald-100'} text-xs sm:text-sm font-bold tracking-wider mt-1 leading-snug drop-shadow-xs`}>
               {activeAccount.role === 'super_admin'
-                ? 'MONITORING LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN'
+                ? 'MONITORING LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN Kelurahan Mangga'
                 : activeAccount.role === 'kasi_pemerintahan'
                 ? 'DASHBOARD LAPORAN & MONITORING REALISASI OPSIR PBB 24 LINGKUNGAN'
                 : activeAccount.role === 'kasi_pembangunan'
@@ -239,8 +244,8 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                   activeAccount.role === 'ketua_pokja' ||
                   activeAccount.role === 'ketua_pkk_lingkungan' ||
                   activeAccount.role === 'sekretaris_pkk'
-                ? 'PORTAL KEGIATAN & KEUANGAN TIM PENGGERAK PKK'
-                : `KECAMATAN MEDAN TUNTUNGAN`}
+                ? 'PORTAL RESMI KEGIATAN & KEUANGAN TIM PENGGERAK PKK KELURAHAN MANGGA'
+                : `KECAMATAN MEDAN TUNTUNGAN • KELURAHAN MANGGA`}
             </p>
           </div>
         </div>
@@ -270,68 +275,79 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
             </button>
           )}
 
-          {onOpenUpdateModal && (
-            <button
-              id="btn-open-update-info-header"
-              type="button"
-              onClick={onOpenUpdateModal}
-              className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-emerald-500/50 text-white font-bold text-xs shadow-md transition-all cursor-pointer shrink-0 hover:scale-[1.02] active:scale-[0.98] relative group"
-              title={`Informasi Pembaruan Aplikasi SiKepling ${CURRENT_APP_VERSION} & Apa yang Baru`}
-            >
-              <div className="relative">
-                <Sparkles className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform" />
+          {/* Unified Help & Info Dropdown Menu Button */}
+          {(onOpenUpdateModal || onOpenPPTModal || onOpenInstallModal) && (
+            <div className="relative" ref={helperMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsHelperMenuOpen(!isHelperMenuOpen)}
+                className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-900/60 hover:bg-emerald-700/80 border border-emerald-500/40 text-emerald-100 font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+                title="Pusat Bantuan, Info Rilis & Panduan Aplikasi"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>Bantuan & Info</span>
                 {hasNewUpdate && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
                 )}
-              </div>
-              <div className="flex flex-col text-left">
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] uppercase tracking-wider text-amber-300 font-black leading-none">
-                    UPDATE
-                  </span>
-                  <span className="text-[9px] text-emerald-400 font-mono font-bold leading-none">
-                    {CURRENT_APP_VERSION}
-                  </span>
+                <ChevronDown className="w-3.5 h-3.5 text-emerald-300" />
+              </button>
+
+              {isHelperMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-2 z-50 text-left animate-fade-in">
+                  <div className="px-3 py-2 border-b border-slate-800 mb-1">
+                    <p className="text-[10px] font-black uppercase text-amber-400">Pusat Informasi & Panduan</p>
+                    <p className="text-[11px] text-slate-300">Akses rilis, materi, & installer</p>
+                  </div>
+
+                  {onOpenUpdateModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHelperMenuOpen(false);
+                        onOpenUpdateModal();
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-amber-300 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
+                        <span>Info Rilis ({CURRENT_APP_VERSION})</span>
+                      </div>
+                      {hasNewUpdate && (
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                      )}
+                    </button>
+                  )}
+
+                  {onOpenPPTModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHelperMenuOpen(false);
+                        onOpenPPTModal();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <Presentation className="w-4 h-4 text-teal-400 shrink-0" />
+                      <span>Buku Panduan PPT</span>
+                    </button>
+                  )}
+
+                  {onOpenInstallModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHelperMenuOpen(false);
+                        onOpenInstallModal();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <Smartphone className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Pasang Aplikasi (APK)</span>
+                    </button>
+                  )}
                 </div>
-                <span className="leading-tight whitespace-nowrap text-slate-200">Info Rilis</span>
-              </div>
-            </button>
-          )}
-
-          {onOpenPPTModal && (
-            <button
-              id="btn-open-ppt-modal"
-              type="button"
-              onClick={onOpenPPTModal}
-              className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-700 hover:bg-teal-600 border border-teal-500/50 text-white font-bold text-xs shadow-md transition-all cursor-pointer shrink-0 hover:scale-[1.02] active:scale-[0.98]"
-              title="Buka Slide Presentation & Download File PowerPoint (.pptx) Panduan Kepling"
-            >
-              <Presentation className="w-4 h-4 text-emerald-300 shrink-0" />
-              <div className="flex flex-col text-left">
-                <span className="text-[9px] uppercase tracking-wider text-teal-200 font-black leading-none">
-                  FILE PPT
-                </span>
-                <span className="leading-tight whitespace-nowrap">Panduan Kepling</span>
-              </div>
-            </button>
-          )}
-
-          {onOpenInstallModal && (
-            <button
-              id="btn-open-install-apk-modal"
-              type="button"
-              onClick={onOpenInstallModal}
-              className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-900/80 hover:bg-emerald-700 border border-emerald-600/60 text-white font-bold text-xs shadow-md transition-all cursor-pointer shrink-0 hover:scale-[1.02] active:scale-[0.98]"
-              title="Pasang aplikasi SI-KEPLING MANGGA di HP Android / iOS"
-            >
-              <Smartphone className="w-4 h-4 text-amber-300 shrink-0" />
-              <div className="flex flex-col text-left">
-                <span className="text-[9px] uppercase tracking-wider text-emerald-200 font-black leading-none">
-                  APK ANDROID
-                </span>
-                <span className="leading-tight whitespace-nowrap">Pasang Aplikasi</span>
-              </div>
-            </button>
+              )}
+            </div>
           )}
 
           {/* Unified User Account Profile Card & Quick Actions */}

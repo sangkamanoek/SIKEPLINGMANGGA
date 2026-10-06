@@ -902,7 +902,7 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
 
                 <div className="pt-8 flex justify-end text-xs font-sans">
                   <div className="text-center w-64 space-y-12">
-                    <p>Medan, {formatTanggalIndonesia(new Date(previewSurat.tanggalSurat))}<br /><strong>{previewSurat.penandatangan || 'Lurah Kelurahan Mangga'}</strong></p>
+                    <p>Medan, {formatTanggalIndonesia(new Date(previewSurat.tanggalSurat))}<br /><strong>Tim Administrasi Kelurahan Mangga</strong></p>
                     <p className="underline font-bold">Kelurahan Mangga</p>
                   </div>
                 </div>
