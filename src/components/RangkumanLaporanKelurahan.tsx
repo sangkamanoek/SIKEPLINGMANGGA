@@ -2563,14 +2563,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
           </div>
 
           {/* Tanda Tangan */}
-          <div className="mt-8 pt-4 flex justify-between text-xs">
-            <div className="text-center w-56">
-              <p>Mengetahui,</p>
-              <p className="font-bold uppercase mt-1">LURAH KELURAHAN MANGGA</p>
-              <div className="h-16" />
-              <p className="font-bold underline">BIMA DANIEL S.P., S.STP, M.SP</p>
-              <p>NIP. 19890623 200804 1 001</p>
-            </div>
+          <div className="mt-8 pt-4 flex justify-end text-xs">
             <div className="text-center w-56">
               <p>Medan, {tanggalLengkapIndo}</p>
               <p className="font-bold uppercase mt-1">SUPER ADMINISTRATOR</p>
@@ -2680,14 +2673,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
             </div>
 
             {/* Tanda Tangan */}
-            <div className="mt-8 pt-4 flex justify-between text-xs">
-              <div className="text-center w-56">
-                <p>Mengetahui,</p>
-                <p className="font-bold uppercase mt-1">LURAH KELURAHAN MANGGA</p>
-                <div className="h-16" />
-                <p className="font-bold underline">BIMA DANIEL S.P., S.STP, M.SP</p>
-                <p>NIP. 19890623 200804 1 001</p>
-              </div>
+            <div className="mt-8 pt-4 flex justify-end text-xs">
               <div className="text-center w-56">
                 <p>Medan, {tanggalLengkapIndo}</p>
                 <p className="font-bold uppercase mt-1">SUPER ADMINISTRATOR</p>

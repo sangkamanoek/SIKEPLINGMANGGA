@@ -501,25 +501,8 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
                       <span>Klasifikasi: Dokumen Kedinasan Resmi • Hal. {idx + 1} dari {filteredItems.length}</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6 text-center pt-0.5">
-                      <div>
-                        <p className="font-bold text-slate-900 text-[8.5px]">
-                          Mengetahui / Menyetujui,
-                        </p>
-                        <div className="h-10 sm:h-12 flex items-center justify-center">
-                          {/* Signature space */}
-                        </div>
-                        <div className="space-y-0.2">
-                          <p className="font-black text-slate-950 underline uppercase text-[8.5px]">
-                            WILLY YANUS GINTING, S.STP
-                          </p>
-                          <p className="text-[7px] text-slate-600">
-                            Penata Tingkat I / NIP. 19850115 200412 1 001
-                          </p>
-                        </div>
-                      </div>
-
-                      <div>
+                    <div className="flex justify-center text-center pt-0.5">
+                      <div className="w-64">
                         <p className="font-bold text-slate-900 text-[8.5px]">
                           Petugas Lapangan / Verifikator,
                         </p>
@@ -640,23 +623,8 @@ export const CetakLaporanPembangunanModal: React.FC<CetakLaporanPembangunanModal
                 <span>Medan, {currentDateFormatted}</span>
                 <span>Klasifikasi: Dokumen Rekapitulasi Resmi</span>
               </div>
-              <div className="grid grid-cols-2 gap-6 text-center pt-0.5">
-                <div>
-                  <p className="font-bold text-slate-900 text-[8.5px]">
-                    Mengetahui / Menyetujui,
-                  </p>
-                  <div className="h-10 sm:h-12 flex items-center justify-center"></div>
-                  <div className="space-y-0.2">
-                    <p className="font-black text-slate-950 underline uppercase text-[8.5px]">
-                      WILLY YANUS GINTING, S.STP
-                    </p>
-                    <p className="text-[7px] text-slate-600">
-                      Penata Tingkat I / NIP. 19850115 200412 1 001
-                    </p>
-                  </div>
-                </div>
-
-                <div>
+              <div className="flex justify-center text-center pt-0.5">
+                <div className="w-64">
                   <p className="font-bold text-slate-900 text-[8.5px]">
                     Petugas Verifikator Lapangan,
                   </p>
