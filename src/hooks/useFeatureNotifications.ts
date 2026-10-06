@@ -246,27 +246,33 @@ export function useFeatureNotifications({
   const markFeatureAsSeen = useCallback(
     (feature: string) => {
       const items = featureItemsMap[feature] || [];
-      const currentSeen = seenMap[feature] || new Set<string>();
-      let hasChanges = false;
-      const nextSeen = new Set(currentSeen);
+      if (!items || items.length === 0) return;
 
-      items.forEach((item) => {
-        const id = getItemId(item);
-        if (id && !nextSeen.has(id)) {
-          nextSeen.add(id);
-          hasChanges = true;
+      setSeenMap((prevSeenMap) => {
+        const currentSeen = prevSeenMap[feature] || new Set<string>();
+        let hasChanges = false;
+        const nextSeen = new Set(currentSeen);
+
+        items.forEach((item) => {
+          const id = getItemId(item);
+          if (id && !nextSeen.has(id)) {
+            nextSeen.add(id);
+            hasChanges = true;
+          }
+        });
+
+        if (!hasChanges) {
+          return prevSeenMap;
         }
-      });
 
-      if (hasChanges || currentSeen.size === 0) {
         saveSeenIds(feature, userId, nextSeen);
-        setSeenMap((prev) => ({
-          ...prev,
+        return {
+          ...prevSeenMap,
           [feature]: nextSeen,
-        }));
-      }
+        };
+      });
     },
-    [featureItemsMap, seenMap, userId]
+    [featureItemsMap, userId]
   );
 
   // Automatically mark activeTab as seen when user opens it

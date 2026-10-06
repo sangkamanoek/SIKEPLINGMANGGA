@@ -30,9 +30,22 @@ import {
   Loader2,
   Database,
   RefreshCw,
+  ExternalLink,
+  User,
+  AlertCircle,
+  Shield,
+  Share2,
+  Copy,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { UserAccount, RealisasiPembangunan, JenisPembangunanType, StatusRealisasiType } from '../types';
+import {
+  UserAccount,
+  RealisasiPembangunan,
+  JenisPembangunanType,
+  StatusRealisasiType,
+  LaporanMonitoringInfrastruktur,
+  isKelurahanAdmin,
+} from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import {
   savePembangunanToServer,
@@ -43,6 +56,18 @@ import {
   PEMBANGUNAN_STORAGE_KEY,
 } from '../lib/pembangunanService';
 import { CetakLaporanPembangunanModal } from './CetakLaporanPembangunanModal';
+import { FormLaporanMonitoringModal } from './FormLaporanMonitoringModal';
+import { CetakMonitoringInfrastrukturModal } from './CetakMonitoringInfrastrukturModal';
+import {
+  subscribeMonitoringReports,
+  saveMonitoringReport,
+  deleteMonitoringReport,
+  exportMonitoringToExcel,
+  getLocalMonitoringList,
+  formatMonitoringForWhatsApp,
+  getWhatsAppShareUrl,
+} from '../lib/monitoringInfrastrukturService';
+import { formatTanggalIndonesia } from '../lib/formatter';
 import { downloadImage, downloadProjectPhotosAsZip, getHighResImageUrl } from '../lib/imageDownloader';
 import { safeSetLocalStorage, safeGetLocalStorage } from '../lib/safeStorage';
 
@@ -318,6 +343,96 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     showToast('Seluruh laporan pembangunan berhasil dikosongkan.');
   };
 
+  // Sub-tab switcher: 'realisasi' | 'monitoring'
+  const [activeSubTab, setActiveSubTab] = useState<'realisasi' | 'monitoring'>('realisasi');
+
+  // Laporan Monitoring Lapangan States
+  const [monitoringItems, setMonitoringItems] = useState<LaporanMonitoringInfrastruktur[]>(() =>
+    getLocalMonitoringList()
+  );
+  const [isFormMonitoringOpen, setIsFormMonitoringOpen] = useState(false);
+  const [isCetakMonitoringOpen, setIsCetakMonitoringOpen] = useState(false);
+  const [editingMonitoringItem, setEditingMonitoringItem] = useState<LaporanMonitoringInfrastruktur | null>(null);
+  const [selectedMonitoringForPrint, setSelectedMonitoringForPrint] = useState<LaporanMonitoringInfrastruktur | null>(null);
+  const [monitoringToDelete, setMonitoringToDelete] = useState<LaporanMonitoringInfrastruktur | null>(null);
+  const [searchMonitoring, setSearchMonitoring] = useState('');
+  const [filterMonitoringLingkungan, setFilterMonitoringLingkungan] = useState('all');
+  const [filterMonitoringKategori, setFilterMonitoringKategori] = useState('all');
+  const [filterMonitoringStatus, setFilterMonitoringStatus] = useState('all');
+  const [monitoringPreviewPhoto, setMonitoringPreviewPhoto] = useState<{
+    url: string;
+    label: string;
+    title: string;
+  } | null>(null);
+
+  // Subscribe to real-time monitoring reports
+  useEffect(() => {
+    const unsub = subscribeMonitoringReports((mList) => {
+      setMonitoringItems(mList);
+    });
+    return () => {
+      unsub();
+    };
+  }, []);
+
+  const handleOpenAddMonitoring = () => {
+    setEditingMonitoringItem(null);
+    setIsFormMonitoringOpen(true);
+  };
+
+  const handleOpenEditMonitoring = (item: LaporanMonitoringInfrastruktur) => {
+    setEditingMonitoringItem(item);
+    setIsFormMonitoringOpen(true);
+  };
+
+  const handleOpenPrintMonitoring = (item: LaporanMonitoringInfrastruktur) => {
+    setSelectedMonitoringForPrint(item);
+    setIsCetakMonitoringOpen(true);
+  };
+
+  const handleSaveMonitoring = async (report: LaporanMonitoringInfrastruktur) => {
+    await saveMonitoringReport(report);
+    showToast(`Laporan Monitoring "${report.nomorLaporan}" berhasil disimpan.`);
+  };
+
+  const confirmDeleteMonitoring = async () => {
+    if (!monitoringToDelete) return;
+    const targetNo = monitoringToDelete.nomorLaporan;
+    await deleteMonitoringReport(monitoringToDelete.id);
+    setMonitoringToDelete(null);
+    showToast(`Laporan Monitoring "${targetNo}" berhasil dihapus.`);
+  };
+
+  const handleExportMonitoringExcel = () => {
+    exportMonitoringToExcel(filteredMonitoring);
+    showToast('Berhasil mengunduh Laporan Monitoring Infrastruktur (.xlsx)');
+  };
+
+  const handleShareWhatsApp = (mon: LaporanMonitoringInfrastruktur) => {
+    const text = formatMonitoringForWhatsApp(mon);
+    navigator.clipboard?.writeText(text);
+    showToast(`Format Laporan WA tersalin! Membuka WhatsApp...`);
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
+  const handleToggleSupervisiStatus = async (
+    mon: LaporanMonitoringInfrastruktur,
+    newStatus: 'MENUNGGU_TINDAK_LANJUT' | 'SELESAI_DIPERBAIKI'
+  ) => {
+    const updated: LaporanMonitoringInfrastruktur = {
+      ...mon,
+      statusTindakLanjut: newStatus,
+      updatedAt: new Date().toISOString(),
+    };
+    await saveMonitoringReport(updated);
+    showToast(
+      newStatus === 'SELESAI_DIPERBAIKI'
+        ? `Supervisi: Laporan No. ${mon.nomorLaporan} ditandai [SUDAH DITANGANI]`
+        : `Supervisi: Laporan No. ${mon.nomorLaporan} ditandai [BELUM DITANGANI]`
+    );
+  };
+
   // Form States
   const [formLingkunganNo, setFormLingkunganNo] = useState<number>(
     currentUser.nomorLingkungan || 1
@@ -500,6 +615,56 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       totalBiaya,
     };
   }, [filteredItems]);
+
+  // Filtered Monitoring Items
+  const filteredMonitoring = useMemo(() => {
+    return monitoringItems.filter((item) => {
+      if (filterMonitoringLingkungan !== 'all' && item.lingkunganNomor !== Number(filterMonitoringLingkungan)) {
+        return false;
+      }
+      if (filterMonitoringKategori !== 'all' && item.kategoriIsu !== filterMonitoringKategori) {
+        return false;
+      }
+      if (filterMonitoringStatus !== 'all' && item.statusTindakLanjut !== filterMonitoringStatus) {
+        return false;
+      }
+      if (searchMonitoring.trim()) {
+        const q = searchMonitoring.toLowerCase();
+        const matchNo = (item.nomorLaporan || '').toLowerCase().includes(q);
+        const matchSubjek = (item.subjek || '').toLowerCase().includes(q);
+        const matchLokasi = (item.lokasi || '').toLowerCase().includes(q);
+        const matchPelapor = (item.pelapor || '').toLowerCase().includes(q);
+        const matchKet = (item.keterangan || '').toLowerCase().includes(q);
+        if (!matchNo && !matchSubjek && !matchLokasi && !matchPelapor && !matchKet) return false;
+      }
+      return true;
+    });
+  }, [monitoringItems, filterMonitoringLingkungan, filterMonitoringKategori, filterMonitoringStatus, searchMonitoring]);
+
+  // Aggregate Monitoring Stats
+  const monitoringStats = useMemo(() => {
+    const total = filteredMonitoring.length;
+    const countLpju = filteredMonitoring.filter(
+      (m) => (m.kategoriIsu || '').includes('LPJU') || (m.subjek || '').toLowerCase().includes('lpju')
+    ).length;
+    const countJalan = filteredMonitoring.filter(
+      (m) => (m.kategoriIsu || '').includes('Jalan') || (m.subjek || '').toLowerCase().includes('jalan')
+    ).length;
+    const countDrainase = filteredMonitoring.filter(
+      (m) =>
+        (m.kategoriIsu || '').includes('Drainase') ||
+        (m.kategoriIsu || '').includes('Parit') ||
+        (m.subjek || '').toLowerCase().includes('parit')
+    ).length;
+    const countMenunggu = filteredMonitoring.filter(
+      (m) => m.statusTindakLanjut === 'MENUNGGU_TINDAK_LANJUT'
+    ).length;
+    const countSelesai = filteredMonitoring.filter(
+      (m) => m.statusTindakLanjut === 'SELESAI_DIPERBAIKI'
+    ).length;
+
+    return { total, countLpju, countJalan, countDrainase, countMenunggu, countSelesai };
+  }, [filteredMonitoring]);
 
   const openAddModal = () => {
     setEditingItem(null);
@@ -770,10 +935,87 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     }
   };
 
+  const getMonitoringStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'SELESAI_DIPERBAIKI':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white font-black text-[11px] shadow-sm">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Sudah Ditangani</span>
+          </span>
+        );
+      case 'SEDANG_DITANGANI':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 text-white font-black text-[11px] shadow-sm">
+            <Clock className="w-3.5 h-3.5" />
+            <span>Sedang Ditangani</span>
+          </span>
+        );
+      case 'MENUNGGU_TINDAK_LANJUT':
+      default:
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-600 text-white font-black text-[11px] shadow-sm">
+            <AlertCircle className="w-3.5 h-3.5" />
+            <span>Belum Ditangani</span>
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
-      {/* HEADER BANNER */}
-      <div className="p-6 sm:p-7 rounded-2xl bg-slate-900 text-white shadow-md relative overflow-hidden border border-slate-800 space-y-5">
+      {/* SUB-MENU TABS: REALISASI FISIK & LAPORAN MONITORING */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-900 rounded-2xl border border-slate-800 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('realisasi')}
+          className={`flex-1 min-w-[200px] py-3 px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+            activeSubTab === 'realisasi'
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+          }`}
+        >
+          <Wrench className="w-4 h-4" />
+          <span>Realisasi Pembangunan Fisik</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              activeSubTab === 'realisasi'
+                ? 'bg-blue-800 text-blue-100'
+                : 'bg-slate-800 text-slate-300'
+            }`}
+          >
+            {items.length} Proyek
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('monitoring')}
+          className={`flex-1 min-w-[200px] py-3 px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+            activeSubTab === 'monitoring'
+              ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+          }`}
+        >
+          <Eye className="w-4 h-4 text-amber-300" />
+          <span>Laporan Monitoring Lapangan (3 Angle)</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              activeSubTab === 'monitoring'
+                ? 'bg-amber-900 text-amber-100'
+                : 'bg-slate-800 text-slate-300'
+            }`}
+          >
+            {monitoringItems.length} Laporan
+          </span>
+        </button>
+      </div>
+
+      {/* TAB 1: REALISASI PEMBANGUNAN FISIK */}
+      {activeSubTab === 'realisasi' && (
+        <div className="space-y-6">
+          {/* HEADER BANNER */}
+          <div className="p-6 sm:p-7 rounded-2xl bg-slate-900 text-white shadow-md relative overflow-hidden border border-slate-800 space-y-5">
         <div className="absolute -top-24 -right-24 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
         
         {/* Top Metadata & Title */}
@@ -1406,6 +1648,550 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+        </div>
+      )}
+
+      {/* TAB 2: LAPORAN MONITORING LAPANGAN (3 SUDUT PANDANG / 3 ANGLE FOTO) */}
+      {activeSubTab === 'monitoring' && (
+        <div className="space-y-6">
+          {/* HEADER BANNER MONITORING */}
+          <div className="p-6 sm:p-7 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white shadow-md relative overflow-hidden border border-slate-800 space-y-5">
+            <div className="absolute -top-24 -right-24 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="space-y-2 relative z-10">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 font-medium">
+                <span className="flex items-center gap-1.5 text-amber-300 font-bold">
+                  <Eye className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Monitoring &amp; Pengawasan Lapangan</span>
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>Kelurahan Mangga</span>
+                <span aria-hidden="true">·</span>
+                <span className="flex items-center gap-1 text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Format Resmi Kedinasan (3 Angle Foto)</span>
+                </span>
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug">
+                Laporan Monitoring Infrastruktur &amp; Fasilitas
+              </h1>
+
+              <p className="text-xs sm:text-sm text-slate-300 max-w-3xl font-normal leading-relaxed">
+                Pencatatan hasil monitoring kondisi LPJU padam, jalan rusak, saluran drainase tersumbat, dan aduan fasilitas publik dengan pelacakan titik koordinat GPS &amp; 3 sudut pandang foto dokumentasi.
+              </p>
+            </div>
+
+            {/* Action Toolbar Monitoring */}
+            <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleOpenAddMonitoring}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Buat Laporan Monitoring Baru</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportMonitoringExcel}
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Ekspor Excel</span>
+                </button>
+              </div>
+
+              {filteredMonitoring.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleOpenPrintMonitoring(filteredMonitoring[0])}
+                  className="px-3.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <Printer className="w-3.5 h-3.5 text-white" />
+                  <span>Cetak Lembar Kedinasan (A4)</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* STATS MONITORING */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-50 to-slate-50 border border-amber-200 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold text-amber-900 uppercase tracking-tight">Total Laporan</span>
+                <div className="p-1.5 rounded-xl bg-amber-600 text-white">
+                  <Eye className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-amber-950">{monitoringStats.total} Kasus</div>
+              <p className="text-[10px] text-amber-700 font-semibold">Tercatat di Sistem</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-yellow-50 to-slate-50 border border-yellow-200 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold text-yellow-900 uppercase tracking-tight">LPJU / Penerangan</span>
+                <div className="p-1.5 rounded-xl bg-yellow-500 text-white">
+                  <Lightbulb className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-yellow-950">{monitoringStats.countLpju} Laporan</div>
+              <p className="text-[10px] text-yellow-700 font-semibold">Lampu Padam &amp; Jaringan</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-50 to-slate-50 border border-blue-200 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold text-blue-900 uppercase tracking-tight">Jalan &amp; Akses</span>
+                <div className="p-1.5 rounded-xl bg-blue-600 text-white">
+                  <Wrench className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-blue-950">{monitoringStats.countJalan} Laporan</div>
+              <p className="text-[10px] text-blue-700 font-semibold">Jalan Berlubang / Rusak</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-rose-50 to-slate-50 border border-rose-200 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold text-rose-900 uppercase tracking-tight">Menunggu Tindak Lanjut</span>
+                <div className="p-1.5 rounded-xl bg-rose-600 text-white">
+                  <Clock className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-rose-950">{monitoringStats.countMenunggu} Laporan</div>
+              <p className="text-[10px] text-rose-700 font-semibold">Perlu Penanganan Dinas</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-50 to-slate-50 border border-emerald-200 shadow-2xs space-y-1 col-span-2 sm:col-span-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold text-emerald-900 uppercase tracking-tight">Selesai Diperbaiki</span>
+                <div className="p-1.5 rounded-xl bg-emerald-600 text-white">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-emerald-950">{monitoringStats.countSelesai} Laporan</div>
+              <p className="text-[10px] text-emerald-700 font-semibold">Tuntas Dikerjakan</p>
+            </div>
+          </div>
+
+          {/* FILTER & SEARCH MONITORING */}
+          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari nomor laporan (misal 158/MANGGA), subjek, lokasi, atau pelapor..."
+                value={searchMonitoring}
+                onChange={(e) => setSearchMonitoring(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">
+                  Kategori Isu:
+                </label>
+                <select
+                  value={filterMonitoringKategori}
+                  onChange={(e) => setFilterMonitoringKategori(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="all">🌐 Semua Kategori Isu</option>
+                  <option value="LPJU / Penerangan">💡 LPJU / Penerangan</option>
+                  <option value="Jalan Rusak / Berlubang">🛣️ Jalan Rusak / Berlubang</option>
+                  <option value="Drainase / Parit Tersumbat">🌊 Drainase / Parit Tersumbat</option>
+                  <option value="Paving / Trotoar">🧱 Paving / Trotoar</option>
+                  <option value="Lainnya">📌 Lainnya</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">
+                  Wilayah Lingkungan:
+                </label>
+                <select
+                  value={filterMonitoringLingkungan}
+                  onChange={(e) => setFilterMonitoringLingkungan(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="all">📍 Semua Lingkungan (I - XXIV)</option>
+                  {Array.from({ length: 24 }, (_, i) => i + 1).map((no) => (
+                    <option key={no} value={String(no)}>
+                      Lingkungan {no}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">
+                  Status Tindak Lanjut:
+                </label>
+                <select
+                  value={filterMonitoringStatus}
+                  onChange={(e) => setFilterMonitoringStatus(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="all">🎯 Semua Status</option>
+                  <option value="MENUNGGU_TINDAK_LANJUT">🚨 Menunggu Tindak Lanjut</option>
+                  <option value="SEDANG_DITANGANI">⏳ Sedang Ditangani</option>
+                  <option value="SELESAI_DIPERBAIKI">✅ Selesai Diperbaiki</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* LIST MONITORING ITEMS */}
+          {filteredMonitoring.length === 0 ? (
+            <div className="p-10 sm:p-14 text-center bg-white rounded-3xl border border-slate-200 space-y-3 shadow-2xs">
+              <div className="p-4 rounded-full bg-amber-50 text-amber-600 inline-block">
+                <Eye className="w-8 h-8" />
+              </div>
+              <h3 className="font-extrabold text-slate-800 text-base">
+                {monitoringItems.length === 0 ? 'Belum Ada Laporan Monitoring' : 'Tidak Ada Data Sesuai Filter'}
+              </h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                {monitoringItems.length === 0
+                  ? 'Gunakan tombol di bawah untuk membuat laporan pemantauan lapangan baru dengan 3 sudut pandang foto.'
+                  : 'Tidak ditemukan laporan monitoring yang cocok dengan pencarian atau filter Anda.'}
+              </p>
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={handleOpenAddMonitoring}
+                  className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Buat Laporan Monitoring Baru</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredMonitoring.map((mon) => (
+                <div
+                  key={mon.id}
+                  className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all overflow-hidden"
+                >
+                  {/* Card Header */}
+                  <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-wrap items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2.5 py-1 rounded-lg bg-blue-500 text-white font-mono font-black text-xs shadow-xs">
+                          NO: {mon.nomorLaporan}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-white/10 text-slate-200 font-bold text-[11px]">
+                          Lingkungan {mon.lingkunganNomor || 'Kelurahan'}
+                        </span>
+                        {mon.kategoriIsu && (
+                          <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 font-bold text-[11px] border border-amber-400/30">
+                            {mon.kategoriIsu}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-base sm:text-lg font-black text-white leading-snug pt-1">
+                        {mon.subjek}
+                      </h3>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {getMonitoringStatusBadge(mon.statusTindakLanjut)}
+                    </div>
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="p-4 sm:p-5 space-y-4 text-xs text-slate-800">
+                    {/* 6-Point Metadata Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-blue-600" />
+                          <span>Lokasi Kegiatan</span>
+                        </span>
+                        <p className="font-bold text-slate-900 leading-snug">{mon.lokasi}</p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-indigo-600" />
+                          <span>Tanggal Laporan</span>
+                        </span>
+                        <p className="font-bold text-slate-900">
+                          {formatTanggalIndonesia(new Date(mon.tanggal))}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1">
+                          <User className="w-3 h-3 text-emerald-600" />
+                          <span>Dari (Pelapor)</span>
+                        </span>
+                        <p className="font-black text-slate-950 text-sm text-blue-900">
+                          {mon.pelapor}
+                        </p>
+                      </div>
+
+                      {mon.koordinatUrl && (
+                        <div className="space-y-0.5 md:col-span-2 lg:col-span-2">
+                          <span className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1">
+                            <Link2 className="w-3 h-3 text-cyan-600" />
+                            <span>Titik Koordinat / Google Maps</span>
+                          </span>
+                          <a
+                            href={mon.koordinatUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-700 hover:text-blue-800 underline font-mono text-[11px] font-bold flex items-center gap-1 break-all"
+                          >
+                            <span>{mon.koordinatUrl}</span>
+                            <ExternalLink className="w-3.5 h-3.5 shrink-0 inline" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SUPERVISI SUPER ADMIN: SUDAH DITANGANI / BELUM */}
+                    {(currentUser.role === 'super_admin' || isKelurahanAdmin(currentUser.role)) && (
+                      <div className="p-3 sm:p-3.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl border border-indigo-500/40 flex flex-wrap items-center justify-between gap-3 shadow-md">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 shrink-0">
+                            <Shield className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] font-black text-white uppercase tracking-wider">
+                                Supervisi Super Admin
+                              </span>
+                              <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+                                mon.statusTindakLanjut === 'SELESAI_DIPERBAIKI'
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                              }`}>
+                                Status: {mon.statusTindakLanjut === 'SELESAI_DIPERBAIKI' ? 'Sudah Ditangani' : 'Belum Ditangani'}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-300">
+                              Ubah status tindak lanjut monitoring dengan 1 klik:
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSupervisiStatus(mon, 'SELESAI_DIPERBAIKI')}
+                            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                              mon.statusTindakLanjut === 'SELESAI_DIPERBAIKI'
+                                ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-900'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-emerald-300 border border-slate-700'
+                            }`}
+                            title="Tandai Sudah Ditangani"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            <span>Sudah Ditangani</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSupervisiStatus(mon, 'MENUNGGU_TINDAK_LANJUT')}
+                            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                              mon.statusTindakLanjut !== 'SELESAI_DIPERBAIKI'
+                                ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-400 ring-offset-2 ring-offset-slate-900'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-rose-300 border border-slate-700'
+                            }`}
+                            title="Tandai Belum Ditangani"
+                          >
+                            <AlertCircle className="w-4 h-4 text-rose-400" />
+                            <span>Belum Ditangani</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {mon.keterangan && (
+                      <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-slate-700 leading-relaxed">
+                        <span className="font-bold text-blue-950 block mb-0.5">Catatan &amp; Uraian Situasi:</span>
+                        <p>{mon.keterangan}</p>
+                      </div>
+                    )}
+
+                    {/* 3 ANGLE PHOTO DOCUMENTATION DISPLAY */}
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Dokumentasi Foto 3 Sudut Pandang (3 Angle)</span>
+                        </h4>
+                        <span className="text-[10px] text-slate-500 font-semibold">
+                          Klik foto untuk memperbesar
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {/* Angle 1 */}
+                        <div className="border border-slate-200 rounded-xl p-2.5 bg-slate-50 space-y-1.5">
+                          <span className="text-[10px] font-black uppercase text-blue-900 block truncate">
+                            {mon.fotoAngle1Label || 'Angle 1: Tampak Depan'}
+                          </span>
+                          {mon.fotoAngle1Url ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setMonitoringPreviewPhoto({
+                                  url: mon.fotoAngle1Url!,
+                                  label: mon.fotoAngle1Label || 'Angle 1: Tampak Depan',
+                                  title: `Laporan No. ${mon.nomorLaporan} - ${mon.subjek}`,
+                                })
+                              }
+                              className="w-full h-36 rounded-lg overflow-hidden relative group cursor-pointer bg-slate-900 block border border-slate-300"
+                            >
+                              <img
+                                src={mon.fotoAngle1Url}
+                                alt="Foto Angle 1"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center text-white">
+                                <Eye className="w-5 h-5" />
+                              </div>
+                            </button>
+                          ) : (
+                            <div className="w-full h-36 rounded-lg bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-slate-400 text-xs">
+                              Tidak ada foto
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Angle 2 */}
+                        <div className="border border-slate-200 rounded-xl p-2.5 bg-slate-50 space-y-1.5">
+                          <span className="text-[10px] font-black uppercase text-blue-900 block truncate">
+                            {mon.fotoAngle2Label || 'Angle 2: Tampak Samping'}
+                          </span>
+                          {mon.fotoAngle2Url ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setMonitoringPreviewPhoto({
+                                  url: mon.fotoAngle2Url!,
+                                  label: mon.fotoAngle2Label || 'Angle 2: Tampak Samping',
+                                  title: `Laporan No. ${mon.nomorLaporan} - ${mon.subjek}`,
+                                })
+                              }
+                              className="w-full h-36 rounded-lg overflow-hidden relative group cursor-pointer bg-slate-900 block border border-slate-300"
+                            >
+                              <img
+                                src={mon.fotoAngle2Url}
+                                alt="Foto Angle 2"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center text-white">
+                                <Eye className="w-5 h-5" />
+                              </div>
+                            </button>
+                          ) : (
+                            <div className="w-full h-36 rounded-lg bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-slate-400 text-xs">
+                              Tidak ada foto
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Angle 3 */}
+                        <div className="border border-slate-200 rounded-xl p-2.5 bg-slate-50 space-y-1.5">
+                          <span className="text-[10px] font-black uppercase text-blue-900 block truncate">
+                            {mon.fotoAngle3Label || 'Angle 3: Tampak Luas'}
+                          </span>
+                          {mon.fotoAngle3Url ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setMonitoringPreviewPhoto({
+                                  url: mon.fotoAngle3Url!,
+                                  label: mon.fotoAngle3Label || 'Angle 3: Tampak Luas',
+                                  title: `Laporan No. ${mon.nomorLaporan} - ${mon.subjek}`,
+                                })
+                              }
+                              className="w-full h-36 rounded-lg overflow-hidden relative group cursor-pointer bg-slate-900 block border border-slate-300"
+                            >
+                              <img
+                                src={mon.fotoAngle3Url}
+                                alt="Foto Angle 3"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center text-white">
+                                <Eye className="w-5 h-5" />
+                              </div>
+                            </button>
+                          ) : (
+                            <div className="w-full h-36 rounded-lg bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-slate-400 text-xs">
+                              Tidak ada foto
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card Actions Footer */}
+                    <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => handleShareWhatsApp(mon)}
+                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border border-emerald-400/30"
+                          title="Kirim Format Laporan Resmi ke WhatsApp"
+                        >
+                          <Share2 className="w-3.5 h-3.5" />
+                          <span>Laporan WA</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPrintMonitoring(mon)}
+                          className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          title="Cetak Format Dokumen Kedinasan Pemko Medan (A4)"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Pratinjau &amp; Cetak A4</span>
+                        </button>
+
+                        {mon.koordinatUrl && (
+                          <a
+                            href={mon.koordinatUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                            <span>Buka Maps</span>
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditMonitoring(mon)}
+                          className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMonitoringToDelete(mon)}
+                          className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -2460,6 +3246,124 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         items={filteredItems}
         currentUser={currentUser}
       />
+
+      {/* MODAL FORM INPUT/EDIT LAPORAN MONITORING INFRASTRUKTUR */}
+      <FormLaporanMonitoringModal
+        isOpen={isFormMonitoringOpen}
+        onClose={() => setIsFormMonitoringOpen(false)}
+        onSave={handleSaveMonitoring}
+        initialReport={editingMonitoringItem}
+        currentUser={currentUser}
+      />
+
+      {/* MODAL CETAK RESMI A4 LAPORAN MONITORING INFRASTRUKTUR */}
+      <CetakMonitoringInfrastrukturModal
+        isOpen={isCetakMonitoringOpen}
+        onClose={() => setIsCetakMonitoringOpen(false)}
+        report={selectedMonitoringForPrint}
+      />
+
+      {/* MONITORING PHOTO PREVIEW ZOOM MODAL */}
+      {monitoringPreviewPhoto && createPortal(
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-6 animate-fade-in">
+          <div className="w-full max-w-4xl bg-slate-900 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl flex flex-col max-h-[92vh]">
+            <div className="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-white">
+              <div>
+                <h3 className="text-sm font-black">{monitoringPreviewPhoto.title}</h3>
+                <p className="text-xs text-blue-400 font-bold">{monitoringPreviewPhoto.label}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMonitoringPreviewPhoto(null)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 bg-black flex-1 flex items-center justify-center overflow-hidden">
+              <img
+                src={monitoringPreviewPhoto.url}
+                alt="Zoom Angle Photo"
+                className="max-h-[70vh] w-auto max-w-full object-contain rounded-xl shadow-lg"
+              />
+            </div>
+            <div className="p-3 bg-slate-900 border-t border-slate-800 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setMonitoringPreviewPhoto(null)}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer"
+              >
+                Tutup Pratinjau
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* CONFIRM DELETE MONITORING MODAL */}
+      {monitoringToDelete && createPortal(
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4 animate-scale-up">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-rose-100 text-rose-600">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900">
+                  Hapus Laporan Monitoring Ini?
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Konfirmasi penghapusan data monitoring infrastruktur
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-blue-700 bg-blue-100 px-2 py-0.5 rounded text-[10px]">
+                  No. {monitoringToDelete.nomorLaporan}
+                </span>
+                <span className="font-bold text-slate-500 text-[11px]">
+                  {monitoringToDelete.tanggal}
+                </span>
+              </div>
+              <p className="font-black text-slate-900 leading-snug">
+                {monitoringToDelete.subjek}
+              </p>
+              <p className="text-[11px] text-slate-600">
+                📍 {monitoringToDelete.lokasi}
+              </p>
+              <p className="text-[11px] text-slate-700 font-semibold">
+                👤 Pelapor: {monitoringToDelete.pelapor}
+              </p>
+            </div>
+
+            <p className="text-xs text-rose-600 font-semibold bg-rose-50 p-2.5 rounded-xl border border-rose-100">
+              ⚠️ Perhatian: Data yang dihapus tidak dapat dipulihkan.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setMonitoringToDelete(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteMonitoring}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Ya, Hapus Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* IN-APP CONFIRM DELETE MODAL (MOBILE & IFRAME COMPATIBLE) */}
       {itemToDelete && createPortal(

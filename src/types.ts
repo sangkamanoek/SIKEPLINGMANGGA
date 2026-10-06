@@ -474,6 +474,30 @@ export interface RealisasiPembangunan {
   createdByName?: string;
 }
 
+export interface LaporanMonitoringInfrastruktur {
+  id: string;
+  nomorLaporan: string; // misal "158/MANGGA"
+  subjek: string; // misal "LPJU Padam sebanyak 9 Titik"
+  lokasi: string; // misal "Jl. Tali Air Kelurahan Mangga Kecamatan Medan Tuntungan"
+  lingkunganNomor?: number;
+  koordinatUrl?: string; // misal "https://maps.app.goo.gl/wVNAV1fu3ufn1ihy5?g_st=aw"
+  tanggal: string; // misal "2026-09-30"
+  pelapor: string; // misal "Fery Arapenta Tarigan"
+  kategoriIsu?: 'LPJU / Penerangan' | 'Jalan Rusak / Berlubang' | 'Drainase / Parit Tersumbat' | 'Paving / Trotoar' | 'Lainnya' | string;
+  statusTindakLanjut?: 'MENUNGGU_TINDAK_LANJUT' | 'SEDANG_DITANGANI' | 'SELESAI_DIPERBAIKI';
+  keterangan?: string;
+  instansiTujuan?: string; // misal "Dinas Perhubungan (Dishub) Kota Medan" / "Dinas SDABMBK"
+  // Opsi Upload Foto sebanyak 3 dari angle yang berbeda:
+  fotoAngle1Url?: string; // Angle 1 (Tampak Depan / Tiang Utama)
+  fotoAngle1Label?: string;
+  fotoAngle2Url?: string; // Angle 2 (Tampak Samping / Bentang Jalan)
+  fotoAngle2Label?: string;
+  fotoAngle3Url?: string; // Angle 3 (Tampak Luas / Detail Tambahan)
+  fotoAngle3Label?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface RuasJalanLingkungan {
   id: string;
   lingkunganId: string;
