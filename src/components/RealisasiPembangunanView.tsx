@@ -57,7 +57,6 @@ import {
 } from '../lib/pembangunanService';
 import { CetakLaporanPembangunanModal } from './CetakLaporanPembangunanModal';
 import { FormLaporanMonitoringModal } from './FormLaporanMonitoringModal';
-import { CetakMonitoringInfrastrukturModal } from './CetakMonitoringInfrastrukturModal';
 import {
   subscribeMonitoringReports,
   saveMonitoringReport,
@@ -351,9 +350,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     getLocalMonitoringList()
   );
   const [isFormMonitoringOpen, setIsFormMonitoringOpen] = useState(false);
-  const [isCetakMonitoringOpen, setIsCetakMonitoringOpen] = useState(false);
   const [editingMonitoringItem, setEditingMonitoringItem] = useState<LaporanMonitoringInfrastruktur | null>(null);
-  const [selectedMonitoringForPrint, setSelectedMonitoringForPrint] = useState<LaporanMonitoringInfrastruktur | null>(null);
   const [monitoringToDelete, setMonitoringToDelete] = useState<LaporanMonitoringInfrastruktur | null>(null);
   const [searchMonitoring, setSearchMonitoring] = useState('');
   const [filterMonitoringLingkungan, setFilterMonitoringLingkungan] = useState('all');
@@ -383,11 +380,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
   const handleOpenEditMonitoring = (item: LaporanMonitoringInfrastruktur) => {
     setEditingMonitoringItem(item);
     setIsFormMonitoringOpen(true);
-  };
-
-  const handleOpenPrintMonitoring = (item: LaporanMonitoringInfrastruktur) => {
-    setSelectedMonitoringForPrint(item);
-    setIsCetakMonitoringOpen(true);
   };
 
   const handleSaveMonitoring = async (report: LaporanMonitoringInfrastruktur) => {
@@ -1704,17 +1696,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   <span>Ekspor Excel</span>
                 </button>
               </div>
-
-              {filteredMonitoring.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleOpenPrintMonitoring(filteredMonitoring[0])}
-                  className="px-3.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                >
-                  <Printer className="w-3.5 h-3.5 text-white" />
-                  <span>Cetak Lembar Kedinasan (A4)</span>
-                </button>
-              )}
             </div>
           </div>
 
@@ -2143,16 +2124,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                         >
                           <Share2 className="w-3.5 h-3.5" />
                           <span>Laporan WA</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleOpenPrintMonitoring(mon)}
-                          className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                          title="Cetak Format Dokumen Kedinasan Pemko Medan (A4)"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>Pratinjau &amp; Cetak A4</span>
                         </button>
 
                         {mon.koordinatUrl && (
@@ -3254,13 +3225,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         onSave={handleSaveMonitoring}
         initialReport={editingMonitoringItem}
         currentUser={currentUser}
-      />
-
-      {/* MODAL CETAK RESMI A4 LAPORAN MONITORING INFRASTRUKTUR */}
-      <CetakMonitoringInfrastrukturModal
-        isOpen={isCetakMonitoringOpen}
-        onClose={() => setIsCetakMonitoringOpen(false)}
-        report={selectedMonitoringForPrint}
       />
 
       {/* MONITORING PHOTO PREVIEW ZOOM MODAL */}
