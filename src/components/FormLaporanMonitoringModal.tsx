@@ -130,31 +130,29 @@ export const FormLaporanMonitoringModal: React.FC<FormLaporanMonitoringModalProp
       setFotoAngle3Url(initialReport.fotoAngle3Url || '');
       setFotoAngle3Label(initialReport.fotoAngle3Label || 'Angle 3: Tampak Luas / Situasi Malam/Siang');
     } else {
-      // Default New Form
-      const initialLingkungan = currentUser.nomorLingkungan || 10;
+      // Default New Form (Kosong agar diisi Kepling)
+      const initialLingkungan = currentUser.nomorLingkungan || 1;
       const autoKepling =
         (currentUser.role === 'kepling' && currentUser.nama)
           ? currentUser.nama
-          : KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === initialLingkungan)?.nama || 'Fery Arapenta Tarigan';
+          : KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === initialLingkungan)?.nama || '';
 
-      setNomorLaporan('158/MANGGA');
-      setSubjek('LPJU Padam sebanyak 9 Titik');
-      setLokasi('Jl. Tali Air Kelurahan Mangga Kecamatan Medan Tuntungan');
+      setNomorLaporan('');
+      setSubjek('');
+      setLokasi('');
       setLingkunganNomor(initialLingkungan);
-      setKoordinatUrl('https://maps.app.goo.gl/wVNAV1fu3ufn1ihy5?g_st=aw');
-      setTanggal('2026-09-30');
+      setKoordinatUrl('');
+      setTanggal(new Date().toISOString().split('T')[0]);
       setPelapor(autoKepling);
       setKategoriIsu('LPJU / Penerangan');
       setStatusTindakLanjut('MENUNGGU_TINDAK_LANJUT');
-      setKeterangan(
-        'Laporan monitoring kondisi lampu penerangan jalan umum (LPJU) padam sebanyak 9 titik di sepanjang Jl. Tali Air Kelurahan Mangga.'
-      );
-      setFotoAngle1Url('/src/assets/images/proses_lampu_lpju_1790846499280.jpg');
-      setFotoAngle1Label('Angle 1: Tampak Depan / Tiang LPJU Padam');
-      setFotoAngle2Url('/src/assets/images/proses_instalasi_lpju_1790856798909.jpg');
-      setFotoAngle2Label('Angle 2: Tampak Samping / Deretan Tiang Jl. Tali Air');
-      setFotoAngle3Url('/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg');
-      setFotoAngle3Label('Angle 3: Tampak Luas / Situasi Malam/Siang');
+      setKeterangan('');
+      setFotoAngle1Url('');
+      setFotoAngle1Label('Angle 1: Tampak Depan / Objek Utama');
+      setFotoAngle2Url('');
+      setFotoAngle2Label('Angle 2: Tampak Samping / Ruas Jalan');
+      setFotoAngle3Url('');
+      setFotoAngle3Label('Angle 3: Tampak Luas / Situasi Lingkungan');
     }
     setFormError(null);
   }, [initialReport, isOpen, currentUser]);

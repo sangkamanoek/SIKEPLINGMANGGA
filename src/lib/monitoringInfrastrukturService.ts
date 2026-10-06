@@ -18,31 +18,8 @@ export const MONITORING_INFRA_STORAGE_KEY = 'sikepling_monitoring_infra_v2';
 export const MONITORING_INFRA_DELETED_KEY = 'sikepling_monitoring_infra_deleted_v2';
 export const MONITORING_INFRA_CHANNEL = 'sikepling_monitoring_infra_channel';
 
-// Default Seed Laporan Monitoring Resmi Sesuai Permintaan User
-export const INITIAL_MONITORING_DATA: LaporanMonitoringInfrastruktur[] = [
-  {
-    id: 'mon_158_mangga',
-    nomorLaporan: '158/MANGGA',
-    subjek: 'LPJU Padam sebanyak 9 Titik',
-    lokasi: 'Jl. Tali Air Kelurahan Mangga Kecamatan Medan Tuntungan',
-    lingkunganNomor: 10,
-    koordinatUrl: 'https://maps.app.goo.gl/wVNAV1fu3ufn1ihy5?g_st=aw',
-    tanggal: '2026-09-30',
-    pelapor: 'Fery Arapenta Tarigan',
-    kategoriIsu: 'LPJU / Penerangan',
-    statusTindakLanjut: 'MENUNGGU_TINDAK_LANJUT',
-    keterangan:
-      'Laporan hasil monitoring lapangan: Terdata sebanyak 9 titik tiang LPJU dalam kondisi padam/rusak di sepanjang ruas Jl. Tali Air Kelurahan Mangga. Mengakibatkan kondisi jalan gelap dan rawan gangguan kamtibmas saat malam hari.',
-    fotoAngle1Url: '/src/assets/images/proses_lampu_lpju_1790846499280.jpg',
-    fotoAngle1Label: 'Angle 1: Tampak Depan / Tiang LPJU Padam',
-    fotoAngle2Url: '/src/assets/images/proses_instalasi_lpju_1790856798909.jpg',
-    fotoAngle2Label: 'Angle 2: Tampak Samping / Deretan Tiang Jl. Tali Air',
-    fotoAngle3Url: '/src/assets/images/awal_gang_becek_tanah_1790856733273.jpg',
-    fotoAngle3Label: 'Angle 3: Tampak Luas / Perspektif Wilayah Pemukiman',
-    createdAt: '2026-09-30T09:30:00.000Z',
-    updatedAt: '2026-09-30T09:30:00.000Z',
-  },
-];
+// Default Seed Laporan Monitoring Resmi Sesuai Permintaan User (Kosong agar diisi Kepling)
+export const INITIAL_MONITORING_DATA: LaporanMonitoringInfrastruktur[] = [];
 
 let memoryMonitoring: LaporanMonitoringInfrastruktur[] = [];
 let deletedMonitoringIdsCache: string[] = safeGetLocalStorage<string[]>(
