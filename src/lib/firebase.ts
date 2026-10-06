@@ -47,9 +47,9 @@ const activeConfig = isFirebaseConfigured ? rawConfig : {
 const app = !getApps().length ? initializeApp(activeConfig) : getApp();
 export const auth = getAuth(app);
 
-// Suppress transient backend offline connection logs in production console
+// Suppress transient backend offline and quota connection logs in console
 try {
-  setLogLevel('error');
+  setLogLevel('silent');
 } catch {}
 
 let firestoreInstance: Firestore;
