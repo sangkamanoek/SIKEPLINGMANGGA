@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build",
-    "start": "tsx server.ts",
+    "build": "vite build && npx tsc server.ts --target es2022 --module commonjs --outDir dist --esModuleInterop --skipLibCheck",
+    "start": "node dist/server.js",
     "lint": "tsc --noEmit",
     "preview": "vite preview"
   },
