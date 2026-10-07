@@ -2377,6 +2377,8 @@ export default function App() {
         >
           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
           <span>SI-MANGGA <strong>{CURRENT_APP_VERSION}</strong></span>
+          <span className="hidden sm:inline text-slate-400">•</span>
+          <span className="hidden sm:inline text-[10px] text-slate-500 font-medium uppercase tracking-tight">Sistem Informasi & Administrasi Kelurahan Mangga</span>
           <span className="text-slate-400">•</span>
           <span className="text-emerald-600 font-semibold">Info Pembaruan</span>
         </button>

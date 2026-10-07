@@ -2533,41 +2533,6 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             </div>
           </div>
 
-          {/* Info Banner for selected Lingkungan */}
-          <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-slate-800 flex items-start gap-2.5">
-            <Info className="w-4.5 h-4.5 text-emerald-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="font-bold text-slate-900">
-                {selectedLingkungan === 'all'
-                  ? 'Menampilkan Rincian SPPT PBB Wajib Pajak Kelurahan Mangga'
-                  : `Rincian SPPT PBB - Lingkungan ${selectedLingkungan}`}
-              </div>
-              <div className="text-slate-600 leading-relaxed">
-                {selectedLingkungan === 'all' ? (
-                  <span>
-                    Rekapitulasi total Kelurahan Mangga terdiri dari <strong>9.290 Objek Pajak</strong> dengan total target <strong>Rp 10.428.216.715</strong>.
-                  </span>
-                ) : (
-                  <span>
-                    Lingkungan {selectedLingkungan} memiliki total rekapitulasi <strong>{kelurahanTotals.totalWp} Objek Pajak</strong> dengan total target <strong>{formatRupiah(kelurahanTotals.targetNominal)}</strong>.
-                    {filteredSpptList.length < kelurahanTotals.totalWp && (
-                      <span className="block mt-1 text-slate-700">
-                        {canManageWp ? (
-                          <>
-                            📌 <em>Catatan: Menampilkan rincian {filteredSpptList.length} Objek Pajak terdaftar. Anda dapat menambah atau memperbarui data menggunakan tombol <strong>+ Tambah WP</strong> atau menu <button onClick={() => setActiveTab('import_csv')} className="font-bold text-emerald-800 underline hover:text-emerald-950 cursor-pointer">Import / Paste Spreadsheet</button>.</em>
-                          </>
-                        ) : (
-                          <>
-                            📌 <em>Catatan: Menampilkan rincian {filteredSpptList.length} Objek Pajak di lingkungan Anda. Hak akses Anda adalah melihat data. Perubahan status pembayaran atau data WP dikelola oleh Kasi Pemerintahan dan Superadmin.</em>
-                          </>
-                        )}
-                      </span>
-                    )}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
 
           {/* Mobile Scroll Hint Banner */}
           <div className="flex sm:hidden items-center justify-between gap-2 px-3 py-2 bg-amber-50 text-amber-900 text-[11px] font-bold rounded-xl border border-amber-200">

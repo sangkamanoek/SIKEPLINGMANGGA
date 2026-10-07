@@ -18,11 +18,11 @@ export const APP_VERSION_HISTORY: VersionRelease[] = [
   {
     version: 'v2.5.0',
     releaseDate: '4 Oktober 2026',
-    title: 'Pembaruan Si-Mangga: Optimasi Performa, Fitur Edit Kunjungan & Pilar TP-PKK Terpadu',
+    title: 'Pembaruan SI-MANGGA: Optimasi Performa, Fitur Edit Kunjungan & Pilar TP-PKK Terpadu',
     badge: 'TERBARU',
     isImportant: true,
     highlights: [
-      'Pembaruan Identitas Resmi Aplikasi SI-MANGGA Kelurahan Mangga',
+      'Pembaruan Identitas Resmi SI-MANGGA: Sistem Informasi & Administrasi Kelurahan Mangga',
       'Tombol Edit & Koreksi Data Kunjungan Warga (Door-to-Door)',
       'Pilar Kegiatan & 6 Buku Wajib Administrasi TP-PKK Terpadu',
       'Optimasi Kecepatan Loading & Splash Screen Instan'

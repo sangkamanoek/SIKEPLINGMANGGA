@@ -622,7 +622,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
 
         // Bottom footer
         slide.addShape(pptx.ShapeType.rect, { x: 0, y: 7.1, w: 13.33, h: 0.4, fill: { color: 'F8FAFC' } });
-        slide.addText('SI-MANGGA • KELURAHAN MANGGA, KEC. MEDAN TUNTUNGAN', {
+        slide.addText('SI-MANGGA • SISTEM INFORMASI & ADMINISTRASI KELURAHAN MANGGA', {
           x: 0.8, y: 7.15, w: 8.0, h: 0.3,
           fontSize: 9, bold: true, color: '64748B'
         });
@@ -1119,7 +1119,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
 
             {/* Slide Sub-Footer */}
             <div className="bg-slate-50 border-t border-slate-200/80 px-5 py-2.5 flex items-center justify-between text-[11px] text-slate-500 shrink-0">
-              <span className="font-bold">SI-MANGGA • KELURAHAN MANGGA</span>
+              <span className="font-bold uppercase tracking-tight text-[10px]">SI-MANGGA • SISTEM INFORMASI & ADMINISTRASI KELURAHAN MANGGA</span>
               <div className="flex items-center gap-2 font-bold">
                 <span className="text-[#991B1B]">#MEDANUNTUKSEMUA</span>
                 <span className="text-slate-300">•</span>

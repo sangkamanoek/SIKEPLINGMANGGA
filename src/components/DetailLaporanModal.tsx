@@ -1526,7 +1526,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
                   {/* Footer lembar */}
                   <div className="mt-3 pt-1 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic font-sans">
-                    <span>SI-MANGGA • Sistem Informasi & Administrasi Kelurahan Mangga Kecamatan Medan Tuntungan</span>
+                    <span>SI-MANGGA • Sistem Informasi & Administrasi Kelurahan Mangga</span>
                     <span>Dokumen Resmi {item.dokumentasiFoto && item.dokumentasiFoto.length > 6 ? 'Halaman 1 dari 2' : '1 Lembar'} • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                   </div>
                 </div>
@@ -3392,7 +3392,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 fontFamily: 'sans-serif',
               }}
             >
-              <span>SI-MANGGA • Sistem Informasi & Administrasi Kelurahan Mangga Kecamatan Medan Tuntungan</span>
+              <span>SI-MANGGA • Sistem Informasi & Administrasi Kelurahan Mangga</span>
               <span>Dokumen Resmi {item.dokumentasiFoto && item.dokumentasiFoto.length > 6 ? 'Halaman 1 dari 2' : '1 Lembar'} • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
             </div>
           </div>

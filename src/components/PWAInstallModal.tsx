@@ -64,7 +64,7 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClos
   };
 
   const handleCopyWaText = () => {
-    const waText = `🟩 *APLIKASI SI-MANGGA (Sistem Informasi & Administrasi Kelurahan Mangga) - KECAMATAN MEDAN TUNTUNGAN*
+    const waText = `🟩 *APLIKASI SI-MANGGA (Sistem Informasi & Administrasi Kelurahan Mangga)*
 Kelurahan Mangga - Kecamatan Medan Tuntungan
 
 Kepada Yth. Bapak/Ibu Kepala Lingkungan I s/d XXIV:

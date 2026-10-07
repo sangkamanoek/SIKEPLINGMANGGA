@@ -75,7 +75,7 @@ export async function createFullApplicationBackup(googleAccessToken?: string): P
     timestamp: timestampIso,
     timestampFormatted,
     version: '1.0.0-PROD',
-    appTitle: 'SI-MANGGA Kelurahan Mangga Medan Tuntungan',
+    appTitle: 'SI-MANGGA (Sistem Informasi & Administrasi Kelurahan Mangga)',
     kelurahan: 'Kelurahan Mangga',
     summary: {
       totalLaporan: reports.length,

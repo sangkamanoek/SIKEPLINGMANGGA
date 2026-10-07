@@ -243,9 +243,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             <p className="text-[11px] font-extrabold text-emerald-700 mt-2 uppercase tracking-wider">
               Sistem Informasi & Administrasi <br /> Kelurahan Mangga
             </p>
-            <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-              Kecamatan Medan Tuntungan
-            </p>
           </div>
 
           {/* Form */}

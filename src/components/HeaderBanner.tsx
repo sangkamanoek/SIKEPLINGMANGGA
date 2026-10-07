@@ -245,7 +245,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                   activeAccount.role === 'ketua_pkk_lingkungan' ||
                   activeAccount.role === 'sekretaris_pkk'
                 ? 'Portal Administrasi & Keuangan TP-PKK Kelurahan Mangga'
-                : `Sistem Informasi & Administrasi Kelurahan Mangga • Medan Tuntungan`}
+                : 'Sistem Informasi & Administrasi Kelurahan Mangga'}
             </p>
           </div>
         </div>
