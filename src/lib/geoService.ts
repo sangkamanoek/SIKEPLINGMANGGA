@@ -147,7 +147,7 @@ export async function reverseGeocodeLocation(
     const directUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
     const res = await fetch(directUrl, {
       headers: {
-        'User-Agent': 'SiKepling/2.0',
+        'User-Agent': 'SI-MANGGA/2.0',
         'Accept': 'application/json',
       },
       signal: AbortSignal.timeout(4500),
@@ -328,7 +328,7 @@ export async function detectStreetAndGangOverlay(
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'SiKepling-Mangga-WebGIS/2.0',
+        'User-Agent': 'SI-MANGGA-WebGIS/2.0',
         'Accept': 'application/json',
       },
       signal: AbortSignal.timeout(4000),

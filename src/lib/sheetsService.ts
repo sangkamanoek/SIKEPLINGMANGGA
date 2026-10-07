@@ -2,7 +2,7 @@ import { LaporanHarianItem, SheetMetadata } from '../types';
 import { ALL_ACCOUNTS, getEffectivePassword } from '../data/keplingList';
 import { isReportDeleted } from './reportsApi';
 
-const SPREADSHEET_TITLE = 'SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA';
+const SPREADSHEET_TITLE = 'SI-MANGGA (Sistem Informasi & Administrasi Kelurahan Mangga)';
 export const USERNAME_SHEET_TAB_NAME = 'Username & Password';
 const SHEET_TAB_NAME = 'Laporan Harian';
 

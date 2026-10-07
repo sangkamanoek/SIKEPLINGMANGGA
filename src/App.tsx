@@ -161,7 +161,7 @@ export default function App() {
       const stored = localStorage.getItem('google_sheet_metadata');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed?.title === 'SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA') return parsed;
+        if (parsed?.title === 'SI-MANGGA (Sistem Informasi & Administrasi Kelurahan Mangga)') return parsed;
       }
     } catch (e) {
       return null;
@@ -2376,7 +2376,7 @@ export default function App() {
           title="Klik untuk melihat catatan rilis versi dan fitur terbaru aplikasi"
         >
           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span>SiKepling <strong>{CURRENT_APP_VERSION}</strong></span>
+          <span>SI-MANGGA <strong>{CURRENT_APP_VERSION}</strong></span>
           <span className="text-slate-400">•</span>
           <span className="text-emerald-600 font-semibold">Info Pembaruan</span>
         </button>

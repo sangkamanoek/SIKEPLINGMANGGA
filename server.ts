@@ -1772,7 +1772,7 @@ app.get('/api/reverse-geocode', async (req, res) => {
     const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
     const geoRes = await fetch(nominatimUrl, {
       headers: {
-        'User-Agent': 'SiKeplingMangga/2.0 (kelurahan.mangga@pemkomedan.go.id)',
+        'User-Agent': 'SI-MANGGA/2.0 (kelurahan.mangga@pemkomedan.go.id)',
         'Accept': 'application/json',
       },
       signal: AbortSignal.timeout(5000),

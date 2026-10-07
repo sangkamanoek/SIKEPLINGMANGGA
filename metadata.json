@@ -1,6 +1,6 @@
 {
-  "name": "SiKeplingMangga",
-  "description": "SiKeplingMangga - Sistem Informasi dan Administrasi Kelurahan Mangga Kecamatan Medan Tuntungan dengan pemantauan 24 Kepling, capaian target indikator, rekapitulasi kinerja, dan dokumentasi foto lapangan.",
+  "name": "SI-MANGGA",
+  "description": "SI-MANGGA - Sistem Informasi & Administrasi Kelurahan Mangga Kecamatan Medan Tuntungan. Platform digital untuk pemantauan 24 Kepling, capaian target indikator, rekapitulasi kinerja, dan dokumentasi foto lapangan.",
   "requestFramePermissions": [
     "camera"
   ],

@@ -1029,7 +1029,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-[10px] sm:text-xs font-extrabold uppercase tracking-wider shadow-inner max-w-full">
               <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-              <span className="truncate">SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA</span>
+              <span className="truncate">SI-MANGGA (Sistem Informasi & Administrasi Kelurahan Mangga)</span>
             </div>
             <h2 className="text-xl sm:text-3xl font-black tracking-tight text-white drop-shadow-xs">
               {mode === 'kepling' ? (

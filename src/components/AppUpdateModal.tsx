@@ -69,7 +69,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose 
                   </span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black text-white mt-1 tracking-tight">
-                  Pembaruan Aplikasi SiKepling
+                  Pembaruan Aplikasi SI-MANGGA
                 </h2>
               </div>
             </div>

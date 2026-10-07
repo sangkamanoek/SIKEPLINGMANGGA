@@ -68,7 +68,7 @@ export const APP_VERSION_HISTORY: VersionRelease[] = [
       },
       {
         category: 'FITUR BARU',
-        description: 'Sistem Informasi Pembaruan Aplikasi Kepling: Popup "Apa yang Baru", banner pembaruan terdeteksi, dan tombol muat ulang cepat.'
+        description: 'Sistem Informasi Pembaruan Aplikasi SI-MANGGA: Popup "Apa yang Baru", banner pembaruan terdeteksi, dan tombol muat ulang cepat.'
       },
       {
         category: 'PERBAIKAN',

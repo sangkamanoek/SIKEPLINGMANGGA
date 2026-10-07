@@ -50,7 +50,7 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClos
         }, 2000);
       }
     } else {
-      alert("📥 Fitur Pemasangan 1-Klik Sedang Memanggil Google Chrome WebAPK Installer...\n\nJika jendela konfirmasi instalasi Google Chrome belum muncul di layar Anda, silakan ikuti petunjuk cepat berikut:\n1. Ketuk tombol menu titik tiga (⋮) di pojok kanan atas browser Google Chrome Anda.\n2. Pilih menu \"Instal Aplikasi\" atau \"Tambahkan ke Layar Utama\".\n\nAplikasi SiKeplingMangga akan langsung terpasang di HP Anda sebagai aplikasi mandiri dengan logo Pemko Medan yang resmi!");
+      alert("📥 Fitur Pemasangan 1-Klik Sedang Memanggil Google Chrome WebAPK Installer...\n\nJika jendela konfirmasi instalasi Google Chrome belum muncul di layar Anda, silakan ikuti petunjuk cepat berikut:\n1. Ketuk tombol menu titik tiga (⋮) di pojok kanan atas browser Google Chrome Anda.\n2. Pilih menu \"Instal Aplikasi\" atau \"Tambahkan ke Layar Utama\".\n\nAplikasi SI-MANGGA akan langsung terpasang di HP Anda sebagai aplikasi mandiri dengan logo Pemko Medan yang resmi!");
     }
   };
 
@@ -64,18 +64,18 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClos
   };
 
   const handleCopyWaText = () => {
-    const waText = `🟩 *APLIKASI SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA - LAPORAN HARIAN KEPALA LINGKUNGAN*
+    const waText = `🟩 *APLIKASI SI-MANGGA (Sistem Informasi & Administrasi Kelurahan Mangga) - KECAMATAN MEDAN TUNTUNGAN*
 Kelurahan Mangga - Kecamatan Medan Tuntungan
 
 Kepada Yth. Bapak/Ibu Kepala Lingkungan I s/d XXIV:
-Silakan buka dan pasang aplikasi resmi *SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA* melalui tautan resmi berikut di browser HP Android/iPhone Anda:
+Silakan buka dan pasang aplikasi resmi *SI-MANGGA* (Sistem Informasi & Administrasi Kelurahan Mangga) melalui tautan resmi berikut di browser HP Android/iPhone Anda:
 👉 ${shareUrl}
 
-*Petunjuk Pemasangan di HP (APK SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA):*
+*Petunjuk Pemasangan di HP (SI-MANGGA):*
 1. Buka link di atas di browser Google Chrome pada HP Anda.
 2. Masukkan Username resmi Anda (misal: kepling_1) dan kata sandi resmi.
 3. Ketuk menu titik tiga (⋮) di pojok kanan atas browser, lalu pilih *"Tambahkan ke Layar Utama"* / *"Instal Aplikasi"*.
-4. Ikon aplikasi SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA (Logo Pemko Medan) akan otomatis terpasang di layar utama HP layaknya aplikasi APK.
+4. Ikon aplikasi SI-MANGGA (Logo Pemko Medan) akan otomatis terpasang di layar utama HP layaknya aplikasi APK.
 5. Gunakan fitur *Dashboard Capaian* untuk memantau akumulasi PBB, Perlinsos, IKD, dan BPJS TK Anda.
 
 #SIKEPLINGMANGGA #MedanUntukSemua #SemuaUntukMedan`;
@@ -100,7 +100,7 @@ Silakan buka dan pasang aplikasi resmi *SISTEM KINERJA KEPALA LINGKUNGAN KELURAH
             </div>
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Pasang APK SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA</span>
+                <span>Pasang Aplikasi SI-MANGGA (WebAPK)</span>
                 <span className="text-[10px] bg-emerald-700 text-emerald-100 px-2 py-0.5 rounded-full font-medium">
                   Resmi Android & iOS
                 </span>

@@ -11,7 +11,7 @@ export async function uploadMakalahToGoogleDrive(accessToken: string): Promise<{
   const fileBlob = await docxRes.blob();
 
   const metadata = {
-    name: 'Makalah Ilmiah - Sistem Informasi Laporan Kepling Kelurahan Mangga.docx',
+    name: 'Makalah Ilmiah - SI-MANGGA (Sistem Informasi & Administrasi Kelurahan Mangga).docx',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   };
 

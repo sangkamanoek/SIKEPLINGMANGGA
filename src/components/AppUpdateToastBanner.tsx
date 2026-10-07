@@ -59,7 +59,7 @@ export const AppUpdateToastBanner: React.FC<AppUpdateToastBannerProps> = ({ onOp
           </div>
 
           <p className="text-xs font-bold text-white mt-1 leading-snug">
-            Pembaruan SiKepling: Opsi Perlinsos Menolak &amp; Perbaikan Spasial WebGIS
+            Pembaruan SI-MANGGA: Opsi Perlinsos Menolak &amp; Perbaikan Spasial WebGIS
           </p>
 
           <p className="text-[11px] text-slate-300 mt-0.5 font-normal line-clamp-1">
