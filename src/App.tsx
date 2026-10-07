@@ -98,7 +98,7 @@ const ViewLoadingFallback = () => (
   <div className="flex flex-col items-center justify-center min-h-[300px] p-8 text-center animate-fade-in">
     <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mb-3"></div>
     <p className="text-sm font-bold text-slate-700">Memuat Modul...</p>
-    <p className="text-xs text-slate-400 mt-1">SI-MANGGA Kelurahan Mangga</p>
+    <p className="text-[10px] text-slate-400 mt-1 uppercase font-medium tracking-wider">Sistem Informasi & Administrasi Kelurahan Mangga</p>
   </div>
 );
 import { AbsenApelItem, CustomEvent, EventAttendance, StatusAbsenApel } from './types';

@@ -123,7 +123,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
               <span className="text-amber-300">{currentUser.nama}</span>
             </h1>
             <p className="text-xs sm:text-sm text-tosca-100 max-w-2xl leading-relaxed">
-              SI-MANGGA • Sistem Informasi & Manajemen Terpadu PKK Kelurahan Mangga. Mengelola Buku Kas Umum, Laporan 4 Pokja, Pendataan Dasa Wisma, dan Integrasi Posyandu di 24 Lingkungan.
+              SI-MANGGA • Sistem Informasi & Administrasi Kelurahan Mangga. Mengelola Buku Kas Umum, Laporan 4 Pokja, Pendataan Dasa Wisma, dan Integrasi Posyandu di 24 Lingkungan.
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <span className="px-2.5 py-0.5 rounded-lg bg-tosca-900/60 border border-tosca-500/40 text-[11px] font-bold text-tosca-200">

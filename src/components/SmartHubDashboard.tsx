@@ -668,9 +668,10 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
               Selamat Datang, <span className="text-emerald-400">{activeAccount.nama}</span>
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 font-medium max-w-2xl">
-              {isKepling && `Kepala Lingkungan ${activeAccount.lingkungan} Kelurahan Mangga, Kec. Medan Tuntungan.`}
-              {isAdmin && "Dashboard Eksekutif Super Admin Kelurahan Mangga. Kelola seluruh 24 lingkungan secara real-time."}
-              {isKasi && "Dashboard Kasi Sektoral. Evaluasi, verifikasi, dan pantau capaian kinerja di bidang Anda."}
+              SI-MANGGA • Sistem Informasi & Administrasi Kelurahan Mangga. 
+              {isKepling && ` Melayani warga di Lingkungan ${activeAccount.lingkungan}, Kec. Medan Tuntungan.`}
+              {isAdmin && " Dashboard Eksekutif Super Admin. Kelola seluruh 24 lingkungan secara real-time."}
+              {isKasi && " Dashboard Kasi Sektoral. Evaluasi, verifikasi, dan pantau capaian kinerja bidang Anda."}
             </p>
           </div>
 
@@ -708,13 +709,13 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       {/* Visual Alert & Deadline 23:30 Push Notif Component */}
       <DeadlineNotifAlert activeAccount={activeAccount} reports={reports} onNavigate={onNavigate} />
 
-      {/* 3 Pilar Utama SI-Mangga Banner Quick Navigation */}
+      {/* 3 Pilar Utama SI-MANGGA Banner Quick Navigation */}
       <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-emerald-600" />
             <h3 className="text-xs sm:text-sm font-black uppercase text-slate-900 tracking-wider">
-              3 Pilar Layanan Utama SI-Mangga
+              3 Pilar Layanan Utama SI-MANGGA
             </h3>
           </div>
           <span className="text-[10px] font-bold text-slate-400">Kelurahan Mangga Kecamatan Medan Tuntungan</span>

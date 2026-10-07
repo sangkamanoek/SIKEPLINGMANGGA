@@ -194,58 +194,58 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
             )}
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-black tracking-tight text-white drop-shadow-xs uppercase whitespace-nowrap">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white drop-shadow-md uppercase whitespace-nowrap">
                 SI-MANGGA
               </h1>
               <span
-                className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md shadow-xs whitespace-nowrap ${
+                className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full shadow-sm border border-white/20 whitespace-nowrap ${
                   activeAccount.role === 'super_admin'
                     ? 'bg-amber-400 text-slate-950'
                     : activeAccount.role === 'kasi_pemerintahan'
-                    ? 'bg-teal-400 text-teal-950 font-black'
+                    ? 'bg-teal-400 text-teal-950'
                     : activeAccount.role === 'kasi_pembangunan'
-                    ? 'bg-blue-400 text-blue-950 font-black'
+                    ? 'bg-blue-400 text-blue-950'
                     : activeAccount.role === 'kasi_trantibum'
-                    ? 'bg-orange-400 text-orange-950 font-black'
+                    ? 'bg-orange-400 text-orange-950'
                     : activeAccount.role === 'ketua_pkk_kelurahan' ||
                       activeAccount.role === 'ketua_pokja' ||
                       activeAccount.role === 'ketua_pkk_lingkungan' ||
                       activeAccount.role === 'sekretaris_pkk'
-                    ? 'bg-white text-tosca-800 font-black'
+                    ? 'bg-white text-tosca-800'
                     : isPkk ? 'bg-tosca-950 text-tosca-200 border border-tosca-600' : 'bg-emerald-950 text-emerald-200 border border-emerald-600'
                 }`}
               >
                 {activeAccount.role === 'super_admin'
                   ? 'PORTAL SUPER ADMIN'
                   : activeAccount.role === 'kasi_pemerintahan'
-                  ? 'KASI TATA PEMERINTAHAN (PBB)'
+                  ? 'KASI TATA PEMERINTAHAN'
                   : activeAccount.role === 'kasi_pembangunan'
-                  ? 'KASI PEMBANGUNAN (PERLINSOS)'
+                  ? 'KASI PEMBANGUNAN'
                   : activeAccount.role === 'kasi_trantibum'
-                  ? 'KASI TRANTIBUM (KETERTIBAN)'
+                  ? 'KASI TRANTIBUM'
                   : activeAccount.role === 'sekretaris_pkk'
-                  ? 'SEKRETARIS TP-PKK KELURAHAN'
+                  ? 'SEKRETARIS TP-PKK'
                   : isPkk
                   ? 'PENGURUS TP-PKK KELURAHAN'
                   : 'KEPALA LINGKUNGAN'}
               </span>
             </div>
-            <p className={`${isPkk ? 'text-tosca-100' : 'text-emerald-100'} text-xs sm:text-sm font-bold tracking-wider mt-1 leading-snug drop-shadow-xs`}>
+            <p className={`${isPkk ? 'text-tosca-100' : 'text-emerald-100'} text-[10px] sm:text-xs font-bold tracking-wider mt-1 leading-snug drop-shadow-xs uppercase`}>
               {activeAccount.role === 'super_admin'
-                ? 'MONITORING LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN Kelurahan Mangga'
+                ? 'Sistem Informasi & Administrasi Kelurahan Mangga'
                 : activeAccount.role === 'kasi_pemerintahan'
-                ? 'DASHBOARD LAPORAN & MONITORING REALISASI OPSIR PBB 24 LINGKUNGAN'
+                ? 'Monitoring Realisasi Opsir PBB-P2 24 Lingkungan'
                 : activeAccount.role === 'kasi_pembangunan'
-                ? 'DASHBOARD LAPORAN & CAPAIAN TARGET PERLINDUNGAN SOSIAL (PERLINSOS)'
+                ? 'Monitoring Capaian Target Perlindungan Sosial (Perlinsos)'
                 : activeAccount.role === 'kasi_trantibum'
-                ? 'DASHBOARD KETENTRAMAN, KETERTIBAN UMUM, POSKAMLING & KEDISIPLINAN'
+                ? 'Monitoring Ketentraman, Ketertiban Umum & Poskamling'
                 : activeAccount.role === 'ketua_pkk_kelurahan' ||
                   activeAccount.role === 'ketua_pokja' ||
                   activeAccount.role === 'ketua_pkk_lingkungan' ||
                   activeAccount.role === 'sekretaris_pkk'
-                ? 'PORTAL RESMI KEGIATAN & KEUANGAN TIM PENGGERAK PKK KELURAHAN MANGGA'
-                : `KECAMATAN MEDAN TUNTUNGAN • KELURAHAN MANGGA`}
+                ? 'Portal Administrasi & Keuangan TP-PKK Kelurahan Mangga'
+                : `Sistem Informasi & Administrasi Kelurahan Mangga • Medan Tuntungan`}
             </p>
           </div>
         </div>

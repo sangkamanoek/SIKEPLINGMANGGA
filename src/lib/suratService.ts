@@ -161,8 +161,9 @@ export async function saveSuratItem(item: SuratKedinasanItem): Promise<void> {
   // 3. Save to Firestore Cloud (with 1MB document boundary protection)
   if (db) {
     try {
-      // Check if fileUrl exceeds safe Firestore document size (approx 700KB base64)
-      const isFileTooLargeForFirestore = item.fileUrl && item.fileUrl.length > 700000;
+      // Check if fileUrl exceeds safe Firestore document size (approx 850KB base64)
+      // Note: Firestore hard limit is 1,048,576 bytes per document
+      const isFileTooLargeForFirestore = item.fileUrl && item.fileUrl.length > 900000;
       if (isFileTooLargeForFirestore) {
         // Save metadata without oversized base64 to prevent DocumentSizeExceeded rejection
         const safeFirestoreDoc = {
