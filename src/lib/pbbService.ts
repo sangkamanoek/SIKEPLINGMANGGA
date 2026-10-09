@@ -77,12 +77,6 @@ export function saveLocalSpptForYear(items: SpptPbbItem[], year: number): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('pbb-data-updated', { detail: { year, count: items.length } }));
   }
-  // AUTO-SYNC TO FIRESTORE IN BACKGROUND WITHOUT BLOCKING
-  items.forEach(item => {
-    if (item && item.id) {
-      savePbbSpptToFirestore(item, year).catch(() => {});
-    }
-  });
 }
 
 /**
@@ -616,23 +610,21 @@ export function subscribePbbSpptFromFirestore(
   };
   window.addEventListener('pbb-item-synced', handleCustomEvent);
 
-  // 4. Periodic polling from Server API buffer every 8 seconds as safety net
+  // 4. Periodic polling from Server API buffer every 30 seconds as fallback only when tab is visible
   const pollInterval = setInterval(async () => {
+    if (typeof document !== 'undefined' && document.hidden) return;
     try {
       const apiItems = await fetchPbbFromApi(year);
       if (apiItems && apiItems.length > 0) {
-        const prevStatusStr = activeList.map((x) => `${x.id}:${x.status}`).join('|');
-        const merged = smartMergeSpptItems(activeList, apiItems);
-        const newStatusStr = merged.map((x) => `${x.id}:${x.status}`).join('|');
-        if (prevStatusStr !== newStatusStr || merged.length !== activeList.length) {
-          activeList = merged;
+        if (apiItems.length !== activeList.length) {
+          activeList = smartMergeSpptItems(activeList, apiItems);
           onData(activeList);
         }
       }
     } catch {
       // ignore
     }
-  }, 8000);
+  }, 30000);
 
   return () => {
     firestoreUnsub();

@@ -219,7 +219,9 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
   // Sync state changes to localStorage for active year
   useEffect(() => {
-    saveLocalSpptForYear(spptList, selectedYear);
+    if (spptList && spptList.length > 0) {
+      saveLocalSpptForYear(spptList, selectedYear);
+    }
   }, [spptList, selectedYear]);
 
   // Manual Full Sync handler (reconciles server buffer, Firestore, and client state)
