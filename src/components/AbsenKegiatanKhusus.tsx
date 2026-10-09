@@ -18,7 +18,8 @@ import {
   RefreshCw,
   Send
 } from 'lucide-react';
-import { CustomEvent, EventAttendance, UserAccount } from '../types';
+import { EventAttendance, UserAccount } from '../types';
+import type { CustomEvent } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { getNetworkNow } from '../lib/networkTimeService';
 import {

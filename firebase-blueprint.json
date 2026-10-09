@@ -38,6 +38,18 @@
       },
       "required": ["id", "accountId", "tanggal", "status"]
     },
+    "AttendanceQR": {
+      "title": "QR Code Apel Pagi",
+      "description": "QR code untuk validasi lokasi apel pagi Kepling.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "token": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "token", "tanggal"]
+    },
     "Target": {
       "title": "Target Capaian",
       "description": "Target kinerja dan penyesuaian (override) untuk tiap Kepling.",
@@ -153,6 +165,10 @@
     "attendance/{attendanceId}": {
       "schema": "Attendance",
       "description": "Koleksi presensi apel pagi."
+    },
+    "attendance_qr/{date}": {
+      "schema": "AttendanceQR",
+      "description": "Koleksi untuk QR code harian."
     },
     "targets_capaian/{keplingId}": {
       "schema": "Target",

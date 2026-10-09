@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDoc,
   setDoc,
   deleteDoc,
   writeBatch,
@@ -11,8 +12,12 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
-import { LaporanHarianItem, KeplingTargetCapaian, TargetsCapaianMap, TaskReminder, NotificationLog, AbsenApelItem, CustomEvent, EventAttendance } from '../types';
+import { LaporanHarianItem, KeplingTargetCapaian, TargetsCapaianMap, TaskReminder, NotificationLog, AbsenApelItem, EventAttendance } from '../types';
+import type { CustomEvent } from '../types';
 import { getDefaultTargetsCapaianMap } from '../data/targetsData';
+
+import { getAccessToken } from './firebase';
+import { syncAttendancePhotoToDrive } from './driveSync';
 
 // Local in-memory cache of deleted report IDs to prevent re-emergence
 const deletedReportIdsMemory = new Set<string>();
@@ -291,7 +296,7 @@ export function subscribeReportsFromFirestore(
         });
 
         onData(reports, isFromCache);
-      }, 60);
+      }, 5);
     },
     (err) => {
       handleFirestoreError(err, OperationType.LIST, REPORTS_COLLECTION);
@@ -646,8 +651,20 @@ export async function fetchAttendanceFromFirestore(): Promise<AbsenApelItem[]> {
 
 export async function saveAttendanceToFirestore(item: AbsenApelItem): Promise<boolean> {
   try {
-    const docRef = doc(db, ATTENDANCE_COLLECTION, item.id);
-    await setDoc(docRef, item, { merge: true });
+    let itemToSave = item;
+
+    // 0. Sync to Drive if connected
+    try {
+      const activeToken = await getAccessToken();
+      if (activeToken) {
+        itemToSave = await syncAttendancePhotoToDrive(item, activeToken);
+      }
+    } catch (err) {
+      console.warn('Drive sync for attendance failed:', err);
+    }
+
+    const docRef = doc(db, ATTENDANCE_COLLECTION, itemToSave.id);
+    await setDoc(docRef, itemToSave, { merge: true });
     return true;
   } catch (err: any) {
     handleFirestoreError(err, OperationType.WRITE, ATTENDANCE_COLLECTION);
@@ -686,6 +703,66 @@ export function subscribeAttendanceFromFirestore(
     },
     (err) => {
       handleFirestoreError(err, OperationType.LIST, ATTENDANCE_COLLECTION);
+    }
+  );
+}
+
+// ==========================================
+// 7.5. DAILY ROTATING ATTENDANCE QR CRUD
+// ==========================================
+
+export const ATTENDANCE_QR_COLLECTION = 'attendance_qr';
+
+export interface AttendanceQREntity {
+  id: string;
+  token: string;
+  tanggal: string;
+  createdAt: string;
+  lat?: number;
+  lng?: number;
+}
+
+export async function fetchAttendanceQRFromFirestore(date: string): Promise<AttendanceQREntity | null> {
+  try {
+    const docRef = doc(db, ATTENDANCE_QR_COLLECTION, date);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data() as AttendanceQREntity;
+    }
+    return null;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, `${ATTENDANCE_QR_COLLECTION}/${date}`);
+    return null;
+  }
+}
+
+export async function saveAttendanceQRToFirestore(item: AttendanceQREntity): Promise<boolean> {
+  try {
+    const docRef = doc(db, ATTENDANCE_QR_COLLECTION, item.tanggal);
+    await setDoc(docRef, cleanFirestoreData(item), { merge: true });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${ATTENDANCE_QR_COLLECTION}/${item.tanggal}`);
+    return false;
+  }
+}
+
+export function subscribeAttendanceQRFromFirestore(
+  date: string,
+  onData: (item: AttendanceQREntity | null) => void
+): Unsubscribe {
+  const docRef = doc(db, ATTENDANCE_QR_COLLECTION, date);
+  return onSnapshot(
+    docRef,
+    (docSnap) => {
+      if (docSnap.exists()) {
+        onData(docSnap.data() as AttendanceQREntity);
+      } else {
+        onData(null);
+      }
+    },
+    (err) => {
+      handleFirestoreError(err, OperationType.GET, `${ATTENDANCE_QR_COLLECTION}/${date}`);
     }
   );
 }

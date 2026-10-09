@@ -38,8 +38,21 @@ export const USERNAME_HEADERS = [
  * Searches for existing database spreadsheet or creates a new one
  */
 export async function getOrCreateSpreadsheet(accessToken: string): Promise<SheetMetadata> {
+  // 0. Ensure root folder exists
+  let rootFolderId: string | undefined;
+  try {
+    const { getOrCreateFolder } = await import('./driveService');
+    rootFolderId = await getOrCreateFolder(accessToken, 'SI_MANGGA_DATA_CENTER');
+  } catch (err) {
+    console.warn('Could not ensure root folder:', err);
+  }
+
   // 1. Try to search Google Drive for an existing spreadsheet named SISTEM KINERJA KEPALA LINGKUNGAN KELURAHAN MANGGA
-  const query = encodeURIComponent(`name = '${SPREADSHEET_TITLE}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`);
+  const q = rootFolderId
+    ? `name = '${SPREADSHEET_TITLE}' and '${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`
+    : `name = '${SPREADSHEET_TITLE}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`;
+  
+  const query = encodeURIComponent(q);
   const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,webViewLink)`;
 
   try {
@@ -65,6 +78,8 @@ export async function getOrCreateSpreadsheet(accessToken: string): Promise<Sheet
           spreadsheetId: file.id,
           spreadsheetUrl: file.webViewLink || `https://docs.google.com/spreadsheets/d/${file.id}/edit`,
           title: file.name,
+          rootFolderId: rootFolderId,
+          rootFolderUrl: rootFolderId ? `https://drive.google.com/drive/folders/${rootFolderId}` : undefined,
         };
       }
     }
@@ -72,9 +87,7 @@ export async function getOrCreateSpreadsheet(accessToken: string): Promise<Sheet
     console.warn('Drive search error, falling back to direct create:', err);
   }
 
-  // 2. If not found, create new spreadsheet with:
-  // Sheet 1: Username & Password (index 0)
-  // Sheet 2: Laporan Harian (index 1)
+  // 2. If not found, create new spreadsheet
   const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
     method: 'POST',
     headers: {
@@ -119,6 +132,18 @@ export async function getOrCreateSpreadsheet(accessToken: string): Promise<Sheet
   const spreadsheetId = createdData.spreadsheetId;
   const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 
+  // 3. Move to root folder if it was created in root Drive by default
+  if (rootFolderId) {
+    try {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${rootFolderId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch (err) {
+      console.warn('Could not move spreadsheet to app folder:', err);
+    }
+  }
+
   // Write Sheet 1 (Username & Password) rows & style
   await ensureUsernameSheetAndPopulate(accessToken, spreadsheetId);
 
@@ -129,6 +154,8 @@ export async function getOrCreateSpreadsheet(accessToken: string): Promise<Sheet
     spreadsheetId,
     spreadsheetUrl,
     title: SPREADSHEET_TITLE,
+    rootFolderId: rootFolderId,
+    rootFolderUrl: rootFolderId ? `https://drive.google.com/drive/folders/${rootFolderId}` : undefined,
   };
 }
 

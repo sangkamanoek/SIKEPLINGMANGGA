@@ -39,14 +39,29 @@ import {
   CloudUpload,
   Server,
   Database,
+  Bell,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import QRCode from 'react-qr-code';
+import {
+  getTugasKhususList,
+  addTugasKhusus,
+  deleteTugasKhusus,
+  updateTugasKhususStatus,
+  TugasKhusus,
+} from '../lib/tugasKhususService';
 import {
   saveSuperAdminDeviceDataToFirestore,
   syncSuperAdminDeviceDataToLiveFirestore,
   getSuperAdminDeviceDataSnapshot,
 } from '../lib/appBackupService';
-import { fetchSyncAuditLogs, SyncAuditLog } from '../lib/firestoreService';
+import {
+  fetchSyncAuditLogs,
+  SyncAuditLog,
+  saveAttendanceQRToFirestore,
+  subscribeAttendanceQRFromFirestore,
+  AttendanceQREntity,
+} from '../lib/firestoreService';
 import {
   LaporanHarianItem,
   SheetMetadata,
@@ -77,16 +92,6 @@ import {
   getReportIsoDate,
 } from '../lib/formatter';
 import {
-  getLocalHouses,
-  getLocalRoads,
-  getLocalPolygons,
-  subscribeWebgisData,
-} from '../lib/webgisService';
-import {
-  computeKelurahanPemetaanOverview,
-  LingkunganPemetaanStats,
-} from '../lib/pemetaanStatsHelper';
-import {
   AVAILABLE_PBB_YEARS,
   DEFAULT_PBB_YEAR,
   getLocalSpptForYear,
@@ -106,7 +111,6 @@ interface MonitoringSuperAdminProps {
   isRefreshing?: boolean;
   onResetReports?: () => Promise<void>;
   onOpenCapaianDashboard?: () => void;
-  onOpenPemetaan?: (lingkunganNomor?: number) => void;
   onOpenPbb?: () => void;
   sheetMeta?: SheetMetadata | null;
 }
@@ -121,14 +125,59 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
   isRefreshing,
   onResetReports,
   onOpenCapaianDashboard,
-  onOpenPemetaan,
   onOpenPbb,
   sheetMeta,
 }) => {
   const todayIso = getTodayLocalIso();
 
-  // Tab mode for Monitoring Dashboard: Laporan Harian vs Realisasi PBB vs Hasil Pemetaan Spasial vs Akun
-  const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PBB_REALISASI' | 'PEMETAAN' | 'ACCOUNTS'>('LAPORAN');
+  // Tab mode for Monitoring Dashboard: Laporan Harian vs Realisasi PBB vs Akun vs Tugas Khusus
+  const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PBB_REALISASI' | 'ACCOUNTS' | 'TUGAS_KHUSUS'>('LAPORAN');
+
+  // Tugas Khusus Lurah states
+  const [tugasList, setTugasList] = useState<TugasKhusus[]>(() => getTugasKhususList());
+  const [taskJudul, setTaskJudul] = useState('');
+  const [taskDeskripsi, setTaskDeskripsi] = useState('');
+  const [taskTargetAccountId, setTaskTargetAccountId] = useState('ALL');
+  const [taskDeadline, setTaskDeadline] = useState(todayIso);
+  const [taskError, setTaskError] = useState('');
+  const [taskSuccess, setTaskSuccess] = useState('');
+
+  useEffect(() => {
+    const handleTugasUpdate = () => {
+      setTugasList(getTugasKhususList());
+    };
+    window.addEventListener('sikepling_tugas_khusus_updated', handleTugasUpdate);
+    return () => window.removeEventListener('sikepling_tugas_khusus_updated', handleTugasUpdate);
+  }, []);
+
+  const handleCreateTugas = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTaskError('');
+    setTaskSuccess('');
+    if (!taskJudul.trim() || !taskDeskripsi.trim()) {
+      setTaskError('Judul dan Deskripsi Tugas Khusus wajib diisi.');
+      return;
+    }
+    try {
+      addTugasKhusus({
+        judul: taskJudul.trim(),
+        deskripsi: taskDeskripsi.trim(),
+        targetAccountId: taskTargetAccountId,
+        targetRole: taskTargetAccountId === 'ALL' ? 'all' : 'kepling',
+        pemberiTugas: 'Lurah Kelurahan Mangga',
+        tanggalMulai: todayIso,
+        deadline: taskDeadline || todayIso,
+        status: 'aktif',
+      });
+      setTaskJudul('');
+      setTaskDeskripsi('');
+      setTaskTargetAccountId('ALL');
+      setTaskSuccess('Tugas Khusus dari Lurah berhasil diterbitkan dan langsung tampil di perangkat target!');
+      setTimeout(() => setTaskSuccess(''), 4000);
+    } catch (err: any) {
+      setTaskError(err.message || 'Gagal menyimpan tugas khusus.');
+    }
+  };
 
   // Account management states
   const [accountSubTab, setAccountSubTab] = useState<'KASI' | 'ALL'>('KASI');
@@ -189,87 +238,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
 
   const formatRupiah = (val: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
-  };
-
-  // WebGIS Data Real-time State
-  const [gisHouses, setGisHouses] = useState<TitikRumahBangunan[]>(getLocalHouses);
-  const [gisRoads, setGisRoads] = useState<RuasJalanLingkungan[]>(getLocalRoads);
-  const [gisPolygons, setGisPolygons] = useState<LingkunganPolygon[]>(getLocalPolygons);
-  const [pemetaanSearch, setPemetaanSearch] = useState<string>('');
-  const [pemetaanFilterStatus, setPemetaanFilterStatus] = useState<'ALL' | 'HAS_HOUSES' | 'NO_HOUSES'>('ALL');
-
-  useEffect(() => {
-    const unsub = subscribeWebgisData(
-      (p) => setGisPolygons(p),
-      (h) => setGisHouses(h),
-      (r) => setGisRoads(r)
-    );
-    return () => unsub();
-  }, []);
-
-  // Compute Pemetaan 24 Lingkungan Overview
-  const kelurahanPemetaan = useMemo(() => {
-    return computeKelurahanPemetaanOverview(gisHouses, gisRoads, gisPolygons);
-  }, [gisHouses, gisRoads, gisPolygons]);
-
-  // Filtered Pemetaan Lingkungan List for Table
-  const filteredPemetaanLingkunganList = useMemo(() => {
-    return kelurahanPemetaan.perLingkunganList.filter((item) => {
-      const matchSearch =
-        pemetaanSearch === '' ||
-        item.lingkunganNama.toLowerCase().includes(pemetaanSearch.toLowerCase()) ||
-        item.keplingNama.toLowerCase().includes(pemetaanSearch.toLowerCase()) ||
-        String(item.lingkunganNomor).includes(pemetaanSearch);
-
-      if (!matchSearch) return false;
-
-      if (pemetaanFilterStatus === 'HAS_HOUSES') {
-        return item.totalRumah > 0;
-      }
-      if (pemetaanFilterStatus === 'NO_HOUSES') {
-        return item.totalRumah === 0;
-      }
-      return true;
-    });
-  }, [kelurahanPemetaan.perLingkunganList, pemetaanSearch, pemetaanFilterStatus]);
-
-  // Export Excel Pemetaan function
-  const handleExportExcelPemetaan = () => {
-    const data = kelurahanPemetaan.perLingkunganList.map((item, idx) => ({
-      'No': idx + 1,
-      'Lingkungan': item.lingkunganNama,
-      'Nama Kepling': item.keplingNama,
-      'No Telepon': item.keplingTelepon || '-',
-      'Batas Poligon': item.hasPolygon ? 'Sudah Ada' : 'Belum Ada',
-      'Titik Rumah Terpetakan': item.totalRumah,
-      'Total Jiwa': item.totalJiwa,
-      'Laki-laki': item.totalLakiLaki,
-      'Perempuan': item.totalPerempuan,
-      'Anak-anak': item.totalAnak,
-      'Lansia': item.totalLansia,
-      'KK KTP Mangga': item.kkMangga,
-      'KK Luar': item.kkLuar,
-      '% KK Mangga': `${item.persenKkMangga}%`,
-      'WRS Aktif': item.wrsAktif,
-      'WRS Mandiri': item.wrsMandiri,
-      'WRS Belum': item.wrsBelum,
-      '% WRS Aktif': `${item.persenWrsAktif}%`,
-      'Potensi Retribusi WRS (Rp/Bln)': item.potensiRetribusiWrs,
-      'PBB Lunas': item.pbbLunas,
-      'PBB Belum Lunas': item.pbbBelumLunas,
-      '% PBB Lunas': `${item.persenPbbLunas}%`,
-      'Nominal PBB (Rp)': item.totalNominalPbb,
-      'Penerima Bansos (KK)': item.bansosKk,
-      'Ruas Jalan/Gang': item.totalRuasJalan,
-      'Panjang Jalan (Meter)': item.totalPanjangJalanMeter,
-      'Jalan Baik': item.jalanBaik,
-      'Jalan Rusak': item.jalanRusak,
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Pemetaan 24 Lingkungan');
-    XLSX.writeFile(wb, `Rekap_Pemetaan_WebGIS_Kelurahan_Mangga_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   // Extract all distinct dates available in reports, with report counts
@@ -341,7 +309,38 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  
+  // Section: Generate QR Apel
+  const [currentQR, setCurrentQR] = useState<AttendanceQREntity | null>(null);
+  const [isGeneratingQR, setIsGeneratingQR] = useState(false);
   const [copiedWa, setCopiedWa] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeAttendanceQRFromFirestore(selectedDate, (qr) => {
+      setCurrentQR(qr);
+    });
+    return () => unsub();
+  }, [selectedDate]);
+
+  const generateApelQR = async () => {
+    setIsGeneratingQR(true);
+    try {
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const qrData: AttendanceQREntity = {
+        id: `qr_${selectedDate}`,
+        token,
+        tanggal: selectedDate,
+        createdAt: new Date().toISOString(),
+        lat: 3.514234, // Kantor Lurah center
+        lng: 98.633175, // Kantor Lurah center
+      };
+      await saveAttendanceQRToFirestore(qrData);
+    } catch (e) {
+      console.error('Failed to generate QR:', e);
+    } finally {
+      setIsGeneratingQR(false);
+    }
+  };
 
   // States for local device synchronization & backup to Firestore
   const [isDeviceSyncModalOpen, setIsDeviceSyncModalOpen] = useState(false);
@@ -596,19 +595,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
               </button>
             )}
 
-            {onOpenPemetaan && (
-              <button
-                type="button"
-                onClick={() => onOpenPemetaan()}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition-colors cursor-pointer shadow-md border border-emerald-400/40"
-                title="Buka Peta Spasial WebGIS Kelurahan Mangga"
-              >
-                <Compass className="w-4 h-4 text-emerald-200" />
-                <span>Peta WebGIS</span>
-              </button>
-            )}
-
-
             <button
               type="button"
               onClick={handleCopyRekapWA}
@@ -660,6 +646,16 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                 <span>Buku Sandi</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('TUGAS_KHUSUS')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 text-xs font-bold transition-colors cursor-pointer shadow-xs animate-pulse"
+              title="Buat dan kelola Tugas Khusus dari Lurah"
+            >
+              <Bell className="w-4 h-4 text-rose-300" />
+              <span>Tugas Khusus Lurah</span>
+            </button>
 
             <button
               type="button"
@@ -798,7 +794,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
         </div>
       </div>
 
-      {/* Main Monitoring Tab Switcher (Laporan Harian vs Hasil Pemetaan Spasial) */}
+      {/* Main Monitoring Tab Switcher (Laporan Harian vs Realisasi PBB vs Akun) */}
       <div className="flex items-center gap-2 p-1.5 bg-slate-800 rounded-2xl border border-slate-700 shadow-2xs">
         <button
           type="button"
@@ -838,26 +834,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
 
         <button
           type="button"
-          onClick={() => setActiveMainTab('PEMETAAN')}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
-            activeMainTab === 'PEMETAAN'
-              ? 'bg-emerald-700 text-white shadow-sm border border-emerald-600'
-              : 'text-slate-300 hover:text-white hover:bg-slate-700'
-          }`}
-        >
-          <MapIcon className="w-4 h-4 text-emerald-300" />
-          <span>Hasil Pemetaan WebGIS & WRS (24 Lingkungan)</span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold hidden sm:inline-block ${
-            activeMainTab === 'PEMETAAN'
-              ? 'bg-white/20 text-white'
-              : 'bg-emerald-100 text-emerald-800'
-          }`}>
-            {kelurahanPemetaan.totalRumahAll} Rumah • {kelurahanPemetaan.totalJiwaAll} Jiwa
-          </span>
-        </button>
-
-        <button
-          type="button"
           onClick={() => setActiveMainTab('ACCOUNTS')}
           className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
             activeMainTab === 'ACCOUNTS'
@@ -875,32 +851,30 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
             {accountsList.length} Akun
           </span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('TUGAS_KHUSUS')}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
+            activeMainTab === 'TUGAS_KHUSUS'
+              ? 'bg-rose-600 text-white shadow-sm border border-rose-500'
+              : 'text-slate-300 hover:text-white hover:bg-slate-700'
+          }`}
+        >
+          <Bell className="w-4 h-4 text-rose-300" />
+          <span>Tugas Khusus Lurah</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold hidden sm:inline-block ${
+            activeMainTab === 'TUGAS_KHUSUS'
+              ? 'bg-white/20 text-white'
+              : 'bg-rose-100 text-rose-800'
+          }`}>
+            {tugasList.filter(t => t.status === 'aktif').length} Aktif
+          </span>
+        </button>
       </div>
 
       {activeMainTab === 'LAPORAN' && (
         <>
-          {/* Quick Notice to WebGIS Pemetaan */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
-                <MapIcon className="w-4 h-4" />
-              </div>
-              <p className="text-slate-700">
-                <strong className="text-emerald-900 font-bold">Hasil Pemetaan Spasial Terkini:</strong>{' '}
-                {kelurahanPemetaan.totalRumahAll} Rumah terpetakan • {kelurahanPemetaan.totalJiwaAll} Jiwa •{' '}
-                {kelurahanPemetaan.totalWrsAktifAll} WRS Aktif (Potensi Rp {kelurahanPemetaan.potensiRetribusiWrsAll.toLocaleString('id-ID')}/bln).
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setActiveMainTab('PEMETAAN')}
-              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 hover:underline flex items-center gap-1 shrink-0 cursor-pointer self-start sm:self-auto"
-            >
-              <span>Lihat Detail Hasil Pemetaan 24 Lingkungan</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
           {/* Empty Database Recovery Banner (If reports is 0) */}
       {reports.length === 0 && (
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 shadow-sm">
@@ -978,6 +952,104 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
           </button>
         </div>
       )}
+
+      {/* Section: Generate & Manage Daily QR Code for Apel Pagi */}
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 rounded-3xl p-6 text-white border border-emerald-500/30 shadow-md space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-amber-400 shrink-0 border border-white/20">
+              <Sparkles className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                <span>QR CODE ABSENSI APEL PAGI HARIAN</span>
+                <span className="text-[10px] bg-emerald-500 text-slate-950 px-2 py-0.5 rounded font-black uppercase tracking-wider">
+                  Sistem Valid
+                </span>
+              </h3>
+              <p className="text-xs text-slate-300 font-medium">
+                Generate token QR Code harian yang selalu berputar (rotating) setiap hari untuk memvalidasi lokasi & identitas Kepala Lingkungan saat Apel Pagi.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 self-end md:self-center">
+            <button
+              type="button"
+              onClick={generateApelQR}
+              disabled={isGeneratingQR}
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-500/50 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingQR ? 'animate-spin' : ''}`} />
+              <span>{currentQR ? 'Regenerasi Token QR' : 'Buat QR Apel Hari Ini'}</span>
+            </button>
+          </div>
+        </div>
+
+        {currentQR ? (
+          <div className="bg-slate-950/80 rounded-2xl p-4 sm:p-6 border border-emerald-500/10 flex flex-col sm:flex-row items-center gap-6 justify-between">
+            <div className="bg-white p-4 rounded-2xl shadow-inner border border-slate-800 shrink-0 flex items-center justify-center">
+              <div className="relative">
+                <QRCode
+                  value={JSON.stringify({
+                    type: 'apel_pagi',
+                    tanggal: currentQR.tanggal,
+                    token: currentQR.token,
+                    lat: currentQR.lat || 3.514234,
+                    lng: currentQR.lng || 98.633175,
+                  })}
+                  size={140}
+                  level="H"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3 flex-1 w-full sm:w-auto">
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+                  <span className="text-slate-400 block text-[10px]">Tanggal Valid:</span>
+                  <span className="font-extrabold text-amber-300">{currentQR.tanggal}</span>
+                </div>
+                <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+                  <span className="text-slate-400 block text-[10px]">Token Pengaman:</span>
+                  <span className="font-mono text-slate-200 select-all truncate block">{currentQR.token}</span>
+                </div>
+                <div className="col-span-2 bg-white/5 p-2.5 rounded-xl border border-white/10">
+                  <span className="text-slate-400 block text-[10px]">Koordinat Pusat (Geofence):</span>
+                  <span className="font-medium text-slate-300 block">
+                    📍 Kantor Lurah Kelurahan Mangga (Lat {currentQR.lat}, Lng {currentQR.lng})
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const shareText = `*SI KEPLING MANGGA*\n*QR Code Absensi Apel Pagi Resmi*\nTanggal: ${currentQR.tanggal}\n\nSilakan scan QR code di bawah ini langsung dari HP Anda pada modul Absensi Apel Pagi di lokasi Kantor Lurah Kelurahan Mangga.`;
+                    navigator.clipboard.writeText(shareText);
+                    setCopiedWa(true);
+                    setTimeout(() => setCopiedWa(false), 2000);
+                  }}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-950 text-emerald-300 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 border border-emerald-500/20 cursor-pointer"
+                >
+                  {copiedWa ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedWa ? 'Informasi Disalin!' : 'Salin Info Share'}</span>
+                </button>
+                <span className="text-[11px] text-slate-400 italic">
+                  Dibuat pada: {new Date(currentQR.createdAt).toLocaleTimeString('id-ID')} WIB
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="border border-dashed border-white/10 rounded-2xl p-6 text-center text-xs text-slate-400 bg-white/2.5">
+            <AlertCircle className="w-5 h-5 text-amber-500 mx-auto mb-2 animate-bounce" />
+            <p className="font-bold text-slate-300">Belum Ada Token QR Code untuk {selectedDate}</p>
+            <p className="mt-0.5 text-slate-400">Silakan klik tombol di kanan atas untuk membuat QR Code pengaman harian bagi para Kepala Lingkungan.</p>
+          </div>
+        )}
+      </div>
 
       {/* High-Level Overview Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -1246,20 +1318,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                         <div className="text-[11px] text-slate-500 font-medium">
                           {kepling.jabatan}
                         </div>
-                        {(() => {
-                          const lStats = kelurahanPemetaan.perLingkunganMap[kepling.id];
-                          if (!lStats || lStats.totalRumah === 0) return null;
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => onOpenPemetaan?.(kepling.nomorLingkungan)}
-                              className="mt-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <MapPin className="w-3 h-3 text-emerald-600" />
-                              <span>{lStats.totalRumah} Rumah Terpeta</span>
-                            </button>
-                          );
-                        })()}
                       </td>
 
                       {/* STATUS BADGE WITH RED BADGE AFTER 23:30 */}
@@ -1438,24 +1496,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                       {kepling.jabatan}
                     </div>
                   </div>
-                  {(() => {
-                    const lStats = kelurahanPemetaan.perLingkunganMap[kepling.id];
-                    if (!lStats || lStats.totalRumah === 0) return null;
-                    return (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenPemetaan?.(kepling.nomorLingkungan);
-                        }}
-                        className="text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1 cursor-pointer transition-colors shrink-0"
-                        title={`Buka peta spasial ${lStats.totalRumah} rumah terpetakan di ${kepling.lingkungan}`}
-                      >
-                        <MapPin className="w-3 h-3 text-emerald-600" />
-                        <span>{lStats.totalRumah} Rumah</span>
-                      </button>
-                    );
-                  })()}
                 </div>
 
                 {/* Report Content Preview (if submitted) */}
@@ -1750,505 +1790,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      )}
-
-      {activeMainTab === 'PEMETAAN' && (
-        <div className="space-y-6">
-          {/* Header Banner */}
-          <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 rounded-2xl p-5 sm:p-6 text-white border border-emerald-800/50 shadow-xl relative overflow-hidden">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5 flex-1 min-w-0">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center font-bold shadow-inner shrink-0">
-                  <MapIcon className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-slate-950 px-2 py-0.5 rounded shadow-xs">
-                      WebGIS Spasial & Potensi Lingkungan
-                    </span>
-                    <span className="text-[10px] font-bold bg-white/10 text-emerald-200 px-2 py-0.5 rounded border border-white/15">
-                      Kelurahan Mangga • 24 Lingkungan
-                    </span>
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white mt-1">
-                    Hasil Pemetaan Spasial & Potensi 24 Lingkungan
-                  </h3>
-                  <p className="text-xs text-slate-300 mt-0.5">
-                    Data door-to-door titik rumah warga, kepatuhan WRS (Wajib Retribusi Sampah), PBB, dan demografi penduduk
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleExportExcelPemetaan}
-                  className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 transition-colors cursor-pointer shadow-xs"
-                  title="Unduh rekapitulasi pemetaan 24 lingkungan dalam format Excel (.xlsx)"
-                >
-                  <Download className="w-4 h-4 text-emerald-300" />
-                  <span>Ekspor Excel (.xlsx)</span>
-                </button>
-
-                {onOpenPemetaan && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenPemetaan()}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-colors cursor-pointer shadow-md"
-                  >
-                    <Compass className="w-4 h-4" />
-                    <span>Buka Peta Interaktif WebGIS</span>
-                    <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 6 Kelurahan Overview Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* 1. Titik Rumah */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs hover:border-emerald-300 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Total Rumah Terpetakan
-                </span>
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                  <Home className="w-5 h-5" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <div className="text-3xl font-black text-slate-900">
-                  {kelurahanPemetaan.totalRumahAll}
-                  <span className="text-xs font-semibold text-slate-500 ml-1.5">Bangunan</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Tersebar di {kelurahanPemetaan.totalLingkunganTerpetakan} dari 24 Lingkungan
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">Penerima Bansos:</span>
-                <strong className="text-emerald-700 font-bold">{(kelurahanPemetaan as any).totalBansosKkAll ?? kelurahanPemetaan.totalBansosAll ?? 0} KK</strong>
-              </div>
-            </div>
-
-            {/* 2. Demografi */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs hover:border-blue-300 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">
-                  Total Penduduk Terdata
-                </span>
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
-                  <Users className="w-5 h-5" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <div className="text-3xl font-black text-blue-950">
-                  {kelurahanPemetaan.totalJiwaAll}
-                  <span className="text-xs font-semibold text-slate-500 ml-1.5">Jiwa</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  L: <strong className="text-slate-800">{kelurahanPemetaan.totalLakiLakiAll}</strong> • P: <strong className="text-slate-800">{kelurahanPemetaan.totalPerempuanAll}</strong> Jiwa
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">Anak: {kelurahanPemetaan.totalAnakAll} Jiwa</span>
-                <span className="text-slate-500">Lansia: <strong className="text-slate-800">{kelurahanPemetaan.totalLansiaAll} Jiwa</strong></span>
-              </div>
-            </div>
-
-            {/* 3. Status KK */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs hover:border-purple-300 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-purple-900 uppercase tracking-wider">
-                  Status KK Warga
-                </span>
-                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <div className="text-3xl font-black text-purple-950">
-                  {kelurahanPemetaan.persenKkManggaAll}%
-                  <span className="text-xs font-semibold text-slate-500 ml-1.5">KTP Mangga</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  {kelurahanPemetaan.totalKkManggaAll} KK Asli • {kelurahanPemetaan.totalKkLuarAll} KK Pendatang
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">Total KK Terpetakan:</span>
-                <strong className="text-purple-800 font-bold">{kelurahanPemetaan.totalRumahAll} KK</strong>
-              </div>
-            </div>
-
-            {/* 4. Retribusi Sampah WRS */}
-            <div className="bg-white rounded-2xl p-5 border-2 border-amber-300 shadow-2xs hover:border-amber-400 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black text-amber-900 uppercase tracking-wider">
-                  Wajib Retribusi Sampah (WRS)
-                </span>
-                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <div className="text-3xl font-black text-amber-950">
-                  {kelurahanPemetaan.totalWrsAktifAll}
-                  <span className="text-xs font-semibold text-amber-800 ml-1.5">
-                    Aktif ({kelurahanPemetaan.persenWrsAktifAll}%)
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 mt-1">
-                  Mandiri: {kelurahanPemetaan.totalWrsMandiriAll} • Belum: {kelurahanPemetaan.totalWrsBelumAll}
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-amber-200/60 flex items-center justify-between text-[11px]">
-                <span className="text-slate-600">Estimasi Potensi Retribusi:</span>
-                <strong className="text-emerald-800 font-black">
-                  Rp {kelurahanPemetaan.potensiRetribusiWrsAll.toLocaleString('id-ID')}/bln
-                </strong>
-              </div>
-            </div>
-
-            {/* 5. Pajak PBB */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs hover:border-emerald-300 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
-                  Kepatuhan Pajak PBB
-                </span>
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <div className="text-3xl font-black text-emerald-800">
-                  {kelurahanPemetaan.totalPbbLunasAll}
-                  <span className="text-xs font-semibold text-slate-500 ml-1.5">
-                    Lunas ({kelurahanPemetaan.persenPbbLunasAll}%)
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Belum Lunas: {kelurahanPemetaan.totalPbbBelumLunasAll} WP Terdata
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">Nominal PBB Terdata:</span>
-                <strong className="text-emerald-700 font-bold">
-                  Rp {kelurahanPemetaan.totalNominalPbbAll.toLocaleString('id-ID')}
-                </strong>
-              </div>
-            </div>
-
-            {/* 6. Jalan & Batas Wilayah */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs hover:border-teal-300 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider">
-                  Ruas Jalan & Batas Poligon
-                </span>
-                <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">
-                  <Navigation className="w-5 h-5" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <div className="text-3xl font-black text-teal-900">
-                  {kelurahanPemetaan.totalRuasJalanAll}
-                  <span className="text-xs font-semibold text-slate-500 ml-1.5">Ruas Jalan</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Panjang: <strong className="text-slate-800">{kelurahanPemetaan.totalPanjangJalanMeterAll}</strong> Meter
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">Poligon Batas:</span>
-                <strong className="text-emerald-700 font-bold">
-                  {(kelurahanPemetaan as any).totalPoligonAda ?? 0} dari 24 Lingkungan
-                </strong>
-              </div>
-            </div>
-          </div>
-
-          {/* Top 3 Leaderboard Lingkungan Teraktif */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs">
-            <div className="flex items-center gap-2.5 mb-4">
-              <Trophy className="w-5 h-5 text-amber-500" />
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm sm:text-base">
-                  Top Lingkungan Teraktif Pemetaan Spasial
-                </h4>
-                <p className="text-xs text-slate-500">
-                  Apresiasi Lingkungan dengan progres inventarisasi rumah dan potensi spasial tertinggi
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-              {(kelurahanPemetaan?.topLingkunganList || (kelurahanPemetaan as any)?.topLingkunganByRumah || []).slice(0, 3).map((item: any, idx: number) => (
-                <div
-                  key={item.lingkunganNomor}
-                  className={`p-4 rounded-xl border relative overflow-hidden flex flex-col justify-between ${
-                    idx === 0
-                      ? 'bg-amber-50/60 border-amber-300'
-                      : idx === 1
-                      ? 'bg-slate-50 border-slate-300'
-                      : 'bg-orange-50/40 border-orange-200'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                        idx === 0
-                          ? 'bg-amber-400 text-slate-950'
-                          : idx === 1
-                          ? 'bg-slate-300 text-slate-900'
-                          : 'bg-orange-300 text-orange-950'
-                      }`}>
-                        Juara {idx + 1}
-                      </span>
-                      <span className="text-xs font-black text-slate-700">
-                        {item.totalRumah} Rumah
-                      </span>
-                    </div>
-                    <h5 className="font-black text-sm text-slate-900 mt-2">
-                      {item.lingkunganNama}
-                    </h5>
-                    <p className="text-xs text-slate-600 mt-0.5">
-                      {item.keplingNama}
-                    </p>
-                    <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
-                      <span>{item.totalJiwa} Jiwa</span>
-                      <span>•</span>
-                      <span>WRS: {item.wrsAktif} Bangunan</span>
-                    </div>
-                  </div>
-
-                  {onOpenPemetaan && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenPemetaan(item.lingkunganNomor)}
-                      className="mt-3 px-3 py-1.5 rounded-lg bg-white hover:bg-emerald-50 text-slate-800 hover:text-emerald-800 text-xs font-bold border border-slate-200 hover:border-emerald-300 transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
-                    >
-                      <Compass className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Buka di Peta WebGIS</span>
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Tabel Rekapitulasi 24 Lingkungan */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-emerald-600" />
-                  <span>Tabel Rekapitulasi Pemetaan 24 Lingkungan</span>
-                </h4>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Menampilkan {filteredPemetaanLingkunganList.length} dari 24 Lingkungan Kelurahan Mangga
-                </p>
-              </div>
-
-              {/* Search and Filters */}
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={pemetaanSearch}
-                    onChange={(e) => setPemetaanSearch(e.target.value)}
-                    placeholder="Cari lingkungan atau nama kepling..."
-                    className="pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 w-48 sm:w-60"
-                  />
-                  {pemetaanSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setPemetaanSearch('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setPemetaanFilterStatus('ALL')}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
-                      pemetaanFilterStatus === 'ALL'
-                        ? 'bg-white text-slate-900 shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Semua (24)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPemetaanFilterStatus('HAS_HOUSES')}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
-                      pemetaanFilterStatus === 'HAS_HOUSES'
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Sudah Memetakan ({kelurahanPemetaan.totalLingkunganTerpetakan})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPemetaanFilterStatus('NO_HOUSES')}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
-                      pemetaanFilterStatus === 'NO_HOUSES'
-                        ? 'bg-amber-500 text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Belum Ada Data ({24 - kelurahanPemetaan.totalLingkunganTerpetakan})
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Table */}
-            <div className="overflow-x-auto mt-4">
-              <table className="w-full text-left text-xs text-slate-700">
-                <thead>
-                  <tr className="bg-slate-50/80 text-[11px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                    <th className="py-2.5 px-3">Lingkungan</th>
-                    <th className="py-2.5 px-3">Kepala Lingkungan</th>
-                    <th className="py-2.5 px-3 text-center">Batas Poligon</th>
-                    <th className="py-2.5 px-3 text-center">Rumah Terpetakan</th>
-                    <th className="py-2.5 px-3 text-center">Penduduk (Jiwa)</th>
-                    <th className="py-2.5 px-3 text-center">KK Mangga</th>
-                    <th className="py-2.5 px-3 text-center">WRS Aktif</th>
-                    <th className="py-2.5 px-3 text-center">PBB Lunas</th>
-                    <th className="py-2.5 px-3 text-center">Jalan</th>
-                    <th className="py-2.5 px-3 text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredPemetaanLingkunganList.map((item) => (
-                    <tr
-                      key={item.lingkunganNomor}
-                      className="hover:bg-emerald-50/30 transition-colors"
-                    >
-                      <td className="py-3 px-3 font-bold text-slate-900 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black flex items-center justify-center shrink-0">
-                            {item.lingkunganNomor}
-                          </span>
-                          <span>{item.lingkunganNama}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        <div className="font-semibold text-slate-800">
-                          {item.keplingNama}
-                        </div>
-                        {item.keplingTelepon && (
-                          <a
-                            href={`https://wa.me/${item.keplingTelepon.replace(/[^0-9]/g, '')}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[11px] text-emerald-700 hover:underline flex items-center gap-1 mt-0.5"
-                          >
-                            <Phone className="w-3 h-3 text-emerald-600" />
-                            <span>{item.keplingTelepon}</span>
-                          </a>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        {item.hasPolygon ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            <Check className="w-3 h-3" />
-                            <span>{item.polygonPointsCount} Sudut</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-800 border border-amber-200">
-                            <span>Belum Digambar</span>
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <span className="font-bold text-slate-900 text-sm">
-                          {item.totalRumah}
-                        </span>
-                        {item.bansosKk > 0 && (
-                          <span className="text-[10px] text-emerald-700 block">
-                            ({item.bansosKk} Bansos)
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <span className="font-bold text-blue-950">
-                          {item.totalJiwa} Jiwa
-                        </span>
-                        <span className="text-[10px] text-slate-400 block">
-                          L: {item.totalLakiLaki} • P: {item.totalPerempuan}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <span className="font-bold text-purple-900">
-                          {item.persenKkMangga}%
-                        </span>
-                        <span className="text-[10px] text-slate-400 block">
-                          {item.kkMangga} / {item.kkLuar}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <span className="font-bold text-amber-900">
-                          {item.wrsAktif} Bangunan ({item.persenWrsAktif}%)
-                        </span>
-                        {item.potensiRetribusiWrs > 0 && (
-                          <span className="text-[10px] text-emerald-700 block font-semibold">
-                            Rp {item.potensiRetribusiWrs.toLocaleString('id-ID')}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <span className="font-bold text-emerald-800">
-                          {item.pbbLunas} ({item.persenPbbLunas}%)
-                        </span>
-                        {item.totalNominalPbb > 0 && (
-                          <span className="text-[10px] text-slate-500 block">
-                            Rp {item.totalNominalPbb.toLocaleString('id-ID')}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <span className="font-semibold text-slate-700">
-                          {item.totalRuasJalan} Ruas
-                        </span>
-                        <span className="text-[10px] text-slate-400 block">
-                          {item.totalPanjangJalanMeter} M
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right whitespace-nowrap">
-                        {onOpenPemetaan && (
-                          <button
-                            type="button"
-                            onClick={() => onOpenPemetaan(item.lingkunganNomor)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                            title={`Buka peta spasial ${item.lingkunganNama}`}
-                          >
-                            <Compass className="w-3.5 h-3.5" />
-                            <span>Buka di Peta</span>
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {filteredPemetaanLingkunganList.length === 0 && (
-              <div className="text-center py-10 text-xs text-slate-400 bg-slate-50 rounded-xl mt-4">
-                Tidak ada Lingkungan yang sesuai dengan pencarian atau filter.
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -3016,6 +2557,186 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                 <span>Penyelarasan Live (Push To Cloud)</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeMainTab === 'TUGAS_KHUSUS' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-rose-950 via-slate-900 to-pink-950 rounded-2xl p-5 sm:p-6 text-white border border-rose-800/50 shadow-xl relative overflow-hidden">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                <div className="w-12 h-12 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-300 flex items-center justify-center font-bold shadow-inner shrink-0">
+                  <Bell className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest bg-rose-500 text-slate-950 px-2 py-0.5 rounded shadow-xs">
+                      Instruksi & Tugas Khusus Lurah
+                    </span>
+                    <span className="text-[10px] font-bold bg-white/10 text-rose-200 px-2 py-0.5 rounded border border-white/15">
+                      Pemberitahuan Pop-Up Real-Time
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white mt-1">
+                    Buat & Kirim Tugas Khusus ke Kepala Lingkungan
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Pesan, perintah, atau tugas khusus yang Anda terbitkan di sini akan langsung tampil sebagai Pop-Up Banner kuning di perangkat akun Kepala Lingkungan atau seluruh staf terkait.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Create Tugas Khusus */}
+          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-4">
+            <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
+              <PlusCircle className="w-4 h-4 text-rose-600" /> Form Penerbitan Tugas Khusus Baru
+            </h4>
+
+            {taskError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" /> {taskError}
+              </div>
+            )}
+            {taskSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" /> {taskSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateTugas} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1">Judul Tugas / Perintah *</label>
+                <input
+                  type="text"
+                  value={taskJudul}
+                  onChange={(e) => setTaskJudul(e.target.value)}
+                  placeholder="Contoh: Pendataan Tambahan Warga Rentan & Lansia Lk. IV"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1">Deskripsi & Instruksi Detail dari Lurah *</label>
+                <textarea
+                  rows={3}
+                  value={taskDeskripsi}
+                  onChange={(e) => setTaskDeskripsi(e.target.value)}
+                  placeholder="Tuliskan detail instruksi, sasaran, atau catatan khusus yang harus dikerjakan oleh penerima tugas..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Target Sasaran Penerima</label>
+                <select
+                  value={taskTargetAccountId}
+                  onChange={(e) => setTaskTargetAccountId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none bg-white"
+                >
+                  <option value="ALL">📢 Semua Kepala Lingkungan (Broadcast Kepling)</option>
+                  {accountsList.filter(a => a.role === 'kepling').map(acc => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.nama} ({acc.jabatan || acc.id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Deadline / Batas Waktu</label>
+                <input
+                  type="date"
+                  value={taskDeadline}
+                  onChange={(e) => setTaskDeadline(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="sm:col-span-2 flex justify-end">
+                <button
+                  type="submit"
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-black px-6 py-2.5 rounded-xl text-xs shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer inline-flex items-center gap-2"
+                >
+                  <Bell className="w-4 h-4" /> Terbitkan & Kirim Tugas Khusus
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* List of Published Tugas Khusus */}
+          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-4">
+            <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-indigo-600" /> Riwayat Tugas Khusus Diterbitkan ({tugasList.length})
+            </h4>
+
+            {tugasList.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-xs">
+                Belum ada Tugas Khusus yang diterbitkan. Silakan buat melalui form di atas.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tugasList.map((t) => {
+                  const targetName = t.targetAccountId === 'ALL'
+                    ? 'Semua Kepala Lingkungan (Broadcast)'
+                    : accountsList.find(a => a.id === t.targetAccountId)?.nama || t.targetAccountId;
+
+                  return (
+                    <div key={t.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition-all space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                            t.status === 'aktif' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                          }`}>
+                            {t.status === 'aktif' ? 'Aktif Berjalan' : 'Selesai'}
+                          </span>
+                          <span className="text-xs font-bold text-slate-600">
+                            Target: <strong className="text-slate-900">{targetName}</strong>
+                          </span>
+                          <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded">
+                            Deadline: {t.deadline}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => updateTugasKhususStatus(t.id, t.status === 'aktif' ? 'selesai' : 'aktif')}
+                            className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 cursor-pointer"
+                          >
+                            {t.status === 'aktif' ? 'Tandai Selesai' : 'Aktifkan Kembali'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm('Hapus tugas khusus ini?')) {
+                                deleteTugasKhusus(t.id);
+                              }
+                            }}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                            title="Hapus Tugas"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <h5 className="font-black text-sm text-slate-900">{t.judul}</h5>
+                      <p className="text-xs text-slate-700 leading-relaxed">{t.deskripsi}</p>
+
+                      <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-500">
+                        <span>Pemberi: {t.pemberiTugas}</span>
+                        <span className="font-bold text-indigo-700">
+                          {t.completedBy?.length || 0} Akun telah menyelesaikan / membaca tugas ini
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

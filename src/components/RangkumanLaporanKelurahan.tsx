@@ -683,6 +683,23 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
 
     lines.push('');
     lines.push('────────────────────────────');
+    
+    // TOTAL KUNJUNGAN PER LINGKUNGAN
+    lines.push(`*TOTAL KUNJUNGAN WARGA PER LINGKUNGAN:*`);
+    lines.push(``);
+    consolidatedKeplingData.forEach((it) => {
+      if (it.kunjungan.length > 0) {
+        lines.push(`*${it.kepling.lingkungan}*`);
+        lines.push(`Total Kunjungan : ${it.kunjungan.length} Warga`);
+        lines.push(`Rincian :`);
+        it.kunjungan.forEach((w) => {
+          lines.push(`- ${w.namaWarga} (${w.alamat || '-'})`);
+        });
+        lines.push(``); // Add a space for readability
+      }
+    });
+    lines.push('────────────────────────────');
+    lines.push('');
 
     // II. RANGKUMAN LAPORAN KINERJA & KUNJUNGAN WARGA 24 LINGKUNGAN
     lines.push(`*II. RANGKUMAN LAPORAN KINERJA & KUNJUNGAN WARGA (24 LINGKUNGAN)*`);

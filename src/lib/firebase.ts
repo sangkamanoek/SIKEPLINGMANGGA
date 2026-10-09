@@ -11,7 +11,8 @@ import {
   initializeFirestore,
   Firestore,
   getFirestore,
-  memoryLocalCache,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   setLogLevel,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -25,6 +26,7 @@ const rawConfig = {
   messagingSenderId: (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string) || (firebaseConfig as any).messagingSenderId,
   appId: (import.meta.env.VITE_FIREBASE_APP_ID as string) || (firebaseConfig as any).appId,
   measurementId: (import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string) || (firebaseConfig as any).measurementId,
+  databaseURL: (import.meta.env.VITE_FIREBASE_DATABASE_URL as string) || (firebaseConfig as any).databaseURL,
   firestoreDatabaseId: (import.meta.env.VITE_FIREBASE_DATABASE_ID as string) || (firebaseConfig as any).firestoreDatabaseId,
 };
 
@@ -55,14 +57,13 @@ try {
 let firestoreInstance: Firestore;
 
 try {
-  // Initialize Firestore with forced long polling for ultra-stable connection.
-  // Explicitly use memoryLocalCache to disable all on-disk persistence, 
-  // ensuring the app is always 100% online.
+  // Initialize Firestore with persistent cache for better offline support and speed.
   firestoreInstance = initializeFirestore(
     app,
     {
-      experimentalForceLongPolling: true,
-      localCache: memoryLocalCache(),
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
     },
     activeConfig.firestoreDatabaseId || undefined
   );
@@ -119,6 +120,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 export const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.metadata.readonly',
   'https://www.googleapis.com/auth/calendar.events',
 ];
 

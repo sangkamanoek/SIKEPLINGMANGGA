@@ -21,9 +21,9 @@ import {
   Stethoscope,
   Moon,
 } from 'lucide-react';
-import { getMaximumAccuracyPosition } from '../lib/geoService';
 import { FormKunjunganWarga, KunjunganWargaData } from './FormKunjunganWarga';
-import { LaporanHarianItem, FotoDokumentasi, KinerjaHarian, UserAccount, AbsenApelItem, CustomEvent, EventAttendance } from '../types';
+import { LaporanHarianItem, FotoDokumentasi, KinerjaHarian, UserAccount, AbsenApelItem, EventAttendance } from '../types';
+import type { CustomEvent } from '../types';
 import {
   subscribeCustomEventsFromFirestore,
   subscribeEventAttendanceFromFirestore,
@@ -98,6 +98,29 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     return () => {
       unsubEvents();
       unsubAttendance();
+    };
+  }, []);
+
+  // Reactive state for Google Drive root folder details
+  const [rootFolderId, setRootFolderId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('google_drive_root_folder_id');
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        setRootFolderId(localStorage.getItem('google_drive_root_folder_id'));
+      } catch {}
+    };
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('google_drive_folder_sync', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('google_drive_folder_sync', handleStorageChange);
     };
   }, []);
 
@@ -219,15 +242,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   // GPS Coordinates detection for Poin 6
   const handleGetGpsCoordinates = async () => {
     setIsDetectingGps(true);
-    try {
-      const pos = await getMaximumAccuracyPosition();
-      const lat = pos.lat.toFixed(6);
-      const lng = pos.lng.toFixed(6);
-      const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
-      setInfrastrukturTitikKoordinat(mapsUrl);
-    } catch (err: any) {
-      console.warn('GPS detection notice, trying browser fallback:', err);
-      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (p) => {
             const lat = p.coords.latitude.toFixed(6);
@@ -241,12 +256,10 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
           },
           { enableHighAccuracy: true, timeout: 8000 }
         );
-        return;
+      } else {
+        alert('Perangkat tidak mendukung geolokasi atau izin lokasi belum aktif.');
+        setIsDetectingGps(false);
       }
-      alert('Perangkat tidak mendukung geolokasi atau izin lokasi belum aktif.');
-    } finally {
-      setIsDetectingGps(false);
-    }
   };
 
   // Dokumentasi Foto state
@@ -2260,18 +2273,63 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
             {/* Google Sheets & Database Sync Settings */}
             <div className="p-4 bg-slate-50 space-y-3">
-              {!hasGoogleAuth && (
-                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-lg text-xs text-emerald-950 flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold block">Penyimpanan Database Langsung:</span>
-                    <span>Laporan otomatis disimpan aman ke Database Aplikasi. Anda juga dapat menghubungkan Google jika ingin sinkronisasi ke Google Sheets Kelurahan.</span>
+              {!hasGoogleAuth ? (
+                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-lg text-xs text-emerald-950 flex flex-col gap-2">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">Penyimpanan Database Langsung:</span>
+                      <span>Laporan otomatis disimpan aman ke Database Aplikasi. Anda juga dapat menghubungkan Google jika ingin sinkronisasi ke Google Sheets Kelurahan.</span>
+                    </div>
+                  </div>
+                  {activeAccount?.role === 'super_admin' && (typeof window !== 'undefined' && window.self !== window.top ? (
+                    <div className="mt-1 p-2 bg-amber-50 border border-amber-200 rounded-md text-[11px] text-amber-900 font-medium animate-pulse">
+                      ⚠️ <span className="font-bold">Info Integrasi:</span> Karena Anda membuka aplikasi di dalam panel preview pembangun, browser memblokir popup autentikasi Google. Silakan klik tombol kuning <strong className="text-slate-950 font-black">"Buka di Tab Baru"</strong> di bagian atas layar untuk menghubungkan Google dengan lancar dan membuat folder <strong className="font-extrabold uppercase text-slate-950">SI_MANGGA_DATA_CENTER</strong>!
+                    </div>
+                  ) : (
                     <button
                       type="button"
                       onClick={onConnectGoogle}
-                      className="mt-1 inline-block font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
+                      className="mt-1 self-start font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
                     >
                       Hubungkan Google Sheets →
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-lg text-xs text-emerald-950 flex flex-col gap-2.5">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <span className="font-bold block text-emerald-900">Google Drive & Sheets Terhubung!</span>
+                      <p className="text-[11px] text-emerald-800">
+                        Folder utama <strong className="font-black text-emerald-950">SI_MANGGA_DATA_CENTER</strong> digunakan untuk menyimpan dokumentasi foto laporan Anda ke Google Drive pribadi Anda secara otomatis.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-emerald-200/50">
+                    {rootFolderId ? (
+                      <a
+                        href={`https://drive.google.com/drive/folders/${rootFolderId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px] shadow-sm flex items-center gap-1 hover:scale-105 active:scale-95 transition-all"
+                      >
+                        📂 Buka SI_MANGGA_DATA_CENTER ↗
+                      </a>
+                    ) : (
+                      <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                        ⚠️ Folder Belum Terbuat
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent('google_drive_trigger_resync'));
+                      }}
+                      className="bg-slate-800 hover:bg-slate-900 text-white font-extrabold px-3 py-1.5 rounded-lg text-[10px] shadow-sm flex items-center gap-1 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                    >
+                      🔄 Buat / Sinkronkan Folder Sekarang
                     </button>
                   </div>
                 </div>

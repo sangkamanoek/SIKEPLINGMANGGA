@@ -17,6 +17,9 @@ import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { sanitizeText, safeSetLocalStorage, safeGetLocalStorage } from '../lib/safeStorage';
 import { saveKunjunganWargaToFirestore } from '../lib/kunjunganService';
 
+import { getAccessToken } from '../lib/firebase';
+import { syncKunjunganPhotoToDrive } from '../lib/driveSync';
+
 export type KeteranganKunjunganType = 'Sudah' | 'Belum' | 'Menolak';
 
 export interface KunjunganWargaData {
@@ -253,7 +256,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
     const nowIso = new Date().toISOString();
     const createdAt = isEdit && initialData.createdAt ? initialData.createdAt : nowIso;
 
-    const data: KunjunganWargaData = {
+    let data: KunjunganWargaData = {
       id,
       tanggal: cleanTanggal || defaultDate,
       namaWarga: cleanNama,
@@ -271,6 +274,12 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
     };
 
     try {
+      // 0. Sync photo to Drive if connected
+      const activeToken = await getAccessToken();
+      if (activeToken) {
+        data = await syncKunjunganPhotoToDrive(data, activeToken);
+      }
+
       // 1. Dual-tier saving & broadcasting (0ms local + Server Buffer + Firestore)
       await saveKunjunganWargaToFirestore(data);
 

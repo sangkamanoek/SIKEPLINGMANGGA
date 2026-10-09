@@ -27,7 +27,7 @@ import { FormKunjunganWarga, KunjunganWargaData } from './FormKunjunganWarga';
 import { downloadImage, downloadMultipleImages } from '../lib/imageDownloader';
 import { exportKunjunganWargaToExcel, exportKunjunganWargaZipPackage } from '../lib/excelExport';
 import { safeGetLocalStorage, safeSetLocalStorage } from '../lib/safeStorage';
-import { getReportIsoDate, isReportMatchingDate, getTodayLocalIso, extractNomorLingkungan } from '../lib/formatter';
+import { getReportIsoDate, isReportMatchingDate, getTodayLocalIso, extractNomorLingkungan, toRoman } from '../lib/formatter';
 import {
   subscribeKunjunganWarga,
   deleteKunjunganWarga,
@@ -236,6 +236,59 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     [filtered]
   );
 
+  // Rekapitulasi Kumulatif Kunjungan 24 Lingkungan (Sampai Dengan Hari Ini / Tanggal Terpilih)
+  const { cumulativeCounts, totalSeluruhKunjungan } = useMemo(() => {
+    const recordsToCount =
+      dateFilterMode === 'SINGLE' && selectedDate && selectedDate < todayStr
+        ? combinedRecords.filter((r) => {
+            const rIso = getKunjunganIsoDate(r);
+            return !rIso || rIso <= selectedDate;
+          })
+        : dateFilterMode === 'RANGE' && endDate && endDate < todayStr
+        ? combinedRecords.filter((r) => {
+            const rIso = getKunjunganIsoDate(r);
+            return !rIso || rIso <= endDate;
+          })
+        : combinedRecords;
+
+    const counts: Record<number, number> = {};
+    for (let i = 1; i <= 24; i++) {
+      counts[i] = 0;
+    }
+
+    recordsToCount.forEach((r) => {
+      let num: number | null = null;
+      if (r.lingkunganNomor !== undefined && r.lingkunganNomor !== null && String(r.lingkunganNomor) !== '') {
+        const n = Number(r.lingkunganNomor);
+        if (n >= 1 && n <= 24) num = n;
+      }
+      if (num === null) {
+        num =
+          extractNomorLingkungan(r.lingkungan) ||
+          extractNomorLingkungan((r as any).lingkunganNama) ||
+          extractNomorLingkungan(r.keplingId);
+      }
+      if (num === null && r.namaKepling) {
+        const kMatch = KEPLING_ACCOUNTS.find(
+          (k) => k.nama.trim().toLowerCase() === String(r.namaKepling).trim().toLowerCase()
+        );
+        if (kMatch && kMatch.nomorLingkungan) num = kMatch.nomorLingkungan;
+      }
+
+      if (num && num >= 1 && num <= 24) {
+        counts[num] = (counts[num] || 0) + 1;
+      }
+    });
+
+    const sumCounts = Object.values(counts).reduce((a, b) => a + b, 0);
+    const totalAll = Math.max(recordsToCount.length, sumCounts);
+
+    return {
+      cumulativeCounts: counts,
+      totalSeluruhKunjungan: totalAll,
+    };
+  }, [combinedRecords, dateFilterMode, selectedDate, endDate, todayStr]);
+
   const handleCopyWA = () => {
     let text = `*REKAP KUNJUNGAN HARIAN DOOR-TO-DOOR*\n`;
     text += `*KELURAHAN MANGGA, KEC. MEDAN TUNTUNGAN*\n`;
@@ -243,15 +296,44 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     text += `Total Kunjungan: ${filtered.length} Rumah\n\n`;
     text += `----------------------------------------\n`;
 
-    filtered.forEach((item, index) => {
-      text += `${index + 1}. *${item.namaWarga}*\n`;
-      text += `   - Tanggal: ${item.tanggal}\n`;
-      text += `   - Alamat: ${item.alamat} (${item.lingkungan})\n`;
-      text += `   - Kepling: ${item.namaKepling}\n`;
-      text += `   - Perlinsos: ${item.perlinsos}\n`;
-      text += `   - IKD: ${item.ikd}\n`;
-      text += `   - Pembayaran PBB: ${item.pbb}\n\n`;
+    // 1. Group records by lingkungan for the current filtered view
+    const grouped = filtered.reduce((acc, item) => {
+      const key = item.lingkungan || 'Tanpa Lingkungan';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {} as Record<string, KunjunganWargaData[]>);
+
+    // Sort lingkungan groups in Part 1 by nomor lingkungan
+    const sortedGroupKeys = Object.keys(grouped).sort((a, b) => {
+      const numA = extractNomorLingkungan(a) || 999;
+      const numB = extractNomorLingkungan(b) || 999;
+      return numA - numB;
     });
+
+    if (sortedGroupKeys.length === 0) {
+      text += `_(Nihil / Belum ada kunjungan pada periode ini)_\n\n`;
+    } else {
+      sortedGroupKeys.forEach((lingkungan) => {
+        const items = grouped[lingkungan];
+        text += `*${lingkungan}*\n`;
+        text += `Total Kunjungan : ${items.length} Warga\n`;
+        text += `Rincian :\n`;
+        items.forEach((item) => {
+          text += `- ${item.namaWarga} (${item.alamat || '-'})\n`;
+        });
+        text += `\n`;
+      });
+    }
+
+    // 2. TOTAL KUNJUNGAN PER LINGKUNGAN SAMPAI DENGAN HARI INI
+    text += `*TOTAL KUNJUNGAN PER LINGKUNGAN SAMPAI DENGAN HARI INI:*\n`;
+    for (let i = 1; i <= 24; i++) {
+      const count = cumulativeCounts[i] || 0;
+      text += `- Lingkungan ${toRoman(i)}: ${count} Warga\n`;
+    }
+
+    text += `\n*TOTAL SELURUH KUNJUNGAN: ${totalSeluruhKunjungan} Warga*\n`;
 
     navigator.clipboard.writeText(text);
     setCopiedWA(true);
@@ -977,6 +1059,88 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* REKAPITULASI TOTAL KUNJUNGAN PER LINGKUNGAN & TOTAL SELURUH KUNJUNGAN */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200 shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm sm:text-base text-slate-900">
+                Rekapitulasi Kunjungan Per Lingkungan (Sampai Dengan Hari Ini)
+              </h3>
+              <p className="text-xs text-slate-500">
+                Total akumulasi sambang warga door-to-door se-Kelurahan Mangga (24 Lingkungan)
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <div className="bg-gradient-to-r from-emerald-700 to-teal-700 text-white px-4 py-2 rounded-xl text-center shadow-xs">
+              <span className="text-[10px] uppercase font-bold tracking-wider block text-emerald-100">
+                Total Seluruh Kunjungan
+              </span>
+              <span className="text-base sm:text-lg font-black tracking-tight">
+                {totalSeluruhKunjungan} Warga
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyWA}
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer"
+              title="Salin rekapitulasi lengkap ke WhatsApp"
+            >
+              <Share2 className="w-4 h-4 text-slate-600" />
+              <span className="hidden sm:inline">{copiedWA ? 'Tersalin!' : 'Salin WA'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 24 Lingkungan Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-2.5">
+          {Array.from({ length: 24 }, (_, i) => i + 1).map((lingNum) => {
+            const count = cumulativeCounts[lingNum] || 0;
+            return (
+              <div
+                key={`ui_ling_${lingNum}`}
+                className={`p-2.5 rounded-xl border text-center transition-all ${
+                  count > 0
+                    ? 'bg-emerald-50/70 border-emerald-200 text-slate-900 shadow-2xs'
+                    : 'bg-slate-50/80 border-slate-200/80 text-slate-400'
+                }`}
+              >
+                <span className="text-[11px] font-bold block text-slate-600">
+                  Lingkungan {toRoman(lingNum)}
+                </span>
+                <span className={`text-sm sm:text-base font-black block mt-0.5 ${count > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                  {count} <span className="text-[10px] font-semibold text-slate-500">Warga</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* REKAPITULASI TOTAL SELURUH KUNJUNGAN */}
+        <div className="mt-5 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl p-4 sm:p-5 text-white shadow-lg border border-emerald-500/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shrink-0">
+              <Users className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h4 className="text-sm sm:text-base font-black uppercase tracking-wider">TOTAL SELURUH KUNJUNGAN</h4>
+              <p className="text-[10px] sm:text-xs text-emerald-100 font-bold opacity-90 uppercase">
+                AKUMULASI SAMBANG WARGA 24 LINGKUNGAN ({dateDisplayLabel})
+              </p>
+            </div>
+          </div>
+          <div className="text-center sm:text-right">
+            <span className="text-3xl sm:text-4xl font-black tracking-tighter drop-shadow-md">
+              {totalSeluruhKunjungan} <span className="text-sm sm:text-lg font-bold text-emerald-100/80 uppercase">Warga</span>
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* LIGHTBOX PHOTO MODAL */}
       {previewPhotoItem && previewPhotoItem.fotoDokumentasi && (

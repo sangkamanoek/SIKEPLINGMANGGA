@@ -42,7 +42,7 @@ interface SmartHubDashboardProps {
   reports: LaporanHarianItem[];
   attendanceList: AbsenApelItem[];
   unreadCounts?: Record<string, number>;
-  onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'pemetaan' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan') => void;
+  onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan') => void;
   onOpenAbsenApel: () => void;
   onOpenPPTModal: () => void;
   onOpenUpdateModal?: () => void;
@@ -77,7 +77,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
   });
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'gis' | 'laporan' | 'capaian' | 'absen'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'laporan' | 'capaian' | 'absen'>('all');
 
   const handleStyleChange = (style: 'classic' | 'consolidated') => {
     setDashboardStyle(style);
@@ -432,17 +432,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           action: () => onNavigate('dashboard_kasi'),
         },
         {
-          id: 'pemetaan',
-          title: 'Peta Spasial Poskamling & Keamanan',
-          desc: 'Pemetaan titik lokasi pos ronda malam di 24 Lingkungan, kontak regu jaga, dan rute patroli ketertiban.',
-          category: 'gis',
-          icon: '🛡️',
-          badge: 'WEBGIS POSKAMLING',
-          badgeColor: 'bg-amber-400 text-slate-950',
-          bgGradient: 'bg-gradient-to-r from-amber-950 to-slate-900 text-white border-amber-600/60',
-          action: () => onNavigate('pemetaan'),
-        },
-        {
           id: 'kegiatan_khusus',
           title: 'Absensi Kegiatan Kelurahan & Linmas',
           desc: 'Absensi check-in patroli gabungan Tiga Pilar, penertiban sampah liar, dan apel siaga trantibum.',
@@ -469,17 +458,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
 
     // Default: Super Admin or Kepling
     return [
-      {
-        id: 'pemetaan',
-        title: isKepling ? 'Pemetaan Wilayah & WRS' : 'Peta Wilayah & WebGIS 24 Lingkungan',
-        desc: 'Gambar poligon batas wilayah, tandai titik rumah warga, pantau Wajib Retribusi Sampah (WRS), bansos, & kondisi jalan.',
-        category: 'gis',
-        icon: '🗺️',
-        badge: 'WEBGIS SPASIAL',
-        badgeColor: 'bg-amber-400 text-slate-950',
-        bgGradient: 'bg-gradient-to-r from-emerald-950 to-slate-900 text-white border-emerald-600/60',
-        action: () => onNavigate('pemetaan'),
-      },
+      // 1. GIAT HARIAN (DAILY ACTIVITIES)
       ...(isKepling
         ? [
             {
@@ -491,10 +470,35 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
               iconBg: 'bg-emerald-50 text-emerald-600',
               badge: 'UTAMA',
               badgeColor: 'bg-red-100 text-red-800',
+              bgGradient: 'bg-gradient-to-r from-emerald-950 to-slate-900 text-white border-emerald-600/60',
               action: () => onNavigate('form'),
             },
           ]
         : []),
+      {
+        id: 'kunjungan',
+        title: 'Buku Kunjungan Warga (Door-to-Door)',
+        desc: 'Pencatatan langsung sambang warga per rumah, verifikasi status Perlinsos, aktivasi IKD, & kepatuhan PBB.',
+        category: 'laporan',
+        icon: Users,
+        iconBg: 'bg-emerald-50 text-emerald-600',
+        badge: 'SAMBANG WARGA',
+        badgeColor: 'bg-emerald-100 text-emerald-800',
+        action: () => onNavigate('kunjungan'),
+      },
+      {
+        id: 'kegiatan_khusus',
+        title: 'Presensi Apel & Kegiatan',
+        desc: 'Absensi check-in kegiatan kelurahan dengan validasi koordinat GPS dan foto selfie kehadiran.',
+        category: 'absen',
+        icon: UserCheck,
+        iconBg: 'bg-teal-50 text-teal-700',
+        badge: 'GPS ABSEN',
+        badgeColor: 'bg-teal-100 text-teal-800',
+        action: () => onNavigate('kegiatan_khusus'),
+      },
+
+      // 2. DATA & LAYANAN (DATA & SERVICES)
       {
         id: 'database_keluarga',
         title: 'Database Data Keluarga (KK)',
@@ -506,6 +510,23 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         badgeColor: 'bg-blue-100 text-blue-900',
         action: () => onNavigate('database_keluarga'),
       },
+      ...(isPbbAllowed
+        ? [
+            {
+              id: 'pbb_lingkungan',
+              title: isKepling ? `Data PBB Lingkungan ${activeAccount.nomorLingkungan || ''}` : `Rekapitulasi Realisasi PBB ${pbbYear}`,
+              desc: isKepling
+                ? `Pantau target nominal PBB, daftar SPPT Wajib Pajak Lingkungan ${activeAccount.nomorLingkungan || ''}, dan tandai WP lunas.`
+                : `Rekapitulasi target dan realisasi penerimaan PBB-P2 Tahun ${pbbYear} di 24 Lingkungan Kelurahan Mangga.`,
+              category: 'capaian',
+              icon: FileSpreadsheet,
+              iconBg: 'bg-emerald-50 text-emerald-700',
+              badge: isKepling ? 'PBB LINGKUNGAN' : `PBB ${pbbYear}`,
+              badgeColor: 'bg-emerald-100 text-emerald-800',
+              action: () => onNavigate('rekap_pbb'),
+            },
+          ]
+        : []),
       ...(isAdmin
         ? [
             {
@@ -521,17 +542,8 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             },
           ]
         : []),
-      {
-        id: 'kunjungan',
-        title: 'Kunjungan Harian Warga',
-        desc: 'Log & rekam interaksi sambang, silaturahmi, serta sosialisasi langsung ke rumah warga lingkungan.',
-        category: 'laporan',
-        icon: Users,
-        iconBg: 'bg-emerald-50 text-emerald-600',
-        badge: 'SOSIAL',
-        badgeColor: 'bg-emerald-100 text-emerald-800',
-        action: () => onNavigate('kunjungan'),
-      },
+
+      // 3. INSIGHT & MONITORING (INSIGHT & MONITORING)
       {
         id: 'riwayat',
         title: isKepling ? 'Riwayat Laporan Saya' : 'Database Riwayat Laporan',
@@ -554,39 +566,11 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         badgeColor: 'bg-amber-100 text-amber-800',
         action: () => onNavigate(isKepling ? 'capaian' : 'capaian_admin'),
       },
-      ...(isPbbAllowed
-        ? [
-            {
-              id: 'pbb_lingkungan',
-              title: isKepling ? `Data PBB Lingkungan ${activeAccount.nomorLingkungan || ''}` : `Rekapitulasi Realisasi PBB ${pbbYear}`,
-              desc: isKepling
-                ? `Pantau target nominal PBB, daftar SPPT Wajib Pajak Lingkungan ${activeAccount.nomorLingkungan || ''}, dan tandai WP lunas.`
-                : `Rekapitulasi target dan realisasi penerimaan PBB-P2 Tahun ${pbbYear} di 24 Lingkungan Kelurahan Mangga.`,
-              category: 'capaian',
-              icon: FileSpreadsheet,
-              iconBg: 'bg-emerald-50 text-emerald-700',
-              badge: isKepling ? 'PBB LINGKUNGAN' : `PBB ${pbbYear}`,
-              badgeColor: 'bg-emerald-100 text-emerald-800',
-              action: () => onNavigate('rekap_pbb'),
-            },
-          ]
-        : []),
-      {
-        id: 'kegiatan_khusus',
-        title: 'Absensi Kegiatan Khusus',
-        desc: 'Absensi check-in kegiatan kelurahan dengan validasi koordinat GPS dan foto selfie kehadiran.',
-        category: 'absen',
-        icon: UserCheck,
-        iconBg: 'bg-emerald-50 text-emerald-600',
-        badge: 'GPS ABSEN',
-        badgeColor: 'bg-teal-100 text-teal-800',
-        action: () => onNavigate('kegiatan_khusus'),
-      },
       ...(isAdmin
         ? [
             {
               id: 'monitoring',
-              title: 'Monitoring 24 Kepling',
+              title: 'Monitoring Keaktifan Kepling',
               desc: 'Pantau status keaktifan laporan harian, rekapitulasi apel pagi, dan peta interaktif kelurahan.',
               category: 'capaian',
               icon: ShieldCheck,
@@ -731,7 +715,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             <div className="min-w-0">
               <span className="text-[10px] font-black text-emerald-800 uppercase block">Pilar 1</span>
               <h4 className="text-xs font-bold text-slate-900 truncate">Kinerja Kepling & Layanan</h4>
-              <p className="text-[10px] text-slate-600 truncate">Presensi, Laporan Harian, PBB & GIS</p>
+              <p className="text-[10px] text-slate-600 truncate">Presensi, Laporan Harian &amp; PBB</p>
             </div>
           </div>
 
@@ -1001,29 +985,29 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                 </div>
 
                 <div 
-                  onClick={() => onNavigate('pemetaan')}
+                  onClick={() => onNavigate('kegiatan_khusus')}
                   className="bg-white border border-slate-200 hover:border-amber-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[9px] uppercase font-black tracking-widest text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
-                        🗺️ WebGIS Pos Ronda
+                        🛡️ Patroli &amp; Apel
                       </span>
-                      <span className="text-[10px] text-slate-400 font-bold">Spasial</span>
+                      <span className="text-[10px] text-slate-400 font-bold">Linmas</span>
                     </div>
                     <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
-                      Peta Spasial Poskamling & Keamanan
+                      Absensi Patroli &amp; Apel Linmas
                     </h3>
                     <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
-                      Sebaran koordinat GPS poskamling, kontak regu ronda malam, dan rute patroli kamtibmas kelurahan.
+                      Check-in GPS patroli gabungan Tiga Pilar, penertiban keamanan lingkungan, dan apel siaga kamtibmas.
                     </p>
                     <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100 mt-2">
-                      <p className="text-[10px] text-amber-800 font-bold">Pemetaan Titik Rawan & Pos Ronda</p>
-                      <p className="text-xs font-black text-amber-950 mt-0.5">Peta Digital Linmas Aktif</p>
+                      <p className="text-[10px] text-amber-800 font-bold">Kesiapsiagaan Trantibum</p>
+                      <p className="text-xs font-black text-amber-950 mt-0.5">Petugas &amp; Linmas Aktif</p>
                     </div>
                   </div>
                   <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-amber-700 group-hover:text-amber-600">
-                    <span>Buka Peta Poskamling →</span>
+                    <span>Buka Absensi Linmas →</span>
                   </div>
                 </div>
 
@@ -1058,41 +1042,41 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
              activeAccount.role !== 'kasi_pembangunan' &&
              activeAccount.role !== 'kasi_trantibum' && (
               <>
-                {/* Bento Card 1: Radar Spasial WebGIS & Heatmap (Kiri / Utama) */}
+                {/* Bento Card 1: Buku Kunjungan Warga Door-to-Door (Kiri / Utama) */}
                 <div 
-                  onClick={() => onNavigate('pemetaan')}
+                  onClick={() => onNavigate('kunjungan')}
                   className="md:col-span-1 bg-slate-900 border border-slate-800 hover:border-emerald-500/80 p-5 rounded-2xl text-white shadow-md transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between min-h-[220px]"
                 >
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl -mr-8 -mt-8" />
                   
                   <div className="space-y-1.5 z-10">
                     <span className="text-[9px] uppercase font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                      🗺️ WebGIS Spasial
+                      👥 Kunjungan Door-to-Door
                     </span>
                     <h3 className="text-lg font-black tracking-tight mt-2 flex items-center gap-1.5 text-slate-100">
-                      <span>Peta Batas 24 Lingkungan</span>
+                      <span>Buku Sambang 24 Lingkungan</span>
                     </h3>
                     <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-                      Peta spasial interaktif batas wilayah, pelacakan WRS Sampah, klasifikasi data Bansos, dan peta kondisi jalan.
+                      Pencatatan langsung sambang warga per rumah, verifikasi status Perlinsos, aktivasi IKD, dan cek SPPT PBB.
                     </p>
                   </div>
 
                   {/* Interactive preview indicators */}
                   <div className="grid grid-cols-2 gap-2 mt-4 z-10">
                     <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Status Peta</p>
-                      <p className="text-xs sm:text-sm font-black text-emerald-400 mt-1">24 Terpetakan</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Format Berbagi</p>
+                      <p className="text-xs sm:text-sm font-black text-emerald-400 mt-1">Salin WA Instan</p>
                     </div>
                     <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Fitur Baru</p>
-                      <p className="text-xs sm:text-sm font-black text-rose-400 mt-1 flex items-center gap-1">
-                        <span>🔥 Heatmap</span>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Ekspor Berkas</p>
+                      <p className="text-xs sm:text-sm font-black text-emerald-400 mt-1 flex items-center gap-1">
+                        <span>Excel &amp; ZIP Foto</span>
                       </p>
                     </div>
                   </div>
 
                   <div className="pt-3 border-t border-slate-800/80 mt-4 flex items-center justify-between text-xs font-black text-emerald-400 group-hover:text-emerald-300">
-                    <span>Buka WebGIS Kelurahan →</span>
+                    <span>Buka Buku Kunjungan →</span>
                   </div>
                 </div>
 
@@ -1366,28 +1350,22 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                   )}
                 </div>
 
-                {/* Kartu 3: Sambang Warga & Pemetaan */}
+                {/* Kartu 3: Sambang Warga Lapangan */}
                 <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-slate-50/90 text-slate-800 flex flex-col justify-between gap-3 shadow-xs">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="text-xs font-black uppercase tracking-wider text-slate-700">3. Sambang &amp; Peta GIS</span>
-                      <p className="text-[11px] text-slate-500 mt-1 font-medium">Plotting rumah warga, tagihan PBB &amp; WRS sampah.</p>
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-700">3. Sambang Warga Lapangan</span>
+                      <p className="text-[11px] text-slate-500 mt-1 font-medium">Pencatatan door-to-door, Perlinsos, IKD, &amp; PBB.</p>
                     </div>
                     <Users className="w-5 h-5 text-emerald-700 shrink-0" />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="pt-1">
                     <button
                       onClick={() => onNavigate('kunjungan')}
-                      className="py-1.5 px-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 text-[11px] font-bold rounded-lg shadow-2xs text-center cursor-pointer active:scale-98"
+                      className="w-full py-2 px-3 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-2xs text-center cursor-pointer active:scale-98 flex items-center justify-center gap-1.5"
                     >
-                      👥 Sambang
-                    </button>
-                    <button
-                      onClick={() => onNavigate('pemetaan')}
-                      className="py-1.5 px-2 bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold rounded-lg shadow-2xs text-center cursor-pointer active:scale-98"
-                    >
-                      🗺️ Peta WRS
+                      <span>👥 Buka Buku Kunjungan Warga</span>
                     </button>
                   </div>
                 </div>
@@ -1457,9 +1435,8 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
           {[
             { id: 'all', label: '🌟 Semua Menu' },
-            { id: 'gis', label: '🗺️ WebGIS & Pemetaan' },
-            { id: 'laporan', label: '📝 Pelaporan & Arsip' },
-            { id: 'capaian', label: '📊 Capaian & Target' },
+            { id: 'laporan', label: '📝 Pelaporan Harian' },
+            { id: 'capaian', label: '📊 Target & Kinerja' },
             { id: 'absen', label: '👤 Absensi GPS' },
           ].map((cat) => (
             <button
@@ -1480,7 +1457,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         {/* Menu Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredMenus.map((menu) => {
-            const isSpecialGis = menu.id === 'pemetaan';
+            const isSpecialGis = false;
             return (
               <div
                 key={menu.id}

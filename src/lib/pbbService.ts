@@ -77,6 +77,12 @@ export function saveLocalSpptForYear(items: SpptPbbItem[], year: number): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('pbb-data-updated', { detail: { year, count: items.length } }));
   }
+  // AUTO-SYNC TO FIRESTORE IN BACKGROUND WITHOUT BLOCKING
+  items.forEach(item => {
+    if (item && item.id) {
+      savePbbSpptToFirestore(item, year).catch(() => {});
+    }
+  });
 }
 
 /**

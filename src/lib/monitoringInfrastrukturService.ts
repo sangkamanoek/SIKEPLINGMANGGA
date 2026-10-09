@@ -13,6 +13,9 @@ import {
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import * as XLSX from 'xlsx';
 
+import { getAccessToken } from './firebase';
+import { syncMonitoringPhotosToDrive } from './driveSync';
+
 export const MONITORING_INFRA_COLLECTION = 'monitoring_infrastruktur';
 export const MONITORING_INFRA_STORAGE_KEY = 'sikepling_monitoring_infra_v2';
 export const MONITORING_INFRA_DELETED_KEY = 'sikepling_monitoring_infra_deleted_v2';
@@ -176,9 +179,21 @@ export const subscribeMonitoringReports = (
 export const saveMonitoringReport = async (
   item: LaporanMonitoringInfrastruktur
 ): Promise<void> => {
+  let itemToSave = item;
+
+  // 0. Sync to Drive if connected
+  try {
+    const activeToken = await getAccessToken();
+    if (activeToken) {
+      itemToSave = await syncMonitoringPhotosToDrive(item, activeToken);
+    }
+  } catch (err) {
+    console.warn('Drive sync for monitoring failed:', err);
+  }
+
   const current = getLocalMonitoringList();
-  const filtered = current.filter((x) => x.id !== item.id);
-  const updated = [item, ...filtered].sort((a, b) => {
+  const filtered = current.filter((x) => x.id !== itemToSave.id);
+  const updated = [itemToSave, ...filtered].sort((a, b) => {
     if (b.tanggal !== a.tanggal) return b.tanggal.localeCompare(a.tanggal);
     return (b.createdAt || '').localeCompare(a.createdAt || '');
   });
@@ -186,8 +201,8 @@ export const saveMonitoringReport = async (
 
   if (db) {
     try {
-      const cleaned = cleanFirestoreData(item);
-      await setDoc(doc(db, MONITORING_INFRA_COLLECTION, item.id), cleaned, { merge: true });
+      const cleaned = cleanFirestoreData(itemToSave);
+      await setDoc(doc(db, MONITORING_INFRA_COLLECTION, itemToSave.id), cleaned, { merge: true });
     } catch (err) {
       console.warn('[saveMonitoringReport to firestore error]:', err);
     }

@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 
 const app = initializeApp(cfg);
-const db = getFirestore(app, cfg.firestoreDatabaseId);
+const db = getFirestore(app, (cfg as any).firestoreDatabaseId);
 
 async function resetAllPbbStatus() {
   console.log('Starting reset of all PBB WP status to "Belum Bayar"...');

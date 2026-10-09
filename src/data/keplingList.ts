@@ -59,6 +59,17 @@ export const KASI_ACCOUNTS: UserAccount[] = [
   KASI_TRANTIBUM_ACCOUNT,
 ];
 
+export const SEKRETARIS_ACCOUNT: UserAccount = {
+  id: 'sekretaris',
+  role: 'sekretaris',
+  lingkungan: 'Kantor Kelurahan',
+  nama: 'SEKRETARIS KELURAHAN',
+  jabatan: 'Sekretaris Kelurahan Mangga',
+  kelurahan: 'Kelurahan Mangga',
+  kecamatan: 'Kecamatan Medan Tuntungan',
+  password: 'sekretaris2026',
+};
+
 export const PETUGAS_BAPENDA_ACCOUNT: UserAccount = {
   id: 'petugas_bapenda',
   role: 'petugas_bapenda',
@@ -72,6 +83,7 @@ export const PETUGAS_BAPENDA_ACCOUNT: UserAccount = {
 
 export const ADMIN_ACCOUNTS: UserAccount[] = [
   SUPER_ADMIN_ACCOUNT,
+  SEKRETARIS_ACCOUNT,
   ...KASI_ACCOUNTS,
   PETUGAS_BAPENDA_ACCOUNT,
 ];
@@ -1026,7 +1038,6 @@ export const findAccountByUsername = (input: string): UserAccount | undefined =>
     norm === 'admin_mangga' ||
     norm === 'adminmangga' ||
     norm === 'lurah' ||
-    norm === 'seklur' ||
     norm === 'kelurahan' ||
     norm === 'kelurahan_mangga' ||
     norm === 'fery' ||
@@ -1034,6 +1045,18 @@ export const findAccountByUsername = (input: string): UserAccount | undefined =>
     rawClean === 'fery.arapenta@gmail.com'
   ) {
     return SUPER_ADMIN_ACCOUNT;
+  }
+
+  // 1ab. Check Sekretaris Kelurahan
+  if (
+    norm === 'sekretaris' ||
+    norm === 'sekretaris_kelurahan' ||
+    norm === 'sekretariskelurahan' ||
+    norm === 'seklur' ||
+    norm === 'sek_lur' ||
+    norm === 'sekretaris_mangga'
+  ) {
+    return getEffectiveAccount(SEKRETARIS_ACCOUNT);
   }
 
   // 1b. Check Kasi Pemerintahan (PBB, IKD, Apel)
@@ -1293,6 +1316,22 @@ export const verifyAccountPassword = (
       '123456',
     ];
     if (adminVariants.includes(trimmed.toLowerCase())) {
+      return true;
+    }
+  }
+
+  // Flexible Sekretaris default passwords
+  if (account.role === 'sekretaris') {
+    const sekretarisVariants = [
+      'sekretaris2026',
+      'sekretaris',
+      'seklur2026',
+      'seklur',
+      'mangga2026',
+      'mangga',
+      '123456',
+    ];
+    if (sekretarisVariants.includes(trimmed.toLowerCase())) {
       return true;
     }
   }

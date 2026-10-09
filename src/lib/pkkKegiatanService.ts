@@ -14,6 +14,9 @@ import {
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import * as XLSX from 'xlsx';
 
+import { getAccessToken } from './firebase';
+import { syncPkkPhotosToDrive } from './driveSync';
+
 export const PKK_KEGIATAN_COLLECTION = 'pkk_kegiatan';
 export const PKK_KEGIATAN_STORAGE_KEY = 'sikepling_pkk_kegiatan_v1';
 export const PKK_DELETED_STORAGE_KEY = 'sikepling_pkk_deleted_v1';
@@ -215,9 +218,21 @@ export const syncPkkKegiatanDirectly = async (): Promise<LaporanKegiatanPkk[]> =
 export const savePkkKegiatan = async (
   item: LaporanKegiatanPkk
 ): Promise<void> => {
+  let itemToSave = item;
+
+  // 0. Sync to Drive if connected
+  try {
+    const activeToken = await getAccessToken();
+    if (activeToken) {
+      itemToSave = await syncPkkPhotosToDrive(item, activeToken);
+    }
+  } catch (err) {
+    console.warn('Drive sync for PKK failed:', err);
+  }
+
   const current = getLocalPkkKegiatanList();
-  const filtered = current.filter((x) => x.id !== item.id);
-  const updated = [item, ...filtered].sort((a, b) => {
+  const filtered = current.filter((x) => x.id !== itemToSave.id);
+  const updated = [itemToSave, ...filtered].sort((a, b) => {
     if (b.tanggal !== a.tanggal) return b.tanggal.localeCompare(a.tanggal);
     return (b.createdAt || '').localeCompare(a.createdAt || '');
   });
@@ -225,8 +240,8 @@ export const savePkkKegiatan = async (
 
   if (db) {
     try {
-      const cleaned = cleanFirestoreData(item);
-      await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, item.id), cleaned, { merge: true });
+      const cleaned = cleanFirestoreData(itemToSave);
+      await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, itemToSave.id), cleaned, { merge: true });
     } catch (err) {
       console.warn('[savePkkKegiatan to firestore error]:', err);
     }

@@ -14,6 +14,7 @@ import {
   WifiOff,
   Loader2,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { GoogleUser, SheetMetadata, UserAccount, isPkkRole } from '../types';
 import { CURRENT_APP_VERSION, hasUnseenAppUpdate } from '../lib/appVersionService';
@@ -61,6 +62,34 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [hasNewUpdate, setHasNewUpdate] = useState(false);
+  const [isIframe, setIsIframe] = useState(false);
+  const [rootFolderId, setRootFolderId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('google_drive_root_folder_id');
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        setRootFolderId(localStorage.getItem('google_drive_root_folder_id'));
+      } catch {}
+    };
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('google_drive_folder_sync', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('google_drive_folder_sync', handleStorageChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsIframe(window.self !== window.top);
+    }
+  }, []);
 
   useEffect(() => {
     setHasNewUpdate(hasUnseenAppUpdate());
@@ -131,6 +160,19 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   }, [isMobileMenuOpen, isHelperMenuOpen]);
   return (
     <header className={`${isPkk ? 'bg-tosca-700' : 'bg-emerald-800'} text-white shadow-lg print:hidden transition-colors duration-500`}>
+      {activeAccount.role === 'super_admin' && isIframe && !user && (
+        <div className="bg-amber-500 text-slate-950 px-4 py-2.5 text-center text-xs font-black flex flex-col sm:flex-row items-center justify-center gap-2 border-b border-amber-600/50 animate-pulse">
+          <span className="flex items-center gap-1">⚠️ <span className="font-extrabold uppercase">Penting:</span> Browser memblokir popup Google di panel preview. Buka di tab baru untuk menghubungkan Google.</span>
+          <a
+            href={window.location.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-slate-950 hover:bg-slate-900 text-white font-extrabold px-3 py-1 rounded-lg text-[11px] shadow-md hover:scale-105 active:scale-95 transition-all inline-flex items-center gap-1 whitespace-nowrap"
+          >
+            Buka di Tab Baru ↗
+          </a>
+        </div>
+      )}
       {/* Top Banner with Medan Logo Replica and Tagline */}
       <div className={`max-w-6xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b ${isPkk ? 'border-tosca-600/60' : 'border-emerald-700/60'} text-xs`}>
         {/* Official Slogan Badge */}
@@ -275,6 +317,68 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
             </button>
           )}
 
+          {/* Google Connection Status Button */}
+          <div className="hidden lg:flex items-center gap-1.5">
+            {user ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-100 font-bold text-xs shadow-xs">
+                <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.866-3.577-7.866-8s3.536-8 7.866-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C18.155 2.235 15.423 1 12.24 1 6.033 1 12.24s5.033 11.24 11.24 11.24c6.478 0 10.793-4.537 10.793-10.977 0-.746-.08-1.32-.176-1.742l-10.617-.478z"/>
+                </svg>
+                <div className="flex flex-col text-left">
+                  <span className="text-[8px] uppercase tracking-wider text-emerald-400 leading-none font-extrabold">GOOGLE TERHUBUNG</span>
+                  <span className="text-[10px] text-white truncate max-w-[100px] font-bold" title={user.email || ''}>{user.displayName || user.email}</span>
+                </div>
+                {rootFolderId ? (
+                  <a
+                    href={`https://drive.google.com/drive/folders/${rootFolderId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-1.5 py-0.5 rounded bg-emerald-800/80 hover:bg-emerald-700 hover:text-white text-[9px] text-emerald-200 font-extrabold transition-colors whitespace-nowrap"
+                    title="Buka folder SI_MANGGA_DATA_CENTER di Google Drive"
+                  >
+                    📂 Folder Drive
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('google_drive_trigger_resync'));
+                    }}
+                    className="px-1.5 py-0.5 rounded bg-amber-900/60 hover:bg-amber-800 hover:text-white text-[9px] text-amber-200 font-extrabold transition-colors whitespace-nowrap cursor-pointer"
+                    title="Buat / sinkronkan folder SI_MANGGA_DATA_CENTER sekarang"
+                  >
+                    🔄 Buat Folder
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onDisconnectGoogle}
+                  className="ml-1 px-1.5 py-0.5 rounded bg-red-950/40 hover:bg-red-900/60 text-[9px] text-red-300 hover:text-red-100 font-extrabold transition-colors cursor-pointer"
+                  title="Putuskan Hubungan Google"
+                >
+                  Putuskan
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onConnectGoogle}
+                disabled={isConnecting}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-slate-100 font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0 hover:scale-[1.02] active:scale-[0.98]"
+                title="Hubungkan ke Google Sheets & Calendar"
+              >
+                {isConnecting ? (
+                  <Loader2 className="w-3.5 h-3.5 text-slate-400 animate-spin" />
+                ) : (
+                  <svg className="w-3.5 h-3.5 text-slate-300 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.866-3.577-7.866-8s3.536-8 7.866-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C18.155 2.235 15.423 1 12.24 1 6.033 1 12.24s5.033 11.24 11.24 11.24c6.478 0 10.793-4.537 10.793-10.977 0-.746-.08-1.32-.176-1.742l-10.617-.478z"/>
+                  </svg>
+                )}
+                <span>{isConnecting ? 'Menghubungkan...' : 'Hubungkan Google'}</span>
+              </button>
+            )}
+          </div>
+
           {/* Unified Help & Info Dropdown Menu Button */}
           {(onOpenUpdateModal || onOpenPPTModal || onOpenInstallModal) && (
             <div className="relative" ref={helperMenuRef}>
@@ -317,6 +421,19 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                       )}
                     </button>
                   )}
+
+                  {/* New Sync Metadata Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsHelperMenuOpen(false);
+                      window.location.reload(); // Force app refresh to re-sync everything
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-emerald-300 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-left"
+                  >
+                    <RefreshCw className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Sinkronisasi Ulang Google</span>
+                  </button>
 
                   {onOpenPPTModal && (
                     <button
@@ -460,6 +577,41 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                       <p className="text-[9px] text-red-300 font-bold mt-0.5">
                         🚨 Lencana: Kinerja Kepling Terburuk
                       </p>
+                    )}
+                  </div>
+
+                  {/* Google Connection Status on Mobile */}
+                  <div className="px-3 py-2 border-b border-slate-800 mb-1.5 bg-slate-950/40 rounded-xl">
+                    <p className="text-[9px] font-black uppercase text-slate-400">Status Google</p>
+                    {user ? (
+                      <div className="flex items-center justify-between mt-1 gap-2">
+                        <span className="text-[11px] text-emerald-400 font-bold truncate max-w-[100px]" title={user.email || ''}>{user.displayName || user.email}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMobileMenuOpen(false);
+                            onDisconnectGoogle();
+                          }}
+                          className="text-[10px] text-red-400 hover:text-red-300 font-bold underline cursor-pointer"
+                        >
+                          Putuskan
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          onConnectGoogle();
+                        }}
+                        disabled={isConnecting}
+                        className="w-full mt-1.5 py-1.5 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 text-[11px] font-bold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <svg className="w-3.5 h-3.5 text-slate-300" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.866-3.577-7.866-8s3.536-8 7.866-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C18.155 2.235 15.423 1 12.24 1 6.033 1 12.24s5.033 11.24 11.24 11.24c6.478 0 10.793-4.537 10.793-10.977 0-.746-.08-1.32-.176-1.742l-10.617-.478z"/>
+                        </svg>
+                        <span>{isConnecting ? 'Menghubungkan...' : 'Hubungkan Google'}</span>
+                      </button>
                     )}
                   </div>
 

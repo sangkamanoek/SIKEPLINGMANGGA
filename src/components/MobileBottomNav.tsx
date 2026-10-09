@@ -29,7 +29,6 @@ export type AppTabType =
   | 'kunjungan'
   | 'dashboard_kasi'
   | 'kegiatan_khusus'
-  | 'pemetaan'
   | 'rekap_pbb'
   | 'database_keluarga'
   | 'realisasi_pembangunan'
@@ -320,37 +319,37 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               <span className="text-[10px] mt-0.5 tracking-tight">7 Bidang</span>
             </button>
 
-            {/* Center Action Button: WebGIS Poskamling */}
+            {/* Center Action Button: Kegiatan Patroli & Trantib */}
             <div className="flex-1 flex justify-center -mt-4">
               <button
-                id="btn-mobile-nav-pemetaan-center"
+                id="btn-mobile-nav-kegiatan-center"
                 type="button"
-                onClick={() => onSelectTab('pemetaan')}
+                onClick={() => onSelectTab('kegiatan_khusus')}
                 className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer border-2 border-white ${
-                  activeTab === 'pemetaan'
+                  activeTab === 'kegiatan_khusus'
                     ? 'bg-gradient-to-tr from-amber-700 to-orange-600 text-white ring-2 ring-amber-500 ring-offset-2'
                     : 'bg-gradient-to-tr from-amber-600 to-orange-500 text-white hover:brightness-105'
                 }`}
-                title="Peta Poskamling & Keamanan Spasial"
+                title="Patroli Trantibum & Poskamling"
               >
-                <Compass className="w-5 h-5 stroke-[2.5]" />
-                <span className="sr-only">Poskamling</span>
+                <ShieldCheck className="w-5 h-5 stroke-[2.5]" />
+                <span className="sr-only">Patroli</span>
               </button>
             </div>
 
             <button
-              id="btn-mobile-nav-kegiatan-trantib"
+              id="btn-mobile-nav-kunjungan-trantib"
               type="button"
-              onClick={() => onSelectTab('kegiatan_khusus')}
+              onClick={() => onSelectTab('kunjungan')}
               className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-                activeTab === 'kegiatan_khusus' ? 'text-emerald-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
+                activeTab === 'kunjungan' ? 'text-emerald-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <div className="relative">
-                <UserCheck className={`w-5 h-5 ${activeTab === 'kegiatan_khusus' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-                {renderBadge('kegiatan_khusus')}
+                <Users className={`w-5 h-5 ${activeTab === 'kunjungan' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                {renderBadge('kunjungan')}
               </div>
-              <span className="text-[10px] mt-0.5 tracking-tight">Patroli</span>
+              <span className="text-[10px] mt-0.5 tracking-tight">Kunjungan</span>
             </button>
 
             <button
@@ -430,17 +429,17 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             </div>
 
             <button
-              id="btn-mobile-nav-pemetaan"
+              id="btn-mobile-nav-pbb"
               type="button"
-              onClick={() => onSelectTab('pemetaan')}
+              onClick={() => onSelectTab('rekap_pbb')}
               className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-                activeTab === 'pemetaan'
+                activeTab === 'rekap_pbb'
                   ? 'text-emerald-700 font-extrabold'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <Compass className={`w-5 h-5 ${activeTab === 'pemetaan' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-              <span className="text-[10px] mt-0.5 tracking-tight">Peta GIS</span>
+              <Landmark className={`w-5 h-5 ${activeTab === 'rekap_pbb' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              <span className="text-[10px] mt-0.5 tracking-tight">PBB</span>
             </button>
 
             {isKepling && (

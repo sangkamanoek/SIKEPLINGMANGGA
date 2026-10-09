@@ -127,6 +127,8 @@ export interface SheetMetadata {
   spreadsheetId: string;
   spreadsheetUrl: string;
   title: string;
+  rootFolderId?: string;
+  rootFolderUrl?: string;
 }
 
 export type TaskCategory = 'PBB' | 'PERLINSOS' | 'IKD' | 'BPJS' | 'LAPORAN_HARIAN';
@@ -166,6 +168,7 @@ export interface CalendarScheduleItem {
 
 export type UserRole =
   | 'super_admin'
+  | 'sekretaris'
   | 'kepling'
   | 'kasi_pemerintahan'
   | 'kasi_pembangunan'
@@ -179,6 +182,7 @@ export type UserRole =
 export const isKelurahanAdmin = (role: UserRole | string): boolean => {
   return (
     role === 'super_admin' ||
+    role === 'sekretaris' ||
     role === 'kasi_pemerintahan' ||
     role === 'kasi_pembangunan' ||
     role === 'kasi_trantibum' ||
@@ -198,6 +202,7 @@ export const isPkkRole = (role: UserRole | string): boolean => {
 export const isKelurahanRole = (role: UserRole | string): boolean => {
   return (
     role === 'kepling' ||
+    role === 'sekretaris' ||
     role === 'kasi_pemerintahan' ||
     role === 'kasi_pembangunan' ||
     role === 'kasi_trantibum' ||

@@ -46,9 +46,12 @@ import {
   getOrCreateSpreadsheet,
   appendLaporanToSheet,
 } from './lib/sheetsService';
-import { uploadMakalahToGoogleDrive } from './lib/driveService';
+import { syncReportPhotosToDrive } from './lib/driveSync';
+import { ensureAppFolderStructure, uploadMakalahToGoogleDrive } from './lib/driveService';
 import { SUPER_ADMIN_ACCOUNT, getAccountById, syncPasswordsWithServer, syncProfilesWithServer, syncAccountsWithServer } from './data/keplingList';
 import { HeaderBanner } from './components/HeaderBanner';
+import { TugasKhususBanner } from './components/TugasKhususBanner';
+import { initBackgroundAutoSync } from './lib/autoSyncService';
 import { FormLaporan } from './components/FormLaporan';
 import { SmartHubDashboard } from './components/SmartHubDashboard';
 import { DeadlineNotifAlert } from './components/DeadlineNotifAlert';
@@ -88,7 +91,7 @@ const PanduanPPTModal = React.lazy(() => import('./components/PanduanPPTModal').
 const AppUpdateModal = React.lazy(() => import('./components/AppUpdateModal').then(m => ({ default: m.AppUpdateModal })));
 const AbsenKegiatanKhusus = React.lazy(() => import('./components/AbsenKegiatanKhusus').then(m => ({ default: m.AbsenKegiatanKhusus })));
 const RekapPbbView = React.lazy(() => import('./components/RekapPbbView').then(m => ({ default: m.RekapPbbView })));
-const PemetaanWilayahView = React.lazy(() => import('./components/PemetaanWilayahView').then(m => ({ default: m.PemetaanWilayahView })));
+// Removed WebGIS import
 const DatabaseKeluargaView = React.lazy(() => import('./components/DatabaseKeluargaView').then(m => ({ default: m.DatabaseKeluargaView })));
 const UbahPasswordModal = React.lazy(() => import('./components/UbahPasswordModal').then(m => ({ default: m.UbahPasswordModal })));
 const EditProfileModal = React.lazy(() => import('./components/EditProfileModal').then(m => ({ default: m.EditProfileModal })));
@@ -101,7 +104,8 @@ const ViewLoadingFallback = () => (
     <p className="text-[10px] text-slate-400 mt-1 uppercase font-medium tracking-wider">Sistem Informasi & Administrasi Kelurahan Mangga</p>
   </div>
 );
-import { AbsenApelItem, CustomEvent, EventAttendance, StatusAbsenApel } from './types';
+import { AbsenApelItem, EventAttendance, StatusAbsenApel } from './types';
+import type { CustomEvent } from './types';
 import { loadAllAttendance, getTodayAbsenForKepling } from './lib/attendanceApi';
 import {
   subscribeAttendanceFromFirestore,
@@ -224,7 +228,6 @@ export default function App() {
     | 'kunjungan'
     | 'dashboard_kasi'
     | 'kegiatan_khusus'
-    | 'pemetaan'
     | 'rekap_pbb'
     | 'database_keluarga'
     | 'realisasi_pembangunan'
@@ -236,29 +239,15 @@ export default function App() {
     | 'buku_pkk'
   >('hub');
 
-  // Mode portal khusus Super Admin: 'kelurahan' (default) atau 'pkk'
+  // Initialize Background Auto Sync to Cloud / Firestore
+  useEffect(() => {
+    const cleanup = initBackgroundAutoSync();
+    return cleanup;
+  }, []);
   const [adminPortalMode, setAdminPortalMode] = useState<'kelurahan' | 'pkk'>('kelurahan');
 
   // Sub-mode untuk tab 'form' bagi Super Admin: 'rangkuman' (default) atau 'formulir' (asistensi)
   const [superAdminFormSubMode, setSuperAdminFormSubMode] = useState<'rangkuman' | 'formulir'>('rangkuman');
-
-  // Targeted lingkungan for Pemetaan WebGIS deep-linking
-  const [pemetaanTargetLingkungan, setPemetaanTargetLingkungan] = useState<string | undefined>(undefined);
-
-  const handleNavigateToPemetaan = (lingkunganNomor?: number | string) => {
-    if (activeAccount.role === 'petugas_bapenda') {
-      showToast('Akses Dibatasi: Petugas Bapenda tidak memiliki izin untuk melihat Peta WebGIS.', 'error');
-      return;
-    }
-    if (lingkunganNomor !== undefined && lingkunganNomor !== null && String(lingkunganNomor).trim() !== '') {
-      const rawStr = String(lingkunganNomor).trim();
-      const idVal = rawStr.startsWith('kepling_') ? rawStr : `kepling_${rawStr}`;
-      setPemetaanTargetLingkungan(idVal);
-    } else {
-      setPemetaanTargetLingkungan(undefined);
-    }
-    setActiveTab('pemetaan');
-  };
 
   // Strict Role-Based Access Control (RBAC) & Complete Isolation between Kelurahan & PKK
   useEffect(() => {
@@ -281,6 +270,8 @@ export default function App() {
         activeAccount.role === 'kepling'
           ? 'form'
           : activeAccount.role === 'super_admin'
+          ? 'monitoring'
+          : activeAccount.role === 'sekretaris'
           ? 'monitoring'
           : activeAccount.role === 'petugas_bapenda'
           ? 'rekap_pbb'
@@ -316,9 +307,9 @@ export default function App() {
       return;
     }
 
-    // 4. Kasi Trantibum: Allowed tabs: hub, dashboard_kasi, pemetaan, riwayat, kegiatan_khusus, surat_kedinasan
+    // 4. Kasi Trantibum: Allowed tabs: hub, dashboard_kasi, riwayat, kegiatan_khusus, surat_kedinasan
     if (activeAccount.role === 'kasi_trantibum') {
-      const allowed = ['hub', 'dashboard_kasi', 'pemetaan', 'riwayat', 'kegiatan_khusus', 'surat_kedinasan'];
+      const allowed = ['hub', 'dashboard_kasi', 'riwayat', 'kegiatan_khusus', 'surat_kedinasan'];
       if (!allowed.includes(activeTab)) {
         setActiveTab('dashboard_kasi');
         showToast('Akses Disesuaikan: Anda diarahkan ke bidang tugas Seksi Trantibum & Linmas.', 'info');
@@ -326,12 +317,22 @@ export default function App() {
       return;
     }
 
-    // 5. Kepling: Allowed tabs: hub, form, capaian, pemetaan, realisasi_pembangunan, rekap_pbb, riwayat, kunjungan, kegiatan_khusus, surat_kedinasan
+    // 5. Kepling: Allowed tabs: hub, form, capaian, realisasi_pembangunan, rekap_pbb, riwayat, kunjungan, kegiatan_khusus, surat_kedinasan
     if (activeAccount.role === 'kepling') {
-      const allowed = ['hub', 'form', 'capaian', 'pemetaan', 'realisasi_pembangunan', 'rekap_pbb', 'riwayat', 'kunjungan', 'kegiatan_khusus', 'surat_kedinasan'];
+      const allowed = ['hub', 'form', 'capaian', 'realisasi_pembangunan', 'rekap_pbb', 'riwayat', 'kunjungan', 'kegiatan_khusus', 'surat_kedinasan'];
       if (!allowed.includes(activeTab)) {
         setActiveTab('form');
         showToast('Akses Disesuaikan: Fitur ini tidak tersedia untuk Kepala Lingkungan.', 'info');
+      }
+      return;
+    }
+
+    // 5b. Sekretaris: Allowed tabs: hub, monitoring, riwayat, capaian_admin, rekap_pbb, realisasi_pembangunan, database_keluarga, kegiatan_khusus, surat_kedinasan
+    if (activeAccount.role === 'sekretaris') {
+      const allowed = ['hub', 'monitoring', 'riwayat', 'capaian_admin', 'rekap_pbb', 'realisasi_pembangunan', 'database_keluarga', 'kegiatan_khusus', 'surat_kedinasan'];
+      if (!allowed.includes(activeTab)) {
+        setActiveTab('monitoring');
+        showToast('Akses Disesuaikan: Anda diarahkan ke Dashboard Monitoring Laporan Kepala Lingkungan.', 'info');
       }
       return;
     }
@@ -486,6 +487,17 @@ export default function App() {
   // Setup spreadsheet and upload Makalah to Google Drive when user logs in
   const syncSpreadsheet = useCallback(async (authToken: string) => {
     try {
+      // 0. Ensure folder structure is ready
+      const folders = await ensureAppFolderStructure(authToken);
+      if (folders && folders.rootId) {
+        safeSetLocalStorage('google_drive_root_folder_id', folders.rootId);
+        // Force header banner to update by dispatching storage event
+        window.dispatchEvent(new Event('storage'));
+      }
+      if (folders && folders.photosId) {
+        safeSetLocalStorage('google_drive_photos_folder_id', folders.photosId);
+      }
+      
       const meta = await getOrCreateSpreadsheet(authToken);
       setSheetMeta(meta);
       try {
@@ -764,6 +776,31 @@ export default function App() {
     };
   }, [syncSpreadsheet, refreshAllReports]);
 
+  // Listen for manual Google Drive folder re-sync events
+  useEffect(() => {
+    const handleTriggerResync = async () => {
+      const activeToken = token || (await getAccessToken());
+      if (activeToken) {
+        showToast('Sedang membuat/menyinkronkan folder SI_MANGGA_DATA_CENTER...', 'info');
+        try {
+          await syncSpreadsheet(activeToken);
+          // Dispatch custom event to notify components to update their localStorage states
+          window.dispatchEvent(new Event('google_drive_folder_sync'));
+          showToast('Folder SI_MANGGA_DATA_CENTER berhasil disinkronkan di Google Drive!', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('Gagal menyinkronkan folder Google Drive. Pastikan koneksi internet stabil.', 'error');
+        }
+      } else {
+        showToast('Silakan hubungkan akun Google terlebih dahulu', 'error');
+      }
+    };
+    window.addEventListener('google_drive_trigger_resync', handleTriggerResync);
+    return () => {
+      window.removeEventListener('google_drive_trigger_resync', handleTriggerResync);
+    };
+  }, [token, syncSpreadsheet]);
+
   // Connect Google account
   const handleConnectGoogle = async () => {
     setIsConnecting(true);
@@ -782,7 +819,12 @@ export default function App() {
       }
     } catch (err: unknown) {
       console.error('Sign in failed:', err);
-      showToast('Koneksi Google dibatalkan atau terjadi kesalahan', 'error');
+      const isIframe = window.self !== window.top;
+      if (isIframe) {
+        showToast('⚠️ Hubungkan Google Gagal: Browser memblokir popup di panel preview. Silakan klik tombol "Buka di Tab Baru" di bagian atas halaman untuk menghubungkan akun Google Anda dengan lancar!', 'error');
+      } else {
+        showToast('Koneksi Google gagal atau dibatalkan. Pastikan Anda tidak memblokir popup browser dan mengizinkan cookie pihak ketiga.', 'error');
+      }
     } finally {
       setIsConnecting(false);
     }
@@ -801,19 +843,30 @@ export default function App() {
   const handleSaveReport = async (item: LaporanHarianItem) => {
     setIsSaving(true);
     try {
+      // 0. If Google account is connected, sync photos to Drive FIRST
+      const activeToken = token || (await getAccessToken());
+      let reportToSave = item;
+      
+      if (activeToken) {
+        try {
+          reportToSave = await syncReportPhotosToDrive(item, activeToken);
+        } catch (syncErr) {
+          console.warn('Photo sync to Drive failed, using original item:', syncErr);
+        }
+      }
+
       // Automatic Consolidation: Check if an existing report for this Kepling on the same date already exists
       const existingReport = reports.find((r) => {
         const sameKepling =
-          (r.keplingId && item.keplingId && r.keplingId === item.keplingId) ||
-          r.namaKepling === item.namaKepling ||
-          r.jabatan === item.jabatan;
-        const sameDate = r.tanggal === item.tanggal;
-        return sameKepling && sameDate && r.id !== item.id;
+          (r.keplingId && reportToSave.keplingId && r.keplingId === reportToSave.keplingId) ||
+          r.namaKepling === reportToSave.namaKepling ||
+          r.jabatan === reportToSave.jabatan;
+        const sameDate = r.tanggal === reportToSave.tanggal;
+        return sameKepling && sameDate && r.id !== reportToSave.id;
       });
 
-      let reportToSave = item;
       if (existingReport) {
-        reportToSave = consolidateDailyReport(existingReport, item);
+        reportToSave = consolidateDailyReport(existingReport, reportToSave);
       }
 
       // 1. ALWAYS save to local database immediately FIRST so data is guaranteed safe (0ms)
@@ -878,7 +931,6 @@ export default function App() {
       }
 
       // 4. If Google account is connected, sync to Google Sheets in background/parallel
-      const activeToken = token || (await getAccessToken());
       if (activeToken) {
         (async () => {
           try {
@@ -1114,6 +1166,9 @@ export default function App() {
         portalMode={adminPortalMode}
       />
 
+      {/* Tugas Khusus Banner from Lurah */}
+      <TugasKhususBanner activeAccount={activeAccount} />
+
       {/* Floating Toast Notification */}
       {toastMsg && (
         <div className="fixed top-4 right-4 z-50 animate-bounce-short">
@@ -1334,24 +1389,6 @@ export default function App() {
                   <span>Formulir Laporan</span>
                 </button>
 
-                {/* Kepling Tab 1c: Pemetaan Wilayah WebGIS & WRS */}
-                <button
-                  id="tab-pemetaan-kepling"
-                  type="button"
-                  onClick={() => setActiveTab('pemetaan')}
-                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                    activeTab === 'pemetaan'
-                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
-                      : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
-                  }`}
-                >
-                  <Compass className={`w-4 h-4 ${activeTab === 'pemetaan' ? 'text-white' : 'text-emerald-600'}`} />
-                  <span>Peta &amp; WRS</span>
-                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'pemetaan' ? 'bg-tosca-700 text-tosca-100' : 'bg-amber-300 text-slate-950'}`}>
-                    GIS
-                  </span>
-                </button>
-
                 {/* Kepling Tab Realisasi Pembangunan */}
                 <button
                   id="tab-pembangunan-kepling"
@@ -1443,6 +1480,39 @@ export default function App() {
                     <Compass className={`w-4 h-4 ${activeTab === 'hub' ? 'text-white' : 'text-tosca-700'}`} />
                     <span>Pusat Menu</span>
                   </button>
+                )}
+
+                {/* Super Admin: Monitoring & Capaian (Moved Up for better UX) */}
+                {activeAccount.role === 'super_admin' && (
+                  <>
+                    <button
+                      id="tab-monitoring-super-admin"
+                      type="button"
+                      onClick={() => setActiveTab('monitoring')}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                        activeTab === 'monitoring'
+                          ? 'bg-amber-600 text-white shadow-md shadow-amber-600/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                      }`}
+                    >
+                      <ShieldCheck className={`w-4 h-4 ${activeTab === 'monitoring' ? 'text-white' : 'text-amber-600'}`} />
+                      <span>Monitoring</span>
+                    </button>
+
+                    <button
+                      id="tab-capaian-super-admin"
+                      type="button"
+                      onClick={() => setActiveTab('capaian_admin')}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                        activeTab === 'capaian_admin'
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                      }`}
+                    >
+                      <Trophy className={`w-4 h-4 ${activeTab === 'capaian_admin' ? 'text-white' : 'text-blue-600'}`} />
+                      <span>Capaian</span>
+                    </button>
+                  </>
                 )}
 
                 {/* Kasi Sektoral Dashboard Tab */}
@@ -1552,26 +1622,6 @@ export default function App() {
                   </button>
                 )}
 
-                {/* Kasi Trantibum: Pemetaan Poskamling Tab */}
-                {activeAccount.role === 'kasi_trantibum' && (
-                  <button
-                    id="tab-pemetaan-kasi"
-                    type="button"
-                    onClick={() => setActiveTab('pemetaan')}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                      activeTab === 'pemetaan'
-                        ? 'bg-amber-600 text-white shadow-md shadow-amber-600/10 scale-[1.02] font-black'
-                        : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
-                    }`}
-                  >
-                    <Compass className={`w-4 h-4 ${activeTab === 'pemetaan' ? 'text-white' : 'text-amber-700'}`} />
-                    <span>Peta Poskamling</span>
-                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'pemetaan' ? 'bg-amber-700 text-amber-100' : 'bg-amber-100 text-amber-900'}`}>
-                      GIS
-                    </span>
-                  </button>
-                )}
-
                 {/* Kasi Sektoral: Riwayat Laporan Tab */}
                 {(activeAccount.role === 'kasi_pemerintahan' ||
                   activeAccount.role === 'kasi_pembangunan' ||
@@ -1597,137 +1647,7 @@ export default function App() {
 
                 {activeAccount.role === 'super_admin' && (
                   <>
-                    {/* Super Admin Tab 1: Monitoring 24 Kepling */}
-                    <button
-                      id="tab-monitoring-super-admin"
-                      type="button"
-                      onClick={() => setActiveTab('monitoring')}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                        activeTab === 'monitoring'
-                          ? 'bg-amber-600 text-white shadow-md shadow-amber-600/10 scale-[1.02] font-black'
-                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
-                      }`}
-                    >
-                      <ShieldCheck className={`w-4 h-4 ${activeTab === 'monitoring' ? 'text-white' : 'text-amber-600'}`} />
-                      <span>Monitoring 24 Kepling</span>
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'monitoring' ? 'bg-amber-700 text-amber-100' : 'bg-amber-200 text-amber-950'}`}>
-                        STATUS
-                      </span>
-                    </button>
-
-                    {/* Super Admin Tab 2: Dashboard Capaian 24 Kepling */}
-                    <button
-                      id="tab-capaian-super-admin"
-                      type="button"
-                      onClick={() => setActiveTab('capaian_admin')}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                        activeTab === 'capaian_admin'
-                          ? 'bg-amber-600 text-white shadow-md shadow-amber-600/10 scale-[1.02] font-black'
-                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
-                      }`}
-                    >
-                      <Trophy className={`w-4 h-4 ${activeTab === 'capaian_admin' ? 'text-white' : 'text-amber-600'}`} />
-                      <span>Dashboard Capaian</span>
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'capaian_admin' ? 'bg-tosca-700 text-tosca-100' : 'bg-tosca-100 text-emerald-800'}`}>
-                        24 KEPLING
-                      </span>
-                    </button>
-
-                    {/* Super Admin Tab 3: Semua Riwayat Laporan */}
-                    <button
-                      id="tab-riwayat-laporan"
-                      type="button"
-                      onClick={() => {
-                        setRiwayatFilterPetugas(undefined);
-                        setActiveTab('riwayat');
-                      }}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                        activeTab === 'riwayat'
-                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
-                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
-                      }`}
-                    >
-                      <History className={`w-4 h-4 ${activeTab === 'riwayat' ? 'text-white' : 'text-tosca-700'}`} />
-                      <span>Semua Riwayat</span>
-                      {renderTabBadge('riwayat')}
-                    </button>
-
-                    {/* Super Admin Tab 4: Kunjungan Harian 24 Kepling */}
-                    <button
-                      id="tab-kunjungan-warga-admin"
-                      type="button"
-                      onClick={() => setActiveTab('kunjungan')}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                        activeTab === 'kunjungan'
-                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
-                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
-                      }`}
-                    >
-                      <Users className={`w-4 h-4 ${activeTab === 'kunjungan' ? 'text-white' : 'text-tosca-700'}`} />
-                      <span>Kunjungan Harian</span>
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'kunjungan' ? 'bg-tosca-700 text-tosca-100' : 'bg-tosca-100 text-emerald-800'}`}>
-                        24 LINGKUNGAN
-                      </span>
-                      {renderTabBadge('kunjungan')}
-                    </button>
-
-                    {/* Super Admin Tab 4b: Pemetaan WebGIS 24 Lingkungan */}
-                    <button
-                      id="tab-pemetaan-admin"
-                      type="button"
-                      onClick={() => setActiveTab('pemetaan')}
-                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                        activeTab === 'pemetaan'
-                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
-                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
-                      }`}
-                    >
-                      <Compass className={`w-4 h-4 ${activeTab === 'pemetaan' ? 'text-white' : 'text-tosca-700'}`} />
-                      <span>WebGIS &amp; WRS</span>
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'pemetaan' ? 'bg-tosca-700 text-tosca-100' : 'bg-amber-400 text-slate-950 shadow-3xs'}`}>
-                        PETA 24
-                      </span>
-                    </button>
-
-                    {/* Super Admin Tab Realisasi Pembangunan */}
-                    <button
-                      id="tab-pembangunan-admin"
-                      type="button"
-                      onClick={() => setActiveTab('realisasi_pembangunan')}
-                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                        activeTab === 'realisasi_pembangunan'
-                          ? 'bg-tosca-700 text-white shadow-md shadow-tosca-700/10 scale-[1.02] font-black'
-                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
-                      }`}
-                    >
-                      <Wrench className={`w-4 h-4 ${activeTab === 'realisasi_pembangunan' ? 'text-white' : 'text-tosca-700'}`} />
-                      <span>Realisasi Pembangunan</span>
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'realisasi_pembangunan' ? 'bg-tosca-800 text-tosca-100' : 'bg-tosca-100 text-tosca-900'}`}>
-                        INFRA
-                      </span>
-                      {renderTabBadge('realisasi_pembangunan')}
-                    </button>
-
-                    {/* Super Admin Tab Surat Kedinasan */}
-                    <button
-                      id="tab-surat-kedinasan-admin"
-                      type="button"
-                      onClick={() => setActiveTab('surat_kedinasan')}
-                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                        activeTab === 'surat_kedinasan'
-                          ? 'bg-tosca-700 text-white shadow-md shadow-tosca-700/10 scale-[1.02] font-black'
-                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
-                      }`}
-                    >
-                      <FileText className={`w-4 h-4 ${activeTab === 'surat_kedinasan' ? 'text-white' : 'text-tosca-700'}`} />
-                      <span>Surat Kedinasan</span>
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'surat_kedinasan' ? 'bg-tosca-800 text-tosca-100' : 'bg-tosca-100 text-tosca-900'}`}>
-                        ARSIP
-                      </span>
-                      {renderTabBadge('surat_kedinasan')}
-                    </button>
-
-                    {/* Super Admin Tab 5: Input Formulir / Rangkuman Laporan */}
+                    {/* 1. Daily Operations */}
                     <button
                       id="tab-input-laporan"
                       type="button"
@@ -1741,14 +1661,25 @@ export default function App() {
                           : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
                       }`}
                     >
-                      <FileText className={`w-4 h-4 ${activeTab === 'form' ? 'text-white' : 'text-tosca-700'}`} />
+                      <FileText className={`w-4 h-4 ${activeTab === 'form' ? 'text-white' : 'text-emerald-600'}`} />
                       <span>Input Laporan</span>
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${activeTab === 'form' ? 'bg-tosca-700 text-tosca-100' : 'bg-tosca-100 text-emerald-800'}`}>
-                        RANGKUMAN
-                      </span>
                     </button>
 
-                    {/* Super Admin Tab 6: Kegiatan Khusus */}
+                    <button
+                      id="tab-kunjungan-warga-admin"
+                      type="button"
+                      onClick={() => setActiveTab('kunjungan')}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                        activeTab === 'kunjungan'
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                      }`}
+                    >
+                      <Users className={`w-4 h-4 ${activeTab === 'kunjungan' ? 'text-white' : 'text-emerald-600'}`} />
+                      <span>Kunjungan Warga</span>
+                      {renderTabBadge('kunjungan')}
+                    </button>
+
                     <button
                       id="tab-kegiatan-khusus"
                       type="button"
@@ -1760,7 +1691,56 @@ export default function App() {
                       }`}
                     >
                       <UserCheck className={`w-4 h-4 ${activeTab === 'kegiatan_khusus' ? 'text-white' : 'text-amber-600'}`} />
-                      <span>Kegiatan Khusus</span>
+                      <span>Absensi GPS</span>
+                    </button>
+
+                    <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block"></div>
+
+                    {/* 2. Insight & Monitoring */}
+                    <button
+                      id="tab-riwayat-laporan"
+                      type="button"
+                      onClick={() => {
+                        setRiwayatFilterPetugas(undefined);
+                        setActiveTab('riwayat');
+                      }}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                        activeTab === 'riwayat'
+                          ? 'bg-slate-700 text-white shadow-md shadow-slate-700/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                      }`}
+                    >
+                      <History className={`w-4 h-4 ${activeTab === 'riwayat' ? 'text-white' : 'text-slate-600'}`} />
+                      <span>Arsip Riwayat</span>
+                      {renderTabBadge('riwayat')}
+                    </button>
+
+                    <button
+                      id="tab-pembangunan-admin"
+                      type="button"
+                      onClick={() => setActiveTab('realisasi_pembangunan')}
+                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                        activeTab === 'realisasi_pembangunan'
+                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                      }`}
+                    >
+                      <Wrench className={`w-4 h-4 ${activeTab === 'realisasi_pembangunan' ? 'text-white' : 'text-indigo-600'}`} />
+                      <span>Pembangunan</span>
+                    </button>
+
+                    <button
+                      id="tab-surat-kedinasan-admin"
+                      type="button"
+                      onClick={() => setActiveTab('surat_kedinasan')}
+                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                        activeTab === 'surat_kedinasan'
+                          ? 'bg-tosca-700 text-white shadow-md shadow-tosca-700/10 scale-[1.02] font-black'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-3xs'
+                      }`}
+                    >
+                      <FileText className={`w-4 h-4 ${activeTab === 'surat_kedinasan' ? 'text-white' : 'text-tosca-700'}`} />
+                      <span>Surat Kedinasan</span>
                     </button>
                   </>
                 )}
@@ -2047,7 +2027,6 @@ export default function App() {
                 setIsModalOpen(true);
               }}
               onNavigateToForm={() => setActiveTab('form')}
-              onNavigateToPemetaan={handleNavigateToPemetaan}
               onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
               attendanceList={attendanceList}
               eventAttendanceList={eventAttendanceList}
@@ -2073,7 +2052,6 @@ export default function App() {
                 setIsModalOpen(true);
               }}
               onNavigateToForm={() => setActiveTab('form')}
-              onNavigateToPemetaan={handleNavigateToPemetaan}
               onOpenRekapPbb={() => setActiveTab('rekap_pbb')}
               attendanceList={attendanceList}
               eventAttendanceList={eventAttendanceList}
@@ -2106,7 +2084,6 @@ export default function App() {
               isRefreshing={isRefreshingReports}
               onResetReports={handleResetAllReports}
               onOpenCapaianDashboard={() => setActiveTab('capaian_admin')}
-              onOpenPemetaan={handleNavigateToPemetaan}
               onOpenPbb={() => setActiveTab('rekap_pbb')}
               sheetMeta={sheetMeta}
             />
@@ -2154,18 +2131,6 @@ export default function App() {
           </ErrorBoundary>
         )}
 
-        {/* Tab Pemetaan Wilayah WebGIS & WRS */}
-        {activeTab === 'pemetaan' && (
-          <ErrorBoundary fallbackTitle="Gagal Memuat Sistem Pemetaan WebGIS">
-            <PemetaanWilayahView
-              currentUser={activeAccount}
-              onShowToast={showToast}
-              initialLingkunganFilter={pemetaanTargetLingkungan}
-              onOpenDatabaseKeluarga={() => setActiveTab('database_keluarga')}
-            />
-          </ErrorBoundary>
-        )}
-
         {/* Tab Rekap Realisasi PBB */}
         {activeTab === 'rekap_pbb' && (
           <ErrorBoundary fallbackTitle="Gagal Memuat Realisasi PBB">
@@ -2179,9 +2144,6 @@ export default function App() {
             <DatabaseKeluargaView
               currentUser={activeAccount}
               onShowToast={showToast}
-              onNavigateToWebgis={(lat, lng) => {
-                setActiveTab('pemetaan');
-              }}
             />
           </ErrorBoundary>
         )}

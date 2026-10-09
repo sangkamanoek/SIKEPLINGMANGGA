@@ -1,4 +1,5 @@
-import { AbsenApelItem, StatusAbsenApel, UserAccount, CustomEvent, EventAttendance } from '../types';
+import { AbsenApelItem, StatusAbsenApel, UserAccount, EventAttendance } from '../types';
+import type { CustomEvent } from '../types';
 import { safeSetLocalStorage } from './safeStorage';
 import {
   fetchAttendanceFromFirestore,
@@ -135,9 +136,15 @@ export async function submitAbsenApel(
 
   const timeStatus = checkApelTimeStatus();
   let finalCatatan = catatan || '';
-  if (status === 'Hadir' && timeStatus.isLate) {
-    if (!finalCatatan.includes('Terlambat')) {
-      finalCatatan = finalCatatan ? `${finalCatatan} (${timeStatus.statusLabel})` : timeStatus.statusLabel;
+  if (status === 'Hadir') {
+    if (timeStatus.isWithinWindow) {
+      if (!finalCatatan.includes('Tepat Waktu')) {
+        finalCatatan = finalCatatan ? `${finalCatatan} (Tepat Waktu 07.30-08.30 WIB)` : 'Tepat Waktu (07.30-08.30 WIB)';
+      }
+    } else {
+      if (!finalCatatan.includes('Diluar Jam Tepat Waktu') && !finalCatatan.includes('Uji Coba')) {
+        finalCatatan = finalCatatan ? `${finalCatatan} (Pengujian QR / Diluar Jam Tepat Waktu)` : 'Pengujian QR / Diluar Jam Tepat Waktu';
+      }
     }
   }
 

@@ -409,6 +409,30 @@ export async function syncSuperAdminDeviceDataToLiveFirestore(
       roads,
     } = snapshot.data;
 
+    // SAFETY CHECK: If local data is completely empty (0 reports and 0 family),
+    // automatically PULL from Firestore instead of pushing zeros to prevent data loss!
+    if (reports.length === 0 && family.length === 0) {
+      onProgress?.('Perangkat ini mendeteksi 0 data lokal. Sistem otomatis mengambil (Pull) data dari Cloud Firestore...');
+      try {
+        const cloudReports = await fetchReportsFromFirestore();
+        const cloudFamily = await fetchAllDataKeluarga();
+        if ((cloudReports && cloudReports.length > 0) || (cloudFamily && cloudFamily.length > 0)) {
+          onProgress?.(`Berhasil menarik ${cloudReports?.length || 0} laporan dan ${cloudFamily?.length || 0} data keluarga dari Cloud!`);
+          return {
+            success: true,
+            message: `Aman! Karena perangkat ini kosong, sistem secara otomatis menarik ${cloudReports?.length || 0} laporan dan ${cloudFamily?.length || 0} data keluarga dari Cloud Firestore (Tidak ada data yang tertimpa).`,
+            stats: {
+              ...stats,
+              reports: { total: cloudReports?.length || 0, synced: cloudReports?.length || 0 },
+              family: { total: cloudFamily?.length || 0, synced: cloudFamily?.length || 0 },
+            },
+          };
+        }
+      } catch (pullErr) {
+        console.warn('Auto-pull protection notice:', pullErr);
+      }
+    }
+
     // 1. Sync Reports
     stats.reports.total = reports.length;
     if (reports.length > 0) {
