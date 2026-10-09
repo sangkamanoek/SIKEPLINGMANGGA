@@ -66,37 +66,38 @@ import { fetchTargetsCapaian, subscribeTargetsFromFirestore } from './lib/target
 import { fetchAllDataKeluarga } from './lib/dataKeluargaService';
 import { useFeatureNotifications } from './hooks/useFeatureNotifications';
 import { showSafeNotification } from './lib/safeNotification';
+import { lazyWithRetry } from './lib/lazyWithRetry';
 
-// Code-Splitting: Lazy load heavy modules to guarantee fast initial startup
-const ViewImagesPage = React.lazy(() => import('./components/ViewImagesPage'));
-const KunjunganHarianView = React.lazy(() => import('./components/KunjunganHarianView').then(m => ({ default: m.KunjunganHarianView })));
-const LaporanKeuanganPkkView = React.lazy(() => import('./components/LaporanKeuanganPkkView').then(m => ({ default: m.LaporanKeuanganPkkView })));
-const PkkHubDashboard = React.lazy(() => import('./components/PkkHubDashboard').then(m => ({ default: m.PkkHubDashboard })));
-const PkkKegiatanView = React.lazy(() => import('./components/PkkKegiatanView').then(m => ({ default: m.PkkKegiatanView })));
-const PkkDasaWismaView = React.lazy(() => import('./components/PkkDasaWismaView').then(m => ({ default: m.PkkDasaWismaView })));
-const PkkPosyanduView = React.lazy(() => import('./components/PkkPosyanduView').then(m => ({ default: m.PkkPosyanduView })));
-const PkkBukuAdministrasiView = React.lazy(() => import('./components/PkkBukuAdministrasiView').then(m => ({ default: m.PkkBukuAdministrasiView })));
-const SuratKedinasanView = React.lazy(() => import('./components/SuratKedinasanView').then(m => ({ default: m.SuratKedinasanView })));
-const RealisasiPembangunanView = React.lazy(() => import('./components/RealisasiPembangunanView').then(m => ({ default: m.RealisasiPembangunanView })));
-const RangkumanLaporanKelurahan = React.lazy(() => import('./components/RangkumanLaporanKelurahan').then(m => ({ default: m.RangkumanLaporanKelurahan })));
-const RiwayatLaporan = React.lazy(() => import('./components/RiwayatLaporan').then(m => ({ default: m.RiwayatLaporan })));
-const DetailLaporanModal = React.lazy(() => import('./components/DetailLaporanModal').then(m => ({ default: m.DetailLaporanModal })));
-const AccountSelectorModal = React.lazy(() => import('./components/AccountSelectorModal').then(m => ({ default: m.AccountSelectorModal })));
-const MonitoringSuperAdmin = React.lazy(() => import('./components/MonitoringSuperAdmin').then(m => ({ default: m.MonitoringSuperAdmin })));
-const DashboardCapaianKepling = React.lazy(() => import('./components/DashboardCapaianKepling').then(m => ({ default: m.DashboardCapaianKepling })));
-const DashboardPbbKasi = React.lazy(() => import('./components/DashboardPbbKasi').then(m => ({ default: m.DashboardPbbKasi })));
-const DashboardPerlinsosKasi = React.lazy(() => import('./components/DashboardPerlinsosKasi').then(m => ({ default: m.DashboardPerlinsosKasi })));
-const DashboardTrantibumKasi = React.lazy(() => import('./components/DashboardTrantibumKasi').then(m => ({ default: m.DashboardTrantibumKasi })));
-const PWAInstallModal = React.lazy(() => import('./components/PWAInstallModal').then(m => ({ default: m.PWAInstallModal })));
-const PanduanPPTModal = React.lazy(() => import('./components/PanduanPPTModal').then(m => ({ default: m.PanduanPPTModal })));
-const AppUpdateModal = React.lazy(() => import('./components/AppUpdateModal').then(m => ({ default: m.AppUpdateModal })));
-const AbsenKegiatanKhusus = React.lazy(() => import('./components/AbsenKegiatanKhusus').then(m => ({ default: m.AbsenKegiatanKhusus })));
-const RekapPbbView = React.lazy(() => import('./components/RekapPbbView').then(m => ({ default: m.RekapPbbView })));
+// Code-Splitting: Lazy load heavy modules to guarantee fast initial startup with auto-retry
+const ViewImagesPage = lazyWithRetry(() => import('./components/ViewImagesPage'));
+const KunjunganHarianView = lazyWithRetry(() => import('./components/KunjunganHarianView'), 'KunjunganHarianView');
+const LaporanKeuanganPkkView = lazyWithRetry(() => import('./components/LaporanKeuanganPkkView'), 'LaporanKeuanganPkkView');
+const PkkHubDashboard = lazyWithRetry(() => import('./components/PkkHubDashboard'), 'PkkHubDashboard');
+const PkkKegiatanView = lazyWithRetry(() => import('./components/PkkKegiatanView'), 'PkkKegiatanView');
+const PkkDasaWismaView = lazyWithRetry(() => import('./components/PkkDasaWismaView'), 'PkkDasaWismaView');
+const PkkPosyanduView = lazyWithRetry(() => import('./components/PkkPosyanduView'), 'PkkPosyanduView');
+const PkkBukuAdministrasiView = lazyWithRetry(() => import('./components/PkkBukuAdministrasiView'), 'PkkBukuAdministrasiView');
+const SuratKedinasanView = lazyWithRetry(() => import('./components/SuratKedinasanView'), 'SuratKedinasanView');
+const RealisasiPembangunanView = lazyWithRetry(() => import('./components/RealisasiPembangunanView'), 'RealisasiPembangunanView');
+const RangkumanLaporanKelurahan = lazyWithRetry(() => import('./components/RangkumanLaporanKelurahan'), 'RangkumanLaporanKelurahan');
+const RiwayatLaporan = lazyWithRetry(() => import('./components/RiwayatLaporan'), 'RiwayatLaporan');
+const DetailLaporanModal = lazyWithRetry(() => import('./components/DetailLaporanModal'), 'DetailLaporanModal');
+const AccountSelectorModal = lazyWithRetry(() => import('./components/AccountSelectorModal'), 'AccountSelectorModal');
+const MonitoringSuperAdmin = lazyWithRetry(() => import('./components/MonitoringSuperAdmin'), 'MonitoringSuperAdmin');
+const DashboardCapaianKepling = lazyWithRetry(() => import('./components/DashboardCapaianKepling'), 'DashboardCapaianKepling');
+const DashboardPbbKasi = lazyWithRetry(() => import('./components/DashboardPbbKasi'), 'DashboardPbbKasi');
+const DashboardPerlinsosKasi = lazyWithRetry(() => import('./components/DashboardPerlinsosKasi'), 'DashboardPerlinsosKasi');
+const DashboardTrantibumKasi = lazyWithRetry(() => import('./components/DashboardTrantibumKasi'), 'DashboardTrantibumKasi');
+const PWAInstallModal = lazyWithRetry(() => import('./components/PWAInstallModal'), 'PWAInstallModal');
+const PanduanPPTModal = lazyWithRetry(() => import('./components/PanduanPPTModal'), 'PanduanPPTModal');
+const AppUpdateModal = lazyWithRetry(() => import('./components/AppUpdateModal'), 'AppUpdateModal');
+const AbsenKegiatanKhusus = lazyWithRetry(() => import('./components/AbsenKegiatanKhusus'), 'AbsenKegiatanKhusus');
+const RekapPbbView = lazyWithRetry(() => import('./components/RekapPbbView'), 'RekapPbbView');
 // Removed WebGIS import
-const DatabaseKeluargaView = React.lazy(() => import('./components/DatabaseKeluargaView').then(m => ({ default: m.DatabaseKeluargaView })));
-const UbahPasswordModal = React.lazy(() => import('./components/UbahPasswordModal').then(m => ({ default: m.UbahPasswordModal })));
-const EditProfileModal = React.lazy(() => import('./components/EditProfileModal').then(m => ({ default: m.EditProfileModal })));
-const AbsenApelModal = React.lazy(() => import('./components/AbsenApelModal').then(m => ({ default: m.AbsenApelModal })));
+const DatabaseKeluargaView = lazyWithRetry(() => import('./components/DatabaseKeluargaView'), 'DatabaseKeluargaView');
+const UbahPasswordModal = lazyWithRetry(() => import('./components/UbahPasswordModal'), 'UbahPasswordModal');
+const EditProfileModal = lazyWithRetry(() => import('./components/EditProfileModal'), 'EditProfileModal');
+const AbsenApelModal = lazyWithRetry(() => import('./components/AbsenApelModal'), 'AbsenApelModal');
 
 const ViewLoadingFallback = () => (
   <div className="flex flex-col items-center justify-center min-h-[300px] p-8 text-center animate-fade-in">
@@ -2251,69 +2252,83 @@ export default function App() {
         />
 
         {/* PWA / APK Install Modal */}
-        <PWAInstallModal
-          isOpen={isInstallModalOpen}
-          onClose={() => setIsInstallModalOpen(false)}
-        />
+        {isInstallModalOpen && (
+          <PWAInstallModal
+            isOpen={isInstallModalOpen}
+            onClose={() => setIsInstallModalOpen(false)}
+          />
+        )}
 
         {/* Ubah Password Modal */}
-        <UbahPasswordModal
-          isOpen={isUbahPasswordOpen}
-          onClose={() => setIsUbahPasswordOpen(false)}
-          activeAccount={activeAccount}
-          onSuccess={(msg) => showToast(msg, 'success')}
-        />
+        {isUbahPasswordOpen && (
+          <UbahPasswordModal
+            isOpen={isUbahPasswordOpen}
+            onClose={() => setIsUbahPasswordOpen(false)}
+            activeAccount={activeAccount}
+            onSuccess={(msg) => showToast(msg, 'success')}
+          />
+        )}
 
         {/* Edit Profil Modal */}
-        <EditProfileModal
-          isOpen={isEditProfileOpen}
-          onClose={() => setIsEditProfileOpen(false)}
-          activeAccount={activeAccount}
-          onProfileUpdated={(updatedAccount) => {
-            setActiveAccount(updatedAccount);
-            showToast(`Profil ${updatedAccount.nama} berhasil diperbarui.`, 'success');
-          }}
-        />
+        {isEditProfileOpen && (
+          <EditProfileModal
+            isOpen={isEditProfileOpen}
+            onClose={() => setIsEditProfileOpen(false)}
+            activeAccount={activeAccount}
+            onProfileUpdated={(updatedAccount) => {
+              setActiveAccount(updatedAccount);
+              showToast(`Profil ${updatedAccount.nama} berhasil diperbarui.`, 'success');
+            }}
+          />
+        )}
 
         {/* Detail Laporan Modal (No WhatsApp) */}
-        <ErrorBoundary fallbackTitle="Gagal Memuat Detail Laporan">
-          <DetailLaporanModal
-            item={selectedReport}
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            sheetMeta={sheetMeta}
-            hasGoogleAuth={Boolean(token)}
-            isAdmin={isKelurahanAdmin(activeAccount.role)}
-            attendanceList={attendanceList}
-            onUpdateReport={handleUpdateReport}
-            onDeleteReport={handleDeleteReport}
-          />
-        </ErrorBoundary>
+        {isModalOpen && (
+          <ErrorBoundary fallbackTitle="Gagal Memuat Detail Laporan">
+            <DetailLaporanModal
+              item={selectedReport}
+              isOpen={isModalOpen}
+              onClose={() => setIsModalOpen(false)}
+              sheetMeta={sheetMeta}
+              hasGoogleAuth={Boolean(token)}
+              isAdmin={isKelurahanAdmin(activeAccount.role)}
+              attendanceList={attendanceList}
+              onUpdateReport={handleUpdateReport}
+              onDeleteReport={handleDeleteReport}
+            />
+          </ErrorBoundary>
+        )}
 
         {/* Panduan PPT Kepling Modal */}
-        <PanduanPPTModal
-          isOpen={isPPTModalOpen}
-          onClose={() => setIsPPTModalOpen(false)}
-        />
+        {isPPTModalOpen && (
+          <PanduanPPTModal
+            isOpen={isPPTModalOpen}
+            onClose={() => setIsPPTModalOpen(false)}
+          />
+        )}
 
         {/* Absen Apel Pagi Modal */}
-        <AbsenApelModal
-          isOpen={isAbsenApelModalOpen}
-          onClose={() => setIsAbsenApelModalOpen(false)}
-          activeAccount={activeAccount}
-          attendanceList={attendanceList}
-          onRefreshAttendance={async () => {
-            const fresh = await loadAllAttendance();
-            setAttendanceList(fresh);
-          }}
-          showToast={showToast}
-        />
+        {isAbsenApelModalOpen && (
+          <AbsenApelModal
+            isOpen={isAbsenApelModalOpen}
+            onClose={() => setIsAbsenApelModalOpen(false)}
+            activeAccount={activeAccount}
+            attendanceList={attendanceList}
+            onRefreshAttendance={async () => {
+              const fresh = await loadAllAttendance();
+              setAttendanceList(fresh);
+            }}
+            showToast={showToast}
+          />
+        )}
 
         {/* App Update / What's New Modal */}
-        <AppUpdateModal
-          isOpen={isUpdateModalOpen}
-          onClose={() => setIsUpdateModalOpen(false)}
-        />
+        {isUpdateModalOpen && (
+          <AppUpdateModal
+            isOpen={isUpdateModalOpen}
+            onClose={() => setIsUpdateModalOpen(false)}
+          />
+        )}
       </React.Suspense>
 
       {/* Floating App Update Notification Toast Banner */}

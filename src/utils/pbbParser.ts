@@ -13,6 +13,7 @@ export interface SpptPbbItem {
   diskonPembayaran?: number;
   persenDiskon?: number;
   keterangan?: string | null;
+  tglBayar?: string | null;
   updatedAt?: string;
 }
 

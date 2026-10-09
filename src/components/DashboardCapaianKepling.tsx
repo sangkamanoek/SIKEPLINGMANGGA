@@ -426,13 +426,50 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     }
   };
 
+  // Helper date calculations
+  const now = useMemo(() => new Date(), []);
+  const bounds = useMemo(() => getPeriodDateBounds(now), [now]);
+  const todayIso = bounds.todayIso;
+  const currentYearMonth = bounds.currentYearMonth;
+
+  // Total Kumulatif All-Time (untuk overview pagu / akhir tahun 31 Desember)
   const pbbOverview = useMemo(() => {
     return computePbbOverview(spptList, pbbYear);
   }, [spptList, pbbYear]);
 
+  // Realisasi PBB berbasis Periode Terpilih (Opsi A: Murni Transaksi Bulan Ini jika memilih Bulan Ini)
+  const isCumulativePeriod = period === 'ALL' || period === 'THIS_YEAR' || period.startsWith('YEAR_');
+
+  // SPPT yang lunas pada periode terpilih (berdasarkan tglBayar atau updatedAt)
+  const filteredSpptByPeriod = useMemo(() => {
+    if (isCumulativePeriod) {
+      return spptList;
+    }
+    return spptList.map((item) => {
+      if (item.status !== 'Sudah Bayar') return item;
+      // Cek apakah tanggal pembayaran jatuh ke dalam periode aktif
+      const dateIso = item.tglBayar || (item.updatedAt ? item.updatedAt.split('T')[0] : '');
+      const isInPeriod = dateIso ? checkDateInPeriod(dateIso, period, now) : false;
+      if (isInPeriod) {
+        return item;
+      }
+      // Jika pembayaran terjadi di luar periode aktif (misal bulan lalu), dalam periode ini belum dianggap lunas
+      return {
+        ...item,
+        status: 'Belum Bayar' as const,
+        jumlahBayar: null,
+      };
+    });
+  }, [spptList, period, isCumulativePeriod, now]);
+
+  const periodPbbOverview = useMemo(() => {
+    if (isCumulativePeriod) return pbbOverview;
+    return computePbbOverview(filteredSpptByPeriod, pbbYear);
+  }, [isCumulativePeriod, pbbOverview, filteredSpptByPeriod, pbbYear]);
+
   const myPbbStats = useMemo(() => {
-    return pbbOverview.lingkunganSummaries.find(lk => lk.lingkungan === (activeAccount.nomorLingkungan || 1));
-  }, [pbbOverview, activeAccount.nomorLingkungan]);
+    return periodPbbOverview.lingkunganSummaries.find(lk => lk.lingkungan === (activeAccount.nomorLingkungan || 1));
+  }, [periodPbbOverview, activeAccount.nomorLingkungan]);
 
   const formatRupiah = (val: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
@@ -473,12 +510,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     const updated = await resetTargetsCapaianToDefaults();
     setTargetsMap(updated);
   };
-
-  // Helper date calculations
-  const now = useMemo(() => new Date(), []);
-  const bounds = useMemo(() => getPeriodDateBounds(now), [now]);
-  const todayIso = bounds.todayIso;
-  const currentYearMonth = bounds.currentYearMonth;
 
   // 1. Filter reports by selected period
   const filteredReportsByPeriod = useMemo(() => {
@@ -615,9 +646,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         bpjs += Number(r.kinerja?.bpjsKetenagakerjaanOrang) || 0;
       });
 
-      // Ambil Realisasi PBB riil dari data SPPT (Wajib Pajak yang berstatus Sudah Bayar di Lingkungan ini)
+      // Ambil Realisasi PBB riil dari data SPPT yang lunas pada periode aktif ini (Opsi A)
       const lkNum = k.nomorLingkungan;
-      const lkSummary = pbbOverview.lingkunganSummaries.find((s) => s.lingkungan === lkNum);
+      const lkSummary = periodPbbOverview.lingkunganSummaries.find((s) => s.lingkungan === lkNum);
       const pbb = lkSummary !== undefined ? lkSummary.wpLunas : pbbReported;
 
       map[k.id] = {
@@ -630,7 +661,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     });
 
     return map;
-  }, [filteredReportsByPeriod, pbbOverview.lingkunganSummaries]);
+  }, [filteredReportsByPeriod, periodPbbOverview.lingkunganSummaries]);
 
   // Memori Kunjungan Harian (prioritas props, fallback localStorage tanpa network query)
   const effectiveKunjunganList = useMemo(() => {
@@ -679,28 +710,43 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       };
 
       const targetConfig = targetsMap[k.id];
-      const targetPerlinsos =
+
+      const rawAnnualPerlinsos =
         targetConfig?.targetPerlinsos ??
         DEFAULT_PERLINSOS_TARGETS[(k.nomorLingkungan || index + 1) - 1] ??
         300;
+      // Target Perlinsos: Tahunan = Pagu (misal 300 KK), Bulanan = Pagu / 12 (misal 25 KK/bulan)
+      const targetPerlinsos = isCumulativePeriod
+        ? rawAnnualPerlinsos
+        : Math.max(1, Math.round(rawAnnualPerlinsos / 12));
       
       // Ambil data realisasi SPPT PBB untuk lingkungan ini
       const lkNum = k.nomorLingkungan || (index + 1);
-      const lkSummary = pbbOverview.lingkunganSummaries.find((s) => s.lingkungan === lkNum);
+      const lkSummary = periodPbbOverview.lingkunganSummaries.find((s) => s.lingkungan === lkNum);
+      const allTimeLkSummary = pbbOverview.lingkunganSummaries.find((s) => s.lingkungan === lkNum);
 
-      // Target PBB (WP): Prioritaskan target riil dari SPPT PBB (totalWp) yang tersinkronisasi (misal: 255 WP untuk Lk XXII).
-      const targetPbb =
-        (targetConfig?.targetPbb && targetConfig.targetPbb !== 100)
-          ? targetConfig.targetPbb
-          : (lkSummary && lkSummary.totalWp > 0)
-          ? lkSummary.totalWp
-          : (targetConfig?.targetPbb || 100);
+      // Target PBB:
+      // - Jika Tahunan / Kumulatif: Pagu PBB totalWp (misal 1166 WP)
+      // - Jika Bulanan (Opsi A): Target bulanan adalah target tahunan dibagi 12 bulan (misal 1166 / 12 = 97 WP/bulan)
+      //   sehingga kepling dinilai adil berdasarkan WP yang membayar khusus di bulan tersebut!
+      const rawAnnualTarget = (targetConfig?.targetPbb && targetConfig.targetPbb !== 100)
+        ? targetConfig.targetPbb
+        : (allTimeLkSummary && allTimeLkSummary.totalWp > 0)
+        ? allTimeLkSummary.totalWp
+        : (targetConfig?.targetPbb || 100);
 
-      const targetIkd = targetConfig?.targetIkd ?? 50;
-      const targetBpjs = (targetConfig?.targetBpjs && targetConfig.targetBpjs >= 50) ? targetConfig.targetBpjs : 50;
+      const targetPbb = isCumulativePeriod
+        ? rawAnnualTarget
+        : Math.max(1, Math.round(rawAnnualTarget / 12));
 
-      // Hitung Capaian Efektif (Realisasi dari Laporan atau Override Super Admin)
-      const effective = calculateEffectiveKinerja(reported, targetConfig);
+      const rawAnnualIkd = targetConfig?.targetIkd ?? 50;
+      const targetIkd = isCumulativePeriod ? rawAnnualIkd : Math.max(1, Math.round(rawAnnualIkd / 12));
+
+      const rawAnnualBpjs = (targetConfig?.targetBpjs && targetConfig.targetBpjs >= 50) ? targetConfig.targetBpjs : 50;
+      const targetBpjs = isCumulativePeriod ? rawAnnualBpjs : Math.max(1, Math.round(rawAnnualBpjs / 12));
+
+      // Hitung Capaian Efektif: Jika bulanan/non-kumulatif, akumulasi poin mulai dari NOL (hanya laporan periode ini)
+      const effective = calculateEffectiveKinerja(reported, targetConfig, index, isCumulativePeriod);
 
       const uniqueDays = new Set(kReports.map((r) => r.createdAt?.split('T')[0] || r.tanggal));
 
@@ -814,6 +860,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         reportedPerlinsos: reported.perlinsos,
         targetPerlinsos,
         targetPbb,
+        rawAnnualTarget,
         targetIkd,
         targetBpjs,
         perlinsosPercentage,
@@ -844,6 +891,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     });
   }, [
     period,
+    isCumulativePeriod,
     filteredReportsByPeriod,
     reportedStatsMap,
     targetsMap,
@@ -852,6 +900,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     filteredEventAttendanceByPeriod,
     filteredCustomEventsByPeriod,
     filteredKunjunganByPeriod,
+    periodPbbOverview.lingkunganSummaries,
     pbbOverview.lingkunganSummaries,
   ]);
 
@@ -1477,10 +1526,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           {/* 4 Pilar Kinerja Cards */}
           {(() => {
             const activeTargetConfig = targetsMap[activeAccount.id];
-            const activeTargetPerlinsos =
+            const rawActiveAnnualPerlinsos =
               activeTargetConfig?.targetPerlinsos ??
               DEFAULT_PERLINSOS_TARGETS[(activeAccount.nomorLingkungan || 1) - 1] ??
               300;
+            const activeTargetPerlinsos = isCumulativePeriod
+              ? rawActiveAnnualPerlinsos
+              : Math.max(1, Math.round(rawActiveAnnualPerlinsos / 12));
+
             const effectiveMyKinerja = calculateEffectiveKinerja(
               {
                 pbb: myStats.totalPbb,
@@ -1488,7 +1541,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 ikd: myStats.totalIkd,
                 bpjs: myStats.totalBpjs,
               },
-              activeTargetConfig
+              activeTargetConfig,
+              (activeAccount.nomorLingkungan || 1) - 1,
+              isCumulativePeriod
             );
             const myPerlinsosPct =
               activeTargetPerlinsos > 0
@@ -1912,27 +1967,34 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               </p>
             </div>
 
-            {/* Total PBB Kelurahan (Terkoneksi Realisasi PBB SPPT) */}
+            {/* Total PBB Kelurahan (Terkoneksi Realisasi PBB SPPT Sesuai Periode Aktif) */}
             {isPbbAllowed && (
               <div
                 onClick={() => onOpenRekapPbb && onOpenRekapPbb()}
                 className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-200 shadow-xs cursor-pointer hover:border-emerald-400 hover:shadow-sm transition-all group"
-                title="Klik untuk membuka Rekapitulasi Realisasi PBB Kelurahan"
+                title={`Klik untuk membuka Rekapitulasi Realisasi PBB Kelurahan. (Akumulasi All-Time: ${pbbOverview.totalWpLunas} WP / ${formatRupiah(pbbOverview.totalRealisasiNominal)})`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 uppercase block">
-                    Realisasi PBB ({pbbYear})
+                    Realisasi PBB {isCumulativePeriod ? `(${pbbYear})` : '(Periode Ini)'}
                   </span>
                   <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
-                    {pbbOverview.persentaseRealisasiNominal.toFixed(1)}%
+                    {periodPbbOverview.persentaseRealisasiNominal.toFixed(1)}%
                   </span>
                 </div>
                 <div className="text-2xl sm:text-3xl font-black text-emerald-900 mt-1">
-                  {pbbOverview.totalWpLunas}
-                  <span className="text-xs font-semibold text-slate-500 ml-1">WP Lunas</span>
+                  {periodPbbOverview.totalWpLunas}
+                  <span className="text-xs font-semibold text-slate-500 ml-1">
+                    {isCumulativePeriod ? 'WP Lunas' : `WP Lunas ${getPeriodLabel(period)}`}
+                  </span>
                 </div>
                 <p className="text-[11px] text-emerald-700 font-semibold mt-1 truncate">
-                  {formatRupiah(pbbOverview.totalRealisasiNominal)}
+                  {formatRupiah(periodPbbOverview.totalRealisasiNominal)}
+                  {!isCumulativePeriod && (
+                    <span className="text-slate-400 ml-1 font-normal">
+                      (Total Pagu: {formatRupiah(pbbOverview.totalRealisasiNominal)})
+                    </span>
+                  )}
                 </p>
               </div>
             )}
@@ -2116,7 +2178,16 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">
-                    Peringkat resmi terpadu untuk periode <strong>{getPeriodLabel(period, now)}</strong> dihitung dari <strong>7 Kriteria Kinerja</strong>: Kehadiran Apel Pagi (15%), Kehadiran Kegiatan Khusus (15%), Capaian Perlinsos (20%), Realisasi PBB (20%), BPJS TK (10%), Kunjungan Harian (10%), dan Poskamling (10%).
+                    Peringkat resmi terpadu untuk periode <strong>{getPeriodLabel(period, now)}</strong> dihitung dari <strong>7 Kriteria Kinerja</strong> (Apel 15%, Kegiatan 15%, Perlinsos 20%, PBB 20%, BPJS TK 10%, Kunjungan 10%, Poskamling 10%). 
+                    {!isCumulativePeriod ? (
+                      <span className="text-emerald-700 font-semibold block mt-0.5">
+                        ⚡ Mode Bulanan Aktif: Akumulasi poin direset otomatis dari 0 pada tanggal 1 bulan berjalan (hanya menghitung transaksi & keaktifan bulan ini). Evaluasi total kumulatif setahun penuh dapat dilihat melalui filter "Tahun 2026".
+                      </span>
+                    ) : (
+                      <span className="text-blue-700 font-semibold block mt-0.5">
+                        📊 Mode Kumulatif Tahunan Aktif: Menghitung total seluruh akumulasi kinerja tahun berjalan untuk evaluasi akhir tahun (31 Desember).
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>

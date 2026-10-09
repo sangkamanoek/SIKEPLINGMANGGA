@@ -2059,7 +2059,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
             {/* POSYANDU REMOVED - MOVED TO PKK */}
           </div>
-          </div>
 
           {/* Section 3: Dokumentasi Foto Lapangan */}
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
@@ -2420,6 +2419,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
             </div>
           </div>
         </div>
+      </div>
 
       {/* Modal Peringatan Foto Harus Sesuai Jumlah Angka Inputan */}
       {showPhotoValidationModal && (

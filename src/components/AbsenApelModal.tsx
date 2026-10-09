@@ -1424,3 +1424,5 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
     </div>
   );
 };
+
+export default AbsenApelModal;

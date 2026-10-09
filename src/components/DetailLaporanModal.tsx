@@ -1388,7 +1388,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                             <tr key={kunj.id || kIdx} className="hover:bg-slate-50">
                               <td className="border border-black text-center font-bold py-1">{kIdx + 1}</td>
                               <td className="border border-black font-bold px-1.5 py-1 uppercase">{kunj.namaWarga}</td>
-                              <td className="border border-black px-1.5 py-1">{kunj.alamat}</td>
+                              <td className="border border-black px-1.5 py-1 uppercase">{kunj.alamat}</td>
                               <td className="border border-black text-center font-bold px-1 py-1">
                                 <span
                                   className={
@@ -2602,7 +2602,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         <tr key={kunj.id || kIdx} className="hover:bg-emerald-50/50">
                           <td className="py-1.5 px-2 text-center font-bold text-slate-500">{kIdx + 1}</td>
                           <td className="py-1.5 px-2 font-bold text-slate-800 uppercase text-[11px]">{kunj.namaWarga}</td>
-                          <td className="py-1.5 px-2 text-slate-600 text-[11px]">{kunj.alamat}</td>
+                          <td className="py-1.5 px-2 text-slate-600 text-[11px] uppercase">{kunj.alamat}</td>
                           <td className="py-1.5 px-2 text-center">
                             <span
                               className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${

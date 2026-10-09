@@ -92,7 +92,8 @@ export function getDefaultTargetsCapaianMap(): TargetsCapaianMap {
 export function calculateEffectiveKinerja(
   reported: { pbb: number; perlinsos: number; ikd: number; bpjs: number },
   targetConfig?: KeplingTargetCapaian | null,
-  keplingIndex?: number
+  keplingIndex?: number,
+  isCumulative: boolean = true
 ) {
   const isPerlinsosOverridden =
     targetConfig?.overridePerlinsos !== null &&
@@ -116,39 +117,43 @@ export function calculateEffectiveKinerja(
 
   // Determine baseline Perlinsos per 7 September 2026
   let baselinePerlinsos = 0;
-  if (isPerlinsosOverridden) {
-    baselinePerlinsos = Number(targetConfig!.overridePerlinsos);
-  } else {
-    const idx =
-      keplingIndex ??
-      (targetConfig?.nomorLingkungan ? targetConfig.nomorLingkungan - 1 : undefined);
-    if (idx !== undefined && DEFAULT_PERLINSOS_BASELINES[idx] !== undefined) {
-      baselinePerlinsos = DEFAULT_PERLINSOS_BASELINES[idx];
+  if (isCumulative) {
+    if (isPerlinsosOverridden) {
+      baselinePerlinsos = Number(targetConfig!.overridePerlinsos);
+    } else {
+      const idx =
+        keplingIndex ??
+        (targetConfig?.nomorLingkungan ? targetConfig.nomorLingkungan - 1 : undefined);
+      if (idx !== undefined && DEFAULT_PERLINSOS_BASELINES[idx] !== undefined) {
+        baselinePerlinsos = DEFAULT_PERLINSOS_BASELINES[idx];
+      }
     }
   }
 
-  const baselinePbb = isPbbOverridden ? Number(targetConfig!.overridePbb) : 0;
-  const baselineIkd = isIkdOverridden ? Number(targetConfig!.overrideIkd) : 0;
+  const baselinePbb = (isCumulative && isPbbOverridden) ? Number(targetConfig!.overridePbb) : 0;
+  const baselineIkd = (isCumulative && isIkdOverridden) ? Number(targetConfig!.overrideIkd) : 0;
 
   let baselineBpjs = 0;
-  if (isBpjsOverridden) {
-    baselineBpjs = Number(targetConfig!.overrideBpjs);
-  } else {
-    const idx =
-      keplingIndex ??
-      (targetConfig?.nomorLingkungan ? targetConfig.nomorLingkungan - 1 : undefined);
-    if (idx !== undefined && DEFAULT_BPJS_BASELINES[idx] !== undefined) {
-      baselineBpjs = DEFAULT_BPJS_BASELINES[idx];
+  if (isCumulative) {
+    if (isBpjsOverridden) {
+      baselineBpjs = Number(targetConfig!.overrideBpjs);
+    } else {
+      const idx =
+        keplingIndex ??
+        (targetConfig?.nomorLingkungan ? targetConfig.nomorLingkungan - 1 : undefined);
+      if (idx !== undefined && DEFAULT_BPJS_BASELINES[idx] !== undefined) {
+        baselineBpjs = DEFAULT_BPJS_BASELINES[idx];
+      }
     }
   }
 
-  // Laporan baru Kepling (mulai tanggal 7 September dan seterusnya)
+  // Laporan baru Kepling pada periode yang dipilih
   const reportedPerlinsos = Number(reported?.perlinsos) || 0;
   const reportedPbb = Number(reported?.pbb) || 0;
   const reportedIkd = Number(reported?.ikd) || 0;
   const reportedBpjs = Number(reported?.bpjs) || 0;
 
-  // Akumulasi Total Capaian = Basis Akhir 7 Sept + Akumulasi Laporan Kepling
+  // Akumulasi Total Capaian = Basis Masa Lalu (hanya jika kumulatif) + Laporan Periode Terpilih
   const effectivePerlinsos = baselinePerlinsos + reportedPerlinsos;
   const effectivePbb = baselinePbb + reportedPbb;
   const effectiveIkd = baselineIkd + reportedIkd;

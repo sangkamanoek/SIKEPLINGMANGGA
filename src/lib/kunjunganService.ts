@@ -108,18 +108,24 @@ export async function fetchKunjunganFromServerBuffer(): Promise<KunjunganWargaDa
  * Simpan 1 catatan Kunjungan secara Dual-Tier (0ms Local + Broadcast + Server Buffer + Firestore)
  */
 export async function saveKunjunganWargaToFirestore(data: KunjunganWargaData): Promise<void> {
+  const normalizedData: KunjunganWargaData = {
+    ...data,
+    namaWarga: (data.namaWarga || '').trim().toUpperCase(),
+    alamat: (data.alamat || '').trim().toUpperCase(),
+  };
+
   // 1. Instant 0ms update di local state & storage
   const current = getLocalKunjunganList();
-  const exists = current.some((x) => x.id === data.id);
-  const updated = exists ? current.map((x) => (x.id === data.id ? data : x)) : [data, ...current];
+  const exists = current.some((x) => x.id === normalizedData.id);
+  const updated = exists ? current.map((x) => (x.id === normalizedData.id ? normalizedData : x)) : [normalizedData, ...current];
   setLocalKunjunganList(updated);
-  broadcastKunjunganChange(data);
+  broadcastKunjunganChange(normalizedData);
 
   // 2. Kirim ke Server API buffer
   fetch('/api/kunjungan', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ item: data }),
+    body: JSON.stringify({ item: normalizedData }),
   }).catch((err) => {
     console.warn('Notice saving kunjungan to server buffer:', err);
   });
@@ -127,8 +133,8 @@ export async function saveKunjunganWargaToFirestore(data: KunjunganWargaData): P
   // 3. Simpan ke Firestore
   if (db) {
     try {
-      const docRef = doc(db, 'kunjungan_warga', data.id);
-      await setDoc(docRef, data);
+      const docRef = doc(db, 'kunjungan_warga', normalizedData.id);
+      await setDoc(docRef, normalizedData);
     } catch (err) {
       console.warn('Firestore setDoc notice for kunjungan_warga:', err);
     }

@@ -512,6 +512,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     return 1;
   });
   const [formStatus, setFormStatus] = useState<'Belum Bayar' | 'Sudah Bayar'>('Belum Bayar');
+  const [formTglBayar, setFormTglBayar] = useState<string>('');
   const [formKeterangan, setFormKeterangan] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -585,6 +586,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     setFormJumlahBayar(item.jumlahBayar !== undefined && item.jumlahBayar !== null ? String(item.jumlahBayar) : String(item.pbbTerutang));
     setFormLingkungan(item.lingkungan);
     setFormStatus(item.status);
+    setFormTglBayar(item.tglBayar || (item.status === 'Sudah Bayar' ? (item.updatedAt ? item.updatedAt.split('T')[0] : new Date().toISOString().split('T')[0]) : ''));
     setFormKeterangan(item.keterangan || '');
     setFormError(null);
     setIsWpModalOpen(true);
@@ -619,6 +621,16 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     if (editingWpItem) {
       // Update Existing Item
       const formattedNop = formatNop(formNop.trim());
+      // Determine tglBayar: if becoming Sudah Bayar today, record today's date YYYY-MM-DD (or use user-chosen date)
+      let effectiveTglBayar = formTglBayar ? formTglBayar.trim() : editingWpItem.tglBayar;
+      if (formStatus === 'Sudah Bayar') {
+        if (!effectiveTglBayar || editingWpItem.status !== 'Sudah Bayar') {
+          effectiveTglBayar = formTglBayar || new Date().toISOString().split('T')[0];
+        }
+      } else {
+        effectiveTglBayar = null;
+      }
+
       const updatedItem: SpptPbbItem = {
         ...editingWpItem,
         nop: formattedNop,
@@ -630,6 +642,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         lingkungan: formLingkungan,
         status: formStatus,
         keterangan: formKeterangan.trim(),
+        tglBayar: effectiveTglBayar,
         updatedAt: new Date().toISOString(),
       };
       setSpptList((prev) =>
@@ -644,6 +657,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     } else {
       // Create New Item
       const formattedNop = formatNop(formNop.trim());
+      const todayIso = new Date().toISOString().split('T')[0];
       const newWp: SpptPbbItem = {
         id: `wp_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         no: spptList.length + 1,
@@ -656,6 +670,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         lingkungan: formLingkungan,
         status: formStatus,
         keterangan: formKeterangan.trim(),
+        tglBayar: formStatus === 'Sudah Bayar' ? todayIso : null,
         updatedAt: new Date().toISOString(),
       };
 
@@ -695,10 +710,21 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             ? (item.jumlahBayar && item.jumlahBayar > 0 ? item.jumlahBayar : item.pbbTerutang)
             : null;
 
+          // Determine tglBayar: if becoming Sudah Bayar today, record today's date YYYY-MM-DD
+          let effectiveTglBayar = item.tglBayar;
+          if (newStatus === 'Sudah Bayar') {
+            if (!effectiveTglBayar || item.status !== 'Sudah Bayar') {
+              effectiveTglBayar = new Date().toISOString().split('T')[0];
+            }
+          } else {
+            effectiveTglBayar = null;
+          }
+
           const updatedItem: SpptPbbItem = {
             ...item,
             status: newStatus as 'Sudah Bayar' | 'Belum Bayar',
             jumlahBayar: newJumlahBayar,
+            tglBayar: effectiveTglBayar,
             updatedAt: new Date().toISOString(),
           };
           savePbbSpptToFirestore(updatedItem, selectedYear).catch(() => {});
@@ -2635,10 +2661,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                               </div>
                             );
                           } else if (pct > 100.05) {
+                            const diffPct = Math.round(pct - 100);
                             return (
                               <div className="flex flex-col items-center leading-none gap-0.5">
                                 <span className="text-purple-700 font-black">{Math.round(pct)}%</span>
-                                <span className="text-[8px] font-black px-1.5 py-0.5 bg-purple-100 text-purple-900 rounded border border-purple-300 uppercase tracking-tight scale-90">+Denda</span>
+                                <span className="text-[8px] font-black px-1.5 py-0.5 bg-purple-100 text-purple-900 rounded border border-purple-300 uppercase tracking-tight scale-90" title={`Termasuk Denda Keterlambatan +${diffPct}%`}>
+                                  +{diffPct}% Denda
+                                </span>
                               </div>
                             );
                           }
@@ -3359,79 +3388,148 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                         const originalVal = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
                         const paidVal = parseInt(formJumlahBayar.replace(/[^0-9]/g, ''), 10) || originalVal;
                         if (paidVal < originalVal) {
+                          const potong = originalVal - paidVal;
+                          const potongPct = originalVal > 0 ? ((potong / originalVal) * 100).toFixed(1) : '0';
                           return (
                             <span className="text-amber-600 font-black">
-                              ⚠️ Terpotong: -{formatRupiah(originalVal - paidVal)} ({((paidVal / originalVal) * 100).toFixed(1)}%)
+                              ⚠️ Terpotong: -{formatRupiah(potong)} (-{potongPct}%)
                             </span>
                           );
                         } else if (paidVal > originalVal) {
+                          const denda = paidVal - originalVal;
+                          const dendaPct = originalVal > 0 ? ((denda / originalVal) * 100).toFixed(1) : '0';
                           return (
                             <span className="text-purple-700 font-black">
-                              ⚡ Termasuk Denda: +{formatRupiah(paidVal - originalVal)} ({((paidVal / originalVal) * 100).toFixed(1)}%)
+                              ⚡ Termasuk Denda: +{formatRupiah(denda)} (+{dendaPct}%)
                             </span>
                           );
                         }
                         return (
                           <span className="text-emerald-700 font-bold">
-                            Bayar Penuh (100%)
+                            Bayar Penuh (100% Sesuai Ketetapan)
                           </span>
                         );
                       })()}
                     </div>
 
-                    <div className="pt-2 border-t border-emerald-200/60 mt-2 flex flex-wrap items-center gap-1.5">
-                      <span className="text-[10px] font-extrabold text-slate-700 uppercase">Preset Denda / Diskon:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
-                          if (base > 0) {
-                            setFormJumlahBayar(String(Math.round(base * 1.02)));
-                            setFormKeterangan((prev) => prev || 'Termasuk Denda Keterlambatan PBB 2% (1 Bulan)');
-                          }
-                        }}
-                        className="px-2 py-0.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-900 text-[10px] font-extrabold cursor-pointer border border-purple-300"
-                        title="Denda 2% keterlambatan lewat 30 September"
-                      >
-                        ⚡ Denda 2% (1 bln)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
-                          if (base > 0) {
-                            setFormJumlahBayar(String(Math.round(base * 1.04)));
-                            setFormKeterangan((prev) => prev || 'Termasuk Denda Keterlambatan PBB 4% (2 Bulan)');
-                          }
-                        }}
-                        className="px-2 py-0.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-900 text-[10px] font-extrabold cursor-pointer border border-purple-300"
-                        title="Denda 4% keterlambatan 2 bulan"
-                      >
-                        ⚡ Denda 4% (2 bln)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
-                          if (base > 0) {
-                            setFormJumlahBayar(String(Math.round(base * 0.9)));
-                            setFormKeterangan((prev) => prev || 'Mendapat Diskon Stimulus PBB 10% Bapenda Pemko Medan');
-                          }
-                        }}
-                        className="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-extrabold cursor-pointer border border-emerald-300"
-                      >
-                        🏷️ Diskon 10%
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormJumlahBayar(formPbbTerutang);
-                        }}
-                        className="px-2 py-0.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-bold cursor-pointer border border-slate-300"
-                      >
-                        Reset Penuh (100%)
-                      </button>
-                    </div>
+                    {/* Presets Denda / Diskon */}
+                    {(() => {
+                      const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
+                      const currentPaid = parseInt(formJumlahBayar.replace(/[^0-9]/g, ''), 10) || 0;
+                      const val2Pct = base > 0 ? base + Math.round(base * 0.02) : 0;
+                      const val4Pct = base > 0 ? base + Math.round(base * 0.04) : 0;
+                      const val10Disc = base > 0 ? base - Math.round(base * 0.10) : 0;
+                      const is2Pct = base > 0 && currentPaid === val2Pct;
+                      const is4Pct = base > 0 && currentPaid === val4Pct;
+                      const is10Disc = base > 0 && currentPaid === val10Disc;
+                      const isFull = base > 0 && currentPaid === base;
+
+                      return (
+                        <div className="pt-2 border-t border-emerald-200/60 mt-2 space-y-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-extrabold text-slate-700 uppercase">Preset Denda / Diskon:</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (base > 0) {
+                                  const denda2 = Math.round(base * 0.02);
+                                  setFormJumlahBayar(String(base + denda2));
+                                  setFormKeterangan('Termasuk Denda Keterlambatan PBB 2% (1 Bulan)');
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold cursor-pointer border transition-all ${
+                                is2Pct
+                                  ? 'bg-purple-700 text-white border-purple-800 shadow-xs ring-1 ring-purple-400'
+                                  : 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300'
+                              }`}
+                              title="Denda 2% keterlambatan 1 bulan (lewat 30 September)"
+                            >
+                              ⚡ Denda 2% (1 bln)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (base > 0) {
+                                  const denda4 = Math.round(base * 0.04);
+                                  setFormJumlahBayar(String(base + denda4));
+                                  setFormKeterangan('Termasuk Denda Keterlambatan PBB 4% (2 Bulan)');
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold cursor-pointer border transition-all ${
+                                is4Pct
+                                  ? 'bg-purple-700 text-white border-purple-800 shadow-xs ring-1 ring-purple-400'
+                                  : 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300'
+                              }`}
+                              title="Denda 4% keterlambatan 2 bulan"
+                            >
+                              ⚡ Denda 4% (2 bln)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (base > 0) {
+                                  const diskon10 = Math.round(base * 0.10);
+                                  setFormJumlahBayar(String(base - diskon10));
+                                  setFormKeterangan('Mendapat Diskon Stimulus PBB 10% Bapenda Pemko Medan');
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold cursor-pointer border transition-all ${
+                                is10Disc
+                                  ? 'bg-emerald-700 text-white border-emerald-800 shadow-xs ring-1 ring-emerald-400'
+                                  : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border-emerald-300'
+                              }`}
+                              title="Diskon stimulus 10% Bapenda"
+                            >
+                              🏷️ Diskon 10%
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (base > 0) {
+                                  setFormJumlahBayar(String(base));
+                                  setFormKeterangan('');
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer border transition-all ${
+                                isFull
+                                  ? 'bg-slate-800 text-white border-slate-900 shadow-xs'
+                                  : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300'
+                              }`}
+                              title="Kembalikan ke nominal penuh sesuai ketetapan"
+                            >
+                              Reset Penuh (100%)
+                            </button>
+                          </div>
+
+                          {/* Tanggal Pelunasan / Pembayaran (Opsi A: Realisasi Bulan Ini) */}
+                          <div className="pt-2 border-t border-emerald-200/40 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-700 block mb-1">
+                                Tanggal Pelunasan (Masuk Capaian Bulan):
+                              </label>
+                              <input
+                                type="date"
+                                value={formTglBayar || new Date().toISOString().split('T')[0]}
+                                onChange={(e) => setFormTglBayar(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                                Catatan / Keterangan Pembayaran:
+                              </label>
+                              <input
+                                type="text"
+                                value={formKeterangan}
+                                onChange={(e) => setFormKeterangan(e.target.value)}
+                                placeholder="Keterangan denda/diskon/keringanan..."
+                                className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

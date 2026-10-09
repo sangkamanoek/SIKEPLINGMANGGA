@@ -228,8 +228,8 @@ export async function exportKunjunganWargaToExcel(
     const row = worksheet.addRow([
       i + 1,
       item.tanggal,
-      item.namaWarga,
-      item.alamat,
+      (item.namaWarga || '').toUpperCase(),
+      (item.alamat || '').toUpperCase(),
       item.lingkungan,
       item.namaKepling,
       item.perlinsos || item.keterangan || '-',
@@ -364,8 +364,8 @@ export async function exportKunjunganWargaZipPackage(
     worksheet.addRow([
       i + 1,
       item.tanggal,
-      item.namaWarga,
-      item.alamat,
+      (item.namaWarga || '').toUpperCase(),
+      (item.alamat || '').toUpperCase(),
       item.lingkungan,
       item.namaKepling,
       item.perlinsos || item.keterangan || '-',

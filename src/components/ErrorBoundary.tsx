@@ -49,6 +49,9 @@ class RawErrorBoundary extends (React.Component as any) {
   }
 
   handleReset = () => {
+    try {
+      sessionStorage.removeItem('chunk_load_auto_reload');
+    } catch {}
     this.setState({ hasError: false, errorMessage: '' });
   };
 
@@ -78,7 +81,12 @@ class RawErrorBoundary extends (React.Component as any) {
             </button>
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                try {
+                  sessionStorage.removeItem('chunk_load_auto_reload');
+                } catch {}
+                window.location.reload();
+              }}
               className="inline-flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
             >
               <span>Refresh Halaman</span>

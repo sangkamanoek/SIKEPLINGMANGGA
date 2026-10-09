@@ -442,6 +442,7 @@ export function cleanPbbItemForFirestore(item: SpptPbbItem): Record<string, any>
       : (!isNaN(Number(item.lingkungan)) ? Number(item.lingkungan) : 0),
     jumlahBayar: jBayar, // Guaranteed to be number or null, NEVER undefined!
     keterangan: item.keterangan ? String(item.keterangan).trim() : '',
+    tglBayar: item.tglBayar ? String(item.tglBayar).trim() : (isLunas ? (item.updatedAt ? item.updatedAt.split('T')[0] : new Date().toISOString().split('T')[0]) : null),
     updatedAt: item.updatedAt || new Date().toISOString(),
   };
 

@@ -66,8 +66,8 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
 
   // State Management
   const [tanggal, setTanggal] = useState<string>(initialData?.tanggal || defaultDate);
-  const [namaWarga, setNamaWarga] = useState<string>(initialData?.namaWarga || '');
-  const [alamat, setAlamat] = useState<string>(initialData?.alamat || '');
+  const [namaWarga, setNamaWarga] = useState<string>((initialData?.namaWarga || '').toUpperCase());
+  const [alamat, setAlamat] = useState<string>((initialData?.alamat || '').toUpperCase());
   const [targetKeplingId, setTargetKeplingId] = useState<string>(
     initialData?.keplingId || (isSuperAdmin ? '' : currentUser.id)
   );
@@ -87,8 +87,8 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   useEffect(() => {
     if (initialData) {
       setTanggal(initialData.tanggal || defaultDate);
-      setNamaWarga(initialData.namaWarga || '');
-      setAlamat(initialData.alamat || '');
+      setNamaWarga((initialData.namaWarga || '').toUpperCase());
+      setAlamat((initialData.alamat || '').toUpperCase());
       setTargetKeplingId(initialData.keplingId || (isSuperAdmin ? '' : currentUser.id));
       setPerlinsos(initialData.perlinsos || 'Belum');
       setIkd(initialData.ikd || 'Belum');
@@ -230,8 +230,8 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
     setErrorMessage('');
     setSuccessMessage('');
 
-    const cleanNama = sanitizeText(namaWarga);
-    const cleanAlamat = sanitizeText(alamat);
+    const cleanNama = sanitizeText(namaWarga).trim().toUpperCase();
+    const cleanAlamat = sanitizeText(alamat).trim().toUpperCase();
     const cleanTanggal = sanitizeText(tanggal);
 
     if (isSuperAdmin && (!targetKeplingId || !selectedKepling)) {
@@ -428,11 +428,14 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
             type="text"
             required
             maxLength={120}
-            placeholder="Contoh: Bpk. Gunawan Tarigan"
+            placeholder="CONTOH: BPK. GUNAWAN TARIGAN"
             value={namaWarga}
-            onChange={(e) => setNamaWarga(e.target.value)}
-            className="w-full p-2.5 rounded-xl border border-slate-300 font-semibold text-slate-800 focus:outline-emerald-500"
+            onChange={(e) => setNamaWarga(e.target.value.toUpperCase())}
+            className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 uppercase focus:outline-emerald-500"
           />
+          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+            * Otomatis diubah menjadi HURUF KAPITAL
+          </p>
         </div>
 
         {/* Alamat */}
@@ -444,11 +447,14 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
             type="text"
             required
             maxLength={250}
-            placeholder="Contoh: Jl. Bunga Rinte No. 12 Gang Bersama"
+            placeholder="CONTOH: JL. BUNGA RINTE NO. 12 GANG BERSAMA"
             value={alamat}
-            onChange={(e) => setAlamat(e.target.value)}
-            className="w-full p-2.5 rounded-xl border border-slate-300 font-semibold text-slate-800 focus:outline-emerald-500"
+            onChange={(e) => setAlamat(e.target.value.toUpperCase())}
+            className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 uppercase focus:outline-emerald-500"
           />
+          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+            * Otomatis diubah menjadi HURUF KAPITAL
+          </p>
         </div>
 
         {/* Dropdown Keterangan Baru */}

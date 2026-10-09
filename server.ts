@@ -662,6 +662,8 @@ app.post('/api/kunjungan', (req, res) => {
     if (Array.isArray(items)) {
       for (const it of items) {
         if (!it || !it.id) continue;
+        if (it.namaWarga) it.namaWarga = String(it.namaWarga).trim().toUpperCase();
+        if (it.alamat) it.alamat = String(it.alamat).trim().toUpperCase();
         const idx = kunjunganCache.findIndex((k) => k.id === it.id);
         if (idx >= 0) {
           kunjunganCache[idx] = { ...kunjunganCache[idx], ...it, updatedAt: new Date().toISOString() };
@@ -675,6 +677,13 @@ app.post('/api/kunjungan', (req, res) => {
 
     if (!item) {
       return res.status(400).json({ success: false, message: 'Data kunjungan tidak lengkap' });
+    }
+
+    if (item.namaWarga) {
+      item.namaWarga = String(item.namaWarga).trim().toUpperCase();
+    }
+    if (item.alamat) {
+      item.alamat = String(item.alamat).trim().toUpperCase();
     }
 
     if (!item.id) {

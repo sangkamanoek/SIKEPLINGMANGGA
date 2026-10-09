@@ -320,7 +320,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         text += `Total Kunjungan : ${items.length} Warga\n`;
         text += `Rincian :\n`;
         items.forEach((item) => {
-          text += `- ${item.namaWarga} (${item.alamat || '-'})\n`;
+          text += `- ${(item.namaWarga || '').toUpperCase()} (${(item.alamat || '-').toUpperCase()})\n`;
         });
         text += `\n`;
       });
@@ -791,7 +791,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                         {index + 1}
                       </span>
                       <div>
-                        <h4 className="font-extrabold text-slate-900 text-sm leading-tight">
+                        <h4 className="font-extrabold text-slate-900 text-sm leading-tight uppercase">
                           {item.namaWarga}
                         </h4>
                         <span className="text-[11px] text-slate-500 font-semibold block">
@@ -820,7 +820,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
 
                   <div className="bg-slate-50 rounded-xl p-2.5 text-xs text-slate-700 flex items-start gap-2 border border-slate-100">
                     <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                    <span className="leading-relaxed font-medium">{item.alamat}</span>
+                    <span className="leading-relaxed font-medium uppercase">{item.alamat}</span>
                   </div>
 
                   {/* Badges: Perlinsos, IKD, PBB */}
@@ -953,10 +953,10 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                       <td className="py-3 px-3 font-bold text-slate-700 whitespace-nowrap">
                         {item.tanggal || '-'}
                       </td>
-                      <td className="py-3 px-3 font-extrabold text-slate-900 whitespace-nowrap">
+                      <td className="py-3 px-3 font-extrabold text-slate-900 whitespace-nowrap uppercase">
                         {item.namaWarga}
                       </td>
-                      <td className="py-3 px-3 text-slate-700 font-medium max-w-xs">
+                      <td className="py-3 px-3 text-slate-700 font-medium max-w-xs uppercase">
                         {item.alamat}
                       </td>
                       <td className="py-3 px-3 text-center font-bold text-slate-800 whitespace-nowrap">
@@ -1179,11 +1179,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Nama Warga:</span>
-                  <span className="font-bold text-slate-900">{previewPhotoItem.namaWarga}</span>
+                  <span className="font-bold text-slate-900 uppercase">{previewPhotoItem.namaWarga}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Alamat:</span>
-                  <span className="font-bold text-slate-900 text-right">{previewPhotoItem.alamat}</span>
+                  <span className="font-bold text-slate-900 text-right uppercase">{previewPhotoItem.alamat}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Kepala Lingkungan:</span>

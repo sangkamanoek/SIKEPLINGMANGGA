@@ -13,6 +13,7 @@ export interface SpptPbbItem {
   status: 'Sudah Bayar' | 'Belum Bayar';
   lingkungan: number;
   keterangan?: string | null;
+  tglBayar?: string | null; // ISO YYYY-MM-DD tanggal riil pembayaran / pelunasan
   updatedAt?: string;
 }
 
