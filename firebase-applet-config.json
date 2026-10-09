@@ -6,5 +6,6 @@
   "storageBucket": "gen-lang-client-0584022510.firebasestorage.app",
   "messagingSenderId": "552310552560",
   "measurementId": "G-M6FW0TQ9RP",
-  "databaseURL": "https://gen-lang-client-0584022510-default-rtdb.asia-southeast1.firebasedatabase.app"
+  "databaseURL": "https://gen-lang-client-0584022510-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "firestoreDatabaseId": "ai-studio-remixlaporankegi-ffd5ab59-6cbc-4b0f-aaed-d527ab34bb85"
 }
