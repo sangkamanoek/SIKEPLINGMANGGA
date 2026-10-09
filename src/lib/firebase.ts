@@ -58,18 +58,33 @@ let firestoreInstance: Firestore;
 
 try {
   // Initialize Firestore with persistent cache for better offline support and speed.
-  firestoreInstance = initializeFirestore(
-    app,
-    {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
-    },
-    activeConfig.firestoreDatabaseId || undefined
-  );
+  firestoreInstance = activeConfig.firestoreDatabaseId
+    ? initializeFirestore(
+        app,
+        {
+          localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager(),
+          }),
+        },
+        activeConfig.firestoreDatabaseId
+      )
+    : initializeFirestore(
+        app,
+        {
+          localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager(),
+          }),
+        }
+      );
 } catch (e) {
   console.warn('initializeFirestore failed, falling back to standard getFirestore:', e);
-  firestoreInstance = getFirestore(app);
+  try {
+    firestoreInstance = activeConfig.firestoreDatabaseId
+      ? getFirestore(app, activeConfig.firestoreDatabaseId)
+      : getFirestore(app);
+  } catch {
+    firestoreInstance = getFirestore(app);
+  }
 }
 
 export const db: Firestore = firestoreInstance;

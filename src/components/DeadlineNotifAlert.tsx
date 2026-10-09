@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { UserAccount, LaporanHarianItem } from '../types';
 import { getTodayLocalIso } from '../lib/formatter';
+import { showSafeNotification } from '../lib/safeNotification';
 
 interface DeadlineNotifAlertProps {
   activeAccount: UserAccount;
@@ -92,7 +93,7 @@ export const DeadlineNotifAlert: React.FC<DeadlineNotifAlertProps> = ({
       setNotifPermission(perm);
 
       if (perm === 'granted') {
-        new Notification('🔔 SI-KEPLING Kelurahan Mangga', {
+        showSafeNotification('🔔 SI-KEPLING Kelurahan Mangga', {
           body: `Notifikasi Pengingat Laporan Harian (Batas 23:30 WIB) berhasil diaktifkan untuk Lingkungan ${activeAccount.lingkungan || ''}!`,
           icon: '/favicon.ico',
           badge: '/favicon.ico',
@@ -132,18 +133,15 @@ export const DeadlineNotifAlert: React.FC<DeadlineNotifAlertProps> = ({
         const body = `Batas waktu pengiriman laporan harian adalah pukul 23:30 WIB. Anda BELUM melapor hari ini (${hours}j ${minutes}m lagi). Klik untuk buka form!`;
 
         try {
-          const notif = new Notification(title, {
+          showSafeNotification(title, {
             body,
             icon: '/favicon.ico',
             tag: 'sikepling-deadline-alert',
             requireInteraction: true,
-          });
-
-          notif.onclick = () => {
+          }, () => {
             window.focus();
             onNavigate('form');
-            notif.close();
-          };
+          });
         } catch (e) {
           console.warn('Notification execution error:', e);
         }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, CheckCircle2, Calendar, UserCheck, AlertTriangle, X, ChevronRight, FileText } from 'lucide-react';
 import { UserAccount } from '../types';
 import { getTugasKhususList, TugasKhusus, markTugasKhususCompletedByAccount } from '../lib/tugasKhususService';
+import { showSafeNotification } from '../lib/safeNotification';
 
 interface TugasKhususBannerProps {
   activeAccount: UserAccount;
@@ -48,17 +49,17 @@ export const TugasKhususBanner: React.FC<TugasKhususBannerProps> = ({ activeAcco
 
         if ('Notification' in window) {
           if (Notification.permission === 'granted') {
-            new Notification('📢 Tugas Khusus Baru dari Lurah', {
+            showSafeNotification('📢 Tugas Khusus Baru dari Lurah', {
               body: tasks[0].judul + '\n' + tasks[0].deskripsi,
             });
           } else if (Notification.permission !== 'denied') {
             Notification.requestPermission().then(permission => {
               if (permission === 'granted') {
-                new Notification('📢 Tugas Khusus Baru dari Lurah', {
+                showSafeNotification('📢 Tugas Khusus Baru dari Lurah', {
                   body: tasks[0].judul + '\n' + tasks[0].deskripsi,
                 });
               }
-            });
+            }).catch(() => {});
           }
         }
       }

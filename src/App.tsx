@@ -65,6 +65,7 @@ import { getDefaultTargetsCapaianMap } from './data/targetsData';
 import { fetchTargetsCapaian, subscribeTargetsFromFirestore } from './lib/targetsApi';
 import { fetchAllDataKeluarga } from './lib/dataKeluargaService';
 import { useFeatureNotifications } from './hooks/useFeatureNotifications';
+import { showSafeNotification } from './lib/safeNotification';
 
 // Code-Splitting: Lazy load heavy modules to guarantee fast initial startup
 const ViewImagesPage = React.lazy(() => import('./components/ViewImagesPage'));
@@ -725,7 +726,7 @@ export default function App() {
           // Check if targeted
           const isTargeted = event.required || event.targetKeplingIds?.includes(activeAccount?.id);
           if (isTargeted) {
-             new window.Notification("BELUM ABSEN KEGIATAN KHUSUS", { body: `Agenda: ${event.title} dimulai dalam 5 menit!` });
+             showSafeNotification("BELUM ABSEN KEGIATAN KHUSUS", { body: `Agenda: ${event.title} dimulai dalam 5 menit!` });
              if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
           }
         }
