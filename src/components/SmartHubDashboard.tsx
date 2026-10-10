@@ -42,7 +42,7 @@ interface SmartHubDashboardProps {
   reports: LaporanHarianItem[];
   attendanceList: AbsenApelItem[];
   unreadCounts?: Record<string, number>;
-  onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan') => void;
+  onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan' | 'daftar_tugas_khusus') => void;
   onOpenAbsenApel: () => void;
   onOpenPPTModal: () => void;
   onOpenUpdateModal?: () => void;
@@ -496,6 +496,17 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         badge: 'GPS ABSEN',
         badgeColor: 'bg-teal-100 text-teal-800',
         action: () => onNavigate('kegiatan_khusus'),
+      },
+      {
+        id: 'daftar_tugas_khusus',
+        title: 'Daftar Tugas Khusus & Dokumentasi',
+        desc: 'Lihat seluruh perintah & instruksi dari Lurah serta unggah foto bukti dokumentasi pelaksanaannya di lapangan.',
+        category: 'laporan',
+        icon: ClipboardList,
+        iconBg: 'bg-amber-50 text-amber-700',
+        badge: 'TUGAS LURAH',
+        badgeColor: 'bg-amber-100 text-amber-900',
+        action: () => onNavigate('daftar_tugas_khusus'),
       },
 
       // 2. DATA & LAYANAN (DATA & SERVICES)

@@ -37,7 +37,8 @@ export type AppTabType =
   | 'dasa_wisma'
   | 'posyandu_pkk'
   | 'surat_kedinasan'
-  | 'buku_pkk';
+  | 'buku_pkk'
+  | 'daftar_tugas_khusus';
 
 interface MobileBottomNavProps {
   activeTab: AppTabType;

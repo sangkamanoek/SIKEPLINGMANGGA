@@ -98,6 +98,7 @@ const DatabaseKeluargaView = lazyWithRetry(() => import('./components/DatabaseKe
 const UbahPasswordModal = lazyWithRetry(() => import('./components/UbahPasswordModal'), 'UbahPasswordModal');
 const EditProfileModal = lazyWithRetry(() => import('./components/EditProfileModal'), 'EditProfileModal');
 const AbsenApelModal = lazyWithRetry(() => import('./components/AbsenApelModal'), 'AbsenApelModal');
+const DaftarTugasKhususView = lazyWithRetry(() => import('./components/DaftarTugasKhususView'), 'DaftarTugasKhususView');
 
 const ViewLoadingFallback = () => (
   <div className="flex flex-col items-center justify-center min-h-[300px] p-8 text-center animate-fade-in">
@@ -239,6 +240,7 @@ export default function App() {
     | 'posyandu_pkk'
     | 'surat_kedinasan'
     | 'buku_pkk'
+    | 'daftar_tugas_khusus'
   >('hub');
 
   // Initialize Background Auto Sync to Cloud / Firestore
@@ -1909,6 +1911,13 @@ export default function App() {
                 }
               />
             )}
+          </ErrorBoundary>
+        )}
+
+        {/* Daftar Tugas Khusus dari Lurah */}
+        {activeTab === 'daftar_tugas_khusus' && (
+          <ErrorBoundary fallbackTitle="Gagal Memuat Daftar Tugas Khusus">
+            <DaftarTugasKhususView currentUser={activeAccount} />
           </ErrorBoundary>
         )}
 

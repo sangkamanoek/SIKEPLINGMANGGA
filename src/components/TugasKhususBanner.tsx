@@ -12,6 +12,7 @@ export const TugasKhususBanner: React.FC<TugasKhususBannerProps> = ({ activeAcco
   const [tasks, setTasks] = useState<TugasKhusus[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [dismissedTaskIds, setDismissedTaskIds] = useState<string[]>([]);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
   useEffect(() => {
     const loadTasks = () => {
@@ -76,8 +77,34 @@ export const TugasKhususBanner: React.FC<TugasKhususBannerProps> = ({ activeAcco
     setDismissedTaskIds(prev => [...prev, taskId]);
   };
 
+  // Touch swipe handling for mobile
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX - touchEndX;
+    if (Math.abs(diff) > 40) {
+      if (diff > 0) {
+        // Swipe left -> next task
+        setCurrentIndex((prev) => (prev + 1) % tasks.length);
+      } else {
+        // Swipe right -> prev task
+        setCurrentIndex((prev) => (prev - 1 + tasks.length) % tasks.length);
+      }
+    }
+    setTouchStartX(null);
+  };
+
   return (
-    <div className="bg-amber-400 text-slate-950 px-4 py-3 shadow-md border-b-2 border-amber-500 relative z-50 animate-fade-in">
+    <div 
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      className="bg-amber-400 text-slate-950 px-4 py-3 shadow-md border-b-2 border-amber-500 relative z-50 animate-fade-in select-none"
+    >
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="p-2 bg-slate-950 text-amber-400 rounded-lg shadow-sm shrink-0 animate-bounce">
@@ -106,11 +133,29 @@ export const TugasKhususBanner: React.FC<TugasKhususBannerProps> = ({ activeAcco
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+        <div className="flex items-center gap-2 self-end md:self-center shrink-0 flex-wrap">
           {tasks.length > 1 && (
-            <span className="text-[11px] font-bold bg-amber-500/80 px-2 py-1 rounded text-slate-950">
-              {currentIndex + 1} dari {tasks.length} Tugas
-            </span>
+            <div className="flex items-center gap-1 bg-amber-500/80 px-2 py-1 rounded text-slate-950">
+              <button
+                type="button"
+                onClick={() => setCurrentIndex((prev) => (prev - 1 + tasks.length) % tasks.length)}
+                className="w-5 h-5 bg-slate-950 text-amber-300 rounded font-bold flex items-center justify-center text-xs hover:bg-slate-900 cursor-pointer"
+                title="Tugas Sebelumnya"
+              >
+                ‹
+              </button>
+              <span className="text-[11px] font-bold px-1">
+                {currentIndex + 1} / {tasks.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentIndex((prev) => (prev + 1) % tasks.length)}
+                className="w-5 h-5 bg-slate-950 text-amber-300 rounded font-bold flex items-center justify-center text-xs hover:bg-slate-900 cursor-pointer"
+                title="Tugas Selanjutnya"
+              >
+                ›
+              </button>
+            </div>
           )}
           <button
             onClick={() => handleMarkDone(currentTask.id)}
@@ -121,7 +166,7 @@ export const TugasKhususBanner: React.FC<TugasKhususBannerProps> = ({ activeAcco
           </button>
           <button
             onClick={() => setDismissedTaskIds(prev => [...prev, currentTask.id])}
-            className="p-1.5 hover:bg-amber-500 rounded-lg text-slate-900 transition-colors"
+            className="p-1.5 hover:bg-amber-500 rounded-lg text-slate-900 transition-colors cursor-pointer"
             title="Tutup Sementara"
           >
             <X className="w-4 h-4" />
