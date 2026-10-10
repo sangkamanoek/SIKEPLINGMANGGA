@@ -578,7 +578,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   Format Username Resmi:
                 </p>
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 font-mono text-[11px] text-slate-700 space-y-1">
-                  <p>• Super Admin : <span className="font-bold text-amber-800">super_admin</span></p>
+                  <p>• Super Admin (Lurah) : <span className="font-bold text-amber-800">super_admin</span></p>
+                  <p>• Sekretaris Kelurahan (Seklur) : <span className="font-bold text-indigo-800">sekretaris</span> (atau <span className="font-bold text-indigo-800">seklur</span> / <span className="font-bold text-indigo-800">sekretaris_lurah</span>)</p>
+                  <p>• Kepala Seksi (Kasi) : <span className="font-bold text-blue-800">kasi_pemerintahan</span>, <span className="font-bold text-blue-800">kasi_pembangunan</span>, <span className="font-bold text-blue-800">kasi_trantibum</span></p>
                   <p>• Kepala Lingkungan : <span className="font-bold text-emerald-800">kepling_1</span> s/d <span className="font-bold text-emerald-800">kepling_24</span></p>
                   <p>• Ketua TP-PKK Kelurahan : <span className="font-bold text-teal-800">ketua_pkk</span></p>
                   <p>• Sekretaris PKK Kelurahan : <span className="font-bold text-teal-800">sekretaris_pkk</span></p>

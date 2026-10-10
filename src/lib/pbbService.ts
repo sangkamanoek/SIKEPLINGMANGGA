@@ -12,6 +12,7 @@ import { db, handleFirestoreError, OperationType } from './firebase';
 import { SpptPbbItem, INITIAL_PBB_SUMMARY, SAMPLE_SPPT_ITEMS } from '../data/pbbSampleData';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import { cleanFirestoreData } from './firestoreService';
+import { KEPLING_ACCOUNTS } from '../data/keplingList';
 
 export interface LingkunganPbbSummary {
   lingkungan: number;
@@ -153,6 +154,68 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
     persentaseWpLunas,
     lingkunganSummaries,
   };
+}
+
+/**
+ * Format teks resmi WhatsApp untuk Rekapitulasi Capaian PBB 24 Lingkungan (Persentase Kepatuhan WP).
+ * Diurutkan dari Lingkungan 1 sampai dengan 24.
+ */
+export function formatRekapPbbWaText(overview: KelurahanPbbOverview, year: number = DEFAULT_PBB_YEAR): string {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const timeStr = now.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const formatRp = (val: number) => 'Rp ' + Math.round(val || 0).toLocaleString('id-ID');
+
+  let text = `*REKAPITULASI CAPAIAN REALISASI PBB-P2 KELURAHAN MANGGA*\n`;
+  text += `*TAHUN PAJAK ${year}*\n`;
+  text += `*KECAMATAN MEDAN TUNTUNGAN*\n\n`;
+  text += `📅 Hari/Tanggal : ${dateStr}\n`;
+  text += `⏰ Waktu Tarik   : Pukul ${timeStr} WIB\n`;
+  text += `👥 Kepatuhan WP  : ${overview.totalWpLunas.toLocaleString('id-ID')} / ${overview.totalWp.toLocaleString('id-ID')} WP (${overview.persentaseWpLunas.toFixed(1)}% Lunas)\n`;
+  text += `💰 Nominal Uang  : ${formatRp(overview.totalRealisasiNominal)} / ${formatRp(overview.totalTargetNominal)} (${overview.persentaseRealisasiNominal.toFixed(1)}%)\n\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `*DAFTAR CAPAIAN 24 LINGKUNGAN (URUT 1 - 24):*\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+  // Urut Lingkungan 1 sampai 24
+  const sorted = [...overview.lingkunganSummaries].sort((a, b) => a.lingkungan - b.lingkungan);
+
+  sorted.forEach((item) => {
+    const lkAccount = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === item.lingkungan);
+    const namaLingkungan = lkAccount?.lingkungan || `Lingkungan ${item.lingkungan}`;
+    const namaKepling = lkAccount?.nama || 'Kepala Lingkungan';
+    const pctWp = item.persentaseWpLunas.toFixed(1);
+    const pctNominal = item.persentaseRealisasi.toFixed(1);
+
+    // Indikator status kepatuhan
+    let badge = '⚪';
+    if (item.persentaseWpLunas >= 80) badge = '🟢';
+    else if (item.persentaseWpLunas >= 50) badge = '🟡';
+    else if (item.wpLunas > 0) badge = '🟠';
+    else badge = '🔴';
+
+    text += `${badge} *${namaLingkungan}* (${namaKepling})\n`;
+    text += `   • Rasio WP Lunas : *${pctWp}%* (${item.wpLunas}/${item.totalWp} WP)\n`;
+    text += `   • Realisasi Uang : ${pctNominal}% (${formatRp(item.realisasiNominal)})\n`;
+  });
+
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `*TOTAL KELURAHAN MANGGA:*\n`;
+  text += `• Total WP Lunas : *${overview.totalWpLunas.toLocaleString('id-ID')} / ${overview.totalWp.toLocaleString('id-ID')} WP (${overview.persentaseWpLunas.toFixed(1)}%)*\n`;
+  text += `• Total Terbayar : *${formatRp(overview.totalRealisasiNominal)} / ${formatRp(overview.totalTargetNominal)} (${overview.persentaseRealisasiNominal.toFixed(1)}%)*\n`;
+  text += `• Sisa Tunggakan : ${formatRp(overview.totalSisaNominal)} (${overview.totalWpBelumLunas.toLocaleString('id-ID')} WP Belum Bayar)\n\n`;
+  text += `_Data tersinkronisasi langsung dengan Database SPPT PBB-P2 Kelurahan Mangga._`;
+
+  return text;
 }
 
 // ====================================================

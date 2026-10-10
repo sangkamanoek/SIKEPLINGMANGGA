@@ -345,10 +345,38 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const handleDownloadPhoto = async (item: KunjunganWargaData) => {
     if (!item.fotoDokumentasi) return;
     const safeName = item.namaWarga.replace(/[^a-zA-Z0-9]/g, '_');
-    const safeLingk = item.lingkungan.replace(/[^a-zA-Z0-9]/g, '_');
-    const fileName = `Kunjungan_${safeName}_${safeLingk}_${item.tanggal}.jpg`;
+    const safeLingk = `Lingkungan_${item.lingkunganNomor}`;
+    const fileName = `${safeLingk}_${safeName}_${item.tanggal}.jpg`;
 
-    const ok = await downloadImage(item.fotoDokumentasi, fileName);
+    // Create annotated image with overlay info
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = item.fotoDokumentasi;
+    
+    await new Promise((resolve) => { img.onload = resolve; });
+
+    const headerHeight = 120;
+    canvas.width = img.width;
+    canvas.height = img.height + headerHeight;
+
+    if (ctx) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, headerHeight);
+
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 36px sans-serif';
+      ctx.fillText(`Foto Kunjungan: ${item.namaWarga.toUpperCase()}`, 20, 50);
+      
+      ctx.font = '24px sans-serif';
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(`${item.lingkungan} • ${item.tanggal}`, 20, 90);
+    }
+
+    const annotatedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const ok = await downloadImage(annotatedDataUrl, fileName);
     if (ok) {
       showToast(`Foto kunjungan ${item.namaWarga} berhasil diunduh.`);
     } else {
@@ -380,7 +408,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       const safeLingk = item.lingkungan.replace(/[^a-zA-Z0-9]/g, '_');
       return {
         url: item.fotoDokumentasi!,
-        fileName: `${idx + 1}_Kunjungan_${safeLingk}_${safeName}_${item.tanggal}.jpg`,
+        fileName: `${idx + 1}_Lingkungan_${item.lingkunganNomor}_${safeName}_${item.tanggal}.jpg`,
       };
     });
 

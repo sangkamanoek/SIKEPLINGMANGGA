@@ -22,6 +22,7 @@ import {
 import { SheetMetadata, UserAccount, isPkkRole } from '../types';
 import {
   SUPER_ADMIN_ACCOUNT,
+  SEKRETARIS_ACCOUNT,
   KASI_ACCOUNTS,
   KASI_PEMERINTAHAN_ACCOUNT,
   KASI_PEMBANGUNAN_ACCOUNT,
@@ -455,6 +456,57 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
                     </button>
                   </div>
 
+                  {/* Sekretaris Kelurahan / Lurah Option */}
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2 flex items-center justify-between">
+                      <span>Akun Pimpinan & Sekretariat Kelurahan</span>
+                      <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                        Password: sekretaris2026
+                      </span>
+                    </div>
+                    <button
+                      id="btn-select-sekretaris"
+                      type="button"
+                      onClick={() => handleStartLogin(SEKRETARIS_ACCOUNT)}
+                      className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                        activeAccount.id === SEKRETARIS_ACCOUNT.id
+                          ? 'bg-indigo-50 border-indigo-400 ring-2 ring-indigo-300'
+                          : 'bg-white border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-xs">
+                          <Building2 className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-black text-slate-900">
+                              {SEKRETARIS_ACCOUNT.nama}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-100 text-indigo-800 border border-indigo-200">
+                              Sekretaris Lurah (Seklur)
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-600 font-medium mt-0.5">
+                            {SEKRETARIS_ACCOUNT.jabatan} • Monitoring, PBB, Pembangunan, Surat & Tugas Khusus
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {activeAccount.id === SEKRETARIS_ACCOUNT.id ? (
+                          <div className="flex items-center gap-1 text-xs font-bold text-indigo-800 bg-indigo-100 px-2 py-1 rounded-lg">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Sedang Aktif</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-bold text-indigo-700 bg-white border border-indigo-200 px-2.5 py-1 rounded-lg shadow-2xs group-hover:bg-indigo-600 group-hover:text-white">
+                            Masuk
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+
                   {/* Kepala Seksi (Kasi) Options */}
                   <div>
                     <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2 flex items-center justify-between">
@@ -811,6 +863,55 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
                         className="px-2 py-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
                       >
                         {copiedId === SUPER_ADMIN_ACCOUNT.id ? (
+                          <>
+                            <Check className="w-3 h-3 text-tosca-600" />
+                            <span className="text-tosca-700">Tersalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Salin</span>
+                          </>
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+
+                  {/* Sekretaris Kelurahan row */}
+                  <tr className="bg-indigo-50/50 font-medium">
+                    <td className="p-2.5 flex items-center gap-1.5">
+                      <Building2 className="w-4 h-4 text-indigo-600" />
+                      <span className="font-bold text-slate-900">Sekretaris Kelurahan (Seklur)</span>
+                    </td>
+                    <td className="p-2.5">
+                      <code className="text-[11px] font-mono font-bold text-indigo-900 bg-indigo-100 border border-indigo-300 px-2 py-0.5 rounded">
+                        sekretaris
+                      </code>
+                    </td>
+                    <td className="p-2.5 text-slate-800 font-bold">
+                      {SEKRETARIS_ACCOUNT.nama}
+                    </td>
+                    <td className="p-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <code className="bg-white border border-indigo-300 text-indigo-900 px-2 py-0.5 rounded font-mono font-bold">
+                          {getEffectivePassword(SEKRETARIS_ACCOUNT)}
+                        </code>
+                        {hasCustomPassword(SEKRETARIS_ACCOUNT.id) && (
+                          <span className="text-[9px] bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded font-bold">
+                            Kustom
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleCopyPassword(getEffectivePassword(SEKRETARIS_ACCOUNT), SEKRETARIS_ACCOUNT.id)
+                        }
+                        className="px-2 py-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        {copiedId === SEKRETARIS_ACCOUNT.id ? (
                           <>
                             <Check className="w-3 h-3 text-tosca-600" />
                             <span className="text-tosca-700">Tersalin</span>

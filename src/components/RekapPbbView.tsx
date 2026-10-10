@@ -37,7 +37,9 @@ import {
   MapPin,
   Calendar,
   Eye,
-  Lock
+  Lock,
+  Copy,
+  Share2,
 } from 'lucide-react';
 import { INITIAL_PBB_SUMMARY, SAMPLE_SPPT_ITEMS, SpptPbbItem } from '../data/pbbSampleData';
 import { parsePbbCsv } from '../utils/pbbParser';
@@ -69,7 +71,10 @@ import {
   wipeAllPbbSpptEverywhere,
   formatNop,
   stripNonDigits,
+  computePbbOverview,
+  formatRekapPbbWaText,
 } from '../lib/pbbService';
+import { RekapCapaianPbb24Lingkungan } from './RekapCapaianPbb24Lingkungan';
 
 interface RekapPbbViewProps {
   activeAccount?: UserAccount | null;
@@ -134,6 +139,26 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     return getLocalSpptForYear(selectedYear);
   });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [copiedPbbWa, setCopiedPbbWa] = useState<boolean>(false);
+
+  // Compute live 24-Lingkungan PBB overview for official WA reporting
+  const livePbbOverview = useMemo(() => {
+    return computePbbOverview(spptList, selectedYear);
+  }, [spptList, selectedYear]);
+
+  // Handler Salin Rekap PBB WA
+  const handleCopyPbbWa = () => {
+    try {
+      const text = formatRekapPbbWaText(livePbbOverview, selectedYear);
+      navigator.clipboard.writeText(text);
+      setCopiedPbbWa(true);
+      notify('Teks Rekap Capaian PBB 24 Lingkungan berhasil disalin ke clipboard! Siap kirim ke WhatsApp.', 'success');
+      setTimeout(() => setCopiedPbbWa(false), 3000);
+    } catch (err) {
+      console.error(err);
+      notify('Gagal menyalin rekap PBB ke clipboard.', 'error');
+    }
+  };
 
   // Tracks the last downloaded/synced state from Firestore
   const lastFirestoreItemsRef = React.useRef<SpptPbbItem[]>([]);
@@ -1579,6 +1604,21 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 </select>
               </div>
 
+              {/* Tombol Salin Rekap PBB WA (24 Lingkungan) */}
+              <button
+                type="button"
+                onClick={handleCopyPbbWa}
+                title="Salin rekapitulasi capaian persentase PBB 24 Lingkungan ke format WhatsApp"
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all shadow-md cursor-pointer ${
+                  copiedPbbWa
+                    ? 'bg-emerald-400 text-slate-950 scale-102 ring-2 ring-emerald-300'
+                    : 'bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white border border-emerald-400/60'
+                }`}
+              >
+                {copiedPbbWa ? <Check className="w-4 h-4 text-slate-950" /> : <Copy className="w-4 h-4 text-emerald-200" />}
+                <span>{copiedPbbWa ? 'Tersalin!' : 'Salin Rekap PBB WA'}</span>
+              </button>
+
               {/* Tombol Sinkronkan Data Realtime */}
               <button
                 type="button"
@@ -2354,6 +2394,20 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 </tr>
               </tfoot>
             </table>
+          </div>
+
+          {/* Rekap Total Capaian Kepatuhan PBB 24 Lingkungan (Grid & Tabel + Salin WA) */}
+          <div className="pt-4 border-t border-slate-200">
+            <RekapCapaianPbb24Lingkungan
+              overview={livePbbOverview}
+              selectedYear={selectedYear}
+              onSelectLingkungan={(lingkunganNum) => {
+                setSelectedLingkungan(String(lingkunganNum));
+                setActiveTab('detail_sppt');
+              }}
+              onShowToast={notify}
+              defaultViewMode="grid"
+            />
           </div>
         </div>
       )}

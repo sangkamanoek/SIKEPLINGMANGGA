@@ -21,6 +21,8 @@ import {
   Smartphone,
   Coins,
   X,
+  Copy,
+  Check,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { LaporanHarianItem, TargetsCapaianMap, UserAccount, AbsenApelItem } from '../types';
@@ -33,10 +35,12 @@ import {
   DEFAULT_PBB_YEAR,
   getLocalSpptForYear,
   computePbbOverview,
+  formatRekapPbbWaText,
   subscribePbbSpptFromFirestore,
   fetchPbbSpptFromFirestore,
 } from '../lib/pbbService';
 import { SpptPbbItem } from '../data/pbbSampleData';
+import { RekapCapaianPbb24Lingkungan } from './RekapCapaianPbb24Lingkungan';
 
 interface DashboardPbbKasiProps {
   reports: LaporanHarianItem[];
@@ -108,6 +112,18 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   const pbbOverview = useMemo(() => {
     return computePbbOverview(spptList, pbbYear);
   }, [spptList, pbbYear]);
+
+  const [copiedWaHeader, setCopiedWaHeader] = useState(false);
+  const handleCopyPbbWa = () => {
+    try {
+      const text = formatRekapPbbWaText(pbbOverview, pbbYear);
+      navigator.clipboard.writeText(text);
+      setCopiedWaHeader(true);
+      setTimeout(() => setCopiedWaHeader(false), 3000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const formatRupiah = (val: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
@@ -566,6 +582,21 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
                   <span className="hidden sm:inline">{isSyncingPbb ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
                 </button>
 
+                {/* Tombol Salin Rekap PBB WA (24 Lingkungan) */}
+                <button
+                  type="button"
+                  onClick={handleCopyPbbWa}
+                  title="Salin rekapitulasi capaian persentase PBB 24 Lingkungan ke format WhatsApp"
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer ${
+                    copiedWaHeader
+                      ? 'bg-emerald-400 text-slate-950 scale-102 ring-2 ring-emerald-300'
+                      : 'bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white border border-emerald-400/60'
+                  }`}
+                >
+                  {copiedWaHeader ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5 text-emerald-200" />}
+                  <span>{copiedWaHeader ? 'Tersalin!' : 'Salin Rekap WA'}</span>
+                </button>
+
                 {onOpenRekapPbb && (
                   <button
                     type="button"
@@ -637,6 +668,16 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Rekap Total Capaian PBB 24 Lingkungan (Grid & Tabel Persentase) */}
+          <RekapCapaianPbb24Lingkungan
+            overview={pbbOverview}
+            selectedYear={pbbYear}
+            onSelectLingkungan={() => {
+              if (onOpenRekapPbb) onOpenRekapPbb();
+            }}
+            defaultViewMode="grid"
+          />
 
           {/* KPI Cards Ringkasan Opsir Harian PBB */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

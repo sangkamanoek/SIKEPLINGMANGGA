@@ -96,10 +96,12 @@ import {
   DEFAULT_PBB_YEAR,
   getLocalSpptForYear,
   computePbbOverview,
+  formatRekapPbbWaText,
   subscribePbbSpptFromFirestore,
   fetchPbbSpptFromFirestore,
 } from '../lib/pbbService';
 import { SpptPbbItem } from '../data/pbbSampleData';
+import { RekapCapaianPbb24Lingkungan } from './RekapCapaianPbb24Lingkungan';
 
 interface MonitoringSuperAdminProps {
   reports: LaporanHarianItem[];
@@ -235,6 +237,18 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
   const pbbOverview = useMemo(() => {
     return computePbbOverview(spptList, pbbYear);
   }, [spptList, pbbYear]);
+
+  const [copiedPbbWaSuperAdmin, setCopiedPbbWaSuperAdmin] = useState(false);
+  const handleCopyPbbWaSuperAdmin = () => {
+    try {
+      const text = formatRekapPbbWaText(pbbOverview, pbbYear);
+      navigator.clipboard.writeText(text);
+      setCopiedPbbWaSuperAdmin(true);
+      setTimeout(() => setCopiedPbbWaSuperAdmin(false), 3000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const formatRupiah = (val: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
@@ -1659,6 +1673,21 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                   <span>{isSyncingPbb ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
                 </button>
 
+                {/* Tombol Salin Rekap PBB WA */}
+                <button
+                  type="button"
+                  onClick={handleCopyPbbWaSuperAdmin}
+                  title="Salin rekapitulasi capaian persentase PBB 24 Lingkungan ke format WhatsApp"
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black shadow-xs transition-all cursor-pointer ${
+                    copiedPbbWaSuperAdmin
+                      ? 'bg-emerald-400 text-slate-950 scale-102 ring-2 ring-emerald-300'
+                      : 'bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white border border-emerald-400/60'
+                  }`}
+                >
+                  {copiedPbbWaSuperAdmin ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5 text-emerald-200" />}
+                  <span>{copiedPbbWaSuperAdmin ? 'Tersalin!' : 'Salin Rekap PBB WA'}</span>
+                </button>
+
                 {onOpenPbb && (
                   <button
                     type="button"
@@ -1704,6 +1733,16 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
               </div>
             </div>
           </div>
+
+          {/* Rekap Total Capaian PBB 24 Lingkungan (Grid & Tabel Persentase) */}
+          <RekapCapaianPbb24Lingkungan
+            overview={pbbOverview}
+            selectedYear={pbbYear}
+            onSelectLingkungan={() => {
+              if (onOpenPbb) onOpenPbb();
+            }}
+            defaultViewMode="grid"
+          />
 
           {/* Detailed Table for 24 Lingkungan */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">

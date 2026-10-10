@@ -21,7 +21,7 @@
     "firebase": "^11.1.0",
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.10.3",
-    "jspdf": "^2.5.2",
+    "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.474.0",
     "postcss": "^8.4.49",

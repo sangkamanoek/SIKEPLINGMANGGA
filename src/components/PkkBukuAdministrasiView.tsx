@@ -114,6 +114,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
   const [b1Pendidikan, setB1Pendidikan] = useState('');
   const [b1Pekerjaan, setB1Pekerjaan] = useState('');
   const [b1Keterangan, setB1Keterangan] = useState('');
+  const [b1PasphotoUrl, setB1PasphotoUrl] = useState('');
 
   // Book 2 (Letters)
   const [b2Nomor, setB2Nomor] = useState('');
@@ -132,6 +133,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
   const [b3Jumlah, setB3Jumlah] = useState<number>(0);
   const [b3Kategori, setB3Kategori] = useState('Kas Umum');
   const [b3Keterangan, setB3Keterangan] = useState('');
+  const [b3Bukti, setB3Bukti] = useState('');
   const [b3NomorBukti, setB3NomorBukti] = useState('');
 
   // Book 4 (Notulen)
@@ -150,6 +152,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
   const [b5Jumlah, setB5Jumlah] = useState<number>(1);
   const [b5Kondisi, setB5Kondisi] = useState<'Baik' | 'Cukup' | 'Rusak Ringan' | 'Rusak Berat'>('Baik');
   const [b5Keterangan, setB5Keterangan] = useState('');
+  const [b5Foto, setB5Foto] = useState('');
 
   // Book 6 (Kegiatan)
   const [b6Nama, setB6Nama] = useState('');
@@ -242,6 +245,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           pendidikan: b1Pendidikan,
           pekerjaan: b1Pekerjaan,
           keterangan: b1Keterangan,
+          pasphotoUrl: b1PasphotoUrl,
         };
         await saveBuku1Item(item);
       } else if (activeBook === 2) {
@@ -568,6 +572,16 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                             <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 cursor-pointer">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
+                            <button
+                              onClick={async () => {
+                                const { generatePkkCardPdf } = await import('../utils/pkkCardGenerator');
+                                await generatePkkCardPdf(it, it.pasphotoUrl || null);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-tosca-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                              title="Cetak Kartu PKK"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -889,6 +903,21 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                     <label className="font-extrabold text-slate-700">Keterangan / Catatan Tambahan</label>
                     <input type="text" value={b1Keterangan} onChange={(e) => setB1Keterangan(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="cth. Aktif sejak 2024" />
                   </div>
+                  <div className="space-y-1">
+                    <label className="font-extrabold text-slate-700">Pasfoto</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const base64 = await fileToBase64(e.target.files[0]);
+                          setB1PasphotoUrl(base64);
+                        }
+                      }}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                    />
+                    {b1PasphotoUrl && <img src={b1PasphotoUrl} className="w-16 h-20 object-cover rounded mt-2" alt="Preview" />}
+                  </div>
                 </div>
               )}
 
@@ -1006,8 +1035,19 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                     <input type="text" value={b3Kategori} onChange={(e) => setB3Kategori(e.target.value)} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="cth. Iuran Wajib, Operasional Pokja I" />
                   </div>
                   <div className="space-y-1">
-                    <label className="font-extrabold text-slate-700">Uraian / Keterangan Transaksi</label>
-                    <textarea value={b3Keterangan} onChange={(e) => setB3Keterangan(e.target.value)} rows={3} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="Keterangan lengkap penerimaan atau pengeluaran dana..." />
+                    <label className="font-extrabold text-slate-700">Foto Bukti Kwitansi / Tanda Terima</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const base64 = await fileToBase64(e.target.files[0]);
+                          setB3Bukti(base64);
+                        }
+                      }}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                    />
+                    {b3Bukti && <img src={b3Bukti} className="w-16 h-16 object-cover rounded mt-2" alt="Preview" />}
                   </div>
                 </div>
               )}

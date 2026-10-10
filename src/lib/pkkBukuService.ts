@@ -14,6 +14,7 @@ export interface PkkBuku1Anggota {
   pendidikan: string;
   pekerjaan: string;
   keterangan: string;
+  pasphotoUrl?: string;
   createdAt?: string;
 }
 
@@ -37,6 +38,7 @@ export interface PkkBuku5Inventaris {
   jumlah: number;
   kondisi: 'Baik' | 'Cukup' | 'Rusak Ringan' | 'Rusak Berat';
   keterangan: string;
+  fotoBarangUrl?: string;
   createdAt?: string;
 }
 

@@ -41,7 +41,18 @@ export const DeadlineNotifAlert: React.FC<DeadlineNotifAlertProps> = ({
     return 'denied';
   });
   const [isNotifTesting, setIsNotifTesting] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(false);
+  // Today's ISO date (YYYY-MM-DD)
+  const todayIso = getTodayLocalIso();
+
+  const [isDismissed, setIsDismissed] = useState(() => {
+    return localStorage.getItem(`deadline_alert_dismissed_${todayIso}`) === 'true';
+  });
+
+  useEffect(() => {
+    if (isDismissed) {
+      localStorage.setItem(`deadline_alert_dismissed_${todayIso}`, 'true');
+    }
+  }, [isDismissed, todayIso]);
 
   // Update clock every second for live countdown
   useEffect(() => {
@@ -50,9 +61,6 @@ export const DeadlineNotifAlert: React.FC<DeadlineNotifAlertProps> = ({
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  // Today's ISO date (YYYY-MM-DD)
-  const todayIso = getTodayLocalIso();
 
   // Check if current Kepling has submitted report today
   const hasSubmittedToday = reports.some(
@@ -291,6 +299,7 @@ export const DeadlineNotifAlert: React.FC<DeadlineNotifAlertProps> = ({
   }
 
   // Case C: Kepling HAS NOT SUBMITTED REPORT TODAY - APPROACHING 23:30 WIB (URGENT / NORMAL)
+  if (isDismissed) return null;
   return (
     <div
       className={`rounded-2xl p-4 sm:p-5 text-white shadow-xl border-2 transition-all relative overflow-hidden ${
@@ -301,7 +310,15 @@ export const DeadlineNotifAlert: React.FC<DeadlineNotifAlertProps> = ({
           : 'bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-950 border-indigo-500/80'
       }`}
     >
-      {/* Background glow graphics */}
+      {/* Background glow graphics & Dismiss Button */}
+      <button
+        onClick={() => setIsDismissed(true)}
+        className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white cursor-pointer transition-all z-20"
+        title="Sembunyikan peringatan hari ini"
+      >
+        <X className="w-4 h-4" />
+      </button>
+
       <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl -mr-12 -mt-12" />
 
       <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">

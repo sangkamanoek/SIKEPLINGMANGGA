@@ -83,9 +83,13 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  // Sync state when initialData changes
+  const prevInitialDataIdRef = useRef<string | null>(initialData?.id || null);
+
+  // Sync state only when a different record is selected for editing
   useEffect(() => {
-    if (initialData) {
+    const nextId = initialData?.id || null;
+    if (initialData && nextId !== prevInitialDataIdRef.current) {
+      prevInitialDataIdRef.current = nextId;
       setTanggal(initialData.tanggal || defaultDate);
       setNamaWarga((initialData.namaWarga || '').toUpperCase());
       setAlamat((initialData.alamat || '').toUpperCase());
@@ -96,8 +100,18 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       setFotoDokumentasi(initialData.fotoDokumentasi || '');
       setSuccessMessage('');
       setErrorMessage('');
+    } else if (!initialData && prevInitialDataIdRef.current !== null) {
+      prevInitialDataIdRef.current = null;
+      setTanggal(defaultDate);
+      setNamaWarga('');
+      setAlamat('');
+      setTargetKeplingId(isSuperAdmin ? '' : currentUser.id);
+      setPerlinsos('Belum');
+      setIkd('Belum');
+      setPbb('Belum');
+      setFotoDokumentasi('');
     }
-  }, [initialData, defaultDate, isSuperAdmin, currentUser.id]);
+  }, [initialData?.id, defaultDate, isSuperAdmin, currentUser.id]);
 
   // AI Photo Verification States
   const [isVerifyingPhoto, setIsVerifyingPhoto] = useState<boolean>(false);

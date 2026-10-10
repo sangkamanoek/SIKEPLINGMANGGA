@@ -456,6 +456,7 @@ export const PKK_ALL_ACCOUNTS: UserAccount[] = [
 
 export const ALL_ACCOUNTS: UserAccount[] = [
   SUPER_ADMIN_ACCOUNT,
+  SEKRETARIS_ACCOUNT,
   ...KASI_ACCOUNTS,
   PETUGAS_BAPENDA_ACCOUNT,
   ...KEPLING_ACCOUNTS,
@@ -1047,13 +1048,16 @@ export const findAccountByUsername = (input: string): UserAccount | undefined =>
     return SUPER_ADMIN_ACCOUNT;
   }
 
-  // 1ab. Check Sekretaris Kelurahan
+  // 1ab. Check Sekretaris Kelurahan / Lurah
   if (
     norm === 'sekretaris' ||
     norm === 'sekretaris_kelurahan' ||
     norm === 'sekretariskelurahan' ||
+    norm === 'sekretaris_lurah' ||
+    norm === 'sekretarislurah' ||
     norm === 'seklur' ||
     norm === 'sek_lur' ||
+    norm === 'seklur_mangga' ||
     norm === 'sekretaris_mangga'
   ) {
     return getEffectiveAccount(SEKRETARIS_ACCOUNT);
