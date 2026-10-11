@@ -38,11 +38,13 @@ import {
 interface PkkHubDashboardProps {
   currentUser: UserAccount;
   onNavigateTab: (tab: 'keuangan_pkk' | 'kegiatan_pkk' | 'dasa_wisma' | 'posyandu_pkk') => void;
+  onOpenUpdateModal?: () => void;
 }
 
 export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
   currentUser,
   onNavigateTab,
+  onOpenUpdateModal,
 }) => {
   const [transaksiList, setTransaksiList] = useState<any[]>([]);
   const [kegiatanList, setKegiatanList] = useState<any[]>([]);
@@ -135,6 +137,17 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
               <span className="px-2.5 py-0.5 rounded-lg bg-tosca-900/60 border border-tosca-500/40 text-[11px] font-mono text-tosca-200">
                 ID: {currentUser.id}
               </span>
+              {onOpenUpdateModal && (
+                <button
+                  type="button"
+                  onClick={onOpenUpdateModal}
+                  className="px-2.5 py-0.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+                  title="Lihat Info Pembaruan Aplikasi"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Info Pembaruan v2.5.0</span>
+                </button>
+              )}
             </div>
           </div>
 

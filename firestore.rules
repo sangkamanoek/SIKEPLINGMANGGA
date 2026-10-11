@@ -154,6 +154,14 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // PKK Reports & Posyandu Reports
+    match /pkk_reports/{docId} {
+      allow read, write: if true;
+    }
+    match /pkk_posyandu_reports/{docId} {
+      allow read, write: if true;
+    }
+
     // Arsip Surat Kedinasan & Persuratan Kelurahan
     match /surat_kedinasan/{docId} {
       allow read, write: if true;

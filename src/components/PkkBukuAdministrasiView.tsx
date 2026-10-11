@@ -248,6 +248,9 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           pasphotoUrl: b1PasphotoUrl,
         };
         await saveBuku1Item(item);
+        const { generatePkkCardPdf } = await import('../utils/pkkCardGenerator');
+        await generatePkkCardPdf(item, b1PasphotoUrl || null);
+        onShowToast?.('Anggota PKK berhasil disimpan & Kartu KTA otomatis terunduh!', 'success');
       } else if (activeBook === 2) {
         // Agenda Surat Masuk/Keluar
         const isMasuk = b2Jenis === 'SURAT_MASUK';

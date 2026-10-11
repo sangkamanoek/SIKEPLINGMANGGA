@@ -64,6 +64,7 @@ import { customFetch } from './lib/fetchInterceptor';
 import { getDefaultTargetsCapaianMap } from './data/targetsData';
 import { fetchTargetsCapaian, subscribeTargetsFromFirestore } from './lib/targetsApi';
 import { fetchAllDataKeluarga } from './lib/dataKeluargaService';
+import { useKeplingMorningNotification } from './hooks/useKeplingMorningNotification';
 import { useFeatureNotifications } from './hooks/useFeatureNotifications';
 import { showSafeNotification } from './lib/safeNotification';
 import { lazyWithRetry } from './lib/lazyWithRetry';
@@ -219,6 +220,9 @@ export default function App() {
   });
   const [preselectedKepling, setPreselectedKepling] = useState<UserAccount | null>(null);
   const [riwayatFilterPetugas, setRiwayatFilterPetugas] = useState<string | undefined>(undefined);
+
+  // Initialize morning browser push notifications for Kepling at 07:30 WIB
+  useKeplingMorningNotification(activeAccount);
 
   // Active view tab
   const [activeTab, setActiveTab] = useState<
@@ -1792,6 +1796,7 @@ export default function App() {
                 <PkkHubDashboard
                   currentUser={activeAccount}
                   onNavigateTab={(tab) => setActiveTab(tab)}
+                  onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
                 />
               </ErrorBoundary>
             ) : (

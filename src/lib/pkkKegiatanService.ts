@@ -243,7 +243,18 @@ export const savePkkKegiatan = async (
       const cleaned = cleanFirestoreData(itemToSave);
       await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, itemToSave.id), cleaned, { merge: true });
     } catch (err) {
-      console.warn('[savePkkKegiatan to firestore error]:', err);
+      console.warn('[savePkkKegiatan to firestore error, attempting safe fallback]:', err);
+      try {
+        const safeItem = {
+          ...itemToSave,
+          fotoDokumentasi: itemToSave.fotoDokumentasi?.slice(0, 3),
+        };
+        const cleanedSafe = cleanFirestoreData(safeItem);
+        await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, itemToSave.id), cleanedSafe, { merge: true });
+      } catch (fallbackErr) {
+        console.error('[savePkkKegiatan fallback failed]:', fallbackErr);
+        throw fallbackErr;
+      }
     }
   }
 };
