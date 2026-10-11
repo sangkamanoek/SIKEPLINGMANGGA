@@ -20,6 +20,11 @@ import {
   Clock,
   Layers,
   Baby,
+  RefreshCw,
+  CloudUpload,
+  Database,
+  Smartphone,
+  X,
 } from 'lucide-react';
 import { UserAccount } from '../types';
 import {
@@ -34,6 +39,10 @@ import {
 import {
   subscribeDasaWisma,
 } from '../lib/pkkDasaWismaService';
+import {
+  syncPkkDeviceDataToLiveFirestore,
+  getPkkDeviceDataSnapshot,
+} from '../lib/pkkSyncService';
 
 interface PkkHubDashboardProps {
   currentUser: UserAccount;
@@ -50,6 +59,19 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
   const [kegiatanList, setKegiatanList] = useState<any[]>([]);
   const [dawisList, setDawisList] = useState<any[]>([]);
   const [activePokjaInfo, setActivePokjaInfo] = useState<'I' | 'II' | 'III' | 'IV'>('I');
+
+  const [isPkkSyncModalOpen, setIsPkkSyncModalOpen] = useState(false);
+  const [isPkkSyncing, setIsPkkSyncing] = useState(false);
+  const [pkkSyncProgress, setPkkSyncProgress] = useState('');
+  const [pkkSyncSuccess, setPkkSyncSuccess] = useState('');
+  const [pkkSyncError, setPkkSyncError] = useState('');
+  const [pkkDeviceStats, setPkkDeviceStats] = useState<any>(null);
+
+  useEffect(() => {
+    if (isPkkSyncModalOpen) {
+      getPkkDeviceDataSnapshot().then(setPkkDeviceStats).catch(console.error);
+    }
+  }, [isPkkSyncModalOpen]);
 
   useEffect(() => {
     const unsub1 = subscribePkkKeuangan((items) => setTransaksiList(items));
@@ -148,6 +170,15 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                   <span>Info Pembaruan v2.5.0</span>
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setIsPkkSyncModalOpen(true)}
+                className="px-2.5 py-0.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+                title="Sinkronisasi Data PKK ke Cloud Firestore"
+              >
+                <RefreshCw className="w-3 h-3" />
+                <span>Sinkronasi Cloud</span>
+              </button>
             </div>
           </div>
 
@@ -615,6 +646,146 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* PKK Device Sync Modal */}
+      {isPkkSyncModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in fade-in max-h-[90vh] flex flex-col">
+            <div className="p-5 bg-tosca-800 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <Smartphone className="w-5 h-5 text-tosca-200" />
+                <h3 className="font-bold text-sm sm:text-base text-white">Sinkronasi Cloud Database Modul PKK</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isPkkSyncing) setIsPkkSyncModalOpen(false);
+                }}
+                disabled={isPkkSyncing}
+                className="text-white/80 hover:text-white cursor-pointer disabled:opacity-30"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-xs text-slate-600 overflow-y-auto flex-1">
+              <div className="p-3.5 bg-tosca-50 border border-tosca-100 text-tosca-900 rounded-xl space-y-1.5 leading-relaxed">
+                <p className="font-bold">🌸 Penyelarasan Data PKK ke Cloud Firestore</p>
+                <p>
+                  Fitur ini menyinkronkan seluruh pencatatan administrasi PKK (Keuangan, Kegiatan 4 Pokja, Dasa Wisma, Buku 1 Anggota, Buku 4 Notulen, Buku 5 Inventaris, dan Laporan Posyandu) dari perangkat Anda ke Database Live Cloud.
+                </p>
+              </div>
+
+              {pkkSyncError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl font-bold">
+                  ⚠️ {pkkSyncError}
+                </div>
+              )}
+
+              {pkkSyncSuccess && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl space-y-1.5 animate-in zoom-in-95 whitespace-pre-line">
+                  <p className="font-bold flex items-center gap-1.5 text-emerald-900">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Berhasil Disinkronkan!
+                  </p>
+                  <p>{pkkSyncSuccess}</p>
+                </div>
+              )}
+
+              {pkkDeviceStats && !isPkkSyncing && !pkkSyncSuccess && (
+                <div className="space-y-3">
+                  <h4 className="font-extrabold text-slate-700 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5 text-tosca-600" />
+                    Data Modul PKK di Perangkat Anda:
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">PKK Keuangan</span>
+                      <span className="text-base font-black text-slate-800">{pkkDeviceStats.pkkKeuangan.length} <span className="text-[10px] font-medium text-slate-500">trx</span></span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">PKK Kegiatan</span>
+                      <span className="text-base font-black text-slate-800">{pkkDeviceStats.pkkKegiatan.length} <span className="text-[10px] font-medium text-slate-500">item</span></span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Dasa Wisma</span>
+                      <span className="text-base font-black text-slate-800">{pkkDeviceStats.dawis.length} <span className="text-[10px] font-medium text-slate-500">kelompok</span></span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Buku I Anggota</span>
+                      <span className="text-base font-black text-slate-800">{pkkDeviceStats.buku1.length} <span className="text-[10px] font-medium text-slate-500">orang</span></span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Buku IV Notulen</span>
+                      <span className="text-base font-black text-slate-800">{pkkDeviceStats.buku4.length} <span className="text-[10px] font-medium text-slate-500">rapat</span></span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Buku V Inventaris</span>
+                      <span className="text-base font-black text-slate-800">{pkkDeviceStats.buku5.length} <span className="text-[10px] font-medium text-slate-500">barang</span></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isPkkSyncing && (
+                <div className="p-4 bg-tosca-50 border border-tosca-200 rounded-xl flex flex-col items-center justify-center gap-3 py-6 animate-pulse">
+                  <RefreshCw className="w-8 h-8 text-tosca-700 animate-spin" />
+                  <div className="space-y-1 text-center">
+                    <p className="font-black text-tosca-900 text-xs">Sedang Menyinkronkan Data PKK...</p>
+                    <p className="text-[11px] text-tosca-700 italic font-medium">{pkkSyncProgress}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsPkkSyncModalOpen(false)}
+                disabled={isPkkSyncing}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs cursor-pointer transition-colors disabled:opacity-50"
+              >
+                Tutup
+              </button>
+
+              <button
+                type="button"
+                disabled={isPkkSyncing || !pkkDeviceStats}
+                onClick={async () => {
+                  if (window.confirm('Apakah Anda yakin ingin menyinkronkan seluruh modul PKK lokal ke Database Cloud Firestore?')) {
+                    setIsPkkSyncing(true);
+                    setPkkSyncError('');
+                    setPkkSyncSuccess('');
+                    const res = await syncPkkDeviceDataToLiveFirestore((msg) => {
+                      setPkkSyncProgress(msg);
+                    });
+                    if (res.success) {
+                      setPkkSyncSuccess(
+                        `${res.message}\n\n` +
+                        `• PKK Keuangan: ${res.stats.pkkKeuangan.synced}/${res.stats.pkkKeuangan.total} berhasil\n` +
+                        `• PKK Kegiatan: ${res.stats.pkkKegiatan.synced}/${res.stats.pkkKegiatan.total} berhasil\n` +
+                        `• Dasa Wisma: ${res.stats.pkkDasaWisma.synced}/${res.stats.pkkDasaWisma.total} berhasil\n` +
+                        `• Buku I Anggota: ${res.stats.buku1.synced}/${res.stats.buku1.total} berhasil\n` +
+                        `• Buku IV Notulen: ${res.stats.buku4.synced}/${res.stats.buku4.total} berhasil\n` +
+                        `• Buku V Inventaris: ${res.stats.buku5.synced}/${res.stats.buku5.total} berhasil\n` +
+                        `• Posyandu PKK: ${res.stats.posyandu.synced}/${res.stats.posyandu.total} berhasil`
+                      );
+                    } else {
+                      setPkkSyncError(res.message);
+                    }
+                    setIsPkkSyncing(false);
+                    setPkkSyncProgress('');
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-tosca-700 hover:bg-tosca-800 text-white font-bold text-xs cursor-pointer shadow-md transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <CloudUpload className="w-3.5 h-3.5" />
+                <span>Sinkronkan Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
