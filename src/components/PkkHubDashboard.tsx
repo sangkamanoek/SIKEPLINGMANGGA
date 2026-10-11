@@ -67,6 +67,25 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
   const [pkkSyncError, setPkkSyncError] = useState('');
   const [pkkDeviceStats, setPkkDeviceStats] = useState<any>(null);
 
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [lastSyncTimeString, setLastSyncTimeString] = useState<string>(() => {
+    try {
+      return localStorage.getItem('pkk_last_sync_time') || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+    } catch {
+      return 'Baru saja';
+    }
+  });
+
+  useEffect(() => {
+    const handleOnlineStatus = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', handleOnlineStatus);
+    window.addEventListener('offline', handleOnlineStatus);
+    return () => {
+      window.removeEventListener('online', handleOnlineStatus);
+      window.removeEventListener('offline', handleOnlineStatus);
+    };
+  }, []);
+
   useEffect(() => {
     if (isPkkSyncModalOpen) {
       getPkkDeviceDataSnapshot().then(setPkkDeviceStats).catch(console.error);
@@ -158,6 +177,12 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
               </span>
               <span className="px-2.5 py-0.5 rounded-lg bg-tosca-900/60 border border-tosca-500/40 text-[11px] font-mono text-tosca-200">
                 ID: {currentUser.id}
+              </span>
+              <span className={`px-2.5 py-0.5 rounded-lg border text-[11px] font-bold flex items-center gap-1.5 ${
+                isOnline ? 'bg-emerald-900/60 border-emerald-500/40 text-emerald-200' : 'bg-amber-900/60 border-amber-500/40 text-amber-200'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span>{isOnline ? `Terhubung • Sync: ${lastSyncTimeString}` : 'Offline (Mode Lokal)'}</span>
               </span>
               {onOpenUpdateModal && (
                 <button
@@ -760,6 +785,9 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                       setPkkSyncProgress(msg);
                     });
                     if (res.success) {
+                      const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+                      setLastSyncTimeString(nowStr);
+                      try { localStorage.setItem('pkk_last_sync_time', nowStr); } catch {}
                       setPkkSyncSuccess(
                         `${res.message}\n\n` +
                         `• PKK Keuangan: ${res.stats.pkkKeuangan.synced}/${res.stats.pkkKeuangan.total} berhasil\n` +
