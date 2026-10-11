@@ -30,6 +30,7 @@ import {
   POKJA_LABELS,
 } from '../lib/pkkKegiatanService';
 import { KopSuratPkk } from './KopSuratPkk';
+import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument } from '../utils/printHelper';
 import { compressMultipleFiles } from '../lib/imageCompressor';
 
@@ -269,6 +270,8 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
           </button>
         </div>
       </div>
+
+      <RealtimeSyncStatusPanel />
 
       {/* Filter & Search Bar */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">

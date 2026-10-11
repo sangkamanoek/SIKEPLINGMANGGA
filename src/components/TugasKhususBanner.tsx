@@ -135,24 +135,24 @@ export const TugasKhususBanner: React.FC<TugasKhususBannerProps> = ({ activeAcco
         </div>
 
         <div className="flex items-center gap-2 self-end md:self-center shrink-0 flex-wrap">
-          {tasks.length > 1 && (
-            <div className="flex items-center gap-1 bg-amber-500/80 px-2 py-1 rounded text-slate-950">
+          {tasks.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-amber-500/80 px-2 py-1 rounded-xl text-slate-950 shadow-xs">
               <button
                 type="button"
                 onClick={() => setCurrentIndex((prev) => (prev - 1 + tasks.length) % tasks.length)}
-                className="w-5 h-5 bg-slate-950 text-amber-300 rounded font-bold flex items-center justify-center text-xs hover:bg-slate-900 cursor-pointer"
+                className="w-6 h-6 bg-slate-950 text-amber-300 rounded-lg font-black flex items-center justify-center text-xs hover:bg-slate-900 cursor-pointer shadow-2xs"
                 title="Tugas Sebelumnya"
               >
                 ‹
               </button>
-              <span className="text-[11px] font-bold px-1">
+              <span className="text-xs font-black px-1.5 font-mono">
                 {currentIndex + 1} / {tasks.length}
               </span>
               <button
                 type="button"
                 onClick={() => setCurrentIndex((prev) => (prev + 1) % tasks.length)}
-                className="w-5 h-5 bg-slate-950 text-amber-300 rounded font-bold flex items-center justify-center text-xs hover:bg-slate-900 cursor-pointer"
-                title="Tugas Selanjutnya"
+                className="w-6 h-6 bg-slate-950 text-amber-300 rounded-lg font-black flex items-center justify-center text-xs hover:bg-slate-900 cursor-pointer shadow-2xs"
+                title="Tugas Berikutnya"
               >
                 ›
               </button>

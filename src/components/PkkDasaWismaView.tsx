@@ -28,6 +28,7 @@ import {
   clearSampleDasaWismaData,
 } from '../lib/pkkDasaWismaService';
 import { KopSuratPkk } from './KopSuratPkk';
+import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument } from '../utils/printHelper';
 
 interface PkkDasaWismaViewProps {
@@ -288,6 +289,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
           </button>
         </div>
       </div>
+
+      <RealtimeSyncStatusPanel />
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3.5">

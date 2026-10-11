@@ -24,6 +24,7 @@ import {
 } from '../lib/pkkPosyanduService';
 import { KETUA_PKK_LINGKUNGAN_ACCOUNTS } from '../data/keplingList';
 import { KopSuratPkk } from './KopSuratPkk';
+import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument } from '../utils/printHelper';
 import { compressMultipleFiles } from '../lib/imageCompressor';
 
@@ -250,6 +251,8 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
           </button>
         </div>
       </div>
+
+      <RealtimeSyncStatusPanel />
 
       {/* Filter Toolbar */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">

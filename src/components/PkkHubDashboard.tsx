@@ -27,6 +27,7 @@ import {
   X,
 } from 'lucide-react';
 import { UserAccount } from '../types';
+import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import {
   subscribePkkKeuangan,
   formatRupiah,
@@ -234,6 +235,8 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      <RealtimeSyncStatusPanel />
 
       {/* 3 Main Action Modules (Segregated specifically for PKK) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

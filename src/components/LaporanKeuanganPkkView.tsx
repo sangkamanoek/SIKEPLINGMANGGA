@@ -40,6 +40,7 @@ import {
 } from '../lib/pkkKeuanganService';
 import { getTodayLocalIso, formatTanggalIndonesia } from '../lib/formatter';
 import { KopSuratPkk } from './KopSuratPkk';
+import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { compressImageFile } from '../lib/imageCompressor';
 
 interface LaporanKeuanganPkkViewProps {
@@ -455,6 +456,8 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
           </div>
         </div>
       </div>
+
+      <RealtimeSyncStatusPanel />
 
       {/* 4 Financial Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

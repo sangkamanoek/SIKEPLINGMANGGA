@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { UserAccount, SuratKedinasanItem, JenisSuratKedinasan } from '../types';
 import { KopSuratPkk } from './KopSuratPkk';
+import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument } from '../utils/printHelper';
 import {
   PkkBuku1Anggota,
@@ -459,6 +460,8 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           </button>
         </div>
       </div>
+
+      <RealtimeSyncStatusPanel />
 
       {/* Floating Glass Capsule Tab Switcher */}
       <div className="bg-white/90 p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-2">
