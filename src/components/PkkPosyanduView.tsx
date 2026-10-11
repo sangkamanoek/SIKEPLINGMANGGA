@@ -3,6 +3,7 @@ import {
   Baby,
   Plus,
   Trash2,
+  Edit3,
   Download,
   Search,
   CheckCircle2,
@@ -41,6 +42,8 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form State
   const defaultLkNum = currentUser.nomorLingkungan || 1;
@@ -110,6 +113,46 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
     e.target.value = '';
   };
 
+  const handleOpenAdd = () => {
+    setIsEditing(false);
+    setEditingId(null);
+    setFormLingkunganNomor(currentUser.nomorLingkungan || 1);
+    setFormTanggal(new Date().toISOString().split('T')[0]);
+    setFormPosyanduNama('');
+    setFormPosyanduLokasi('');
+    setFormJumlahKader('');
+    setFormBayi02('');
+    setFormBalita25('');
+    setFormAnak612('');
+    setFormRemaja1318('');
+    setFormDewasaBumil1959('');
+    setFormLansia60('');
+    setFormJenisLayanan([]);
+    setFormKeterangan('');
+    setFotoList([]);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (report: PosyanduReport) => {
+    setIsEditing(true);
+    setEditingId(report.id);
+    setFormLingkunganNomor(report.nomorLingkungan || 1);
+    setFormTanggal(report.tanggal || new Date().toISOString().split('T')[0]);
+    setFormPosyanduNama(report.posyanduNama || '');
+    setFormPosyanduLokasi(report.posyanduLokasi || '');
+    setFormJumlahKader(String(report.posyanduJumlahPetugasKader || ''));
+    setFormBayi02(String(report.posyanduBayi02Tahun || ''));
+    setFormBalita25(String(report.posyanduBalita25Tahun || ''));
+    setFormAnak612(String(report.posyanduAnak612Tahun || ''));
+    setFormRemaja1318(String(report.posyanduRemaja1318Tahun || ''));
+    setFormDewasaBumil1959(String(report.posyanduDewasaIbuHamil1959Tahun || ''));
+    setFormLansia60(String(report.posyanduLansia60TahunKeatas || ''));
+    setFormJenisLayanan(report.posyanduJenisLayanan || []);
+    setFormKeterangan(report.posyanduKeterangan || '');
+    setFotoList(report.dokumentasiFoto || []);
+    setIsModalOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formPosyanduNama.trim()) {
@@ -123,10 +166,13 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
         (a) => a.nomorLingkungan === formLingkunganNomor
       ) || currentUser;
 
+      const id = isEditing && editingId ? editingId : 'posyandu_' + Date.now();
+      const existingReport = reports.find((r) => r.id === id);
+
       const report: PosyanduReport = {
-        id: 'posyandu_' + Date.now(),
-        pkkLingkunganId: selectedAcc.id,
-        namaPetugas: selectedAcc.nama,
+        id,
+        pkkLingkunganId: existingReport?.pkkLingkunganId || selectedAcc.id,
+        namaPetugas: existingReport?.namaPetugas || selectedAcc.nama,
         lingkungan: `Lingkungan ${formLingkunganNomor}`,
         nomorLingkungan: formLingkunganNomor,
         tanggal: formTanggal,
@@ -143,11 +189,14 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
         posyanduJenisLayanan: formJenisLayanan,
         posyanduKeterangan: formKeterangan.trim(),
         dokumentasiFoto: fotoList,
-        createdAt: new Date().toISOString(),
+        createdAt: existingReport?.createdAt || new Date().toISOString(),
       };
 
       await savePosyanduReport(report);
-      onShowToast?.('Laporan Posyandu berhasil disimpan & ditampilkan di Dashboard PKK!', 'success');
+      onShowToast?.(
+        isEditing ? 'Laporan Posyandu berhasil diperbarui!' : 'Laporan Posyandu berhasil disimpan & ditampilkan di Dashboard PKK!',
+        'success'
+      );
       setIsModalOpen(false);
       setFotoList([]);
     } catch (err) {
@@ -193,10 +242,7 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
         <div className="flex items-center gap-2.5 shrink-0">
           <button
             type="button"
-            onClick={() => {
-              setFotoList([]);
-              setIsModalOpen(true);
-            }}
+            onClick={handleOpenAdd}
             className="px-4 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md active:scale-95"
           >
             <Plus className="w-4 h-4" />
@@ -346,15 +392,25 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                     <Printer className="w-3 h-3" />
                     <span>Cetak</span>
                   </button>
-                  {(currentUser.role === 'super_admin' || currentUser.id === report.pkkLingkunganId) && (
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(report.id)}
-                      className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                      title="Hapus laporan"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  {(currentUser.role === 'super_admin' || currentUser.role === 'ketua_pkk_kelurahan' || currentUser.role === 'sekretaris_pkk' || currentUser.role === 'sekretaris' || currentUser.role === 'ketua_pokja' || currentUser.role === 'ketua_pkk_lingkungan' || currentUser.id === report.pkkLingkunganId) && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(report)}
+                        className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
+                        title="Edit laporan posyandu"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(report.id)}
+                        className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Hapus laporan"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -369,8 +425,10 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
           <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-rose-200 overflow-hidden animate-in fade-in zoom-in duration-200 my-8">
             <div className="bg-gradient-to-r from-rose-800 to-pink-900 text-white px-6 py-4 flex items-center justify-between">
               <div>
-                <h3 className="font-black text-lg">Formulir Pelayanan Posyandu & Kesehatan</h3>
-                <p className="text-xs text-rose-200">Diisi oleh Ketua PKK Lingkungan (Pokja IV)</p>
+                <h3 className="font-black text-lg">
+                  {isEditing ? 'Edit Laporan Pelayanan Posyandu' : 'Formulir Pelayanan Posyandu & Kesehatan'}
+                </h3>
+                <p className="text-xs text-rose-200">Diisi oleh Ketua PKK Lingkungan / Sekretaris (Pokja IV)</p>
               </div>
               <button
                 type="button"
@@ -570,7 +628,7 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                   disabled={isSubmitting}
                   className="flex-1 py-2.5 rounded-xl bg-rose-600 text-white font-black text-xs hover:bg-rose-500 shadow-md cursor-pointer disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Menyimpan...' : 'Simpan Laporan Posyandu'}
+                  {isSubmitting ? 'Menyimpan...' : isEditing ? 'Perbarui Laporan' : 'Simpan Laporan Posyandu'}
                 </button>
               </div>
             </form>
