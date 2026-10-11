@@ -1,7 +1,7 @@
 /**
  * Safe Storage & Performance Optimization Utility
  * Provides defensive storage management, non-blocking asynchronous persistence,
- * quota overflow recovery, and memory caching.
+ * quota overflow recovery, and memory caching optimized for low-end mobile devices & laptops.
  */
 
 import {
@@ -12,7 +12,9 @@ import {
   saveHistoryToIndexedDB,
 } from './indexedDbStorage';
 
+// Bounded memory cache (max 2MB total) to avoid memory leaks on 1GB/2GB RAM mobile devices
 const memoryFallbackStorage = new Map<string, string>();
+const MAX_MEMORY_CACHE_ENTRY_BYTES = 150_000; // 150KB per entry max for in-memory string cache
 
 let idbSaveTimeout: any = null;
 let idbKkSaveTimeout: any = null;
@@ -31,17 +33,19 @@ export function sanitizeText(input: unknown): string {
 }
 
 /**
- * Manual override to populate memory map (used on startup from IndexedDB)
+ * Populate in-memory cache for high-frequency small settings/keys
  */
 export function populateMemoryCache(key: string, value: string): void {
-  memoryFallbackStorage.set(key, value);
+  if (value.length <= MAX_MEMORY_CACHE_ENTRY_BYTES) {
+    memoryFallbackStorage.set(key, value);
+  }
 }
 
 /**
  * Type-safe and error-resilient retrieval from LocalStorage with fallback
  */
 export function safeGetLocalStorage<T>(key: string, defaultValue: T): T {
-  // Always check memory cache first for maximum speed and to bypass LocalStorage quota-saving placeholders (like empty arrays)
+  // Check memory cache first for fast lookup of lightweight data
   const cached = memoryFallbackStorage.get(key);
   if (cached !== undefined && cached !== null) {
     try {
@@ -64,15 +68,45 @@ export function safeGetLocalStorage<T>(key: string, defaultValue: T): T {
 }
 
 /**
+ * Helper to strip heavy base64 media strings from objects for lightweight storage
+ */
+function stripHeavyMediaFromItem(item: any): any {
+  if (!item || typeof item !== 'object') return item;
+  const copy = { ...item };
+  const stripHeavyStr = (url?: any) =>
+    typeof url === 'string' && url.startsWith('data:') && url.length > 200 ? '' : url;
+
+  if (Array.isArray(copy.dokumentasiFoto)) {
+    copy.dokumentasiFoto = copy.dokumentasiFoto.map((f: any) => {
+      if (!f) return f;
+      return { ...f, url: stripHeavyStr(f.url) };
+    });
+  }
+
+  if (copy.fotoSebelumUrl) copy.fotoSebelumUrl = stripHeavyStr(copy.fotoSebelumUrl);
+  if (copy.fotoProsesUrl) copy.fotoProsesUrl = stripHeavyStr(copy.fotoProsesUrl);
+  if (copy.fotoSelesaiUrl) copy.fotoSelesaiUrl = stripHeavyStr(copy.fotoSelesaiUrl);
+  if (copy.fotoDokumentasi) copy.fotoDokumentasi = stripHeavyStr(copy.fotoDokumentasi);
+  if (copy.fotoKkUrl) copy.fotoKkUrl = stripHeavyStr(copy.fotoKkUrl);
+  if (copy.fotoRumahUrl) copy.fotoRumahUrl = stripHeavyStr(copy.fotoRumahUrl);
+
+  return copy;
+}
+
+/**
  * Safely set localStorage items with defensive quota recovery.
  * Optimized with debounced asynchronous IndexedDB persistence to prevent main-thread lag.
  */
 export function safeSetLocalStorage(key: string, value: string): boolean {
   try {
-    // Keep in memory map first
-    memoryFallbackStorage.set(key, value);
+    // Only store lightweight keys in memory map to conserve RAM on low-end devices
+    if (value.length <= MAX_MEMORY_CACHE_ENTRY_BYTES) {
+      memoryFallbackStorage.set(key, value);
+    } else {
+      memoryFallbackStorage.delete(key);
+    }
 
-    // If it's a reports array, persist to IndexedDB asynchronously with debounce
+    // Persist heavy entities to IndexedDB in background with debouncing
     if (key.includes('laporan') || key.includes('reports')) {
       if (idbSaveTimeout) clearTimeout(idbSaveTimeout);
       idbSaveTimeout = setTimeout(() => {
@@ -85,7 +119,6 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
       }, 300);
     }
 
-    // If it's a family database, persist to IndexedDB asynchronously with debounce
     if (key.includes('keluarga') || key.includes('family')) {
       if (idbKkSaveTimeout) clearTimeout(idbKkSaveTimeout);
       idbKkSaveTimeout = setTimeout(() => {
@@ -98,7 +131,6 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
       }, 500);
     }
 
-    // If it's PBB data, persist to IndexedDB asynchronously with debounce
     if (key.includes('pbb') || key.includes('sppt')) {
       if (idPbbSaveTimeout) clearTimeout(idPbbSaveTimeout);
       idPbbSaveTimeout = setTimeout(() => {
@@ -111,7 +143,6 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
       }, 700);
     }
 
-    // If it's visits data
     if (key.includes('kunjungan') || key.includes('visit')) {
       if (idbVisitsTimeout) clearTimeout(idbVisitsTimeout);
       idbVisitsTimeout = setTimeout(() => {
@@ -124,7 +155,6 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
       }, 800);
     }
 
-    // If it's history data
     if (key.includes('history')) {
       if (idbHistoryTimeout) clearTimeout(idbHistoryTimeout);
       idbHistoryTimeout = setTimeout(() => {
@@ -135,11 +165,6 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
           }
         } catch {}
       }, 900);
-    }
-
-    // If it's WebGIS spatial data
-    if (key.includes('webgis') || key.includes('rumah') || key.includes('titik')) {
-      // Memory cache is already updated at top of function
     }
 
     localStorage.setItem(key, value);
@@ -153,115 +178,66 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
         error.code === 1014);
 
     if (isQuotaError) {
-      console.warn(`[safeStorage] LocalStorage quota exceeded for key "${key}". Offloading to memory cache & IndexedDB...`);
+      console.warn(`[safeStorage] LocalStorage quota exceeded for key "${key}". Running defensive recovery...`);
 
       // 1. Aggressively clear volatile and obsolete items to free space immediately
       try {
         localStorage.removeItem('cleaned_reports_v2_kepling21');
         localStorage.removeItem('google_cached_access_token');
         localStorage.removeItem('sikepling_bottom5_monthly_kepling_ids');
-        
-        // Remove ANY key that looks like a legacy version or temp data
+
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
           if (k && (k.includes('_v1') || k.includes('_v2')) && k !== key) {
             if (!k.includes('history') && !k.includes('reports') && !k.includes('list')) {
-               localStorage.removeItem(k);
+              localStorage.removeItem(k);
             }
           }
         }
       } catch {}
 
-      // 2. Large Data Recovery (Full redirect to memory & IndexedDB, LocalStorage receives empty array pointer)
-      if (
-        key.includes('keluarga') ||
-        key.includes('family') ||
-        key.includes('pbb') ||
-        key.includes('sppt') ||
-        key.includes('kunjungan') ||
-        key.includes('visit') ||
-        key.includes('history') ||
-        key.includes('webgis') ||
-        key.includes('rumah') ||
-        key.includes('titik')
-      ) {
-        try {
-          const parsed = JSON.parse(value);
-          if (Array.isArray(parsed)) {
-            if (key.includes('keluarga') || key.includes('family')) {
-              saveKeluargaToIndexedDB(parsed).catch(() => {});
-            } else if (key.includes('pbb') || key.includes('sppt')) {
-              savePbbToIndexedDB(parsed).catch(() => {});
-            } else if (key.includes('kunjungan') || key.includes('visit')) {
-              saveVisitsToIndexedDB(parsed).catch(() => {});
-            } else if (key.includes('history')) {
-              saveHistoryToIndexedDB(parsed).catch(() => {});
-            }
-
-            // Save empty pointer to LocalStorage without throwing
-            try {
-              localStorage.setItem(key, JSON.stringify([]));
-            } catch {}
-            console.log(`[safeStorage] Successfully offloaded "${key}" to memory cache & IndexedDB.`);
-            return true;
-          }
-        } catch {}
-      }
-
-      // Final fallback: try saving tiny empty pointer or ignore error
-      try {
-        localStorage.setItem(key, '[]');
-        return true;
-      } catch {
-        return false; // Silently fail localStorage write since memoryFallbackStorage holds the value
-      }
-
-      // 3. Selective Payload Compression (Strip heavy base64 strings but keep metadata)
+      // 2. Selective Payload Compression: Strip heavy base64 media while keeping all text & metadata
       try {
         const parsed = JSON.parse(value);
         if (Array.isArray(parsed)) {
           // Asynchronously persist full data with photos to IndexedDB first
           if (key.includes('laporan') || key.includes('reports')) {
             saveReportsToIndexedDB(parsed).catch(() => {});
+          } else if (key.includes('keluarga') || key.includes('family')) {
+            saveKeluargaToIndexedDB(parsed).catch(() => {});
+          } else if (key.includes('pbb') || key.includes('sppt')) {
+            savePbbToIndexedDB(parsed).catch(() => {});
+          } else if (key.includes('kunjungan') || key.includes('visit')) {
+            saveVisitsToIndexedDB(parsed).catch(() => {});
+          } else if (key.includes('history')) {
+            saveHistoryToIndexedDB(parsed).catch(() => {});
           }
 
-          // Preserve ALL items, stripping heavy base64 strings to ensure 100% fit in LocalStorage
-          const lightweight = parsed.map((item: any) => {
-            if (!item || typeof item !== 'object') return item;
-            const copy = { ...item };
-            
-            const stripHeavyStr = (url?: any) => (typeof url === 'string' && url.startsWith('data:') && url.length > 300 ? '' : url);
-
-            // Handle reports format (dokumentasiFoto array)
-            if (Array.isArray(copy.dokumentasiFoto)) {
-              copy.dokumentasiFoto = copy.dokumentasiFoto.map((f: any) => {
-                if (!f) return f;
-                return { ...f, url: stripHeavyStr(f.url) };
-              });
-            }
-            
-            // Handle various photo field names across entities
-            if (copy.fotoSebelumUrl) copy.fotoSebelumUrl = stripHeavyStr(copy.fotoSebelumUrl);
-            if (copy.fotoProsesUrl) copy.fotoProsesUrl = stripHeavyStr(copy.fotoProsesUrl);
-            if (copy.fotoSelesaiUrl) copy.fotoSelesaiUrl = stripHeavyStr(copy.fotoSelesaiUrl);
-            if (copy.fotoDokumentasi) copy.fotoDokumentasi = stripHeavyStr(copy.fotoDokumentasi);
-            if (copy.fotoKkUrl) copy.fotoKkUrl = stripHeavyStr(copy.fotoKkUrl);
-            if (copy.fotoRumahUrl) copy.fotoKkUrl = stripHeavyStr(copy.fotoRumahUrl);
-            
-            return copy;
-          });
-
+          const lightweight = parsed.map(stripHeavyMediaFromItem);
           const compressedJson = JSON.stringify(lightweight);
-          localStorage.setItem(key, compressedJson);
-          console.log(`[safeStorage] Successfully compressed "${key}" by stripping heavy media.`);
-          return true;
+
+          try {
+            localStorage.setItem(key, compressedJson);
+            console.log(`[safeStorage] Successfully saved stripped lightweight data for "${key}".`);
+            return true;
+          } catch (secondQuotaErr) {
+            console.warn(`[safeStorage] Stripped data still exceeded quota. Offloading to IndexedDB.`);
+          }
         }
       } catch (stripError) {
         console.error('[safeStorage] Error during defensive compression recovery:', stripError);
       }
 
-      return false;
+      // 3. Fallback: Data is safely in IndexedDB; keep empty/minimal placeholder in localStorage
+      try {
+        localStorage.setItem(key, '[]');
+        return true;
+      } catch {
+        return false;
+      }
     }
+
+    return false;
   }
 }
 

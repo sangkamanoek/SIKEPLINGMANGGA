@@ -169,6 +169,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
               body: JSON.stringify({
                 imageBase64: compressedDataUrl,
                 isGallery: isGallerySource,
+                fileName: file.name,
               }),
             })
               .then((res) => res.json())
@@ -181,12 +182,12 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
                   setFotoDokumentasi('');
                   setPhotoNotice({
                     type: 'error',
-                    title: `❌ FOTO DITOLAK OTOMATIS OLEH AI (${
-                      isGallerySource ? 'Galeri HP' : 'Kamera'
-                    })`,
+                    title: result.isScreenshot
+                      ? `❌ FOTO DITOLAK: TERDETEKSI SCREENSHOT HP (${isGallerySource ? 'Galeri HP' : 'Kamera'})`
+                      : `❌ FOTO DITOLAK: TIDAK MEMUAT WAJAH/WARGA (${isGallerySource ? 'Galeri HP' : 'Kamera'})`,
                     detail:
                       result.reason ||
-                      'Foto dari galeri ditolak karena tidak mendeteksi foto rumah/bangunan atau objek manusia (warga/petugas). Harap unggah foto asli kunjungan rumah warga.',
+                      'Foto ditolak karena terdeteksi sebagai tangkapan layar (screenshot) HP atau tidak memperlihatkan wajah orang/warga. Harap unggah foto asli kunjungan warga di lapangan.',
                   });
                 } else {
                   // Disetujui AI Vision
@@ -205,12 +206,23 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
                 console.warn('Network issue during AI photo verification:', err);
                 setIsVerifyingPhoto(false);
                 setVerifyingSource(null);
-                setFotoDokumentasi(compressedDataUrl);
-                setPhotoNotice({
-                  type: 'success',
-                  title: '✅ Foto Terverifikasi',
-                  detail: 'Dokumentasi foto kunjungan warga berhasil dilampirkan.',
-                });
+
+                const isSuspiciousScreenshot = /screenshot|screen_shot|tangkapan_layar|screencap/i.test(file.name);
+                if (isSuspiciousScreenshot) {
+                  setFotoDokumentasi('');
+                  setPhotoNotice({
+                    type: 'error',
+                    title: '❌ FOTO DITOLAK: TERDETEKSI SCREENSHOT',
+                    detail: 'Berkas ini terindikasi sebagai tangkapan layar (screenshot) HP. Mohon lampirkan foto dokumentasi asli yang memperlihatkan warga di lapangan.',
+                  });
+                } else {
+                  setFotoDokumentasi(compressedDataUrl);
+                  setPhotoNotice({
+                    type: 'success',
+                    title: '✅ Foto Terlampir',
+                    detail: 'Dokumentasi foto kunjungan warga berhasil dilampirkan.',
+                  });
+                }
               });
           } else {
             setIsVerifyingPhoto(false);
@@ -259,6 +271,21 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
     }
     if (!cleanAlamat) {
       setErrorMessage('Alamat warga wajib diisi dengan benar.');
+      return;
+    }
+
+    if (isVerifyingPhoto) {
+      setErrorMessage('Mohon tunggu sejenak, AI Vision sedang memverifikasi keaslian foto...');
+      return;
+    }
+
+    if (!fotoDokumentasi || !fotoDokumentasi.trim()) {
+      setErrorMessage('Foto dokumentasi kunjungan warga WAJIB dilampirkan! Silakan ambil foto kamera langsung atau pilih foto warga dari galeri.');
+      return;
+    }
+
+    if (photoNotice?.type === 'error') {
+      setErrorMessage('Foto yang dilampirkan ditolak oleh sistem verifikasi AI. Harap unggah foto asli yang memperlihatkan warga di lapangan.');
       return;
     }
 
@@ -510,10 +537,20 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
         </div>
 
         {/* Unggah Dokumentasi */}
-        <div>
-          <label className="font-extrabold text-slate-700 block mb-1">
-            Unggah Dokumentasi (Kamera / Foto):
-          </label>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <label className="font-extrabold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
+              <span>Foto Dokumentasi Kunjungan Warga</span>
+              <span className="text-rose-600 font-black text-xs">* (Wajib Foto Asli Warga)</span>
+            </label>
+            <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md font-bold inline-flex items-center gap-1">
+              <span>🛡️ Anti-Screenshot AI Aktif</span>
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Lampirkan foto dokumentasi yang memperlihatkan wajah warga atau interaksi door-to-door di lokasi. <strong className="text-rose-600">Dilarang mengunggah tangkapan layar (screenshot) HP</strong>.
+          </p>
+
           <input
             type="file"
             accept="image/*"
@@ -535,10 +572,10 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
               <div className="w-5 h-5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0 mt-0.5" />
               <div>
                 <p className="font-extrabold text-blue-900">
-                  🤖 AI Vision Verifier sedang mengecek foto dari {verifyingSource === 'gallery' ? 'Galeri HP' : 'Kamera'}...
+                  🤖 AI Vision Verifier sedang memeriksa foto dari {verifyingSource === 'gallery' ? 'Galeri HP' : 'Kamera'}...
                 </p>
                 <p className="text-[11px] text-blue-700 font-medium mt-0.5">
-                  Memeriksa objek RUMAH/BANGUNAN atau MANUSIA (Warga/Petugas)...
+                  Memeriksa keberadaan wajah orang/warga dan mendeteksi tangkapan layar HP (anti-screenshot)...
                 </p>
               </div>
             </div>
@@ -591,28 +628,28 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputCameraRef.current?.click()}
-                className="py-4 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-xl flex flex-col items-center justify-center gap-1.5 text-slate-500 hover:text-emerald-700 transition-colors cursor-pointer bg-slate-50/50 hover:bg-emerald-50/20"
+                className="py-4 border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl flex flex-col items-center justify-center gap-1.5 text-slate-600 hover:text-emerald-700 transition-colors cursor-pointer bg-emerald-50/40 hover:bg-emerald-50/70"
               >
                 <Camera className="w-6 h-6 text-emerald-600 animate-pulse" />
-                <span className="font-bold text-xs text-slate-800">
-                  📸 Ambil Foto Kamera
+                <span className="font-extrabold text-xs text-slate-800">
+                  📸 Ambil Foto Kamera Langsung
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">
-                  Buka kamera HP secara langsung
+                <span className="text-[10px] text-slate-500 font-medium">
+                  Buka kamera HP di lokasi warga
                 </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => fileInputGalleryRef.current?.click()}
-                className="py-4 border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-1.5 text-slate-500 hover:text-blue-700 transition-colors cursor-pointer bg-slate-50/50 hover:bg-blue-50/20"
+                className="py-4 border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-1.5 text-slate-600 hover:text-blue-700 transition-colors cursor-pointer bg-slate-50/60 hover:bg-blue-50/40"
               >
                 <Upload className="w-6 h-6 text-blue-600" />
-                <span className="font-bold text-xs text-slate-800">
+                <span className="font-extrabold text-xs text-slate-800">
                   📁 Pilih dari Galeri HP
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">
-                  Pilih gambar yang sudah ada di galeri
+                <span className="text-[10px] text-rose-600 font-bold">
+                  Khusus foto warga asli (Bukan Screenshot)
                 </span>
               </button>
             </div>

@@ -1,32 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardList, Bell, Calendar, CheckCircle2, Camera, Upload, Check, AlertCircle, X, Shield, FileText } from 'lucide-react';
+import { ClipboardList, Bell, Calendar, CheckCircle2, Camera, Upload, Check, AlertCircle, X, Shield, FileText, RefreshCw } from 'lucide-react';
 import { UserAccount } from '../types';
-import { getTugasKhususList, TugasKhusus, markTugasKhususCompletedByAccount } from '../lib/tugasKhususService';
-import { safeSetLocalStorage, safeGetLocalStorage } from '../lib/safeStorage';
+import {
+  getTugasKhususList,
+  TugasKhusus,
+  subscribeTugasKhususFromFirestore,
+  subscribeTugasKhususSubmissions,
+  saveTugasKhususSubmission,
+  getTugasSubmissionsLocal,
+  compressTugasFoto,
+  TugasFotoSubmissionItem,
+} from '../lib/tugasKhususService';
 
 interface DaftarTugasKhususViewProps {
   currentUser: UserAccount;
 }
 
-interface TugasFotoSubmission {
-  [taskId: string]: {
-    fotoUrl: string;
-    keterangan: string;
-    updatedAt: string;
-  };
-}
-
-const STORAGE_KEY_TUGAS_FOTO = 'sikepling_tugas_khusus_submissions_v1';
-
 export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ currentUser }) => {
   const [tasks, setTasks] = useState<TugasKhusus[]>([]);
-  const [submissions, setSubmissions] = useState<TugasFotoSubmission>(() => {
-    return safeGetLocalStorage<TugasFotoSubmission>(STORAGE_KEY_TUGAS_FOTO, {});
+  const [submissions, setSubmissions] = useState<Record<string, TugasFotoSubmissionItem>>(() => {
+    return getTugasSubmissionsLocal();
   });
 
   const [selectedTask, setSelectedTask] = useState<TugasKhusus | null>(null);
   const [fotoUrl, setFotoUrl] = useState<string>('');
   const [keterangan, setKeterangan] = useState<string>('');
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -35,9 +35,8 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
   };
 
   useEffect(() => {
-    const load = () => {
-      const all = getTugasKhususList();
-      const relevant = all.filter(t => {
+    const filterAndSet = (all: TugasKhusus[]) => {
+      const relevant = all.filter((t) => {
         const isForAll = t.targetAccountId === 'ALL' || t.targetRole === 'all';
         const isForThisRole = t.targetRole === currentUser.role;
         const isForThisAccount = t.targetAccountId === currentUser.id;
@@ -45,14 +44,33 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
       });
       setTasks(relevant);
     };
-    load();
-    window.addEventListener('sikepling_tugas_khusus_updated', load);
-    return () => window.removeEventListener('sikepling_tugas_khusus_updated', load);
-  }, [currentUser]);
 
-  useEffect(() => {
-    safeSetLocalStorage(STORAGE_KEY_TUGAS_FOTO, JSON.stringify(submissions));
-  }, [submissions]);
+    // Initial load from cache
+    filterAndSet(getTugasKhususList());
+
+    // Real-time Firestore subscription
+    const unsubTasks = subscribeTugasKhususFromFirestore((liveTasks) => {
+      filterAndSet(liveTasks);
+    });
+
+    const unsubSubmissions = subscribeTugasKhususSubmissions((liveSubs) => {
+      setSubmissions(liveSubs);
+    });
+
+    const handleLocalUpdate = () => {
+      filterAndSet(getTugasKhususList());
+      setSubmissions(getTugasSubmissionsLocal());
+    };
+    window.addEventListener('sikepling_tugas_khusus_updated', handleLocalUpdate);
+    window.addEventListener('sikepling_tugas_khusus_submissions_updated', handleLocalUpdate);
+
+    return () => {
+      unsubTasks();
+      unsubSubmissions();
+      window.removeEventListener('sikepling_tugas_khusus_updated', handleLocalUpdate);
+      window.removeEventListener('sikepling_tugas_khusus_submissions_updated', handleLocalUpdate);
+    };
+  }, [currentUser]);
 
   const handleOpenTask = (task: TugasKhusus) => {
     setSelectedTask(task);
@@ -65,39 +83,53 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
+    setIsCompressing(true);
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const res = event.target?.result as string;
       if (res) {
-        setFotoUrl(res);
-        showToast('Foto dokumentasi berhasil dipilih.');
+        try {
+          // Auto compress to max 800px to ensure quick upload and stay well below 1MB
+          const compressed = await compressTugasFoto(res, 800, 0.75);
+          setFotoUrl(compressed);
+          showToast('Foto dokumentasi berhasil dipilih & dioptimalkan.');
+        } catch {
+          setFotoUrl(res);
+        } finally {
+          setIsCompressing(false);
+        }
+      } else {
+        setIsCompressing(false);
       }
     };
+    reader.onerror = () => setIsCompressing(false);
     reader.readAsDataURL(file);
   };
 
-  const handleSaveSubmission = () => {
+  const handleSaveSubmission = async () => {
     if (!selectedTask) return;
     if (!fotoUrl) {
       alert('Mohon unggah foto dokumentasi terlebih dahulu.');
       return;
     }
 
-    const updatedSubmissions = {
-      ...submissions,
-      [selectedTask.id]: {
+    setIsSaving(true);
+    try {
+      await saveTugasKhususSubmission({
+        taskId: selectedTask.id,
+        accountId: currentUser.id,
+        namaKepling: currentUser.nama,
         fotoUrl,
         keterangan,
-        updatedAt: new Date().toISOString()
-      }
-    };
-    setSubmissions(updatedSubmissions);
+      });
 
-    // Tandai selesai juga
-    markTugasKhususCompletedByAccount(selectedTask.id, currentUser.id);
-
-    showToast(`Dokumentasi tugas "${selectedTask.judul}" berhasil disimpan & dikirim ke Lurah!`);
-    setSelectedTask(null);
+      showToast(`Dokumentasi tugas "${selectedTask.judul}" berhasil tersinkron ke Lurah via Firebase!`);
+      setSelectedTask(null);
+    } catch (err: any) {
+      alert('Gagal menyimpan dokumentasi: ' + (err.message || 'Terjadi kesalahan'));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -264,9 +296,14 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
                         </span>{' '}
                         <span className="text-slate-500">atau drag & drop</span>
                       </div>
-                      <p className="text-[11px] text-slate-400">Mendukung format PNG, JPG dari kamera HP</p>
+                      <p className="text-[11px] text-slate-400">Mendukung format PNG, JPG dari kamera HP (Kompresi otomatis &lt; 800px)</p>
                     </label>
                   </div>
+                )}
+                {isCompressing && (
+                  <p className="text-xs text-amber-700 font-bold flex items-center gap-1.5 animate-pulse">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Mengompresi resolusi foto agar ringan dan cepat...
+                  </p>
                 )}
                 <input
                   id="change-tugas-foto"
@@ -296,6 +333,7 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
               <button
                 type="button"
                 onClick={() => setSelectedTask(null)}
+                disabled={isSaving}
                 className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition-colors"
               >
                 Batal
@@ -303,9 +341,18 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
               <button
                 type="button"
                 onClick={handleSaveSubmission}
-                className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-md cursor-pointer transition-all inline-flex items-center gap-2"
+                disabled={isSaving || isCompressing}
+                className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-black shadow-md cursor-pointer transition-all inline-flex items-center gap-2"
               >
-                <Check className="w-4 h-4" /> Simpan & Kirim Dokumentasi
+                {isSaving ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" /> Menyimpan ke Firebase...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" /> Simpan & Kirim Dokumentasi
+                  </>
+                )}
               </button>
             </div>
           </div>

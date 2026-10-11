@@ -90,6 +90,40 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
   let totalWp = 0;
   let totalWpLunas = 0;
 
+  // Single-pass bucket aggregation for 24 Lingkungan
+  interface LkBucket {
+    count: number;
+    lunasCount: number;
+    nominalTotal: number;
+    nominalLunas: number;
+  }
+
+  const buckets: LkBucket[] = Array.from({ length: 25 }, () => ({
+    count: 0,
+    lunasCount: 0,
+    nominalTotal: 0,
+    nominalLunas: 0,
+  }));
+
+  for (let i = 0; i < spptList.length; i++) {
+    const s = spptList[i];
+    const n = Number(s.lingkungan);
+    if (n >= 1 && n <= 24) {
+      const b = buckets[n];
+      b.count++;
+      const terutang = Number(s.pbbTerutang) || 0;
+      b.nominalTotal += terutang;
+      if (s.status === 'Sudah Bayar') {
+        b.lunasCount++;
+        const paid =
+          s.jumlahBayar !== undefined && s.jumlahBayar !== null && Number(s.jumlahBayar) > 0
+            ? Number(s.jumlahBayar)
+            : terutang;
+        b.nominalLunas += paid;
+      }
+    }
+  }
+
   for (let n = 1; n <= 24; n++) {
     const base = INITIAL_PBB_SUMMARY[n] || {
       targetNominal: 0,
@@ -98,23 +132,11 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
       wpLunas: 0,
     };
 
-    const spptLingkungan = spptList.filter((s) => Number(s.lingkungan) === n);
-    const spptLunas = spptLingkungan.filter((s) => s.status === 'Sudah Bayar');
-
-    const spptNominalLunas = spptLunas.reduce((acc, curr) => {
-      const actualPaid = (curr.jumlahBayar !== undefined && curr.jumlahBayar !== null && Number(curr.jumlahBayar) > 0)
-        ? Number(curr.jumlahBayar)
-        : (Number(curr.pbbTerutang) || 0);
-      return acc + actualPaid;
-    }, 0);
-    const spptNominalTotal = spptLingkungan.reduce((acc, curr) => acc + (Number(curr.pbbTerutang) || 0), 0);
-
-    // If actual SPPTs exist in database, use actual counts and sums; otherwise use target baseline
-    const lkTotalWp = spptLingkungan.length > 0 ? spptLingkungan.length : base.totalWp;
-    const lkTargetNominal = spptNominalTotal > 0 ? spptNominalTotal : base.targetNominal;
-
-    const lkWpLunas = spptLunas.length;
-    const lkRealisasiNominal = spptNominalLunas;
+    const b = buckets[n];
+    const lkTotalWp = b.count > 0 ? b.count : base.totalWp;
+    const lkTargetNominal = b.nominalTotal > 0 ? b.nominalTotal : base.targetNominal;
+    const lkWpLunas = b.count > 0 ? b.lunasCount : base.wpLunas;
+    const lkRealisasiNominal = b.nominalTotal > 0 ? b.nominalLunas : base.realisasiNominal;
     const lkSisaNominal = Math.max(0, lkTargetNominal - lkRealisasiNominal);
 
     const persentaseRealisasi = lkTargetNominal > 0 ? (lkRealisasiNominal / lkTargetNominal) * 100 : 0;

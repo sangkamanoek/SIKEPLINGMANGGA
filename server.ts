@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import { GoogleGenAI } from '@google/genai';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -711,7 +712,7 @@ app.post('/api/kunjungan', (req, res) => {
 // AI Vision Verification Endpoint untuk Foto Kunjungan Galeri HP / Kamera
 app.post('/api/verify-kunjungan-photo', async (req, res) => {
   try {
-    const { imageBase64, isGallery } = req.body;
+    const { imageBase64, isGallery, fileName } = req.body;
     if (!imageBase64 || typeof imageBase64 !== 'string') {
       return res.status(400).json({ valid: false, reason: 'Foto tidak ditemukan atau format tidak valid.' });
     }
@@ -734,13 +735,90 @@ app.post('/api/verify-kunjungan-photo', async (req, res) => {
       });
     }
 
+    // Heuristik cepat 1: Cek nama file jika terindikasi screenshot
+    if (fileName && typeof fileName === 'string') {
+      const lowerName = fileName.toLowerCase();
+      if (
+        lowerName.includes('screenshot') ||
+        lowerName.includes('screen_shot') ||
+        lowerName.includes('tangkapan_layar') ||
+        lowerName.includes('screen-shot') ||
+        lowerName.includes('screencap')
+      ) {
+        return res.json({
+          valid: false,
+          isScreenshot: true,
+          hasHumanFaceOrPerson: false,
+          detectedObjects: 'Tangkapan Layar (Screenshot File)',
+          reason: 'File terdeteksi sebagai Screenshot berdasarkan nama berkas. Dilarang mengunggah tangkapan layar HP.',
+        });
+      }
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (apiKey) {
       try {
-        // AI Validation skipped
-        const aiAvailable = false;
-        if (aiAvailable) {
-          // logic removed
+        const ai = new GoogleGenAI({ apiKey });
+        const prompt = `Anda adalah sistem verifikasi AI untuk laporan kunjungan warga door-to-door (tatap muka) oleh Kepala Lingkungan (Kepling) Kelurahan Mangga.
+Tugas Anda: Memeriksa apakah foto yang diunggah adalah FOTO ASLI DOKUMENTASI KUNJUNGAN atau TANGKAPAN LAYAR (SCREENSHOT).
+
+Aturan Verifikasi Ketat:
+1. DETEKSI SCREENSHOT:
+   - Jika gambar memperlihatkan antarmuka HP/aplikasi (status bar jam/baterai, tombol navigasi Android/iOS, gelembung chat WhatsApp, teks dokumen digital, media sosial, browser, form aplikasi yang difoto ulang), gambar ini ADALAH SCREENSHOT.
+   - Jika ini SCREENSHOT, atur "isScreenshot": true dan "valid": false.
+2. DETEKSI MANUSIA / WAJAH / LAPANGAN:
+   - Foto harus memperlihatkan manusia/orang (wajah warga / keluarga / lansia / balita / petugas) atau interaksi di rumah / lingkungan warga.
+   - Jika gambar tidak memperlihatkan manusia/wajah warga/rumah sama sekali (misalnya gambar dokumen kertas saja, gambar layar komputer, foto hitam/buram, gambar logo/kartu), atur "valid": false.
+3. KEPUTUSAN "valid":
+   - valid = true HANYA JIKA foto BUKAN screenshot DAN memperlihatkan manusia/warga atau dokumentasi kunjungan rumah asli.
+   - valid = false JIKA terdeteksi screenshot ATAU tidak ada wajah/manusia/kunjungan lapangan.
+
+Kembalikan jawaban HANYA dalam format JSON valid tanpa markdown backtick:
+{
+  "valid": boolean,
+  "isScreenshot": boolean,
+  "hasHumanFaceOrPerson": boolean,
+  "detectedObjects": "string singkat objek yang terlihat",
+  "reason": "penjelasan jelas dan sopan dalam Bahasa Indonesia mengapa foto disetujui atau ditolak"
+}`;
+
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType || 'image/jpeg',
+                    data: cleanBase64,
+                  },
+                },
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          config: {
+            responseMimeType: 'application/json',
+          },
+        });
+
+        const text = response.text?.trim() || '';
+        if (text) {
+          try {
+            const parsed = JSON.parse(text);
+            return res.json({
+              valid: Boolean(parsed.valid),
+              isScreenshot: Boolean(parsed.isScreenshot),
+              hasHumanFaceOrPerson: Boolean(parsed.hasHumanFaceOrPerson),
+              detectedObjects: parsed.detectedObjects || 'Objek dokumentasi',
+              reason: parsed.reason || (parsed.valid ? 'Foto terverifikasi valid.' : 'Foto ditolak.'),
+            });
+          } catch (pe) {
+            console.warn('Failed to parse Gemini response JSON:', pe, text);
+          }
         }
       } catch (geminiErr) {
         console.warn('Gemini Vision Verification error, proceeding with smart fallback:', geminiErr);

@@ -38,6 +38,7 @@ import {
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { safeSetLocalStorage } from '../lib/safeStorage';
 import { loadAllAttendance, checkApelTimeStatus, calculateAbsentDays } from '../lib/attendanceApi';
+import { compressImageFile } from '../lib/imageCompressor';
 
 interface FormLaporanProps {
   onSaveReport: (item: LaporanHarianItem) => Promise<void>;
@@ -264,6 +265,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
   // Dokumentasi Foto state
   const [fotoList, setFotoList] = useState<FotoDokumentasi[]>([]);
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
+  const [compressionProgress, setCompressionProgress] = useState<string>('');
   const [copiedPreview, setCopiedPreview] = useState(false);
   const [showPhotoValidationModal, setShowPhotoValidationModal] = useState<boolean>(false);
   const [showKunjunganInline, setShowKunjunganInline] = useState<boolean>(false);
@@ -393,47 +396,8 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     setHari(e.target.value);
   };
 
-  const compressFile = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          let width = img.width;
-          let height = img.height;
-          // Dimensi 720px memberikan ketajaman tinggi untuk SPPT PBB & perlinsos, sekaligus ukuran file sangat efisien (~40KB per foto)
-          const maxDim = 720;
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'medium';
-            ctx.drawImage(img, 0, 0, width, height);
-            // Kualitas 0.42 menghasilkan foto jernih, tajam, dan ukuran super ringan tanpa resiko kuota Firestore / Vercel
-            resolve(canvas.toDataURL('image/jpeg', 0.42));
-          } else {
-            resolve((event.target?.result as string) || '');
-          }
-        };
-        img.onerror = () => {
-          resolve((event.target?.result as string) || '');
-        };
-        img.src = (event.target?.result as string) || '';
-      };
-      reader.onerror = () => resolve('');
-      reader.readAsDataURL(file);
-    });
+  const compressFile = async (file: File): Promise<string> => {
+    return compressImageFile(file, 720, 0.42);
   };
 
   const handleImageUpload = async (
@@ -445,12 +409,15 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
     const fileArray: File[] = Array.from(files);
     e.target.value = '';
+    setIsCompressingPhoto(true);
 
-    // Parallel compress all uploaded files for maximum speed
-    const compressedResults = await Promise.all(
-      fileArray.map(async (file, i) => {
-        const compressedUrl = await compressFile(file);
-        if (!compressedUrl) return null;
+    try {
+      const validPhotos: FotoDokumentasi[] = [];
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        setCompressionProgress(`Mengompresi foto ${i + 1} dari ${fileArray.length}...`);
+        const compressedUrl = await compressImageFile(file, 720, 0.42);
+        if (!compressedUrl) continue;
 
         let categoryPrefix = '';
         if (kategori === 'pbb') categoryPrefix = '[PBB] ';
@@ -461,19 +428,21 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
         else if (kategori === 'lainnya') categoryPrefix = '[KEGIATAN LAINNYA] ';
         else if (kategori === 'infrastruktur') categoryPrefix = '[INFRASTRUKTUR] ';
 
-        return {
+        validPhotos.push({
           id: 'foto_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6) + '_' + i,
           url: compressedUrl,
           name: categoryPrefix ? `${categoryPrefix}${file.name || 'Foto Dokumentasi'}` : file.name || `Foto ${i + 1}`,
           timestamp: new Date().toISOString(),
           kategori,
-        };
-      })
-    );
+        });
+      }
 
-    const validPhotos = compressedResults.filter((p): p is NonNullable<typeof p> => p !== null);
-    if (validPhotos.length > 0) {
-      setFotoList((prev) => [...prev, ...validPhotos]);
+      if (validPhotos.length > 0) {
+        setFotoList((prev) => [...prev, ...validPhotos]);
+      }
+    } finally {
+      setIsCompressingPhoto(false);
+      setCompressionProgress('');
     }
   };
 
@@ -2075,12 +2044,19 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
             </div>
 
             {/* Upload Area */}
+            {isCompressingPhoto && (
+              <div className="mb-3 p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-center gap-2.5 text-xs font-bold text-emerald-800 animate-pulse">
+                <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                <span>{compressionProgress || 'Mengompresi foto otomatis agar ringan untuk HP...'}</span>
+              </div>
+            )}
             <div className="border-2 border-dashed border-slate-200 hover:border-emerald-500 rounded-xl p-6 text-center transition-colors bg-slate-50/50">
               <input
                 id="file-input-dokumentasi"
                 type="file"
                 multiple
                 accept="image/*"
+                disabled={isCompressingPhoto}
                 onChange={handleImageUpload}
                 className="hidden"
               />

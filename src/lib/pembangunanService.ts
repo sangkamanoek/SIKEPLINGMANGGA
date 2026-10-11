@@ -26,10 +26,27 @@ export async function savePembangunanToFirestore(item: RealisasiPembangunan): Pr
       ...item,
       updatedAt: new Date().toISOString(),
     });
+
+    // Guard: Prevent exceeding Firestore 1MB document limit
+    try {
+      const jsonStr = JSON.stringify(cleaned);
+      const byteSize = new Blob([jsonStr]).size;
+      if (byteSize > 1000000) {
+        console.warn(`[Firestore Pembangunan] Warning: Item ${item.id} payload is ${byteSize} bytes (near 1MB limit). Trimming redundant photo arrays.`);
+        delete cleaned.fotoSebelumList;
+        delete cleaned.fotoProsesList;
+        delete cleaned.fotoSesudahList;
+      }
+    } catch {}
+
     await setDoc(docRef, cleaned, { merge: true });
+    console.log(`[Firestore Pembangunan] Successfully saved item ${item.id} (${item.namaProyek}) to Firestore.`);
     return true;
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, PEMBANGUNAN_COLLECTION);
+    console.error(`[Firestore Pembangunan Error] Failed saving ${item.id} to Firestore:`, error);
+    try {
+      handleFirestoreError(error, OperationType.WRITE, PEMBANGUNAN_COLLECTION);
+    } catch {}
     return false;
   }
 }
@@ -123,6 +140,7 @@ export async function savePembangunanToServer(item: RealisasiPembangunan): Promi
   })();
 
   const [fsOk, srvOk] = await Promise.all([firestorePromise, serverPromise]);
+  console.log(`[savePembangunanToServer] Sync result for ${item.id}: Firestore=${fsOk}, ServerBuffer=${srvOk}`);
   return Boolean(fsOk || srvOk);
 }
 

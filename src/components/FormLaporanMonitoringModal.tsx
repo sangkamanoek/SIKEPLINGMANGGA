@@ -36,7 +36,7 @@ const compressImage = (file: File): Promise<string> => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const maxDim = 1200;
+        const maxDim = 800; // Optimal 800px max (safe under 1 MB Firestore limit)
         let width = img.width;
         let height = img.height;
         if (width > maxDim || height > maxDim) {
@@ -56,7 +56,7 @@ const compressImage = (file: File): Promise<string> => {
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.78));
+        resolve(canvas.toDataURL('image/jpeg', 0.70));
       };
       img.onerror = () => reject(new Error('Gagal memuat gambar'));
       img.src = e.target?.result as string;

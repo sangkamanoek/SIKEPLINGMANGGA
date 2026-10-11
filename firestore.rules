@@ -114,13 +114,14 @@ service cloud.firestore {
 
     // Realisasi Pembangunan & Laporan Pemantauan Kondisi Infrastruktur
     match /realisasi_pembangunan/{docId} {
-      allow read: if true;
-      allow create, update: if request.resource.data.keys().hasAll(['id', 'namaProyek'])
-                            && isValidString(request.resource.data.id, 1, 100);
-      allow delete: if true;
+      allow read, write: if true;
     }
 
     match /laporan_infrastruktur/{docId} {
+      allow read, write: if true;
+    }
+
+    match /monitoring_infrastruktur/{docId} {
       allow read, write: if true;
     }
 
@@ -164,6 +165,14 @@ service cloud.firestore {
 
     // Arsip Surat Kedinasan & Persuratan Kelurahan
     match /surat_kedinasan/{docId} {
+      allow read, write: if true;
+    }
+
+    // Tugas Khusus Lurah & Dokumentasi Lapangan Kepling
+    match /tugas_khusus/{docId} {
+      allow read, write: if true;
+    }
+    match /tugas_khusus_submissions/{docId} {
       allow read, write: if true;
     }
 

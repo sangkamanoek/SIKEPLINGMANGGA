@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, CheckCircle2, Calendar, UserCheck, AlertTriangle, X, ChevronRight, FileText, Camera } from 'lucide-react';
 import { UserAccount } from '../types';
-import { getTugasKhususList, TugasKhusus, markTugasKhususCompletedByAccount } from '../lib/tugasKhususService';
+import {
+  getTugasKhususList,
+  TugasKhusus,
+  markTugasKhususCompletedByAccount,
+  subscribeTugasKhususFromFirestore,
+} from '../lib/tugasKhususService';
 import { showSafeNotification } from '../lib/safeNotification';
 
 interface TugasKhususBannerProps {
@@ -16,10 +21,8 @@ export const TugasKhususBanner: React.FC<TugasKhususBannerProps> = ({ activeAcco
   const [confirmTaskToFinish, setConfirmTaskToFinish] = useState<TugasKhusus | null>(null);
 
   useEffect(() => {
-    const loadTasks = () => {
-      const all = getTugasKhususList();
-      // Filter tasks active and targeted to this account or 'ALL'
-      const relevant = all.filter(t => {
+    const filterRelevantTasks = (all: TugasKhusus[]) => {
+      const relevant = all.filter((t) => {
         if (t.status !== 'aktif') return false;
         // Check if target matches
         const isForAll = t.targetAccountId === 'ALL' || t.targetRole === 'all';
@@ -35,9 +38,23 @@ export const TugasKhususBanner: React.FC<TugasKhususBannerProps> = ({ activeAcco
       setTasks(relevant);
     };
 
-    loadTasks();
-    window.addEventListener('sikepling_tugas_khusus_updated', loadTasks);
-    return () => window.removeEventListener('sikepling_tugas_khusus_updated', loadTasks);
+    // Load initial
+    filterRelevantTasks(getTugasKhususList());
+
+    // Subscribe to Firestore for instantaneous push when Lurah adds task on another device
+    const unsub = subscribeTugasKhususFromFirestore((liveTasks) => {
+      filterRelevantTasks(liveTasks);
+    });
+
+    const handleLocalUpdate = () => {
+      filterRelevantTasks(getTugasKhususList());
+    };
+    window.addEventListener('sikepling_tugas_khusus_updated', handleLocalUpdate);
+
+    return () => {
+      unsub();
+      window.removeEventListener('sikepling_tugas_khusus_updated', handleLocalUpdate);
+    };
   }, [activeAccount]);
 
   useEffect(() => {

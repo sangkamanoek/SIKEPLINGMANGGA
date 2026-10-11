@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan to restrict data access for all reports to lingkungan-specific data and implement custom photo download naming.",
-  "updatedAt":  "2026-10-10T16:13:26.240703960Z",
+  "summary":  "Rencana implementasi komprehensif untuk sinkronisasi real-time Tugas Khusus Lurah ke seluruh perangkat (HP/laptop) via Firebase Firestore, mencakup pembuatan koleksi Firestore, aturan keamanan, real-time listener (onSnapshot), sinkronisasi status selesai, dan kompresi foto dokumentasi lapangan.",
+  "updatedAt":  "2026-10-11T13:38:02.715706629Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

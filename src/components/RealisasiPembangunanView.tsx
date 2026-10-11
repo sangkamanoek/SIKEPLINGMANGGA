@@ -82,7 +82,7 @@ const compressImageFile = (file: File): Promise<string> => {
       const img = new window.Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const maxDim = 1200; // Optimal HD resolution (1200px max)
+        const maxDim = 800; // Optimal 800px max (safe under 1 MB Firestore limit)
         let width = img.width;
         let height = img.height;
         if (width > maxDim || height > maxDim) {
@@ -102,7 +102,7 @@ const compressImageFile = (file: File): Promise<string> => {
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.70);
         resolve(dataUrl);
       };
       img.onerror = () => reject(new Error('Gagal memuat gambar'));
@@ -735,7 +735,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNamaProyek.trim()) {
       setFormError('Nama proyek pembangunan wajib diisi.');
@@ -745,6 +745,9 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
 
     const keplingObj = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === formLingkunganNo);
     const keplingName = keplingObj ? keplingObj.nama : `Kepling Lingkungan ${formLingkunganNo}`;
+    const creatorDisplay = currentUser.role === 'kepling'
+      ? `${currentUser.nama} (${currentUser.jabatan || `Kepala Lingkungan ${formLingkunganNo}`})`
+      : `${currentUser.nama} (${keplingName})`;
 
     const cleanSebelumList = formFotoSebelumList.length > 0 ? formFotoSebelumList : (formFotoSebelum ? [formFotoSebelum] : []);
     const cleanProsesList = formFotoProsesList.length > 0 ? formFotoProsesList : (formFotoProses ? [formFotoProses] : []);
@@ -766,23 +769,26 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         tanggalMulai: formTglMulai || undefined,
         tanggalSelesai: formTglSelesai || undefined,
         fotoSebelumUrl: cleanSebelumList[0] || formFotoSebelum.trim() || undefined,
-        fotoSebelumList: cleanSebelumList.length > 0 ? cleanSebelumList : undefined,
+        fotoSebelumList: cleanSebelumList.length > 1 ? cleanSebelumList : undefined,
         fotoProsesUrl: cleanProsesList[0] || formFotoProses.trim() || undefined,
-        fotoProsesList: cleanProsesList.length > 0 ? cleanProsesList : undefined,
+        fotoProsesList: cleanProsesList.length > 1 ? cleanProsesList : undefined,
         fotoSesudahUrl: cleanSesudahList[0] || formFotoSesudah.trim() || undefined,
-        fotoSesudahList: cleanSesudahList.length > 0 ? cleanSesudahList : undefined,
+        fotoSesudahList: cleanSesudahList.length > 1 ? cleanSesudahList : undefined,
         keterangan: formKeterangan.trim(),
         updatedAt: new Date().toISOString(),
       };
       setItems((prev) => prev.map((i) => (i.id === editingItem.id ? updated : i)));
-      savePembangunanToServer(updated).catch((err) => {
-        console.warn('Save updated pembangunan to server notice:', err);
-      });
-      showToast(`Pembaruan proyek "${updated.namaProyek}" berhasil disimpan ke database!`);
+      setIsModalOpen(false);
+      const ok = await savePembangunanToServer(updated);
+      showToast(
+        ok
+          ? `Pembaruan proyek "${updated.namaProyek}" berhasil disimpan ke Firebase & database!`
+          : `Pembaruan proyek "${updated.namaProyek}" tersimpan di memori perangkat.`
+      );
     } else {
       // Create new
       const newItem: RealisasiPembangunan = {
-        id: `pemb_${Date.now()}`,
+        id: `pemb_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         lingkunganId: `kepling_${formLingkunganNo}`,
         lingkunganNomor: formLingkunganNo,
         jenisPembangunan: formJenis,
@@ -795,23 +801,24 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         tanggalMulai: formTglMulai || undefined,
         tanggalSelesai: formTglSelesai || undefined,
         fotoSebelumUrl: cleanSebelumList[0] || formFotoSebelum.trim() || undefined,
-        fotoSebelumList: cleanSebelumList.length > 0 ? cleanSebelumList : undefined,
+        fotoSebelumList: cleanSebelumList.length > 1 ? cleanSebelumList : undefined,
         fotoProsesUrl: cleanProsesList[0] || formFotoProses.trim() || undefined,
-        fotoProsesList: cleanProsesList.length > 0 ? cleanProsesList : undefined,
+        fotoProsesList: cleanProsesList.length > 1 ? cleanProsesList : undefined,
         fotoSesudahUrl: cleanSesudahList[0] || formFotoSesudah.trim() || undefined,
-        fotoSesudahList: cleanSesudahList.length > 0 ? cleanSesudahList : undefined,
+        fotoSesudahList: cleanSesudahList.length > 1 ? cleanSesudahList : undefined,
         keterangan: formKeterangan.trim(),
         createdAt: new Date().toISOString(),
-        createdByName: `${currentUser.nama} (${keplingName})`,
+        createdByName: creatorDisplay,
       };
       setItems((prev) => [newItem, ...prev]);
-      savePembangunanToServer(newItem).catch((err) => {
-        console.warn('Save new pembangunan to server notice:', err);
-      });
-      showToast(`Laporan infrastruktur "${newItem.namaProyek}" berhasil disimpan ke database!`);
+      setIsModalOpen(false);
+      const ok = await savePembangunanToServer(newItem);
+      showToast(
+        ok
+          ? `Laporan proyek "${newItem.namaProyek}" berhasil disimpan ke Firebase Firestore!`
+          : `Laporan proyek "${newItem.namaProyek}" tersimpan di memori lokal.`
+      );
     }
-
-    setIsModalOpen(false);
   };
 
   const handleExportExcel = () => {

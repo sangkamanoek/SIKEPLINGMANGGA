@@ -147,9 +147,52 @@
         "createdByName": { "type": "string" }
       },
       "required": ["id", "namaProyek", "lingkunganNomor"]
+    },
+    "TugasKhusus": {
+      "title": "Tugas Khusus Lurah",
+      "description": "Instruksi dan tugas khusus resmi dari Lurah yang ditujukan kepada Kepala Lingkungan.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "judul": { "type": "string" },
+        "deskripsi": { "type": "string" },
+        "targetAccountId": { "type": "string" },
+        "targetRole": { "type": "string" },
+        "pemberiTugas": { "type": "string" },
+        "tanggalMulai": { "type": "string" },
+        "deadline": { "type": "string" },
+        "status": { "type": "string", "enum": ["aktif", "selesai"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "completedBy": { "type": "array" }
+      },
+      "required": ["id", "judul", "deskripsi", "status"]
+    },
+    "TugasKhususSubmission": {
+      "title": "Dokumentasi Tugas Khusus",
+      "description": "Laporan foto bukti dan catatan pelaksanaan tugas khusus oleh Kepling.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "taskId": { "type": "string" },
+        "accountId": { "type": "string" },
+        "namaKepling": { "type": "string" },
+        "fotoUrl": { "type": "string" },
+        "keterangan": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "taskId", "fotoUrl"]
     }
   },
   "firestore": {
+    "tugas_khusus/{docId}": {
+      "schema": "TugasKhusus",
+      "description": "Koleksi tugas khusus lurah tersinkronisasi real-time ke seluruh HP."
+    },
+    "tugas_khusus_submissions/{docId}": {
+      "schema": "TugasKhususSubmission",
+      "description": "Koleksi bukti foto dan dokumentasi pengerjaan tugas khusus oleh Kepling."
+    },
     "realisasi_pembangunan/{docId}": {
       "schema": "RealisasiPembangunan",
       "description": "Koleksi proyek realisasi pembangunan dan pemantauan fisik infrastruktur."

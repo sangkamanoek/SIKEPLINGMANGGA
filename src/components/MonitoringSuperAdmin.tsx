@@ -40,6 +40,7 @@ import {
   Server,
   Database,
   Bell,
+  Camera,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import QRCode from 'react-qr-code';
@@ -49,6 +50,10 @@ import {
   deleteTugasKhusus,
   updateTugasKhususStatus,
   TugasKhusus,
+  subscribeTugasKhususFromFirestore,
+  subscribeTugasKhususSubmissions,
+  TugasFotoSubmissionItem,
+  getTugasSubmissionsLocal,
 } from '../lib/tugasKhususService';
 import {
   saveSuperAdminDeviceDataToFirestore,
@@ -137,6 +142,8 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
 
   // Tugas Khusus Lurah states
   const [tugasList, setTugasList] = useState<TugasKhusus[]>(() => getTugasKhususList());
+  const [tugasSubmissions, setTugasSubmissions] = useState<Record<string, TugasFotoSubmissionItem>>(() => getTugasSubmissionsLocal());
+  const [viewingSubmission, setViewingSubmission] = useState<{ task: TugasKhusus; sub: TugasFotoSubmissionItem } | null>(null);
   const [taskJudul, setTaskJudul] = useState('');
   const [taskDeskripsi, setTaskDeskripsi] = useState('');
   const [taskTargetAccountId, setTaskTargetAccountId] = useState('ALL');
@@ -145,11 +152,30 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
   const [taskSuccess, setTaskSuccess] = useState('');
 
   useEffect(() => {
+    // 1. Initial cached values
+    setTugasList(getTugasKhususList());
+    setTugasSubmissions(getTugasSubmissionsLocal());
+
+    // 2. Real-time Firestore sync
+    const unsubTasks = subscribeTugasKhususFromFirestore((liveTasks) => {
+      setTugasList(liveTasks);
+    });
+    const unsubSubs = subscribeTugasKhususSubmissions((liveSubs) => {
+      setTugasSubmissions(liveSubs);
+    });
+
     const handleTugasUpdate = () => {
       setTugasList(getTugasKhususList());
+      setTugasSubmissions(getTugasSubmissionsLocal());
     };
     window.addEventListener('sikepling_tugas_khusus_updated', handleTugasUpdate);
-    return () => window.removeEventListener('sikepling_tugas_khusus_updated', handleTugasUpdate);
+    window.addEventListener('sikepling_tugas_khusus_submissions_updated', handleTugasUpdate);
+    return () => {
+      unsubTasks();
+      unsubSubs();
+      window.removeEventListener('sikepling_tugas_khusus_updated', handleTugasUpdate);
+      window.removeEventListener('sikepling_tugas_khusus_submissions_updated', handleTugasUpdate);
+    };
   }, []);
 
   const handleCreateTugas = (e: React.FormEvent) => {
@@ -318,7 +344,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
   }, [reports, todayIso, latestAvailableDate, selectedDate]);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'LATE_PENDING' | 'WAITING'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'WAITING'>('ALL');
   const [displayLayout, setDisplayLayout] = useState<'TABLE' | 'CARDS'>('TABLE');
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -397,20 +423,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
     }
   }, [isDeviceSyncModalOpen]);
 
-  // Check if 23:30 cutoff time has passed for the selected date or today
-  const isCutoffPassed = useMemo(() => {
-    const targetDateIso = selectedDate || todayIso;
-    if (targetDateIso < todayIso) {
-      return true; // Past dates without report = cutoff passed
-    }
-    if (targetDateIso === todayIso) {
-      const now = new Date();
-      const currentMins = now.getHours() * 60 + now.getMinutes();
-      return currentMins >= (23 * 60 + 30); // 23:30 = 1410 minutes
-    }
-    return false; // Future date
-  }, [selectedDate, todayIso]);
-
   // Map of every Kepling to their most recent report across the ENTIRE database
   const keplingLatestReportMap = useMemo(() => {
     const map = new Map<string, LaporanHarianItem>();
@@ -462,8 +474,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
     let totalIkd = 0;
     let totalBpjs = 0;
     let submittedCount = 0;
-    let latePendingCount = 0;
-    let waitingPendingCount = 0;
 
     KEPLING_ACCOUNTS.forEach((k) => {
       const rep = activeKeplingReportMap.get(k.id);
@@ -473,12 +483,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
         totalPerlinsos += Number(rep.kinerja?.perlinsosKk) || 0;
         totalIkd += Number(rep.kinerja?.ikdOrang) || 0;
         totalBpjs += Number(rep.kinerja?.bpjsKetenagakerjaanOrang) || 0;
-      } else {
-        if (isCutoffPassed) {
-          latePendingCount++;
-        } else {
-          waitingPendingCount++;
-        }
       }
     });
 
@@ -489,16 +493,13 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
       totalKepling: KEPLING_ACCOUNTS.length,
       submittedCount,
       pendingCount,
-      latePendingCount,
-      waitingPendingCount,
       completionPct,
       totalPbb,
       totalPerlinsos,
       totalIkd,
       totalBpjs,
-      isCutoffPassed,
     };
-  }, [activeKeplingReportMap, isCutoffPassed]);
+  }, [activeKeplingReportMap]);
 
   // Filtered kepling list
   const filteredList = useMemo(() => {
@@ -506,8 +507,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
       const isSubmitted = activeKeplingReportMap.has(k.id);
 
       if (statusFilter === 'SUBMITTED' && !isSubmitted) return false;
-      if (statusFilter === 'LATE_PENDING' && (isSubmitted || !isCutoffPassed)) return false;
-      if (statusFilter === 'WAITING' && (isSubmitted || isCutoffPassed)) return false;
+      if (statusFilter === 'WAITING' && isSubmitted) return false;
 
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
@@ -519,7 +519,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
 
       return true;
     });
-  }, [activeKeplingReportMap, statusFilter, searchTerm, isCutoffPassed]);
+  }, [activeKeplingReportMap, statusFilter, searchTerm]);
 
   const handleCopyRekapWA = () => {
     let tglLabel = 'Semua Tanggal';
@@ -532,10 +532,8 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
     let text = `*REKAPITULASI PENGIRIMAN LAPORAN HARIAN KEPLING*\n`;
     text += `*KELURAHAN MANGGA - KECAMATAN MEDAN TUNTUNGAN*\n`;
     text += `📅 Periode/Tanggal: ${tglLabel}\n`;
-    text += `⏰ Cutoff Waktu Lapor: Jam 23:30 WIB\n`;
     text += `📊 Progress: ${stats.submittedCount}/${stats.totalKepling} Lingkungan (${stats.completionPct}%)\n`;
-    text += `🔴 Belum Melapor (Melewati Cutoff 23:30): ${stats.latePendingCount} Kepling\n`;
-    text += `⏰ Menunggu Laporan: ${stats.waitingPendingCount} Kepling\n\n`;
+    text += `🔴 Belum Melapor: ${stats.pendingCount} Kepling\n\n`;
     text += `*STATUS PELAPORAN 24 LINGKUNGAN:*\n`;
 
     KEPLING_ACCOUNTS.forEach((k) => {
@@ -545,11 +543,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
         text += `✅ ${k.lingkungan} (${k.nama})${tglText} - SUDAH LAPOR\n`;
         text += `   - PBB: ${rep.kinerja?.opsirPbbWp || 0} WP | Perlinsos: ${rep.kinerja?.perlinsosKk || 0} KK | IKD: ${rep.kinerja?.ikdOrang || 0} Jiwa | BPJS: ${rep.kinerja?.bpjsKetenagakerjaanOrang || 0} Jiwa\n`;
       } else {
-        if (isCutoffPassed) {
-          text += `🔴 ${k.lingkungan} (${k.nama}) - BELUM MELAPOR (MELEWATI CUTOFF 23:30)\n`;
-        } else {
-          text += `⏰ ${k.lingkungan} (${k.nama}) - MENUNGGU LAPORAN (s.d. Jam 23:30)\n`;
-        }
+        text += `🔴 ${k.lingkungan} (${k.nama}) - BELUM MELAPOR\n`;
       }
     });
 
@@ -1184,32 +1178,18 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
               <span>🟢 Sudah Lapor ({stats.submittedCount})</span>
             </button>
             <button
-              id="filter-late-pending-status"
-              type="button"
-              onClick={() => setStatusFilter('LATE_PENDING')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                statusFilter === 'LATE_PENDING'
-                  ? 'bg-rose-600 text-white shadow-xs ring-2 ring-rose-300'
-                  : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
-              }`}
-              title="Kepling yang belum melapor hingga melewati batas jam 23:30 WIB"
-            >
-              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-              <span>🔴 Belum Melapor ({stats.latePendingCount})</span>
-            </button>
-            <button
               id="filter-waiting-status"
               type="button"
               onClick={() => setStatusFilter('WAITING')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                 statusFilter === 'WAITING'
-                  ? 'bg-amber-500 text-slate-950 shadow-xs'
-                  : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+                  ? 'bg-rose-600 text-white shadow-xs ring-2 ring-rose-300'
+                  : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
               }`}
-              title="Kepling yang belum melapor namun masih dalam batas waktu s.d. jam 23:30 WIB"
+              title="Kepling yang belum mengirim laporan harian"
             >
-              <Clock className="w-3.5 h-3.5 text-amber-600" />
-              <span>⏰ Menunggu Laporan ({stats.waitingPendingCount})</span>
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+              <span>🔴 Belum Melapor ({stats.pendingCount})</span>
             </button>
           </div>
 
@@ -1259,19 +1239,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
             </div>
           </div>
         </div>
-
-        {/* 23:30 Cutoff Info Banner */}
-        <div className="p-2.5 bg-slate-900 text-white rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>
-              <strong>Aturan Automatic Cutoff 23:30 WIB:</strong> Kepling yang belum mengirim laporan harian setelah jam 23:30 otomatis ditandai dengan badge merah <span className="bg-rose-600 text-white px-2 py-0.5 rounded font-black">🔴 BELUM MELAPOR</span>.
-            </span>
-          </div>
-          <span className="font-mono text-amber-300 font-bold bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-            Cutoff Status Hari Ini: {isCutoffPassed ? 'MELEWATI 23:30 (🔴 CUTOFF AKTIF)' : 'SEBELUM 23:30 (⏰ MENUNGGU)'}
-          </span>
-        </div>
       </div>
 
       {/* RENDER LAYOUT 1: TABEL MONITORING SUPER ADMIN */}
@@ -1311,7 +1278,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                     <tr
                       key={kepling.id}
                       className={`hover:bg-slate-50/80 transition-colors ${
-                        hasReported ? 'bg-white' : isCutoffPassed ? 'bg-rose-50/20' : 'bg-amber-50/10'
+                        hasReported ? 'bg-white' : 'bg-rose-50/20'
                       }`}
                     >
                       {/* Lingkungan Number */}
@@ -1334,7 +1301,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                         </div>
                       </td>
 
-                      {/* STATUS BADGE WITH RED BADGE AFTER 23:30 */}
+                      {/* STATUS BADGE */}
                       <td className="py-3.5 px-4 text-center">
                         {hasReported ? (
                           <div className="inline-flex flex-col items-center">
@@ -1346,24 +1313,14 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                               {viewMode === 'LATEST_PER_KEPLING' ? (report.tanggal || 'Ada Data') : 'Laporan Diterima'}
                             </span>
                           </div>
-                        ) : isCutoffPassed ? (
+                        ) : (
                           <div className="inline-flex flex-col items-center">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-600 text-white border border-rose-700 shadow-sm animate-pulse">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-600 text-white border border-rose-700 shadow-sm">
                               <AlertCircle className="w-3.5 h-3.5 text-white shrink-0" />
                               <span>BELUM MELAPOR</span>
                             </span>
-                            <span className="text-[10px] text-rose-700 font-extrabold mt-1">
-                              ⚠️ Melewati Cutoff 23:30
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="inline-flex flex-col items-center">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
-                              <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                              <span>MENUNGGU LAPORAN</span>
-                            </span>
-                            <span className="text-[10px] text-amber-800 font-semibold mt-1">
-                              ⏰ Tenggat Jam 23:30
+                            <span className="text-[10px] text-rose-700 font-medium mt-1">
+                              Belum Ada Laporan
                             </span>
                           </div>
                         )}
@@ -1465,9 +1422,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
               className={`rounded-2xl border p-4 transition-all flex flex-col justify-between ${
                 hasReported
                   ? 'bg-white border-emerald-200 hover:border-emerald-300 shadow-2xs'
-                  : isCutoffPassed
-                  ? 'bg-rose-50/30 border-rose-200 hover:border-rose-300 shadow-2xs'
-                  : 'bg-amber-50/30 border-amber-200 hover:border-amber-300 shadow-2xs'
+                  : 'bg-rose-50/20 border-rose-200 hover:border-rose-300 shadow-2xs'
               }`}
             >
               <div>
@@ -1487,15 +1442,10 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                       <span>{viewMode === 'LATEST_PER_KEPLING' ? (report.tanggal || 'Ada Laporan') : 'SUDAH LAPOR'}</span>
                     </span>
-                  ) : isCutoffPassed ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white border border-rose-700 shadow-xs animate-pulse">
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white border border-rose-700 shadow-xs">
                       <AlertCircle className="w-3 h-3 text-white" />
                       <span>BELUM MELAPOR</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                      <Clock className="w-3 h-3 text-amber-600" />
-                      <span>MENUNGGU LAPORAN</span>
                     </span>
                   )}
                 </div>
@@ -2708,9 +2658,15 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
 
           {/* List of Published Tugas Khusus */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-4">
-            <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
-              <ClipboardList className="w-4 h-4 text-indigo-600" /> Riwayat Tugas Khusus Diterbitkan ({tugasList.length})
-            </h4>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-indigo-600" /> Riwayat Tugas Khusus Diterbitkan ({tugasList.length})
+              </h4>
+              <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 self-start sm:self-auto">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                Tersinkronisasi Real-Time ke Seluruh HP
+              </span>
+            </div>
 
             {tugasList.length === 0 ? (
               <div className="text-center py-8 text-slate-400 text-xs">
@@ -2722,9 +2678,13 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                   const targetName = t.targetAccountId === 'ALL'
                     ? 'Semua Kepala Lingkungan (Broadcast)'
                     : accountsList.find(a => a.id === t.targetAccountId)?.nama || t.targetAccountId;
+                  const submission = tugasSubmissions[t.id];
+                  const completedNames = (t.completedBy || []).map(id => {
+                    return accountsList.find(a => a.id === id)?.nama || id;
+                  });
 
                   return (
-                    <div key={t.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition-all space-y-2">
+                    <div key={t.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition-all space-y-2.5">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
@@ -2765,11 +2725,48 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                       <h5 className="font-black text-sm text-slate-900">{t.judul}</h5>
                       <p className="text-xs text-slate-700 leading-relaxed">{t.deskripsi}</p>
 
-                      <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-500">
+                      {/* Dokumentasi Foto Submisi dari Kepling */}
+                      {submission && submission.fotoUrl && (
+                        <div className="p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <img
+                              src={submission.fotoUrl}
+                              alt="Bukti Dokumentasi"
+                              className="w-10 h-10 object-cover rounded-lg border border-indigo-200 shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-bold uppercase text-indigo-700 block">
+                                Bukti Lapangan Diterima: {submission.namaKepling || 'Kepling'}
+                              </span>
+                              <p className="text-xs text-slate-700 truncate font-medium">
+                                {submission.keterangan || 'Tidak ada catatan tambahan'}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setViewingSubmission({ task: t, sub: submission })}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer inline-flex items-center gap-1 shadow-xs"
+                          >
+                            <Camera className="w-3.5 h-3.5" /> Buka Foto
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-500">
                         <span>Pemberi: {t.pemberiTugas}</span>
-                        <span className="font-bold text-indigo-700">
-                          {t.completedBy?.length || 0} Akun telah menyelesaikan / membaca tugas ini
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-indigo-700">
+                            {t.completedBy?.length || 0} Akun Selesai:
+                          </span>
+                          {completedNames.length > 0 ? (
+                            <span className="text-slate-700 font-semibold">
+                              {completedNames.join(', ')}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">Belum ada akun</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -2777,6 +2774,61 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
               </div>
             )}
           </div>
+
+          {/* Modal Preview Bukti Dokumentasi Tugas Khusus */}
+          {viewingSubmission && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
+              <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+                  <div>
+                    <span className="text-[10px] font-black uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-md">
+                      Bukti Dokumentasi Lapangan
+                    </span>
+                    <h3 className="text-base font-black text-slate-900 mt-1">
+                      {viewingSubmission.task.judul}
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Pengirim: <strong>{viewingSubmission.sub.namaKepling || 'Kepling'}</strong> &bull; {new Date(viewingSubmission.sub.updatedAt).toLocaleString('id-ID')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setViewingSubmission(null)}
+                    className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 aspect-video flex items-center justify-center">
+                    <img
+                      src={viewingSubmission.sub.fotoUrl}
+                      alt="Foto Bukti Lapangan"
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  </div>
+
+                  {viewingSubmission.sub.keterangan && (
+                    <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs text-slate-800 space-y-1">
+                      <span className="font-bold text-slate-600 block">Keterangan / Laporan Kepling:</span>
+                      <p className="leading-relaxed">{viewingSubmission.sub.keterangan}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setViewingSubmission(null)}
+                    className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

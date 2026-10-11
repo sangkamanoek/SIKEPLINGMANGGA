@@ -559,49 +559,8 @@ export default function App() {
     // Instantly load cached local reports to populate the UI in 10ms (Buttery-smooth startup)
     loadLocalReports();
 
-    // Stagger heavy database memory caching across idle intervals so older phones don't freeze or drop frames
-    const runIdle = (fn: () => void, timeoutMs: number) => {
-      if ('requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(fn, { timeout: timeoutMs });
-      } else {
-        setTimeout(fn, timeoutMs);
-      }
-    };
-
-    const tVisit = setTimeout(() => {
-      runIdle(() => {
-        getVisitsFromIndexedDB().then((data) => {
-          if (data && data.length > 0) {
-            populateMemoryCache('sikepling_kunjungan_harian_list_v1', JSON.stringify(data));
-          }
-        });
-        getHistoryFromIndexedDB().then((data) => {
-          if (data && data.length > 0) {
-            populateMemoryCache('kepling_local_laporan_history_v2', JSON.stringify(data));
-          }
-        });
-      }, 1200);
-    }, 800);
-
-    const tPbb = setTimeout(() => {
-      runIdle(() => {
-        getPbbFromIndexedDB().then((data) => {
-          if (data && data.length > 0) {
-            populateMemoryCache('sikepling_sppt_pbb_records_2026_v3', JSON.stringify(data));
-          }
-        });
-      }, 2500);
-    }, 2000);
-
-    const tKeluarga = setTimeout(() => {
-      runIdle(() => {
-        getKeluargaFromIndexedDB().then((data) => {
-          if (data && data.length > 0) {
-            populateMemoryCache('sikepling_database_keluarga_v1', JSON.stringify(data));
-          }
-        });
-      }, 4000);
-    }, 3500);
+    // Lightweight warm-up: Reports are already fetched in 10ms via loadLocalReports()
+    // Heavy databases (PBB, Keluarga, Kunjungan) are queried asynchronously on-demand by their respective tabs
 
     // Stagger secondary background syncs to ensure first UI frame paints at 60fps
     const timer1 = setTimeout(() => {
