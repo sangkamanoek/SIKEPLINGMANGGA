@@ -728,9 +728,6 @@ export default function App() {
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
-      clearTimeout(tVisit);
-      clearTimeout(tPbb);
-      clearTimeout(tKeluarga);
       unsubscribeTargets();
       unsubscribeFirestoreReports();
       unsubscribeAttendance();
