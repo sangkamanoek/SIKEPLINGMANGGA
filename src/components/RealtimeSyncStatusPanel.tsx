@@ -127,20 +127,31 @@ export const RealtimeSyncStatusPanel: React.FC<RealtimeSyncStatusPanelProps> = (
           </div>
 
           {/* Service 2: Google Sheets */}
-          <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 transition-all hover:border-slate-700">
+          <button
+            type="button"
+            onClick={() => {
+              if (isGoogleConnected) {
+                window.open('https://docs.google.com/spreadsheets/u/0/', '_blank');
+              } else {
+                window.dispatchEvent(new CustomEvent('google_auth_trigger_connect'));
+              }
+            }}
+            className="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 transition-all hover:border-emerald-500/50 cursor-pointer text-left w-full"
+            title={isGoogleConnected ? 'Buka Google Sheets di tab baru' : 'Klik untuk Hubungkan Akun Google'}
+          >
             <div className={`p-2 rounded-lg shrink-0 ${isGoogleConnected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
               <FileSpreadsheet className="w-4 h-4" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${isGoogleConnected ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                <span className={`w-2 h-2 rounded-full ${isGoogleConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
                 <span className="text-xs font-black text-slate-100 truncate">Google Sheets</span>
               </div>
-              <span className={`text-[10px] font-bold block truncate ${isGoogleConnected ? 'text-emerald-400' : 'text-slate-400'}`}>
-                {isGoogleConnected ? `🟢 ${spreadsheetTitle || 'Terhubung'}` : '⚪ Siap Konek'}
+              <span className={`text-[10px] font-bold block truncate ${isGoogleConnected ? 'text-emerald-400' : 'text-amber-400 underline'}`}>
+                {isGoogleConnected ? `🟢 ${spreadsheetTitle || 'Terhubung'}` : '🔗 Klik untuk Hubungkan'}
               </span>
             </div>
-          </div>
+          </button>
 
           {/* Service 3: IndexedDB & Local Cache */}
           <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 flex items-center gap-2.5 transition-all hover:border-slate-700">
