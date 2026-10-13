@@ -1,10 +1,23 @@
-# Implementation Plan - Digital PKK ID Card Generator Explanation
+# Implementation Plan - Dynamic PBB Progress Bar Colors
 
-## What the Feature Does
-Kalimat tersebut menjelaskan fitur **Kartu Tanda Anggota (KTA) PKK Digital** yang sudah tersedia di dalam aplikasi (`PkkBukuAdministrasiView.tsx` / `pkkCardGenerator.ts`):
-1. **Unggah Foto Profil Pengurus**: Saat mencatat data pengurus/kader di Buku I PKK, Anda dapat mengunggah foto wajah pengurus tersebut.
-2. **Cetak Kartu Anggota Otomatis**: Sistem secara otomatis menggabungkan data teks (nama, jabatan, lingkungan, alamat) dan foto yang diunggah ke dalam desain kartu resmi PKK berformat kartu tanda anggota digital yang siap diunduh atau dicetak.
+## User Goal
+Update the PBB progress bar and indicator colors in `RekapPbbView.tsx` (and related dashboard cards) based on achievement thresholds:
+- **< 50%**: Merah (Red) — Kategori rendah / perlu perhatian khusus
+- **51% - 74%**: Kuning (Yellow) — Kategori sedang / dalam proses
+- **>= 75%**: Hijau (Green) — Kategori baik / hampir atau sudah mencapai target
 
 ---
+
+## Proposed Changes
+
+### 1. Update `RekapPbbView.tsx` & Dashboard Cards
+- Add a helper function `getPbbProgressColor(pct: number)`:
+  - `if (pct < 50) return 'bg-rose-500 text-rose-600';`
+  - `if (pct < 75) return 'bg-amber-500 text-amber-600';`
+  - `return 'bg-emerald-500 text-emerald-600';`
+- Apply this dynamic color to the progress bar and status indicator dot.
+
+---
+
 ## Verification Plan
 - Compile app using `compile_applet`.

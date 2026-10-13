@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for explaining and verifying the digital PKK ID card generator feature in PkkBukuAdministrasiView.",
-  "updatedAt": "2026-10-12T14:33:47.354530330Z",
+  "summary": "Implementation plan for updating PBB progress bar colors based on percentage thresholds (<50% red, 51-74% yellow, >=75% green).",
+  "updatedAt": "2026-10-13T14:54:08.723224346Z",
   "requestFeedback": true,
   "userFacing": true
 }
