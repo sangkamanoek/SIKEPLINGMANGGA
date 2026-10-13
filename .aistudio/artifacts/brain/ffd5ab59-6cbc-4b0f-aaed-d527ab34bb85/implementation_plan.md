@@ -1,21 +1,16 @@
-# Implementation Plan - Dynamic PBB Progress Bar Colors
+# Revised Implementation Plan - Comprehensive ZIP Package Export (Excel + High-Res Photos)
 
 ## User Goal
-Update the PBB progress bar and indicator colors in `RekapPbbView.tsx` (and related dashboard cards) based on achievement thresholds:
-- **< 50%**: Merah (Red) — Kategori rendah / perlu perhatian khusus
-- **51% - 74%**: Kuning (Yellow) — Kategori sedang / dalam proses
-- **>= 75%**: Hijau (Green) — Kategori baik / hampir atau sudah mencapai target
+Provide a comprehensive backup & export feature ("Ekspor Paket ZIP Lengkap") that bundles:
+1. **Spreadsheet Excel (.xlsx)** containing comprehensive system data across all modules (Laporan Harian, PBB, Kunjungan Warga, PKK).
+2. **High-Resolution Photo Documentation Folder** containing all original photo files embedded in reports, properly categorized per environment.
 
 ---
 
 ## Proposed Changes
 
-### 1. Update `RekapPbbView.tsx` & Dashboard Cards
-- Add a helper function `getPbbProgressColor(pct: number)`:
-  - `if (pct < 50) return 'bg-rose-500 text-rose-600';`
-  - `if (pct < 75) return 'bg-amber-500 text-amber-600';`
-  - `return 'bg-emerald-500 text-emerald-600';`
-- Apply this dynamic color to the progress bar and status indicator dot.
+### 1. Verify Excel & ZIP Export Utilities (`src/lib/excelExport.ts`, `src/lib/appBackupService.ts`)
+- Ensure robust multi-sheet Excel generation and JSZip image packaging for high-resolution photo backups.
 
 ---
 
