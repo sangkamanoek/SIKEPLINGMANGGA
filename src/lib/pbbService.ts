@@ -218,11 +218,10 @@ export function formatRekapPbbWaText(overview: KelurahanPbbOverview, year: numbe
     const pctWp = item.persentaseWpLunas.toFixed(1);
     const pctNominal = item.persentaseRealisasi.toFixed(1);
 
-    // Indikator status kepatuhan
-    let badge = '⚪';
-    if (item.persentaseWpLunas >= 80) badge = '🟢';
+    // Indikator status kepatuhan (< 50% Merah, 50-74% Kuning, >= 75% Hijau)
+    let badge = '🔴';
+    if (item.persentaseWpLunas >= 75) badge = '🟢';
     else if (item.persentaseWpLunas >= 50) badge = '🟡';
-    else if (item.wpLunas > 0) badge = '🟠';
     else badge = '🔴';
 
     text += `${badge} *${namaLingkungan}* (${namaKepling})\n`;
