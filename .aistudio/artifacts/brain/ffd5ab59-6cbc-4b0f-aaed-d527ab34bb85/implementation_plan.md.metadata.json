@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for adding lightweight encryption/decryption utilities for sensitive data (NIK, passwords) in firestoreService.ts.",
-  "updatedAt": "2026-10-14T13:34:01.979984286Z",
+  "summary": "Implementation plan for completely removing consolidateKunjunganWithReports so Kunjungan Warga and Perlinsos reports are fully separated.",
+  "updatedAt": "2026-10-14T18:20:18.213842336Z",
   "requestFeedback": true,
   "userFacing": true
 }

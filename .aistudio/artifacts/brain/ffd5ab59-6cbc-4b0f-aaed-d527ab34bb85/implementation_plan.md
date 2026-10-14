@@ -1,17 +1,23 @@
-# Implementation Plan - Sensitive Data Encryption Utilities
+# Implementation Plan - Sever Perlinsos Synthesis from Kunjungan Warga
 
 ## User Goal
-Implement lightweight encryption/decryption functions (Base64 + XOR key obfuscation) for sensitive data fields (such as NIK, passwords, or personal credentials) in `firestoreService.ts` before saving to Firestore, and decrypt them when read in admin dashboards.
+The user requested to completely remove the consolidation function (`consolidateKunjunganWithReports`) so that "Kunjungan Warga" (Citizen Visits) and "Pendataan Perlinsos" (Social Protection Data in Daily Reports) are completely separated and independent.
 
 ---
 
 ## Proposed Changes
 
-### 1. Update `src/lib/firestoreService.ts`
-- Add helper functions `encryptSensitiveData(text: string): string` and `decryptSensitiveData(encoded: string): string`.
-- Apply encryption to sensitive fields during document writes and decryption upon retrieval.
+### 1. Update `src/lib/kunjunganService.ts`
+- Remove or disable `consolidateKunjunganWithReports` (return raw kunjungan list without merging daily reports).
+
+### 2. Update `src/components/KunjunganHarianView.tsx`
+- Ensure `KunjunganHarianView` only reads independent `kunjungan_warga` records from `subscribeKunjunganWarga` without calling `consolidateKunjunganWithReports`.
+
+### 3. Update `src/components/RangkumanLaporanKelurahan.tsx`
+- Ensure `RangkumanLaporanKelurahan` does not call `consolidateKunjunganWithReports`.
 
 ---
 
 ## Verification Plan
-- Compile app using `compile_applet`.
+- Compile applet using `compile_applet`.
+- Verify that Kunjungan Warga table only displays entries created directly in the Kunjungan Warga form, and Perlinsos reports no longer appear as synthesized kunjungan entries.
