@@ -1649,7 +1649,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                       <td className="py-4 px-5 text-center">
                         <div className="flex flex-col items-center gap-1.5">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                            lk.persentaseRealisasi >= 90 ? 'bg-emerald-100 text-emerald-700' : 
+                            lk.persentaseRealisasi >= 75 ? 'bg-emerald-100 text-emerald-700' : 
                             lk.persentaseRealisasi >= 50 ? 'bg-amber-100 text-amber-700' : 
                             'bg-rose-100 text-rose-700'
                           }`}>
@@ -1658,7 +1658,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                           <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden">
                             <div 
                               className={`h-full ${
-                                lk.persentaseRealisasi >= 90 ? 'bg-emerald-500' : 
+                                lk.persentaseRealisasi >= 75 ? 'bg-emerald-500' : 
                                 lk.persentaseRealisasi >= 50 ? 'bg-amber-500' : 
                                 'bg-rose-500'
                               }`}

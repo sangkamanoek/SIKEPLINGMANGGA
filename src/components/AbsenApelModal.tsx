@@ -25,8 +25,6 @@ import {
 } from 'lucide-react';
 import { AbsenApelItem, StatusAbsenApel, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
-import { QrReader } from 'react-qr-reader';
-import { fetchAttendanceQRFromFirestore } from '../lib/firestoreService';
 import {
   getTodayDateString,
   getCurrentTimeString,
@@ -78,12 +76,6 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
   const [gpsAccuracyStatus, setGpsAccuracyStatus] = useState<string>('');
   const [isGettingGps, setIsGettingGps] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // QR Code Verification State
-  const [keplingCoords, setKeplingCoords] = useState<{lat: number; lng: number} | null>(null);
-  const [qrScanStatus, setQrScanStatus] = useState<'idle' | 'scanning' | 'valid' | 'expired' | 'invalid_location'>('idle');
-  const [qrScanMessage, setQrScanMessage] = useState('');
-  const [showScanner, setShowScanner] = useState(false);
 
   // Camera Live Capture State
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -297,7 +289,6 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
           const latStr = lat.toFixed(5);
           const lngStr = lng.toFixed(5);
           const acc = Math.round(pos.coords.accuracy);
-          setKeplingCoords({ lat, lng });
           setLokasiGps(`Lokasi Terdeteksi • Akurasi GPS: ±${acc}m (Lat ${latStr}, Lng ${lngStr})`);
           setGpsAccuracyStatus(`±${acc}m`);
           setIsGettingGps(false);
@@ -320,120 +311,27 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
 
   const playSuccessSound = () => {
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
-      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.15); // E5
-      
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
-      
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
       osc.start();
-      osc.stop(ctx.currentTime + 0.45);
-    } catch (e) {
-      console.warn('Gagal memutar suara sukses:', e);
-    }
-  };
-
-  const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371000; // Earth radius in meters
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  const handleScanQR = async (scannedText: string) => {
-    if (!scannedText) return;
-    setQrScanStatus('scanning');
-    setQrScanMessage('Sedang memvalidasi token QR Code...');
-
-    try {
-      let parsedData: any = null;
-      try {
-        parsedData = JSON.parse(scannedText);
-      } catch (err) {
-        setQrScanStatus('expired');
-        setQrScanMessage('Invalid - QR Code bukan merupakan format resmi kelurahan.');
-        return;
-      }
-
-      if (parsedData.type !== 'apel_pagi' || !parsedData.token || !parsedData.tanggal) {
-        setQrScanStatus('expired');
-        setQrScanMessage('Invalid - Metadata QR Code tidak cocok.');
-        return;
-      }
-
-      // Check date
-      if (parsedData.tanggal !== selectedDate) {
-        setQrScanStatus('expired');
-        setQrScanMessage(`Expired - QR Code ditujukan untuk tanggal ${parsedData.tanggal}, bukan hari ini (${selectedDate}).`);
-        return;
-      }
-
-      // Verify with Firestore
-      const liveQR = await fetchAttendanceQRFromFirestore(selectedDate);
-      if (!liveQR) {
-        setQrScanStatus('expired');
-        setQrScanMessage('Expired - Belum ada QR Code aktif yang dibuat oleh Super Admin untuk hari ini.');
-        return;
-      }
-
-      if (liveQR.token !== parsedData.token) {
-        setQrScanStatus('expired');
-        setQrScanMessage('Expired - Token QR Code sudah kedaluwarsa atau di-regenerasi oleh Super Admin.');
-        return;
-      }
-
-      // Verify location coordinates
-      const qrLat = parsedData.lat || 3.514234;
-      const qrLng = parsedData.lng || 98.633175;
-
-      if (!keplingCoords) {
-        setQrScanStatus('invalid_location');
-        setQrScanMessage('Invalid Location - Sistem gagal mendeteksi koordinat GPS Anda. Pastikan izin lokasi aktif.');
-        return;
-      }
-
-      const distance = getDistanceInMeters(keplingCoords.lat, keplingCoords.lng, qrLat, qrLng);
-      // Limit to 200 meters from center
-      if (distance > 200) {
-        setQrScanStatus('invalid_location');
-        setQrScanMessage(`Invalid Location - Anda terdeteksi berada sejauh ${Math.round(distance)} meter di luar radius Kantor Lurah Kelurahan Mangga (maksimal radius 200 meter).`);
-        return;
-      }
-
-      // Success!
-      setQrScanStatus('valid');
-      setQrScanMessage(`Valid - Berhasil diverifikasi! Anda berada di Kantor Lurah (jarak ±${Math.round(distance)}m).`);
-      playSuccessSound();
-      setShowScanner(false);
-      showToast?.('QR Code Valid! Presensi Apel Pagi berhasil dibuka.', 'success');
-    } catch (err) {
-      console.error(err);
-      setQrScanStatus('expired');
-      setQrScanMessage('Gagal memvalidasi QR Code. Silakan coba kembali.');
+      osc.stop(ctx.currentTime + 0.3);
+    } catch {
+      // Audio playback ignore error
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // REQUIREMENT: if status is 'Hadir', Kepling must scan QR first (only if activeAccount is kepling, admin doesn't need to scan)
-    if (status === 'Hadir' && activeAccount.role === 'kepling' && qrScanStatus !== 'valid') {
-      showToast?.('Anda wajib melakukan scan QR Code harian di Kantor Lurah untuk memverifikasi kehadiran!', 'error');
-      return;
-    }
 
     // REQUIREMENT: Izin/Sakit must have Catatan
     if ((status === 'Izin' || status === 'Sakit') && !catatan.trim()) {
@@ -967,170 +865,6 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
                   ))}
                 </div>
               </div>
-
-              {/* QR Code Scanner & Visual Feedback (Only for "Hadir" and activeAccount "kepling") */}
-              {status === 'Hadir' && activeAccount.role === 'kepling' && (
-                <div className="bg-slate-900 text-white rounded-3xl p-5 border border-slate-800 shadow-lg space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-                      <span className="text-xs font-black uppercase tracking-wider text-emerald-400">QR Code Geofence Verifier</span>
-                    </div>
-                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-bold">
-                      Radius Max 200m
-                    </span>
-                  </div>
-
-                  {qrScanStatus === 'idle' && !showScanner && (
-                    <div className="text-center py-4 space-y-3">
-                      <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
-                        Sebagai Kepala Lingkungan, Anda wajib melakukan scan QR Code harian yang ditampilkan oleh Super Admin untuk memverifikasi posisi kehadiran Anda di Kantor Lurah.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowScanner(true);
-                          setQrScanStatus('scanning');
-                          setQrScanMessage('Membuka kamera pemindai...');
-                        }}
-                        className="w-full sm:w-auto px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <Camera className="w-4 h-4 text-slate-950" />
-                        <span>Mulai Scan QR Apel Pagi</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {showScanner && (
-                    <div className="space-y-4">
-                      <div className="relative max-w-sm mx-auto bg-black rounded-2xl overflow-hidden border border-slate-700">
-                        {/* QR Scanner using react-qr-reader */}
-                        <QrReader
-                          onResult={(result, error) => {
-                            if (result) {
-                              handleScanQR(result.getText());
-                            }
-                          }}
-                          constraints={{ facingMode: 'environment' }}
-                        />
-                        <div className="absolute inset-0 border-2 border-emerald-500/30 pointer-events-none flex items-center justify-center">
-                          <div className="w-48 h-48 border-2 border-dashed border-emerald-400 rounded-xl opacity-80 animate-pulse"></div>
-                        </div>
-                      </div>
-                      
-                      <div className="text-center">
-                        <span className="text-[11px] text-emerald-400 font-bold block animate-pulse">
-                          {qrScanMessage}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowScanner(false);
-                            setQrScanStatus('idle');
-                          }}
-                          className="mt-3 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl cursor-pointer"
-                        >
-                          Batalkan Scan
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* VISUAL FEEDBACK COMPONENT FOR SCAN COMPLETED */}
-                  {qrScanStatus !== 'idle' && !showScanner && (
-                    <div className="animate-in fade-in duration-200">
-                      {qrScanStatus === 'valid' && (
-                        <div className="bg-emerald-950/75 border-2 border-emerald-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left justify-between">
-                          <div className="flex flex-col sm:flex-row items-center gap-3">
-                            <div className="w-12 h-12 bg-emerald-500/20 border border-emerald-400 rounded-2xl flex items-center justify-center text-emerald-400 shrink-0">
-                              <CheckCircle2 className="w-6 h-6 text-emerald-400 animate-bounce" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-black text-emerald-300 uppercase tracking-tight">
-                                Scan QR Code Valid
-                              </h4>
-                              <p className="text-[11px] text-emerald-100 font-medium mt-0.5">
-                                {qrScanMessage}
-                              </p>
-                              <span className="text-[10px] text-emerald-300/80 block mt-0.5">
-                                Identitas &amp; lokasi terverifikasi dalam geofence Kantor Lurah.
-                              </span>
-                            </div>
-                          </div>
-                          <span className="px-3 py-1 rounded-full bg-emerald-500 text-slate-950 text-xs font-black shadow-md whitespace-nowrap">
-                            PRESENSI DIBUKA
-                          </span>
-                        </div>
-                      )}
-
-                      {qrScanStatus === 'expired' && (
-                        <div className="bg-amber-950/75 border-2 border-amber-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left justify-between">
-                          <div className="flex flex-col sm:flex-row items-center gap-3">
-                            <div className="w-12 h-12 bg-amber-500/20 border border-amber-400 rounded-2xl flex items-center justify-center text-amber-400 shrink-0">
-                              <AlertCircle className="w-6 h-6 text-amber-400" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-black text-amber-300 uppercase tracking-tight">
-                                Token QR Kedaluwarsa
-                              </h4>
-                              <p className="text-[11px] text-amber-100 font-medium mt-0.5">
-                                {qrScanMessage}
-                              </p>
-                              <span className="text-[10px] text-amber-300/80 block mt-0.5">
-                                Silakan hubungi Super Admin untuk meregenerasi QR Code harian.
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowScanner(true);
-                              setQrScanStatus('scanning');
-                            }}
-                            className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black rounded-xl shadow-md whitespace-nowrap transition-all cursor-pointer"
-                          >
-                            Coba Lagi
-                          </button>
-                        </div>
-                      )}
-
-                      {qrScanStatus === 'invalid_location' && (
-                        <div className="bg-rose-950/75 border-2 border-rose-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left justify-between">
-                          <div className="flex flex-col sm:flex-row items-center gap-3">
-                            <div className="w-12 h-12 bg-rose-500/20 border border-rose-400 rounded-2xl flex items-center justify-center text-rose-400 shrink-0">
-                              <ShieldAlert className="w-6 h-6 text-rose-400" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-black text-rose-300 uppercase tracking-tight">
-                                Lokasi Tidak Valid (Geofence Out)
-                              </h4>
-                              <p className="text-[11px] text-rose-100 font-medium mt-0.5 leading-relaxed">
-                                {qrScanMessage}
-                              </p>
-                              <span className="text-[10px] text-rose-300/80 block mt-0.5">
-                                Anda harus berada langsung di Kantor Lurah Kelurahan Mangga untuk melakukan absen.
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex flex-col gap-2 w-full sm:w-auto">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleFetchGps();
-                                setShowScanner(true);
-                                setQrScanStatus('scanning');
-                              }}
-                              className="px-4 py-2 bg-rose-500 hover:bg-rose-400 text-white text-xs font-black rounded-xl shadow-md whitespace-nowrap transition-all cursor-pointer text-center"
-                            >
-                              Deteksi &amp; Scan Ulang
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Photo Bukti / Selfie Camera */}
               <div className="space-y-2">

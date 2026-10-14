@@ -1443,16 +1443,14 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           yTickFormatter: (val: number) => `${val}%`,
           getBarColor: (entry: any) => {
             const pct = entry.persentaseRealisasi;
-            if (pct >= 80) return '#059669';
-            if (pct >= 60) return '#10b981';
-            if (pct >= 40) return '#f59e0b';
-            return '#ef4444';
+            if (pct >= 75) return '#059669'; // Hijau (≥ 75%)
+            if (pct >= 50) return '#f59e0b'; // Kuning (51% - 74%)
+            return '#ef4444'; // Merah (< 50%)
           },
           legend: [
-            { label: 'Sangat Baik (≥ 80%)', color: '#059669' },
-            { label: 'Baik (60% - 79%)', color: '#10b981' },
-            { label: 'Cukup (40% - 59%)', color: '#f59e0b' },
-            { label: 'Kurang (< 40%)', color: '#ef4444' },
+            { label: 'Tinggi (≥ 75%)', color: '#059669' },
+            { label: 'Sedang (51% - 74%)', color: '#f59e0b' },
+            { label: 'Rendah (< 50%)', color: '#ef4444' },
           ],
           renderTooltip: (data: any) => (
             <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-lg text-xs space-y-1.5 min-w-[210px]">
@@ -1495,16 +1493,14 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           yTickFormatter: (val: number) => `${val}%`,
           getBarColor: (entry: any) => {
             const pct = entry.persentaseRealisasi;
-            if (pct >= 80) return '#059669';
-            if (pct >= 60) return '#10b981';
-            if (pct >= 40) return '#f59e0b';
-            return '#ef4444';
+            if (pct >= 75) return '#059669'; // Hijau (≥ 75%)
+            if (pct >= 50) return '#f59e0b'; // Kuning (51% - 74%)
+            return '#ef4444'; // Merah (< 50%)
           },
           legend: [
-            { label: 'Sangat Baik (≥ 80%)', color: '#059669' },
-            { label: 'Baik (60% - 79%)', color: '#10b981' },
-            { label: 'Cukup (40% - 59%)', color: '#f59e0b' },
-            { label: 'Kurang (< 40%)', color: '#ef4444' },
+            { label: 'Tinggi (≥ 75%)', color: '#059669' },
+            { label: 'Sedang (51% - 74%)', color: '#f59e0b' },
+            { label: 'Rendah (< 50%)', color: '#ef4444' },
           ],
           renderTooltip: (data: any) => (
             <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-lg text-xs space-y-1.5 min-w-[210px]">
@@ -2277,21 +2273,18 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               </thead>
               <tbody className="divide-y divide-slate-200 text-slate-800">
                 {filteredSummaryByLingkungan.map((row, idx) => {
-                  let statusBadgeClass = 'bg-red-100 text-red-800 border-red-200';
-                  let statusLabel = 'Belum Ada Bayar';
+                  let statusBadgeClass = 'bg-rose-100 text-rose-800 border-rose-200';
+                  let statusLabel = 'Rendah (< 50%)';
 
                   if (row.persentaseRealisasi >= 75) {
                     statusBadgeClass = 'bg-emerald-100 text-emerald-900 border-emerald-300';
-                    statusLabel = 'Sangat Tinggi';
-                  } else if (row.persentaseRealisasi >= 60) {
-                    statusBadgeClass = 'bg-teal-100 text-teal-800 border-teal-200';
-                    statusLabel = 'Tinggi';
+                    statusLabel = 'Tinggi (≥ 75%)';
                   } else if (row.persentaseRealisasi >= 50) {
                     statusBadgeClass = 'bg-amber-100 text-amber-800 border-amber-200';
-                    statusLabel = 'Sedang';
-                  } else if (row.persentaseRealisasi > 0) {
-                    statusBadgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
-                    statusLabel = 'Mulai Progres';
+                    statusLabel = 'Sedang (51% - 74%)';
+                  } else {
+                    statusBadgeClass = 'bg-rose-100 text-rose-800 border-rose-200';
+                    statusLabel = 'Rendah (< 50%)';
                   }
 
                   const isOwnLingkungan = isKepling && row.lingkungan === keplingLingkunganNum;
@@ -2349,7 +2342,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                       <td className={`py-3 px-4 ${sortBy === 'persentase' ? 'bg-emerald-50/70 font-black' : ''}`}>
                         <div className="space-y-1">
                           <div className="flex justify-between items-center text-xs font-bold">
-                            <span className="text-emerald-800 font-black">{row.persentaseRealisasi.toFixed(1)}%</span>
+                            <span className={`font-black ${
+                              row.persentaseRealisasi >= 75
+                                ? 'text-emerald-800'
+                                : row.persentaseRealisasi >= 50
+                                ? 'text-amber-700'
+                                : 'text-rose-700'
+                            }`}>{row.persentaseRealisasi.toFixed(1)}%</span>
                           </div>
                           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/60">
                             <div
@@ -2358,9 +2357,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                                   ? 'bg-emerald-600'
                                   : row.persentaseRealisasi >= 50
                                   ? 'bg-amber-500'
-                                  : row.persentaseRealisasi > 0
-                                  ? 'bg-blue-500'
-                                  : 'bg-red-400'
+                                  : 'bg-rose-500'
                               }`}
                               style={{ width: `${Math.min(100, row.persentaseRealisasi)}%` }}
                             />

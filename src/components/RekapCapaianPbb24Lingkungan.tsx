@@ -342,9 +342,9 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
                   const lkAccount = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === item.lingkungan);
                   const namaKepling = lkAccount?.nama || 'Kepala Lingkungan';
                   const pct = item.persentaseWpLunas;
-                  const isHigh = pct >= 80;
-                  const isMedium = pct >= 50 && pct < 80;
-                  const isLow = pct > 0 && pct < 50;
+                  const isHigh = pct >= 75;
+                  const isMedium = pct >= 50 && pct < 75;
+                  const isLow = pct < 50;
 
                   return (
                     <tr
@@ -374,10 +374,8 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
                               isHigh
                                 ? 'text-emerald-700'
                                 : isMedium
-                                ? 'text-teal-700'
-                                : isLow
                                 ? 'text-amber-700'
-                                : 'text-slate-400'
+                                : 'text-rose-700'
                             }`}
                           >
                             {pct.toFixed(1)}%
@@ -388,10 +386,8 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
                                 isHigh
                                   ? 'bg-emerald-600'
                                   : isMedium
-                                  ? 'bg-teal-600'
-                                  : isLow
                                   ? 'bg-amber-500'
-                                  : 'bg-slate-300'
+                                  : 'bg-rose-500'
                               }`}
                               style={{ width: `${Math.min(100, pct)}%` }}
                             />
@@ -406,23 +402,19 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
                       </td>
                       <td className="py-2.5 px-3.5 text-center">
                         <span
-                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                             isHigh
-                              ? 'bg-emerald-100 text-emerald-800'
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                               : isMedium
-                              ? 'bg-teal-100 text-teal-800'
-                              : isLow
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-600'
+                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                              : 'bg-rose-100 text-rose-800 border-rose-300'
                           }`}
                         >
                           {isHigh
-                            ? 'Sangat Tinggi'
+                            ? 'Tinggi (≥ 75%)'
                             : isMedium
-                            ? 'Tinggi'
-                            : isLow
-                            ? 'Berjalan'
-                            : 'Belum Bayar'}
+                            ? 'Sedang (51% - 74%)'
+                            : 'Rendah (< 50%)'}
                         </span>
                       </td>
                       <td className="py-2.5 px-3.5 text-center">
