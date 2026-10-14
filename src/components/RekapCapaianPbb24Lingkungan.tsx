@@ -232,8 +232,8 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
               const lkAccount = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === item.lingkungan);
               const namaKepling = lkAccount?.nama || 'Kepala Lingkungan';
               const pct = item.persentaseWpLunas;
-              const isHigh = pct >= 80;
-              const isMedium = pct >= 50 && pct < 80;
+              const isHigh = pct >= 75;
+              const isMedium = pct >= 50 && pct < 75;
               const isLow = pct > 0 && pct < 50;
 
               return (
@@ -244,9 +244,9 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
                     isHigh
                       ? 'bg-emerald-50/50 hover:bg-emerald-50 border-emerald-200/90'
                       : isMedium
-                      ? 'bg-teal-50/40 hover:bg-teal-50 border-teal-200/80'
-                      : isLow
                       ? 'bg-amber-50/40 hover:bg-amber-50 border-amber-200/80'
+                      : isLow
+                      ? 'bg-rose-50/60 hover:bg-rose-50 border-rose-200/90'
                       : 'bg-slate-50/50 hover:bg-slate-100 border-slate-200'
                   }`}
                   title={`Klik untuk melihat detail SPPT Lingkungan ${item.lingkungan}`}
@@ -260,9 +260,9 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
                         isHigh
                           ? 'bg-emerald-500'
                           : isMedium
-                          ? 'bg-teal-500'
-                          : isLow
                           ? 'bg-amber-500'
+                          : isLow
+                          ? 'bg-rose-500'
                           : 'bg-slate-300'
                       }`}
                     />
@@ -279,9 +279,9 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
                         isHigh
                           ? 'text-emerald-700'
                           : isMedium
-                          ? 'text-teal-700'
-                          : isLow
                           ? 'text-amber-700'
+                          : isLow
+                          ? 'text-rose-700'
                           : 'text-slate-400'
                       }`}
                     >
@@ -297,9 +297,9 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
                         isHigh
                           ? 'bg-emerald-600'
                           : isMedium
-                          ? 'bg-teal-600'
-                          : isLow
                           ? 'bg-amber-500'
+                          : isLow
+                          ? 'bg-rose-500'
                           : 'bg-slate-300'
                       }`}
                       style={{ width: `${Math.min(100, pct)}%` }}
