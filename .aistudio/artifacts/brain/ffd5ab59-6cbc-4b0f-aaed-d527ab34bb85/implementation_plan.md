@@ -1,18 +1,15 @@
-# Implementation Plan - FormLaporan Mobile Layout Optimization
+# Implementation Plan - Sensitive Data Encryption Utilities
 
 ## User Goal
-Optimize `FormLaporan.tsx` for mobile devices:
-1. Reduce excessive vertical padding (`p-6 sm:p-8` -> `p-4 sm:p-6`, `space-y-6` -> `space-y-3`).
-2. Streamline input fields into efficient 2-column grids on mobile devices (`grid-cols-1 sm:grid-cols-2`).
-3. Make reporting faster and less scroll-heavy for Kepling on smartphones.
+Implement lightweight encryption/decryption functions (Base64 + XOR key obfuscation) for sensitive data fields (such as NIK, passwords, or personal credentials) in `firestoreService.ts` before saving to Firestore, and decrypt them when read in admin dashboards.
 
 ---
 
 ## Proposed Changes
 
-### 1. Update `src/components/FormLaporan.tsx`
-- Refactor outer container padding and section spacing.
-- Convert single-column input rows into compact 2-column mobile grid layouts where appropriate.
+### 1. Update `src/lib/firestoreService.ts`
+- Add helper functions `encryptSensitiveData(text: string): string` and `decryptSensitiveData(encoded: string): string`.
+- Apply encryption to sensitive fields during document writes and decryption upon retrieval.
 
 ---
 

@@ -47,6 +47,46 @@ export function cleanFirestoreData<T extends Record<string, any>>(data: T): Reco
   return cleaned;
 }
 
+// ==========================================
+// SENSITIVE DATA ENCRYPTION & DECRYPTION UTILITIES
+// ==========================================
+const ENCRYPTION_SECRET_KEY = 'SI_KEPLING_MANGGA_SECURE_2026';
+
+export function encryptSensitiveData(text: string): string {
+  if (!text || typeof text !== 'string') return text;
+  // If already encrypted with prefix, return as is
+  if (text.startsWith('ENC:')) return text;
+  try {
+    let result = '';
+    for (let i = 0; i < text.length; i++) {
+      const charCode = text.charCodeAt(i) ^ ENCRYPTION_SECRET_KEY.charCodeAt(i % ENCRYPTION_SECRET_KEY.length);
+      result += String.fromCharCode(charCode);
+    }
+    return 'ENC:' + btoa(result);
+  } catch (err) {
+    console.warn('Encryption warning:', err);
+    return text;
+  }
+}
+
+export function decryptSensitiveData(encoded: string): string {
+  if (!encoded || typeof encoded !== 'string') return encoded;
+  if (!encoded.startsWith('ENC:')) return encoded;
+  try {
+    const rawB64 = encoded.slice(4);
+    const decoded = atob(rawB64);
+    let result = '';
+    for (let i = 0; i < decoded.length; i++) {
+      const charCode = decoded.charCodeAt(i) ^ ENCRYPTION_SECRET_KEY.charCodeAt(i % ENCRYPTION_SECRET_KEY.length);
+      result += String.fromCharCode(charCode);
+    }
+    return result;
+  } catch (err) {
+    console.warn('Decryption warning:', err);
+    return encoded;
+  }
+}
+
 export const shouldFilterReport = (report: any): boolean => {
   if (!report) return true;
   if (report.id && deletedReportIdsMemory.has(report.id)) {
