@@ -13,6 +13,8 @@ import {
   getFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  memoryLocalCache,
+  memoryEagerGarbageCollector,
   setLogLevel,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -77,13 +79,35 @@ try {
         }
       );
 } catch (e) {
-  console.warn('initializeFirestore failed, falling back to standard getFirestore:', e);
+  console.warn('initializeFirestore with persistent cache failed (possibly IndexedDB corruption), falling back to memory cache:', e);
   try {
     firestoreInstance = activeConfig.firestoreDatabaseId
-      ? getFirestore(app, activeConfig.firestoreDatabaseId)
-      : getFirestore(app);
-  } catch {
-    firestoreInstance = getFirestore(app);
+      ? initializeFirestore(
+          app,
+          {
+            localCache: memoryLocalCache({
+              garbageCollector: memoryEagerGarbageCollector(),
+            }),
+          },
+          activeConfig.firestoreDatabaseId
+        )
+      : initializeFirestore(
+          app,
+          {
+            localCache: memoryLocalCache({
+              garbageCollector: memoryEagerGarbageCollector(),
+            }),
+          }
+        );
+  } catch (fallbackErr) {
+    console.warn('Memory cache initialization also failed, using getFirestore:', fallbackErr);
+    try {
+      firestoreInstance = activeConfig.firestoreDatabaseId
+        ? getFirestore(app, activeConfig.firestoreDatabaseId)
+        : getFirestore(app);
+    } catch {
+      firestoreInstance = getFirestore(app);
+    }
   }
 }
 

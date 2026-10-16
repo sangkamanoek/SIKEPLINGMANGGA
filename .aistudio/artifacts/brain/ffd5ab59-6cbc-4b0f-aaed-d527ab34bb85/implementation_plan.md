@@ -1,23 +1,17 @@
-# Implementation Plan - Sever Perlinsos Synthesis from Kunjungan Warga
+# Implementation Plan - Side-by-Side Realisasi Pembangunan & Laporan Monitoring Lapangan
 
-## User Goal
-The user requested to completely remove the consolidation function (`consolidateKunjunganWithReports`) so that "Kunjungan Warga" (Citizen Visits) and "Pendataan Perlinsos" (Social Protection Data in Daily Reports) are completely separated and independent.
-
----
+## User Request
+- Change position of "Realisasi Pembangunan Fisik" and "Laporan Monitoring Lapangan" to be side-by-side (ke samping, jangan atas bawah).
+- Create easy-to-distinguish color combinations (Professional Blue for Realisasi Pembangunan, Fresh Green for Laporan Monitoring Lapangan).
 
 ## Proposed Changes
-
-### 1. Update `src/lib/kunjunganService.ts`
-- Remove or disable `consolidateKunjunganWithReports` (return raw kunjungan list without merging daily reports).
-
-### 2. Update `src/components/KunjunganHarianView.tsx`
-- Ensure `KunjunganHarianView` only reads independent `kunjungan_warga` records from `subscribeKunjunganWarga` without calling `consolidateKunjunganWithReports`.
-
-### 3. Update `src/components/RangkumanLaporanKelurahan.tsx`
-- Ensure `RangkumanLaporanKelurahan` does not call `consolidateKunjunganWithReports`.
-
----
+1. **Modify `src/components/RealisasiPembangunanView.tsx`**:
+   - Remove the old single-tab toggle switcher (`activeSubTab`).
+   - Restructure the layout into a side-by-side 2-column grid (`grid grid-cols-1 xl:grid-cols-2 gap-6`) on wide screens.
+   - Apply **Professional Blue** theme (`bg-gradient-to-br from-blue-900 to-slate-900` / blue accents) for the **Realisasi Pembangunan Fisik** section.
+   - Apply **Fresh Green** theme (`bg-gradient-to-br from-emerald-900 to-slate-900` / emerald accents) for the **Laporan Monitoring Lapangan** section.
+   - Keep all interactive features (adding, editing, deleting, filtering, searching, photo previewing, 3-angle monitoring, Excel export, WhatsApp sharing, etc.) fully functional for both sections.
 
 ## Verification Plan
-- Compile applet using `compile_applet`.
-- Verify that Kunjungan Warga table only displays entries created directly in the Kunjungan Warga form, and Perlinsos reports no longer appear as synthesized kunjungan entries.
+- Run `compile_applet` and `lint_applet` to ensure zero compilation or type errors.
+- Verify UI responsiveness and side-by-side layout presentation.

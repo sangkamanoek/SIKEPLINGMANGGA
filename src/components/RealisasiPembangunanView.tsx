@@ -339,9 +339,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     showToast('Seluruh laporan pembangunan berhasil dikosongkan.');
   };
 
-  // Sub-tab switcher: 'realisasi' | 'monitoring'
-  const [activeSubTab, setActiveSubTab] = useState<'realisasi' | 'monitoring'>('realisasi');
-
   // Laporan Monitoring Lapangan States
   const [monitoringItems, setMonitoringItems] = useState<LaporanMonitoringInfrastruktur[]>(() =>
     getLocalMonitoringList()
@@ -960,56 +957,11 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
-      {/* SUB-MENU TABS: REALISASI FISIK & LAPORAN MONITORING */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-900 rounded-2xl border border-slate-800 shadow-sm">
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('realisasi')}
-          className={`flex-1 min-w-[200px] py-3 px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
-            activeSubTab === 'realisasi'
-              ? 'bg-blue-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-          }`}
-        >
-          <Wrench className="w-4 h-4" />
-          <span>Realisasi Pembangunan Fisik</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-              activeSubTab === 'realisasi'
-                ? 'bg-blue-800 text-blue-100'
-                : 'bg-slate-800 text-slate-300'
-            }`}
-          >
-            {items.length} Proyek
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('monitoring')}
-          className={`flex-1 min-w-[200px] py-3 px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
-            activeSubTab === 'monitoring'
-              ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-          }`}
-        >
-          <Eye className="w-4 h-4 text-amber-300" />
-          <span>Laporan Monitoring Lapangan (3 Angle)</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-              activeSubTab === 'monitoring'
-                ? 'bg-amber-900 text-amber-100'
-                : 'bg-slate-800 text-slate-300'
-            }`}
-          >
-            {monitoringItems.length} Laporan
-          </span>
-        </button>
-      </div>
-
-      {/* TAB 1: REALISASI PEMBANGUNAN FISIK */}
-      {activeSubTab === 'realisasi' && (
-        <div className="space-y-6">
+      {/* SIDE-BY-SIDE DUAL COLUMN LAYOUT: REALISASI PEMBANGUNAN FISIK & LAPORAN MONITORING */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+        
+        {/* COLUMN 1: REALISASI PEMBANGUNAN FISIK (PROFESSIONAL BLUE THEME) */}
+        <div className="space-y-6 bg-blue-950/10 p-4 sm:p-5 rounded-3xl border border-blue-200 shadow-sm">
           {/* HEADER BANNER */}
           <div className="p-6 sm:p-7 rounded-2xl bg-slate-900 text-white shadow-md relative overflow-hidden border border-slate-800 space-y-5">
         <div className="absolute -top-24 -right-24 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -1638,19 +1590,17 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         </div>
       )}
         </div>
-      )}
 
-      {/* TAB 2: LAPORAN MONITORING LAPANGAN (3 SUDUT PANDANG / 3 ANGLE FOTO) */}
-      {activeSubTab === 'monitoring' && (
-        <div className="space-y-6">
-          {/* HEADER BANNER MONITORING */}
-          <div className="p-6 sm:p-7 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white shadow-md relative overflow-hidden border border-slate-800 space-y-5">
-            <div className="absolute -top-24 -right-24 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* COLUMN 2: LAPORAN MONITORING LAPANGAN (FRESH GREEN THEME) */}
+      <div className="space-y-6 bg-emerald-950/10 p-4 sm:p-5 rounded-3xl border border-emerald-200 shadow-sm">
+          {/* HEADER BANNER MONITORING (FRESH GREEN THEME) */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-emerald-950 via-slate-900 to-emerald-900 text-white shadow-md relative overflow-hidden border border-emerald-800/80 space-y-4">
+            <div className="absolute -top-24 -right-24 w-60 h-60 bg-emerald-600/20 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="space-y-2 relative z-10">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 font-medium">
-                <span className="flex items-center gap-1.5 text-amber-300 font-bold">
-                  <Eye className="w-3.5 h-3.5 text-amber-400" />
+            <div className="space-y-1.5 relative z-10">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-emerald-300 font-bold">
+                <span className="flex items-center gap-1.5">
+                  <Eye className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Monitoring &amp; Pengawasan Lapangan</span>
                 </span>
                 <span aria-hidden="true">·</span>
@@ -2154,7 +2104,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* MODAL FORM INPUT / EDIT REALISASI PEMBANGUNAN */}
       {isModalOpen && (
