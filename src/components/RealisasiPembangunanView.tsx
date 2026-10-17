@@ -2378,10 +2378,10 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
 
       {/* MODAL FORM INPUT / EDIT REALISASI PEMBANGUNAN */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-blue-200 shadow-2xl custom-scrollbar">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-fade-in overflow-hidden">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col border border-blue-200 shadow-2xl overflow-hidden">
             {/* Modal Header */}
-            <div className="p-5 bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white rounded-t-3xl flex items-center justify-between sticky top-0 z-10">
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-2xl bg-blue-500/20 border border-blue-400/30 text-blue-300">
                   <Wrench className="w-6 h-6" />
@@ -2404,8 +2404,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs font-semibold text-slate-800">
+            {/* Modal Form Body */}
+            <form id="realisasi-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs font-semibold text-slate-800 custom-scrollbar">
               {formError && (
                 <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2.5 animate-shake">
                   <div className="p-1 rounded-full bg-rose-100 text-rose-600 shrink-0">
@@ -3339,23 +3339,30 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                 />
               </div>
 
-              {/* Action Buttons */}
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+            </form>
+
+            {/* Sticky Modal Footer */}
+            <div className="px-6 py-3.5 bg-slate-100 border-t border-slate-200 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-slate-500 font-medium hidden sm:inline-block">
+                * Pastikan seluruh data isian telah sesuai
+              </span>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-slate-200 text-slate-700 font-bold border border-slate-300 transition-colors cursor-pointer text-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white font-extrabold shadow-md transition-all cursor-pointer"
+                  form="realisasi-form"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white font-extrabold shadow-md transition-all cursor-pointer text-xs"
                 >
                   {editingItem ? 'Simpan Perubahan' : 'Tambahkan Realisasi'}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
