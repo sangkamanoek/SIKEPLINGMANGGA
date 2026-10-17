@@ -20,6 +20,16 @@ import {
   Sparkles,
   RefreshCw,
   Edit3,
+  TrendingUp,
+  BarChart3,
+  Filter,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  Award,
+  Activity,
+  CalendarDays,
+  ArrowUpRight,
 } from 'lucide-react';
 import { UserAccount, isKelurahanAdmin, LaporanHarianItem } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
@@ -55,6 +65,8 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     return safeGetLocalStorage<KunjunganWargaData[]>(KUNJUNGAN_STORAGE_KEY, []);
   });
   const [dateFilterMode, setDateFilterMode] = useState<'SINGLE' | 'RANGE' | 'ALL'>('SINGLE');
+  const [activePreset, setActivePreset] = useState<'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'custom' | 'all'>('today');
+  const [showTrendPanel, setShowTrendPanel] = useState<boolean>(true);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [startDate, setStartDate] = useState<string>(() => {
     const d = new Date();
@@ -62,6 +74,50 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     return getTodayLocalIso(d);
   });
   const [endDate, setEndDate] = useState<string>(todayStr);
+
+  // Quick Preset Selector Function for Lurah & Kasi
+  const applyPreset = useCallback((preset: 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'custom' | 'all') => {
+    setActivePreset(preset);
+    const now = new Date();
+    if (preset === 'today') {
+      setDateFilterMode('SINGLE');
+      setSelectedDate(todayStr);
+    } else if (preset === 'yesterday') {
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      setDateFilterMode('SINGLE');
+      setSelectedDate(getTodayLocalIso(y));
+    } else if (preset === 'last7') {
+      const d = new Date();
+      d.setDate(d.getDate() - 6);
+      setDateFilterMode('RANGE');
+      setStartDate(getTodayLocalIso(d));
+      setEndDate(todayStr);
+    } else if (preset === 'last30') {
+      const d = new Date();
+      d.setDate(d.getDate() - 29);
+      setDateFilterMode('RANGE');
+      setStartDate(getTodayLocalIso(d));
+      setEndDate(todayStr);
+    } else if (preset === 'thisMonth') {
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      setDateFilterMode('RANGE');
+      setStartDate(`${year}-${month}-01`);
+      setEndDate(todayStr);
+    } else if (preset === 'lastMonth') {
+      const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      setDateFilterMode('RANGE');
+      setStartDate(getTodayLocalIso(firstDayLastMonth));
+      setEndDate(getTodayLocalIso(lastDayLastMonth));
+    } else if (preset === 'all') {
+      setDateFilterMode('ALL');
+    } else if (preset === 'custom') {
+      setDateFilterMode('RANGE');
+    }
+  }, [todayStr]);
+
   const [selectedLingkungan, setSelectedLingkungan] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showAddForm, setShowAddForm] = useState<boolean>(true);
@@ -77,9 +133,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   // Label tampilan tanggal/periode terpilih untuk Laporan/WA/Print/Excel
   const dateDisplayLabel = useMemo(() => {
     if (dateFilterMode === 'SINGLE') {
+      if (selectedDate === todayStr) return `Hari Ini (${selectedDate})`;
       return selectedDate ? selectedDate : 'Semua Tanggal';
     } else if (dateFilterMode === 'RANGE') {
       if (startDate && endDate) {
+        if (startDate === endDate) return startDate;
         return `${startDate} s/d ${endDate}`;
       } else if (startDate) {
         return `Mulai ${startDate}`;
@@ -88,9 +146,9 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       }
       return 'Sebagian Tanggal';
     } else {
-      return 'Semua Tanggal (Keseluruhan)';
+      return 'Semua Periode (Keseluruhan)';
     }
-  }, [dateFilterMode, selectedDate, startDate, endDate]);
+  }, [dateFilterMode, selectedDate, startDate, endDate, todayStr]);
 
   // View mode for mobile (cards vs table)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
@@ -235,6 +293,121 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     () => filtered.filter((r) => Boolean(r.fotoDokumentasi)).length,
     [filtered]
   );
+
+  // Analisis Tren Kunjungan Warga Per Periode (Khusus Pemantauan Lurah & Kasi)
+  const trendAnalytics = useMemo(() => {
+    const dateCounts: Record<string, { total: number; perlinsosSudah: number; ikdSudah: number; pbbSudah: number }> = {};
+    const lingkunganCounts: Record<number, number> = {};
+    for (let i = 1; i <= 24; i++) {
+      lingkunganCounts[i] = 0;
+    }
+
+    let totalPerlinsosSudah = 0;
+    let totalPerlinsosBelum = 0;
+    let totalPerlinsosMenolak = 0;
+    let totalIkdSudah = 0;
+    let totalIkdBelum = 0;
+    let totalPbbSudah = 0;
+    let totalPbbBelum = 0;
+
+    filtered.forEach((r) => {
+      const iso = getKunjunganIsoDate(r) || r.tanggal || 'Tanpa Tanggal';
+      if (!dateCounts[iso]) {
+        dateCounts[iso] = { total: 0, perlinsosSudah: 0, ikdSudah: 0, pbbSudah: 0 };
+      }
+      dateCounts[iso].total += 1;
+
+      if (r.perlinsos === 'Sudah') {
+        dateCounts[iso].perlinsosSudah += 1;
+        totalPerlinsosSudah += 1;
+      } else if (r.perlinsos === 'Menolak') {
+        totalPerlinsosMenolak += 1;
+      } else {
+        totalPerlinsosBelum += 1;
+      }
+
+      if (r.ikd === 'Sudah') {
+        dateCounts[iso].ikdSudah += 1;
+        totalIkdSudah += 1;
+      } else {
+        totalIkdBelum += 1;
+      }
+
+      if (r.pbb === 'Sudah') {
+        dateCounts[iso].pbbSudah += 1;
+        totalPbbSudah += 1;
+      } else {
+        totalPbbBelum += 1;
+      }
+
+      let num: number | null = null;
+      if (r.lingkunganNomor !== undefined && r.lingkunganNomor !== null && String(r.lingkunganNomor) !== '') {
+        const n = Number(r.lingkunganNomor);
+        if (n >= 1 && n <= 24) num = n;
+      }
+      if (num === null) {
+        num = extractNomorLingkungan(r.lingkungan) || extractNomorLingkungan(r.keplingId);
+      }
+      if (num && num >= 1 && num <= 24) {
+        lingkunganCounts[num] = (lingkunganCounts[num] || 0) + 1;
+      }
+    });
+
+    // Timeline sorted chronologically
+    const sortedDates = Object.keys(dateCounts).sort();
+    const timeline = sortedDates.map((d) => ({
+      date: d,
+      ...dateCounts[d],
+    }));
+
+    // Find peak day
+    let peakDate = '-';
+    let peakCount = 0;
+    timeline.forEach((item) => {
+      if (item.total > peakCount) {
+        peakCount = item.total;
+        peakDate = item.date;
+      }
+    });
+
+    // Active lingkungan count (how many of 24 have >0 visits in this period)
+    const activeLingkunganCount = Object.values(lingkunganCounts).filter((c) => c > 0).length;
+
+    // Leaderboard
+    const leaderboard = Object.entries(lingkunganCounts)
+      .map(([ling, count]) => ({ lingkungan: Number(ling), count }))
+      .sort((a, b) => b.count - a.count);
+
+    // Days count in current filter
+    let daysCount = 1;
+    if (dateFilterMode === 'RANGE' && startDate && endDate) {
+      const s = new Date(startDate);
+      const e = new Date(endDate);
+      const diffTime = Math.abs(e.getTime() - s.getTime());
+      daysCount = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
+    } else if (dateFilterMode === 'ALL') {
+      daysCount = Math.max(1, sortedDates.length);
+    }
+
+    const avgPerDay = (filtered.length / daysCount).toFixed(1);
+
+    return {
+      timeline,
+      peakDate,
+      peakCount,
+      activeLingkunganCount,
+      leaderboard,
+      daysCount,
+      avgPerDay,
+      totalPerlinsosSudah,
+      totalPerlinsosBelum,
+      totalPerlinsosMenolak,
+      totalIkdSudah,
+      totalIkdBelum,
+      totalPbbSudah,
+      totalPbbBelum,
+    };
+  }, [filtered, dateFilterMode, startDate, endDate]);
 
   // Rekapitulasi Kumulatif Kunjungan 24 Lingkungan (Sampai Dengan Hari Ini / Tanggal Terpilih)
   const { cumulativeCounts, totalSeluruhKunjungan } = useMemo(() => {
@@ -585,8 +758,105 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       )}
 
       {/* Filter & Action Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-3.5 sm:p-4 shadow-xs space-y-3">
-        {/* Row 1: Filters */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-3.5 sm:p-4 shadow-xs space-y-3.5">
+        {/* Row 1: Quick Period Presets for Lurah & Kasi */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none text-xs font-bold border-b border-slate-100">
+          <span className="text-[11px] text-slate-500 font-extrabold uppercase tracking-wider flex items-center gap-1 shrink-0 mr-1">
+            <Filter className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Filter Periode:</span>
+          </span>
+
+          <button
+            type="button"
+            onClick={() => applyPreset('today')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              activePreset === 'today'
+                ? 'bg-emerald-700 text-white shadow-xs font-black ring-2 ring-emerald-400'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            Hari Ini
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('yesterday')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              activePreset === 'yesterday'
+                ? 'bg-emerald-700 text-white shadow-xs font-black ring-2 ring-emerald-400'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            Kemarin
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('last7')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              activePreset === 'last7'
+                ? 'bg-emerald-700 text-white shadow-xs font-black ring-2 ring-emerald-400'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            7 Hari Terakhir
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('last30')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              activePreset === 'last30'
+                ? 'bg-emerald-700 text-white shadow-xs font-black ring-2 ring-emerald-400'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            30 Hari Terakhir
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('thisMonth')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              activePreset === 'thisMonth'
+                ? 'bg-teal-700 text-white shadow-xs font-black ring-2 ring-teal-400'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            Bulan Ini
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('lastMonth')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              activePreset === 'lastMonth'
+                ? 'bg-teal-700 text-white shadow-xs font-black ring-2 ring-teal-400'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            Bulan Lalu
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('custom')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              activePreset === 'custom'
+                ? 'bg-indigo-600 text-white shadow-xs font-black ring-2 ring-indigo-400'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            Rentang Kustom...
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              activePreset === 'all'
+                ? 'bg-slate-800 text-white shadow-xs font-black ring-2 ring-slate-500'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            Semua Periode
+          </button>
+        </div>
+
+        {/* Row 2: Detailed Date Controls & Scope */}
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {/* Opsi Filter Tanggal */}
@@ -595,7 +865,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                 <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
                 <select
                   value={dateFilterMode}
-                  onChange={(e) => setDateFilterMode(e.target.value as 'SINGLE' | 'RANGE' | 'ALL')}
+                  onChange={(e) => {
+                    const mode = e.target.value as 'SINGLE' | 'RANGE' | 'ALL';
+                    setDateFilterMode(mode);
+                    setActivePreset('custom');
+                  }}
                   className="bg-transparent font-extrabold text-slate-800 focus:outline-none cursor-pointer text-xs pr-1"
                 >
                   <option value="SINGLE">Tanggal Tertentu</option>
@@ -610,19 +884,29 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                   <input
                     type="date"
                     value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedDate(e.target.value);
+                      if (e.target.value === todayStr) {
+                        setActivePreset('today');
+                      } else {
+                        setActivePreset('custom');
+                      }
+                    }}
                     className="bg-transparent font-extrabold text-slate-800 focus:outline-none cursor-pointer text-xs"
                   />
                 </div>
               )}
 
               {dateFilterMode === 'RANGE' && (
-                <div className="flex flex-wrap items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                <div className="flex flex-wrap items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-2xs">
                   <span className="text-[10px] text-slate-500 font-semibold">Dari:</span>
                   <input
                     type="date"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      setActivePreset('custom');
+                    }}
                     className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
                   />
                   <span className="text-[10px] text-slate-400 font-extrabold">s/d</span>
@@ -630,15 +914,18 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                   <input
                     type="date"
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      setActivePreset('custom');
+                    }}
                     className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
                   />
                 </div>
               )}
 
               {dateFilterMode === 'ALL' && (
-                <div className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-lg text-[11px] font-extrabold">
-                  Semua Data
+                <div className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-lg text-[11px] font-extrabold">
+                  Semua Data ({records.length} total)
                 </div>
               )}
             </div>
@@ -679,7 +966,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               onClick={() => setViewMode('table')}
               className={`px-2.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'table'
-                  ? 'bg-white text-slate-900 shadow-2xs'
+                  ? 'bg-white text-slate-900 shadow-2xs font-black'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -690,7 +977,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               onClick={() => setViewMode('cards')}
               className={`px-2.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'cards'
-                  ? 'bg-white text-slate-900 shadow-2xs'
+                  ? 'bg-white text-slate-900 shadow-2xs font-black'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -797,6 +1084,246 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* DASHBOARD TREN KUNJUNGAN WARGA PER PERIODE (PEMKAB / LURAH & KASI) */}
+      <div className="bg-gradient-to-br from-slate-900 via-teal-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 border border-teal-500/30 shadow-lg space-y-4">
+        {/* Header & Toggle */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-400/30 flex items-center justify-center text-teal-300 shrink-0">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-black tracking-tight text-white flex items-center gap-2">
+                  <span>Tren Kunjungan Warga Per Periode</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-400/20 text-teal-300 border border-teal-400/30">
+                    LURAH &amp; KASI
+                  </span>
+                </h3>
+              </div>
+              <p className="text-xs text-teal-200/80 mt-0.5">
+                Periode Terpilih: <strong className="text-white font-bold">{dateDisplayLabel}</strong> • {filtered.length} rumah dikunjungi
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowTrendPanel(!showTrendPanel)}
+            className="inline-flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-teal-200 text-xs font-bold border border-teal-500/20 transition-all cursor-pointer shadow-xs"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-teal-400" />
+            <span>{showTrendPanel ? 'Sembunyikan Grafik Tren' : 'Buka Analisis Tren'}</span>
+            {showTrendPanel ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {/* 4 Key Metric Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          <div className="bg-slate-800/80 border border-teal-500/20 rounded-xl p-3 shadow-inner">
+            <span className="text-[10px] sm:text-[11px] font-bold text-teal-300 uppercase tracking-wider block">
+              Total Kunjungan
+            </span>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-xl sm:text-2xl font-black text-white">{filtered.length}</span>
+              <span className="text-xs text-slate-300 font-semibold">Rumah</span>
+            </div>
+            <span className="text-[10px] text-teal-200/70 block mt-1">
+              Dalam {trendAnalytics.daysCount} hari periode
+            </span>
+          </div>
+
+          <div className="bg-slate-800/80 border border-teal-500/20 rounded-xl p-3 shadow-inner">
+            <span className="text-[10px] sm:text-[11px] font-bold text-emerald-300 uppercase tracking-wider block">
+              Rata-Rata Harian
+            </span>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-xl sm:text-2xl font-black text-emerald-400">{trendAnalytics.avgPerDay}</span>
+              <span className="text-xs text-slate-300 font-semibold">Rumah/Hari</span>
+            </div>
+            <span className="text-[10px] text-emerald-200/70 block mt-1">
+              Laju aktivitas sambang
+            </span>
+          </div>
+
+          <div className="bg-slate-800/80 border border-teal-500/20 rounded-xl p-3 shadow-inner">
+            <span className="text-[10px] sm:text-[11px] font-bold text-amber-300 uppercase tracking-wider block">
+              Cakupan Wilayah
+            </span>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-xl sm:text-2xl font-black text-amber-400">{trendAnalytics.activeLingkunganCount}</span>
+              <span className="text-xs text-slate-300 font-semibold">/ 24 Aktif</span>
+            </div>
+            <span className="text-[10px] text-amber-200/70 block mt-1">
+              {Math.round((trendAnalytics.activeLingkunganCount / 24) * 100)}% lingkungan terlayani
+            </span>
+          </div>
+
+          <div className="bg-slate-800/80 border border-teal-500/20 rounded-xl p-3 shadow-inner">
+            <span className="text-[10px] sm:text-[11px] font-bold text-purple-300 uppercase tracking-wider block">
+              Puncak Kunjungan
+            </span>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-xl sm:text-2xl font-black text-purple-300">{trendAnalytics.peakCount}</span>
+              <span className="text-xs text-slate-300 font-semibold">Rumah</span>
+            </div>
+            <span className="text-[10px] text-purple-200/70 block mt-1 truncate" title={trendAnalytics.peakDate}>
+              Puncak: {trendAnalytics.peakDate}
+            </span>
+          </div>
+        </div>
+
+        {/* Expandable Trend Details: Visual Chart, Sektoral Status, and Leaderboard */}
+        {showTrendPanel && (
+          <div className="space-y-4 pt-2 border-t border-teal-500/20 animate-in fade-in duration-200">
+            {/* 1. Visual Daily Trend Bar Chart */}
+            <div className="bg-slate-950/70 rounded-xl p-3.5 sm:p-4 border border-teal-500/20 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-teal-200 flex items-center gap-1.5">
+                  <BarChart3 className="w-4 h-4 text-teal-400" />
+                  <span>Grafik Distribusi Kunjungan Harian</span>
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {trendAnalytics.timeline.length} hari kegiatan tercatat
+                </span>
+              </div>
+
+              {trendAnalytics.timeline.length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-400">
+                  Belum ada catatan kunjungan pada periode {dateDisplayLabel}.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-end gap-2 overflow-x-auto pb-4 pt-6 min-h-[140px] px-1 scrollbar-thin">
+                    {trendAnalytics.timeline.map((item) => {
+                      const maxVal = Math.max(1, trendAnalytics.peakCount);
+                      const heightPercent = Math.max(14, Math.round((item.total / maxVal) * 100));
+                      const isPeak = item.total === trendAnalytics.peakCount && item.total > 0;
+                      
+                      return (
+                        <div key={item.date} className="flex flex-col items-center gap-1.5 shrink-0 group">
+                          <span className={`text-[10px] font-mono font-black ${isPeak ? 'text-amber-300 font-bold' : 'text-teal-200'}`}>
+                            {item.total}
+                          </span>
+                          <div className="w-8 sm:w-10 bg-slate-800 rounded-t-lg h-24 flex items-end justify-center p-0.5">
+                            <div
+                              style={{ height: `${heightPercent}%` }}
+                              className={`w-full rounded-t-md transition-all duration-300 ${
+                                isPeak
+                                  ? 'bg-gradient-to-t from-amber-500 to-amber-300 shadow-md ring-1 ring-amber-300'
+                                  : 'bg-gradient-to-t from-teal-600 to-emerald-400 hover:brightness-110'
+                              }`}
+                              title={`${item.date}: ${item.total} kunjungan warga`}
+                            />
+                          </div>
+                          <span className="text-[10px] font-medium text-slate-300 whitespace-nowrap rotate-[-30deg] origin-top-left mt-2 block">
+                            {item.date.slice(5)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Sektoral Summary & Leaderboard Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Sektoral Status (Perlinsos, IKD, PBB) */}
+              <div className="bg-slate-950/70 rounded-xl p-3.5 border border-teal-500/20 space-y-2.5">
+                <span className="text-xs font-bold text-teal-200 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-teal-400" />
+                  <span>Kebutuhan Sektoral Warga Periode Ini</span>
+                </span>
+
+                <div className="space-y-2 text-xs">
+                  {/* Perlinsos */}
+                  <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-white block">Perlindungan Sosial (Bansos)</span>
+                      <span className="text-[11px] text-slate-400">
+                        {trendAnalytics.totalPerlinsosSudah} Menerima • {trendAnalytics.totalPerlinsosBelum} Belum • {trendAnalytics.totalPerlinsosMenolak} Menolak
+                      </span>
+                    </div>
+                    <span className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[11px]">
+                      {filtered.length > 0 ? Math.round((trendAnalytics.totalPerlinsosSudah / filtered.length) * 100) : 0}% Tercover
+                    </span>
+                  </div>
+
+                  {/* IKD */}
+                  <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-white block">Aktivasi IKD (KTP Digital)</span>
+                      <span className="text-[11px] text-slate-400">
+                        {trendAnalytics.totalIkdSudah} Sudah Aktivasi • {trendAnalytics.totalIkdBelum} Belum Aktivasi
+                      </span>
+                    </div>
+                    <span className="px-2 py-1 rounded bg-blue-500/20 text-blue-300 font-bold text-[11px]">
+                      {filtered.length > 0 ? Math.round((trendAnalytics.totalIkdSudah / filtered.length) * 100) : 0}% Aktivasi
+                    </span>
+                  </div>
+
+                  {/* PBB */}
+                  <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-white block">Pajak Bumi &amp; Bangunan (PBB-P2)</span>
+                      <span className="text-[11px] text-slate-400">
+                        {trendAnalytics.totalPbbSudah} Lunas / Sudah Bayar • {trendAnalytics.totalPbbBelum} Belum Lunas
+                      </span>
+                    </div>
+                    <span className="px-2 py-1 rounded bg-teal-500/20 text-teal-300 font-bold text-[11px]">
+                      {filtered.length > 0 ? Math.round((trendAnalytics.totalPbbSudah / filtered.length) * 100) : 0}% Lunas
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top 5 Lingkungan Teraktif Periode Ini */}
+              <div className="bg-slate-950/70 rounded-xl p-3.5 border border-teal-500/20 space-y-2.5">
+                <span className="text-xs font-bold text-teal-200 flex items-center gap-1.5">
+                  <Award className="w-4 h-4 text-amber-400" />
+                  <span>Top Lingkungan Teraktif (Periode Ini)</span>
+                </span>
+
+                <div className="space-y-1.5">
+                  {trendAnalytics.leaderboard.slice(0, 5).map((item, idx) => {
+                    const maxL = Math.max(1, trendAnalytics.leaderboard[0]?.count || 1);
+                    const barPercent = Math.round((item.count / maxL) * 100);
+
+                    return (
+                      <div key={item.lingkungan} className="p-2 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 ${
+                            idx === 0 ? 'bg-amber-400 text-slate-950 font-black' : idx === 1 ? 'bg-slate-300 text-slate-950' : idx === 2 ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-300'
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <span className="font-bold text-white truncate">
+                            Lingkungan {toRoman(item.lingkungan)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <div className="w-20 bg-slate-800 rounded-full h-2 hidden sm:block">
+                            <div
+                              style={{ width: `${barPercent}%` }}
+                              className="bg-emerald-500 h-2 rounded-full"
+                            />
+                          </div>
+                          <span className="font-mono font-black text-emerald-400 text-xs">
+                            {item.count} <span className="text-[10px] font-normal text-slate-400">Kunjungan</span>
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* VIEW MODE 1: MOBILE CARDS VIEW */}

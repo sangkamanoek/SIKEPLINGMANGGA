@@ -439,45 +439,43 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
           </button>
         </div>
 
-        {/* Navigation Tabs inside Modal */}
-        <div className="bg-slate-100 border-b border-slate-200 px-4 py-2 flex items-center justify-between gap-2 shrink-0">
-          <div className="flex gap-2">
-            {(activeAccount.role === 'kepling' || activeAccount.role === 'super_admin') && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('form')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === 'form'
-                    ? 'bg-emerald-800 text-white shadow-md'
-                    : 'bg-white text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                <span>Input Absen Apel</span>
-              </button>
-            )}
+        {/* Navigation Tabs inside Modal: Side-by-Side 2 Columns for Mobile & Desktop */}
+        <div className="bg-slate-100 border-b border-slate-200 px-3 sm:px-4 py-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
+          <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setActiveTab('form')}
+              className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                activeTab === 'form'
+                  ? 'bg-emerald-800 text-white shadow-md ring-2 ring-emerald-500'
+                  : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-300 shadow-2xs'
+              }`}
+            >
+              <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Input Absen Apel</span>
+            </button>
 
-            {activeAccount.role !== 'kepling' && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('monitoring')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === 'monitoring'
-                    ? 'bg-emerald-800 text-white shadow-md'
-                    : 'bg-white text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4 text-amber-400" />
-                <span>Rekap 24 Kepala Lingkungan</span>
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-950 text-emerald-200">
-                  {summary.totalHadir}/24
-                </span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setActiveTab('monitoring')}
+              className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                activeTab === 'monitoring'
+                  ? 'bg-blue-800 text-white shadow-md ring-2 ring-blue-500'
+                  : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-300 shadow-2xs'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="truncate">Daftar Absensi Apel</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-black ${
+                activeTab === 'monitoring' ? 'bg-blue-950 text-blue-200' : 'bg-slate-100 text-slate-800'
+              }`}>
+                {summary.totalHadir}/24
+              </span>
+            </button>
           </div>
 
           {/* Date Picker */}
-          <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-2.5 py-1 text-xs font-bold text-slate-700 shadow-2xs">
+          <div className="flex items-center justify-center sm:justify-start gap-1.5 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-2xs shrink-0">
             <Calendar className="w-3.5 h-3.5 text-emerald-700" />
             <input
               type="date"

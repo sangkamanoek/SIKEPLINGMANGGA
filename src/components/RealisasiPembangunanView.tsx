@@ -18,6 +18,7 @@ import {
   Edit,
   ArrowRight,
   TrendingUp,
+  Activity,
   FileSpreadsheet,
   Zap,
   Lightbulb,
@@ -339,6 +340,10 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     showToast('Seluruh laporan pembangunan berhasil dikosongkan.');
   };
 
+  // Active Sub-Tab Navigation & Responsive Layout Mode
+  const [activeSubTab, setActiveSubTab] = useState<'realisasi' | 'monitoring'>('realisasi');
+  const [layoutMode, setLayoutMode] = useState<'tab' | 'split'>('tab');
+
   // Laporan Monitoring Lapangan States
   const [monitoringItems, setMonitoringItems] = useState<LaporanMonitoringInfrastruktur[]>(() =>
     getLocalMonitoringList()
@@ -430,6 +435,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
   const [formStatus, setFormStatus] = useState<StatusRealisasiType>('SELESAI_100%');
   const [formVolume, setFormVolume] = useState('');
   const [formBiaya, setFormBiaya] = useState<number | ''>('');
+  const [formRealisasiBiaya, setFormRealisasiBiaya] = useState<string>('');
+  const [formPersentaseFisik, setFormPersentaseFisik] = useState<number>(100);
   const [formTglMulai, setFormTglMulai] = useState('');
   const [formTglSelesai, setFormTglSelesai] = useState('');
   
@@ -588,7 +595,26 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     const countLampu = filteredItems.filter((i) => i.jenisPembangunan === 'PERBAIKAN_LAMPU_LPJU').length;
     const countTiang = filteredItems.filter((i) => i.jenisPembangunan === 'PENAMBAHAN_TIANG_LPJU').length;
     const countSelesai = filteredItems.filter((i) => i.statusRealisasi === 'SELESAI_100%').length;
-    const totalBiaya = filteredItems.reduce((sum, i) => sum + (i.biayaEstimasiRp || 0), 0);
+    const totalPagu = filteredItems.reduce((sum, i) => sum + (i.biayaEstimasiRp || 0), 0);
+    const totalRealisasi = filteredItems.reduce((sum, i) => {
+      if (i.realisasiBiayaRp !== undefined) return sum + i.realisasiBiayaRp;
+      const pagu = i.biayaEstimasiRp || 0;
+      if (i.statusRealisasi === 'SELESAI_100%' || i.statusRealisasi === 'PEMELIHARAAN') return sum + pagu;
+      if (i.statusRealisasi === 'PROSES_PENGERJAAN') {
+        const prog = i.persentaseFisik !== undefined ? i.persentaseFisik : 65;
+        return sum + Math.round(pagu * (prog / 100));
+      }
+      return sum;
+    }, 0);
+
+    const totalProgSum = filteredItems.reduce((sum, i) => {
+      const prog = i.persentaseFisik !== undefined
+        ? i.persentaseFisik
+        : (i.statusRealisasi === 'SELESAI_100%' || i.statusRealisasi === 'PEMELIHARAAN' ? 100 : (i.statusRealisasi === 'PROSES_PENGERJAAN' ? 65 : 15));
+      return sum + prog;
+    }, 0);
+    const rataRataFisik = totalProyek > 0 ? Math.round(totalProgSum / totalProyek) : 0;
+    const persenSerapan = totalPagu > 0 ? Math.round((totalRealisasi / totalPagu) * 100) : 0;
 
     return {
       totalProyek,
@@ -598,7 +624,11 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       countLampu,
       countTiang,
       countSelesai,
-      totalBiaya,
+      totalBiaya: totalPagu,
+      totalPagu,
+      totalRealisasi,
+      rataRataFisik,
+      persenSerapan,
     };
   }, [filteredItems]);
 
@@ -662,6 +692,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     setFormStatus('SELESAI_100%');
     setFormVolume('250 Meter');
     setFormBiaya('');
+    setFormRealisasiBiaya('');
+    setFormPersentaseFisik(100);
     setFormTglMulai(new Date().toISOString().split('T')[0]);
     setFormTglSelesai(new Date().toISOString().split('T')[0]);
     setFormFotoSebelum('');
@@ -691,6 +723,16 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     setFormStatus(item.statusRealisasi);
     setFormVolume(item.volumeRealisasi);
     setFormBiaya(item.biayaEstimasiRp || '');
+    setFormRealisasiBiaya(item.realisasiBiayaRp !== undefined ? String(item.realisasiBiayaRp) : '');
+    setFormPersentaseFisik(
+      item.persentaseFisik !== undefined
+        ? item.persentaseFisik
+        : item.statusRealisasi === 'SELESAI_100%' || item.statusRealisasi === 'PEMELIHARAAN'
+        ? 100
+        : item.statusRealisasi === 'PROSES_PENGERJAAN'
+        ? 65
+        : 15
+    );
     setFormTglMulai(item.tanggalMulai || '');
     setFormTglSelesai(item.tanggalSelesai || '');
     
@@ -763,6 +805,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         statusRealisasi: formStatus,
         volumeRealisasi: formVolume.trim() || '1 Paket',
         biayaEstimasiRp: formBiaya ? Number(formBiaya) : undefined,
+        realisasiBiayaRp: formRealisasiBiaya ? Number(formRealisasiBiaya) : undefined,
+        persentaseFisik: formPersentaseFisik,
         tanggalMulai: formTglMulai || undefined,
         tanggalSelesai: formTglSelesai || undefined,
         fotoSebelumUrl: cleanSebelumList[0] || formFotoSebelum.trim() || undefined,
@@ -795,6 +839,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         statusRealisasi: formStatus,
         volumeRealisasi: formVolume.trim() || '1 Paket',
         biayaEstimasiRp: formBiaya ? Number(formBiaya) : undefined,
+        realisasiBiayaRp: formRealisasiBiaya ? Number(formRealisasiBiaya) : undefined,
+        persentaseFisik: formPersentaseFisik,
         tanggalMulai: formTglMulai || undefined,
         tanggalSelesai: formTglSelesai || undefined,
         fotoSebelumUrl: cleanSebelumList[0] || formFotoSebelum.trim() || undefined,
@@ -957,11 +1003,84 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
-      {/* SIDE-BY-SIDE DUAL COLUMN LAYOUT: REALISASI PEMBANGUNAN FISIK & LAPORAN MONITORING */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+      {/* TWO SIDE-BY-SIDE TABS (GRID 2 COLS FOR BALANCED LAYOUT ON MOBILE & DESKTOP) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-slate-900 rounded-2xl border border-slate-800 shadow-md">
+        <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
+          {/* Tab 1: Realisasi Pembangunan Fisik (Professional Blue) */}
+          <button
+            type="button"
+            id="tab-sub-realisasi"
+            onClick={() => setActiveSubTab('realisasi')}
+            className={`flex items-center justify-center sm:justify-start gap-2 px-3 sm:px-5 py-3 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer ${
+              activeSubTab === 'realisasi'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-2 ring-blue-400'
+                : 'bg-slate-800/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60'
+            }`}
+          >
+            <Wrench className={`w-4 h-4 shrink-0 ${activeSubTab === 'realisasi' ? 'text-white' : 'text-blue-400'}`} />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 text-left">
+              <span className="truncate">Pembangunan Fisik</span>
+              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                activeSubTab === 'realisasi' ? 'bg-blue-800 text-blue-100' : 'bg-slate-700 text-slate-300'
+              }`}>
+                {items.length} Proyek
+              </span>
+            </div>
+          </button>
+
+          {/* Tab 2: Laporan Monitoring Lapangan (Fresh Green) */}
+          <button
+            type="button"
+            id="tab-sub-monitoring"
+            onClick={() => setActiveSubTab('monitoring')}
+            className={`flex items-center justify-center sm:justify-start gap-2 px-3 sm:px-5 py-3 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer ${
+              activeSubTab === 'monitoring'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-2 ring-emerald-400'
+                : 'bg-slate-800/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60'
+            }`}
+          >
+            <Camera className={`w-4 h-4 shrink-0 ${activeSubTab === 'monitoring' ? 'text-white' : 'text-emerald-400'}`} />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 text-left">
+              <span className="truncate">Monitoring Lapangan</span>
+              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                activeSubTab === 'monitoring' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-700 text-slate-300'
+              }`}>
+                {monitoringItems.length} Laporan
+              </span>
+            </div>
+          </button>
+        </div>
+
+        {/* Desktop Split View Mode Toggle (For desktop monitors) */}
+        <div className="hidden xl:flex items-center gap-1.5 px-2 py-1 bg-slate-800/90 rounded-xl border border-slate-700/60 text-slate-300 text-xs font-bold">
+          <span className="text-[11px] text-slate-400 mr-1">Tampilan Desktop:</span>
+          <button
+            type="button"
+            onClick={() => setLayoutMode('tab')}
+            className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-xs ${
+              layoutMode === 'tab' ? 'bg-blue-600 text-white font-black' : 'hover:text-white'
+            }`}
+          >
+            Tab Tunggal
+          </button>
+          <button
+            type="button"
+            onClick={() => setLayoutMode('split')}
+            className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-xs ${
+              layoutMode === 'split' ? 'bg-emerald-600 text-white font-black' : 'hover:text-white'
+            }`}
+          >
+            2 Kolom Berdampingan
+          </button>
+        </div>
+      </div>
+
+      {/* DUAL MODE CONTAINER: TAB VIEW OR 2-COLUMN SPLIT VIEW */}
+      <div className={layoutMode === 'split' ? 'grid grid-cols-1 xl:grid-cols-2 gap-6 items-start' : 'space-y-6'}>
         
         {/* COLUMN 1: REALISASI PEMBANGUNAN FISIK (PROFESSIONAL BLUE THEME) */}
-        <div className="space-y-6 bg-blue-950/10 p-4 sm:p-5 rounded-3xl border border-blue-200 shadow-sm">
+        {(layoutMode === 'split' || activeSubTab === 'realisasi') && (
+          <div className="space-y-6 bg-blue-950/10 p-4 sm:p-5 rounded-3xl border border-blue-200 shadow-sm animate-fade-in">
           {/* HEADER BANNER */}
           <div className="p-6 sm:p-7 rounded-2xl bg-slate-900 text-white shadow-md relative overflow-hidden border border-slate-800 space-y-5">
         <div className="absolute -top-24 -right-24 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -1033,6 +1152,51 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               <span>Bersihkan Contoh Data</span>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* KPI PROGRESS FISIK & REALISASI ANGGARAN STRIP */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4 rounded-2xl bg-white border border-blue-200 shadow-2xs">
+        <div className="space-y-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Pagu Anggaran Total</span>
+          <div className="text-base sm:text-lg font-black text-slate-900 font-mono tabular-nums">
+            Rp {stats.totalPagu.toLocaleString('id-ID')}
+          </div>
+          <span className="text-[10px] text-slate-500 font-medium">Alokasi 24 Lingkungan</span>
+        </div>
+
+        <div className="space-y-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Realisasi Dana</span>
+          <div className="text-base sm:text-lg font-black text-emerald-700 font-mono tabular-nums">
+            Rp {stats.totalRealisasi.toLocaleString('id-ID')}
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-800">
+            <span className="px-1.5 py-0.2 rounded bg-emerald-100 font-black">{stats.persenSerapan}%</span>
+            <span>Serapan Anggaran</span>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Rata-Rata Kemajuan Fisik</span>
+          <div className="text-base sm:text-lg font-black text-blue-700 font-mono tabular-nums">
+            {stats.rataRataFisik}%
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${stats.rataRataFisik >= 80 ? 'bg-emerald-600' : stats.rataRataFisik >= 50 ? 'bg-blue-600' : 'bg-amber-500'}`}
+              style={{ width: `${Math.min(100, Math.max(0, stats.rataRataFisik))}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Penyelesaian Proyek</span>
+          <div className="text-base sm:text-lg font-black text-slate-900 font-mono tabular-nums">
+            {stats.countSelesai} / {stats.totalProyek} Proyek
+          </div>
+          <span className="text-[10px] text-blue-600 font-bold">
+            {stats.totalProyek > 0 ? `${Math.round((stats.countSelesai / stats.totalProyek) * 100)}% Proyek Tuntas` : '0%'}
+          </span>
         </div>
       </div>
 
@@ -1268,6 +1432,68 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                     )}
                   </div>
 
+                  {/* Status Kemajuan Fisik & Realisasi Anggaran */}
+                  {(() => {
+                    const prog = item.persentaseFisik !== undefined
+                      ? item.persentaseFisik
+                      : (item.statusRealisasi === 'SELESAI_100%' || item.statusRealisasi === 'PEMELIHARAAN' ? 100 : (item.statusRealisasi === 'PROSES_PENGERJAAN' ? 65 : 15));
+                    const pagu = item.biayaEstimasiRp || 0;
+                    const real = item.realisasiBiayaRp !== undefined
+                      ? item.realisasiBiayaRp
+                      : (item.statusRealisasi === 'SELESAI_100%' ? pagu : Math.round(pagu * (prog / 100)));
+                    const persenSerap = pagu > 0 ? Math.round((real / pagu) * 100) : 0;
+
+                    return (
+                      <div className="space-y-2 pt-2 border-t border-slate-100">
+                        {/* Kemajuan Fisik Bar */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-[11px] font-black">
+                            <span className="text-slate-600 flex items-center gap-1">
+                              <Activity className="w-3.5 h-3.5 text-blue-600" />
+                              Kemajuan Fisik:
+                            </span>
+                            <span className={`px-2 py-0.5 rounded font-black tabular-nums ${
+                              prog >= 100 ? 'bg-emerald-100 text-emerald-800' : prog >= 50 ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {prog}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                            <div
+                              className={`h-full rounded-full transition-all duration-300 ${
+                                prog >= 100 ? 'bg-emerald-600' : prog >= 50 ? 'bg-blue-600' : 'bg-amber-500'
+                              }`}
+                              style={{ width: `${Math.min(100, Math.max(0, prog))}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Pagu & Realisasi Anggaran */}
+                        <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 grid grid-cols-2 gap-2 text-[11px]">
+                          <div>
+                            <span className="text-slate-400 block font-bold text-[9px]">PAGU ANGGARAN</span>
+                            <span className="font-extrabold text-slate-800 font-mono tabular-nums">
+                              {pagu > 0 ? `Rp ${pagu.toLocaleString('id-ID')}` : 'Belum Ditetapkan'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block font-bold text-[9px]">REALISASI DANA</span>
+                            <div className="flex items-center gap-1">
+                              <span className="font-black text-emerald-700 font-mono tabular-nums">
+                                {real > 0 ? `Rp ${real.toLocaleString('id-ID')}` : 'Rp 0'}
+                              </span>
+                              {pagu > 0 && (
+                                <span className="text-[9px] font-extrabold px-1 py-0.2 rounded bg-emerald-100 text-emerald-900">
+                                  {persenSerap}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Photo Gallery 3-Stage: Sebelum (0%), Proses (50%), Sesudah (100%) */}
                   {(() => {
                     const sebelumPhotos = Array.from(new Set([
@@ -1490,6 +1716,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   <th className="p-3">Lokasi Detail</th>
                   <th className="p-3">Volume</th>
                   <th className="p-3">Pelaksana Kegiatan</th>
+                  <th className="p-3 text-center">Kemajuan Fisik</th>
+                  <th className="p-3 text-right">Pagu / Realisasi</th>
                   <th className="p-3 text-center">Status</th>
                   <th className="p-3 text-center">Dokumentasi Foto</th>
                   <th className="p-3 text-center w-20">Aksi</th>
@@ -1507,6 +1735,45 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                     <td className="p-3 text-slate-600">{item.lokasiDetail}</td>
                     <td className="p-3 font-extrabold text-slate-900 whitespace-nowrap">{item.volumeRealisasi}</td>
                     <td className="p-3 text-slate-700 whitespace-nowrap">{item.sumberDana}</td>
+                    <td className="p-3 text-center whitespace-nowrap">
+                      {(() => {
+                        const prog = item.persentaseFisik !== undefined
+                          ? item.persentaseFisik
+                          : (item.statusRealisasi === 'SELESAI_100%' || item.statusRealisasi === 'PEMELIHARAAN' ? 100 : (item.statusRealisasi === 'PROSES_PENGERJAAN' ? 65 : 15));
+                        return (
+                          <div className="inline-flex items-center gap-1.5">
+                            <div className="w-14 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                              <div
+                                className={`h-full ${prog >= 100 ? 'bg-emerald-600' : prog >= 50 ? 'bg-blue-600' : 'bg-amber-500'}`}
+                                style={{ width: `${Math.min(100, Math.max(0, prog))}%` }}
+                              />
+                            </div>
+                            <span className="font-black text-[11px] tabular-nums">{prog}%</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="p-3 text-right whitespace-nowrap font-mono text-[11px]">
+                      {(() => {
+                        const prog = item.persentaseFisik !== undefined
+                          ? item.persentaseFisik
+                          : (item.statusRealisasi === 'SELESAI_100%' || item.statusRealisasi === 'PEMELIHARAAN' ? 100 : (item.statusRealisasi === 'PROSES_PENGERJAAN' ? 65 : 15));
+                        const pagu = item.biayaEstimasiRp || 0;
+                        const real = item.realisasiBiayaRp !== undefined
+                          ? item.realisasiBiayaRp
+                          : (item.statusRealisasi === 'SELESAI_100%' ? pagu : Math.round(pagu * (prog / 100)));
+                        return (
+                          <div>
+                            <div className="font-extrabold text-slate-800">
+                              {pagu > 0 ? `Rp ${pagu.toLocaleString('id-ID')}` : '-'}
+                            </div>
+                            <div className="text-[10px] text-emerald-700 font-black">
+                              {real > 0 ? `Rp ${real.toLocaleString('id-ID')}` : '-'}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="p-3 text-center whitespace-nowrap">{getStatusBadge(item.statusRealisasi)}</td>
                     <td className="p-3 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1">
@@ -1590,9 +1857,11 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         </div>
       )}
         </div>
+      )}
 
       {/* COLUMN 2: LAPORAN MONITORING LAPANGAN (FRESH GREEN THEME) */}
-      <div className="space-y-6 bg-emerald-950/10 p-4 sm:p-5 rounded-3xl border border-emerald-200 shadow-sm">
+      {(layoutMode === 'split' || activeSubTab === 'monitoring') && (
+        <div className="space-y-6 bg-emerald-950/10 p-4 sm:p-5 rounded-3xl border border-emerald-200 shadow-sm animate-fade-in">
           {/* HEADER BANNER MONITORING (FRESH GREEN THEME) */}
           <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-emerald-950 via-slate-900 to-emerald-900 text-white shadow-md relative overflow-hidden border border-emerald-800/80 space-y-4">
             <div className="absolute -top-24 -right-24 w-60 h-60 bg-emerald-600/20 rounded-full blur-3xl pointer-events-none" />
@@ -2104,6 +2373,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
             </div>
           )}
         </div>
+      )}
       </div>
 
       {/* MODAL FORM INPUT / EDIT REALISASI PEMBANGUNAN */}
@@ -2264,6 +2534,64 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                     <option value="USULAN">💡 Usulan Proyek</option>
                     <option value="PEMELIHARAAN">🛠️ Pemeliharaan</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Kemajuan Fisik & Anggaran */}
+              <div className="p-3.5 bg-blue-50/70 rounded-2xl border border-blue-200 space-y-3">
+                <span className="text-[11px] font-black text-blue-900 uppercase tracking-tight block">
+                  Indikator Kemajuan Fisik &amp; Anggaran
+                </span>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-800 font-bold mb-1">
+                      Kemajuan Fisik Proyek (%)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="5"
+                        value={formPersentaseFisik}
+                        onChange={(e) => setFormPersentaseFisik(Number(e.target.value))}
+                        className="w-full accent-blue-600 cursor-pointer"
+                      />
+                      <span className="w-14 text-center py-1 bg-white rounded-lg border border-blue-300 text-xs font-black text-blue-900 tabular-nums">
+                        {formPersentaseFisik}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-800 font-bold mb-1">
+                      Pagu Anggaran (Rp)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="Contoh: 50000000"
+                      value={formBiaya}
+                      onChange={(e) => setFormBiaya(e.target.value ? Number(e.target.value) : '')}
+                      className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 font-bold text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-800 font-bold mb-1">
+                    Realisasi Dana / Serapan Anggaran (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Contoh: 45000000 (Kosongkan jika otomatis dihitung)"
+                    value={formRealisasiBiaya}
+                    onChange={(e) => setFormRealisasiBiaya(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 font-bold text-slate-900"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1 font-medium">
+                    Jika dikosongkan, realisasi akan otomatis disesuaikan dengan persentase kemajuan fisik ({formPersentaseFisik}%).
+                  </p>
                 </div>
               </div>
 

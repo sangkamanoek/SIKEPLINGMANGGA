@@ -460,6 +460,8 @@ export interface RealisasiPembangunan {
   statusRealisasi: StatusRealisasiType;
   volumeRealisasi: string;
   biayaEstimasiRp?: number;
+  realisasiBiayaRp?: number;
+  persentaseFisik?: number;
   tanggalMulai?: string;
   tanggalSelesai?: string;
   fotoSebelumUrl?: string;
