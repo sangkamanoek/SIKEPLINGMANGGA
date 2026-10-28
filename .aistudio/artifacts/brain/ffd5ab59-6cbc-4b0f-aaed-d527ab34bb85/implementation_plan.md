@@ -1,10 +1,20 @@
-# Status Rencana: Dibatalkan (Cancelled)
+# Implementation Plan - Grant Kepling Access to Pembangunan & Rename
 
-Rencana perubahan menu **Absensi GPS** menjadi dua tab terpisah (*Presensi Kegiatan Khusus* dan *Presensi Apel Pagi*) pada akun Super Admin telah **dibatalkan** sesuai dengan permintaan Anda.
+## Problem
+Previously, the "Pembangunan" (Realisasi Pembangunan) menu was restricted exclusively to Super Admin accounts (`isAdmin`), making it invisible to Kepling accounts. The user wants Kepling to be able to access it and wants the name updated to **"MONITORING & REALISASI PEMBANGUNAN WILAYAH"**.
 
-### Kondisi Sistem Saat Ini:
-- **Navigasi Super Admin**: Tetap menggunakan menu **Absensi GPS** seperti semula tanpa modifikasi navigasi atas.
-- **Fitur Realisasi Pembangunan**: Tata letak tab berdampingan di layar HP dan visualisasi kemajuan fisik serta pagu anggaran yang telah diselesaikan sebelumnya tetap aman dan aktif.
-- **Presensi Apel Pagi**: Rekapitulasi absensi harian, foto apel, dan status kehadiran 24 Kepala Lingkungan tetap dapat diakses normal melalui tombol Absen Apel di Pusat Menu dan Dashboard.
+## Proposed Changes
 
-Tidak ada perubahan kode yang diterapkan untuk rencana yang dibatalkan ini. Silakan beri tahu jika Anda ingin melanjutkan pengerjaan fitur lain atau melakukan penyesuaian yang berbeda.
+### 1. Navigation & Access Guard Updates
+- **`/src/components/TopNavigationBar.tsx`**:
+  - Remove `isAdmin` check for `realisasi_pembangunan` so Kepling can see it.
+  - Rename label from `'Pembangunan'` to `'MONITORING & REALISASI PEMBANGUNAN WILAYAH'`.
+- **`/src/App.tsx`**:
+  - Remove `'realisasi_pembangunan'` from `restrictedForKepling` array so Kepling can navigate to it.
+- **`/src/components/SmartHubDashboard.tsx`**:
+  - Remove `isAdmin` condition for the Pembangunan card so Kepling sees it on their Hub dashboard with the updated name.
+- **`/src/components/RealisasiPembangunanView.tsx`**:
+  - Ensure Kepling accounts can view and manage infrastructure reports for their assigned Lingkungan.
+
+### 2. Verification
+- Compile and build applet to ensure zero build errors.

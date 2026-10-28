@@ -1008,7 +1008,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   if (!isOpen || !item) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs print:p-0 print:m-0 print:bg-white print:static print:inset-auto print:overflow-visible print:block">
+    <div className="modal-preview p-0 sm:p-4 bg-black/60 backdrop-blur-xs print:p-0 print:m-0 print:bg-white print:static print:inset-auto print:overflow-visible print:block">
       {/* 1. TAMPILAN INTERAKTIF MODAL (HANYA DITAMPILKAN DI LAYAR, DISEMBUNYIKAN SAAT CETAK) */}
       <div className="relative w-full max-w-2xl bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-full sm:h-auto sm:max-h-[92vh] print:hidden">
         {/* Header Modal */}
@@ -1144,7 +1144,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   {/* Judul Laporan */}
                   <div className="text-center my-2.5">
                     <h1 className="text-[11.5pt] font-black uppercase tracking-[0.04em] underline font-serif">
-                      LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN
+                      {isPkkRole(item.petugasRole || '') ? 'LAPORAN KEGIATAN TP PKK KELURAHAN MANGGA' : 'LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN'}
                     </h1>
                     <div className="text-[8.5pt] font-serif mt-1 text-slate-900">
                       <span className="font-bold">Hari:</span> {String(item.hari || '').toUpperCase()} &nbsp;&nbsp;|&nbsp;&nbsp; <span className="font-bold">Tanggal:</span> {String(displayTanggal || '').toUpperCase()}
@@ -1174,46 +1174,48 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                           <td className="font-bold">:</td>
                           <td className="text-slate-900">{item.kecamatan || 'Kecamatan Medan Tuntungan'}</td>
                         </tr>
-                        <tr>
-                          <td className="font-bold py-0.5 text-slate-800">Presensi Apel Pagi</td>
-                          <td className="font-bold">:</td>
-                          <td className="font-bold text-slate-900" colSpan={4}>
-                            <div className="flex flex-wrap items-center gap-1.5 font-sans">
-                              <span
-                                className={`px-2 py-0.5 rounded text-[7.5pt] font-black uppercase tracking-wider ${
-                                  absenApelData?.status === 'Hadir'
-                                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                                    : absenApelData?.status === 'Izin'
-                                    ? 'bg-blue-100 text-blue-900 border border-blue-300'
-                                    : absenApelData?.status === 'Sakit'
-                                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                    : absenApelData?.status === 'Dinas Luar'
-                                    ? 'bg-purple-100 text-purple-900 border border-purple-300'
-                                    : absenApelData?.status === 'Tidak Mengikuti Apel'
-                                    ? 'bg-rose-100 text-rose-900 border border-rose-300'
-                                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                }`}
-                              >
-                                {absenApelData?.status === 'Tidak Mengikuti Apel'
-                                  ? '✕ TIDAK MENGIKUTI APEL'
-                                  : absenApelData?.status
-                                  ? `✓ ${String(absenApelData.status).toUpperCase()}`
-                                  : '✓ HADIR'}
-                              </span>
-                              <span className="text-slate-800 font-medium text-[8pt]">
-                                {absenApelData?.status === 'Tidak Mengikuti Apel' ? (
-                                  absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ' • Tanpa Kehadiran Apel Pagi'
-                                ) : (
-                                  <>
-                                    {absenApelData?.jam ? `(Pukul ${absenApelData.jam})` : '(07.35 WIB)'}
-                                    {absenApelData?.lokasiGps ? ` • ${absenApelData.lokasiGps}` : ' • Halaman Kantor Kelurahan Mangga'}
-                                    {absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ''}
-                                  </>
-                                )}
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
+                        {!isPkkRole(item.petugasRole || '') && (
+                          <tr>
+                            <td className="font-bold py-0.5 text-slate-800">Presensi Apel Pagi</td>
+                            <td className="font-bold">:</td>
+                            <td className="font-bold text-slate-900" colSpan={4}>
+                              <div className="flex flex-wrap items-center gap-1.5 font-sans">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[7.5pt] font-black uppercase tracking-wider ${
+                                    absenApelData?.status === 'Hadir'
+                                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                      : absenApelData?.status === 'Izin'
+                                      ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                      : absenApelData?.status === 'Sakit'
+                                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                      : absenApelData?.status === 'Dinas Luar'
+                                      ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                                      : absenApelData?.status === 'Tidak Mengikuti Apel'
+                                      ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  }`}
+                                >
+                                  {absenApelData?.status === 'Tidak Mengikuti Apel'
+                                    ? '✕ TIDAK MENGIKUTI APEL'
+                                    : absenApelData?.status
+                                    ? `✓ ${String(absenApelData.status).toUpperCase()}`
+                                    : '✓ HADIR'}
+                                </span>
+                                <span className="text-slate-800 font-medium text-[8pt]">
+                                  {absenApelData?.status === 'Tidak Mengikuti Apel' ? (
+                                    absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ' • Tanpa Kehadiran Apel Pagi'
+                                  ) : (
+                                    <>
+                                      {absenApelData?.jam ? `(Pukul ${absenApelData.jam})` : '(07.35 WIB)'}
+                                      {absenApelData?.lokasiGps ? ` • ${absenApelData.lokasiGps}` : ' • Halaman Kantor Kelurahan Mangga'}
+                                      {absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ''}
+                                    </>
+                                  )}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -2959,7 +2961,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       <div
         id="lembar-cetak-laporan-kepling"
         className="hidden print:block bg-white text-slate-900 w-[190mm] mx-auto font-serif text-[8pt] leading-tight"
-        style={{ paddingTop: '8px', paddingLeft: '4px', paddingRight: '4px' }}
+        style={{ paddingTop: '8px', paddingLeft: '4px', paddingRight: '4px', textTransform: 'uppercase' }}
       >
         {/* ================= HALAMAN 1 : LAPORAN UTAMA ================= */}
         <div className="page-print-single" style={{ minHeight: 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -2977,7 +2979,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 className="text-[11.5pt] font-black uppercase tracking-[0.04em] underline font-serif"
                 style={{ fontSize: '11.5pt', fontWeight: 'bold', textDecoration: 'underline', textTransform: 'uppercase', fontFamily: "'Times New Roman', Times, serif" }}
               >
-                LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN
+                {isPkkRole(item.petugasRole || '') ? 'LAPORAN KEGIATAN TP PKK KELURAHAN MANGGA' : 'LAPORAN KEGIATAN HARIAN KEPALA LINGKUNGAN'}
               </h1>
               <div
                 className="text-[8.5pt] font-serif mt-1"
@@ -3024,44 +3026,46 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     <td className="font-bold" style={{ fontWeight: 'bold' }}>:</td>
                     <td className="text-slate-900" style={{ color: '#0f172a' }}>{item?.kecamatan || 'Kecamatan Medan Tuntungan'}</td>
                   </tr>
-                  <tr>
-                    <td className="font-bold py-0.5 text-slate-800" style={{ fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Presensi Apel Pagi</td>
-                    <td className="font-bold" style={{ fontWeight: 'bold' }}>:</td>
-                    <td className="font-bold text-slate-900" colSpan={4} style={{ fontWeight: 'bold', color: '#0f172a' }}>
-                      <span
-                        style={{
-                          fontWeight: 'bold',
-                          color:
-                            absenApelData?.status === 'Tidak Mengikuti Apel'
-                              ? '#be123c'
-                              : absenApelData?.status === 'Izin'
-                              ? '#1d4ed8'
-                              : absenApelData?.status === 'Sakit'
-                              ? '#b45309'
-                              : absenApelData?.status === 'Dinas Luar'
-                              ? '#6b21a8'
-                              : '#065f46',
-                        }}
-                      >
-                        {absenApelData?.status === 'Tidak Mengikuti Apel'
-                          ? '[✕ TIDAK MENGIKUTI APEL]'
-                          : absenApelData?.status
-                          ? `[✓ ${String(absenApelData.status).toUpperCase()}]`
-                          : '[✓ HADIR]'}
-                      </span>{' '}
-                      <span style={{ color: '#334155' }}>
-                        {absenApelData?.status === 'Tidak Mengikuti Apel' ? (
-                          absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ' • Tanpa Kehadiran Apel Pagi'
-                        ) : (
-                          <>
-                            {absenApelData?.jam ? `(Pukul ${absenApelData.jam})` : '(07.35 WIB)'}
-                            {absenApelData?.lokasiGps ? ` • ${absenApelData.lokasiGps}` : ' • Halaman Kantor Kelurahan Mangga'}
-                            {absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ''}
-                          </>
-                        )}
-                      </span>
-                    </td>
-                  </tr>
+                  {!isPkkRole(item.petugasRole || '') && (
+                    <tr>
+                      <td className="font-bold py-0.5 text-slate-800" style={{ fontWeight: 'bold', padding: '2px 0', color: '#1e293b' }}>Presensi Apel Pagi</td>
+                      <td className="font-bold" style={{ fontWeight: 'bold' }}>:</td>
+                      <td className="font-bold text-slate-900" colSpan={4} style={{ fontWeight: 'bold', color: '#0f172a' }}>
+                        <span
+                          style={{
+                            fontWeight: 'bold',
+                            color:
+                              absenApelData?.status === 'Tidak Mengikuti Apel'
+                                ? '#be123c'
+                                : absenApelData?.status === 'Izin'
+                                ? '#1d4ed8'
+                                : absenApelData?.status === 'Sakit'
+                                ? '#b45309'
+                                : absenApelData?.status === 'Dinas Luar'
+                                ? '#6b21a8'
+                                : '#065f46',
+                          }}
+                        >
+                          {absenApelData?.status === 'Tidak Mengikuti Apel'
+                            ? '[✕ TIDAK MENGIKUTI APEL]'
+                            : absenApelData?.status
+                            ? `[✓ ${String(absenApelData.status).toUpperCase()}]`
+                            : '[✓ HADIR]'}
+                        </span>{' '}
+                        <span style={{ color: '#334155' }}>
+                          {absenApelData?.status === 'Tidak Mengikuti Apel' ? (
+                            absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ' • Tanpa Kehadiran Apel Pagi'
+                          ) : (
+                            <>
+                              {absenApelData?.jam ? `(Pukul ${absenApelData.jam})` : '(07.35 WIB)'}
+                              {absenApelData?.lokasiGps ? ` • ${absenApelData.lokasiGps}` : ' • Halaman Kantor Kelurahan Mangga'}
+                              {absenApelData?.catatan ? ` • (${absenApelData.catatan})` : ''}
+                            </>
+                          )}
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -3574,7 +3578,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       {/* Lightbox / Pratinjau & Download Foto Modal HD */}
       {previewPhoto && (
         <div
-          className="fixed inset-0 z-60 bg-black/90 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 print:hidden select-none animate-in fade-in duration-150"
+          className="modal-preview bg-black/90 backdrop-blur-sm p-2 sm:p-4 print:hidden select-none animate-in fade-in duration-150"
           onClick={() => setPreviewPhoto(null)}
         >
           <div

@@ -31,6 +31,29 @@ import { KopSuratPkk } from './KopSuratPkk';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument } from '../utils/printHelper';
 
+const formatProperWriting = (text: string): string => {
+  if (!text) return '';
+  let formatted = text.replace(/(^\s*|[.!?]\s+)([a-z])/g, (m) => m.toUpperCase());
+  const keywords = [
+    { pattern: /\bpkk\b/gi, replacement: 'PKK' },
+    { pattern: /\btp-pkk\b/gi, replacement: 'TP-PKK' },
+    { pattern: /\blurah\b/gi, replacement: 'Lurah' },
+    { pattern: /\bkelurahan\b/gi, replacement: 'Kelurahan' },
+    { pattern: /\bmangga\b/gi, replacement: 'Mangga' },
+    { pattern: /\bkepling\b/gi, replacement: 'Kepling' },
+    { pattern: /\bkepala lingkungan\b/gi, replacement: 'Kepala Lingkungan' },
+    { pattern: /\btaman pkk\b/gi, replacement: 'Taman PKK' },
+    { pattern: /\btoga\b/gi, replacement: 'TOGA' },
+    { pattern: /\bdawis\b/gi, replacement: 'Dawis' },
+    { pattern: /\bdasa wisma\b/gi, replacement: 'Dasa Wisma' },
+    { pattern: /\bposyandu\b/gi, replacement: 'Posyandu' },
+  ];
+  keywords.forEach((kw) => {
+    formatted = formatted.replace(kw.pattern, kw.replacement);
+  });
+  return formatted;
+};
+
 interface PkkDasaWismaViewProps {
   currentUser: UserAccount;
 }
@@ -365,7 +388,7 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
       </div>
 
       {/* Dasa Wisma Cards List or Clean Empty State */}
-      <div id="lembar-cetak-dasa-wisma">
+      <div id="lembar-cetak-dasa-wisma" className="uppercase">
         <div className="hidden print:block mb-4">
           <KopSuratPkk />
           <div className="text-center my-2">
@@ -454,7 +477,7 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
 
                 {item.kegiatanUtama && (
                   <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">
-                    {item.kegiatanUtama}
+                    {formatProperWriting(item.kegiatanUtama)}
                   </p>
                 )}
               </div>

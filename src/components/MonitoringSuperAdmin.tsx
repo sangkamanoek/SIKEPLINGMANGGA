@@ -36,7 +36,7 @@ import {
   ClipboardList,
   LayoutGrid,
   Smartphone,
-  CloudUpload,
+  UploadCloud as CloudUpload,
   Server,
   Database,
   Bell,
@@ -75,6 +75,7 @@ import {
   TitikRumahBangunan,
   RuasJalanLingkungan,
   LingkunganPolygon,
+  isPkkRole,
 } from '../types';
 import { 
   KEPLING_ACCOUNTS, 
@@ -187,12 +188,21 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
       return;
     }
     try {
+      const isTargetPkkAll = taskTargetAccountId === 'ALL_PKK';
+      const isTargetAllKepling = taskTargetAccountId === 'ALL';
+      const targetAcc = accountsList.find((a) => a.id === taskTargetAccountId);
+      const targetRole = isTargetPkkAll
+        ? 'pkk'
+        : isTargetAllKepling
+        ? 'kepling'
+        : targetAcc?.role || 'all';
+
       addTugasKhusus({
         judul: taskJudul.trim(),
         deskripsi: taskDeskripsi.trim(),
         targetAccountId: taskTargetAccountId,
-        targetRole: taskTargetAccountId === 'ALL' ? 'all' : 'kepling',
-        pemberiTugas: 'Lurah Kelurahan Mangga',
+        targetRole,
+        pemberiTugas: isTargetPkkAll ? 'Lurah / Ketua TP-PKK' : 'Lurah Kelurahan Mangga',
         tanggalMulai: todayIso,
         deadline: taskDeadline || todayIso,
         status: 'aktif',
@@ -200,7 +210,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
       setTaskJudul('');
       setTaskDeskripsi('');
       setTaskTargetAccountId('ALL');
-      setTaskSuccess('Tugas Khusus dari Lurah berhasil diterbitkan dan langsung tampil di perangkat target!');
+      setTaskSuccess('Tugas Khusus berhasil diterbitkan dan langsung tampil di perangkat target!');
       setTimeout(() => setTaskSuccess(''), 4000);
     } catch (err: any) {
       setTaskError(err.message || 'Gagal menyimpan tugas khusus.');
@@ -2529,11 +2539,21 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none bg-white"
                 >
                   <option value="ALL">📢 Semua Kepala Lingkungan (Broadcast Kepling)</option>
-                  {accountsList.filter(a => a.role === 'kepling').map(acc => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.nama} ({acc.jabatan || acc.id})
-                    </option>
-                  ))}
+                  <option value="ALL_PKK">🌸 Semua Pengurus TP-PKK (Broadcast PKK)</option>
+                  <optgroup label="Pengurus & Anggota TP-PKK">
+                    {accountsList.filter(a => isPkkRole(a.role)).map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        🌸 {acc.nama} ({acc.jabatan || acc.id})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Kepala Lingkungan (Kepling 1-24)">
+                    {accountsList.filter(a => a.role === 'kepling').map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        📍 {acc.nama} ({acc.jabatan || acc.id})
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 

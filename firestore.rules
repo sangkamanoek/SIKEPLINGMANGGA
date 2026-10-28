@@ -34,8 +34,11 @@ service cloud.firestore {
 
     // Passwords & Profile Sync (Secured payload validation)
     match /account_passwords/{accountId} {
-      allow read: if true;
-      allow write: if request.resource.data.keys().hasAll(['accountId', 'passwordHash']);
+      allow read, write: if true;
+    }
+
+    match /user_accounts/{accountId} {
+      allow read, write: if true;
     }
 
     match /account_profiles/{accountId} {

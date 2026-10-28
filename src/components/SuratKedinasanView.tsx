@@ -32,6 +32,7 @@ import {
   subscribeSurat,
   saveSuratItem,
   deleteSuratItem,
+  getSuratWithAttachment,
 } from '../lib/suratService';
 import { getTodayLocalIso, formatTanggalIndonesia } from '../lib/formatter';
 import { KopSuratResmi } from './KopSuratResmi';
@@ -165,10 +166,10 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size (max 15MB)
-    const MAX_SIZE = 15 * 1024 * 1024;
+    // Validate size (max 25MB for high-res PDF scans)
+    const MAX_SIZE = 25 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      onShowToast('Ukuran file maksimal adalah 15 MB!', 'error');
+      onShowToast('Ukuran file maksimal adalah 25 MB!', 'error');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -182,7 +183,7 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
         setFormFileName(file.name);
         setFormFileSize(file.size);
         setFormFileType(file.type || 'application/pdf');
-        onShowToast(`File "${file.name}" berhasil diunggah!`, 'success');
+        onShowToast(`File "${file.name}" (${formatFileSize(file.size)}) berhasil dimuat dan siap disimpan!`, 'success');
       }
       setIsProcessingFile(false);
     };
@@ -234,7 +235,12 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
 
     try {
       await saveSuratItem(newItem);
-      onShowToast(editingSurat ? 'Surat berhasil diperbarui!' : 'Arsip surat baru berhasil dicatat!', 'success');
+      onShowToast(
+        editingSurat
+          ? 'Surat berhasil diperbarui!'
+          : `Arsip surat baru beserta berkas ${newItem.fileName ? `(${newItem.fileName})` : ''} berhasil disimpan ke sistem!`,
+        'success'
+      );
       setIsFormOpen(false);
     } catch (err) {
       onShowToast('Gagal menyimpan arsip surat.', 'error');
@@ -245,29 +251,51 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
     if (window.confirm('Yakin ingin menghapus arsip surat kedinasan ini?')) {
       try {
         await deleteSuratItem(id);
-        onShowToast('Arsip surat berhasil dihapus.', 'info');
+        onShowToast('Arsip surat berhasil dihapus dari sistem.', 'info');
       } catch {
         onShowToast('Gagal menghapus arsip surat.', 'error');
       }
     }
   };
 
-  const handleDownloadPdf = (item: SuratKedinasanItem) => {
-    if (!item.fileUrl) {
+  const handleOpenPdfViewer = async (item: SuratKedinasanItem) => {
+    let targetItem = item;
+    if (!targetItem.fileUrl) {
+      onShowToast('Memuat berkas PDF dari penyimpanan sistem...', 'info');
+      const full = await getSuratWithAttachment(item.id);
+      if (full && full.fileUrl) {
+        targetItem = full;
+      } else {
+        onShowToast('Berkas lampiran PDF belum dapat dimuat.', 'error');
+        return;
+      }
+    }
+    setViewingPdfSurat(targetItem);
+  };
+
+  const handleDownloadPdf = async (item: SuratKedinasanItem) => {
+    let fileUrl = item.fileUrl;
+    if (!fileUrl) {
+      onShowToast('Mengambil berkas PDF dari penyimpanan sistem...', 'info');
+      const full = await getSuratWithAttachment(item.id);
+      fileUrl = full?.fileUrl;
+    }
+
+    if (!fileUrl) {
       onShowToast('Tidak ada lampiran file PDF pada surat ini.', 'error');
       return;
     }
 
     try {
       const link = document.createElement('a');
-      link.href = item.fileUrl;
+      link.href = fileUrl;
       link.download = item.fileName || `Arsip_Surat_${item.nomorSurat.replace(/[\/\s]/g, '_')}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       onShowToast(`Mengunduh berkas ${item.fileName || 'PDF'}...`, 'success');
     } catch (err) {
-      window.open(item.fileUrl, '_blank');
+      window.open(fileUrl, '_blank');
     }
   };
 
@@ -459,7 +487,7 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
                   </p>
 
                   {/* Attached PDF Badge & Preview Pill */}
-                  {item.fileUrl && (
+                  {(item.fileUrl || item.fileName) && (
                     <div className="pt-1 flex items-center gap-2 flex-wrap">
                       <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[11px] font-bold">
                         <FileText className="w-3.5 h-3.5 text-rose-600" />
@@ -471,7 +499,7 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
 
                       <button
                         type="button"
-                        onClick={() => setViewingPdfSurat(item)}
+                        onClick={() => handleOpenPdfViewer(item)}
                         className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
                         title="Lihat Berkas PDF"
                       >
@@ -771,7 +799,7 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
 
       {/* Modal In-App PDF Viewer */}
       {viewingPdfSurat && viewingPdfSurat.fileUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xs animate-in fade-in">
+        <div className="modal-preview p-4 bg-slate-900/80 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl overflow-hidden flex flex-col max-h-[95vh]">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
@@ -829,7 +857,7 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
 
       {/* Modal Preview / Cetak Surat Resmi */}
       {previewSurat && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in">
+        <div className="modal-preview p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden flex flex-col max-h-[95vh]">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <h3 className="font-black text-sm uppercase tracking-wide flex items-center gap-2">
@@ -837,12 +865,13 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
                 <span>Pratinjau Resmi Surat Kedinasan</span>
               </h3>
               <div className="flex items-center gap-2">
-                {previewSurat.fileUrl && (
+                {(previewSurat.fileUrl || previewSurat.fileName) && (
                   <button
                     type="button"
                     onClick={() => {
-                      setViewingPdfSurat(previewSurat);
+                      const target = previewSurat;
                       setPreviewSurat(null);
+                      handleOpenPdfViewer(target);
                     }}
                     className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
                   >
@@ -902,8 +931,17 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
 
                 <div className="pt-8 flex justify-end text-xs font-sans">
                   <div className="text-center w-64 space-y-12">
-                    <p>Medan, {formatTanggalIndonesia(new Date(previewSurat.tanggalSurat))}<br /><strong>Tim Administrasi Kelurahan Mangga</strong></p>
-                    <p className="underline font-bold">Kelurahan Mangga</p>
+                    <p>
+                      Medan, {formatTanggalIndonesia(new Date(previewSurat.tanggalSurat))}
+                      <br />
+                      <strong>{isPkkRole(previewSurat.dibuatOlehRole || '') ? 'Tim Penggerak PKK' : 'Pemerintah Kelurahan Mangga'}</strong>
+                    </p>
+                    <div>
+                      <p className="underline font-bold uppercase">{previewSurat.penandatangan || 'Kelurahan Mangga'}</p>
+                      {isPkkRole(previewSurat.dibuatOlehRole || '') && (
+                        <p className="text-[10px] text-slate-500 font-normal">Tim Penggerak PKK Kelurahan Mangga</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

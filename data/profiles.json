@@ -1,0 +1,14 @@
+{
+  "ketua_pkk": {
+    "accountId": "ketua_pkk",
+    "nama": "Ny. Fransiska Fery Arapenta Tarigan",
+    "telepon": "08126010000",
+    "updatedAt": "2026-10-28T16:30:00.000Z"
+  },
+  "sekretaris_pkk": {
+    "accountId": "sekretaris_pkk",
+    "nama": "Nur Aisyah Dewi, A.Md",
+    "telepon": "08126020000",
+    "updatedAt": "2026-10-28T16:30:00.000Z"
+  }
+}

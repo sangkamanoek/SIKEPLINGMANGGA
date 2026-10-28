@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ClipboardList, Bell, Calendar, CheckCircle2, Camera, Upload, Check, AlertCircle, X, Shield, FileText, RefreshCw } from 'lucide-react';
-import { UserAccount } from '../types';
+import { UserAccount, isPkkRole } from '../types';
 import {
   getTugasKhususList,
   TugasKhusus,
@@ -34,13 +34,36 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const isUserPkk = isPkkRole(currentUser.role);
+
   useEffect(() => {
     const filterAndSet = (all: TugasKhusus[]) => {
       const relevant = all.filter((t) => {
-        const isForAll = t.targetAccountId === 'ALL' || t.targetRole === 'all';
-        const isForThisRole = t.targetRole === currentUser.role;
-        const isForThisAccount = t.targetAccountId === currentUser.id;
-        return isForAll || isForThisRole || isForThisAccount;
+        // Direct match on this specific account ID
+        if (t.targetAccountId === currentUser.id) return true;
+
+        if (isUserPkk) {
+          // If viewing from a PKK account, ONLY show tasks intended for PKK
+          const isTargetPkkBroadcast = t.targetAccountId === 'ALL_PKK' || t.targetRole === 'pkk';
+          const isTargetPkkRole = t.targetRole === currentUser.role || isPkkRole(t.targetRole || '');
+          const isTargetPkkId =
+            !!t.targetAccountId &&
+            (t.targetAccountId.toLowerCase().includes('pkk') || t.targetAccountId.toLowerCase().includes('pokja'));
+          return isTargetPkkBroadcast || isTargetPkkRole || isTargetPkkId;
+        } else {
+          // Non-PKK (Kepling / Lurah / Kasi)
+          if (currentUser.role === 'kepling') {
+            return (
+              (t.targetAccountId === 'ALL' && (t.targetRole === 'kepling' || t.targetRole === 'all')) ||
+              t.targetRole === 'kepling'
+            );
+          }
+          return (
+            t.targetAccountId === 'ALL' ||
+            t.targetRole === currentUser.role ||
+            t.targetRole === 'all'
+          );
+        }
       });
       setTasks(relevant);
     };
@@ -143,22 +166,39 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
       )}
 
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-900 text-white p-6 sm:p-8 rounded-3xl shadow-lg relative overflow-hidden">
+      <div
+        className={`p-6 sm:p-8 rounded-3xl shadow-lg relative overflow-hidden text-white ${
+          isUserPkk
+            ? 'bg-gradient-to-r from-tosca-800 via-tosca-700 to-tosca-900 border border-tosca-600/30'
+            : 'bg-gradient-to-r from-amber-600 via-amber-700 to-amber-900'
+        }`}
+      >
         <div className="absolute right-0 top-0 translate-x-6 -translate-y-6 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/30 text-amber-100 text-xs font-black uppercase tracking-wider border border-amber-300/30">
-              <Bell className="w-3.5 h-3.5 text-amber-300" /> Arahan Resmi Lurah
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${
+                isUserPkk
+                  ? 'bg-tosca-900/60 text-tosca-100 border-tosca-400/40'
+                  : 'bg-amber-400/30 text-amber-100 border-amber-300/30'
+              }`}
+            >
+              <Bell className="w-3.5 h-3.5" />
+              <span>{isUserPkk ? 'Tugas Khusus TP-PKK' : 'Arahan Resmi Lurah'}</span>
             </span>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Daftar Tugas Khusus & Unggah Dokumentasi
+              {isUserPkk ? 'Daftar Tugas Khusus TP-PKK & Dokumentasi' : 'Daftar Tugas Khusus & Unggah Dokumentasi'}
             </h2>
-            <p className="text-xs sm:text-sm text-amber-100 max-w-2xl leading-relaxed font-medium">
-              Berikut adalah seluruh instruksi dan penugasan khusus dari Lurah Kelurahan Mangga untuk Anda laksanakan. Tekan salah satu tugas untuk melampirkan foto bukti pelaksanaan di lapangan.
+            <p className={`text-xs sm:text-sm max-w-2xl leading-relaxed font-medium ${isUserPkk ? 'text-tosca-100' : 'text-amber-100'}`}>
+              {isUserPkk
+                ? 'Berikut adalah seluruh instruksi dan penugasan khusus Tim Penggerak PKK Kelurahan Mangga. Tekan salah satu tugas untuk melampirkan foto bukti pelaksanaan di lapangan.'
+                : 'Berikut adalah seluruh instruksi dan penugasan khusus dari Lurah Kelurahan Mangga untuk Anda laksanakan. Tekan salah satu tugas untuk melampirkan foto bukti pelaksanaan di lapangan.'}
             </p>
           </div>
           <div className="bg-white/10 backdrop-blur-md px-5 py-4 rounded-2xl border border-white/20 text-center shrink-0">
-            <span className="text-[10px] uppercase font-bold text-amber-200 block">Total Tugas</span>
+            <span className={`text-[10px] uppercase font-bold block ${isUserPkk ? 'text-tosca-200' : 'text-amber-200'}`}>
+              Total Tugas
+            </span>
             <span className="text-3xl font-black">{tasks.length}</span>
           </div>
         </div>

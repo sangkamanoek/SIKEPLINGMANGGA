@@ -10,6 +10,7 @@ import {
   savePbbToIndexedDB,
   saveVisitsToIndexedDB,
   saveHistoryToIndexedDB,
+  saveSuratToIndexedDB,
 } from './indexedDbStorage';
 
 // Bounded memory cache (max 2MB total) to avoid memory leaks on 1GB/2GB RAM mobile devices
@@ -21,6 +22,7 @@ let idbKkSaveTimeout: any = null;
 let idPbbSaveTimeout: any = null;
 let idbVisitsTimeout: any = null;
 let idbHistoryTimeout: any = null;
+let idbSuratTimeout: any = null;
 
 /**
  * Clean & sanitize text input to prevent malicious injections (XSS / SQLi / Corrupt characters)
@@ -89,6 +91,7 @@ function stripHeavyMediaFromItem(item: any): any {
   if (copy.fotoDokumentasi) copy.fotoDokumentasi = stripHeavyStr(copy.fotoDokumentasi);
   if (copy.fotoKkUrl) copy.fotoKkUrl = stripHeavyStr(copy.fotoKkUrl);
   if (copy.fotoRumahUrl) copy.fotoRumahUrl = stripHeavyStr(copy.fotoRumahUrl);
+  if (copy.fileUrl) copy.fileUrl = stripHeavyStr(copy.fileUrl);
 
   return copy;
 }
@@ -167,6 +170,18 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
       }, 900);
     }
 
+    if (key.includes('surat')) {
+      if (idbSuratTimeout) clearTimeout(idbSuratTimeout);
+      idbSuratTimeout = setTimeout(() => {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            saveSuratToIndexedDB(parsed).catch(() => {});
+          }
+        } catch {}
+      }, 500);
+    }
+
     localStorage.setItem(key, value);
     return true;
   } catch (error: any) {
@@ -211,6 +226,8 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
             saveVisitsToIndexedDB(parsed).catch(() => {});
           } else if (key.includes('history')) {
             saveHistoryToIndexedDB(parsed).catch(() => {});
+          } else if (key.includes('surat')) {
+            saveSuratToIndexedDB(parsed).catch(() => {});
           }
 
           const lightweight = parsed.map(stripHeavyMediaFromItem);

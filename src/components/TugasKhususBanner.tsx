@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, CheckCircle2, Calendar, UserCheck, AlertTriangle, X, ChevronRight, FileText, Camera } from 'lucide-react';
-import { UserAccount } from '../types';
+import { UserAccount, isPkkRole } from '../types';
 import {
   getTugasKhususList,
   TugasKhusus,
@@ -21,14 +21,33 @@ export const TugasKhususBanner: React.FC<TugasKhususBannerProps> = ({ activeAcco
   const [confirmTaskToFinish, setConfirmTaskToFinish] = useState<TugasKhusus | null>(null);
 
   useEffect(() => {
+    const isUserPkk = isPkkRole(activeAccount.role);
     const filterRelevantTasks = (all: TugasKhusus[]) => {
       const relevant = all.filter((t) => {
         if (t.status !== 'aktif') return false;
-        // Check if target matches
-        const isForAll = t.targetAccountId === 'ALL' || t.targetRole === 'all';
-        const isForThisRole = t.targetRole === activeAccount.role;
-        const isForThisAccount = t.targetAccountId === activeAccount.id;
-        const targetMatched = isForAll || isForThisRole || isForThisAccount;
+        
+        let targetMatched = false;
+        if (t.targetAccountId === activeAccount.id) {
+          targetMatched = true;
+        } else if (isUserPkk) {
+          const isTargetPkkBroadcast = t.targetAccountId === 'ALL_PKK' || t.targetRole === 'pkk';
+          const isTargetPkkRole = t.targetRole === activeAccount.role || isPkkRole(t.targetRole || '');
+          const isTargetPkkId =
+            !!t.targetAccountId &&
+            (t.targetAccountId.toLowerCase().includes('pkk') || t.targetAccountId.toLowerCase().includes('pokja'));
+          targetMatched = isTargetPkkBroadcast || isTargetPkkRole || isTargetPkkId;
+        } else {
+          if (activeAccount.role === 'kepling') {
+            targetMatched =
+              (t.targetAccountId === 'ALL' && (t.targetRole === 'kepling' || t.targetRole === 'all')) ||
+              t.targetRole === 'kepling';
+          } else {
+            targetMatched =
+              t.targetAccountId === 'ALL' ||
+              t.targetRole === activeAccount.role ||
+              t.targetRole === 'all';
+          }
+        }
 
         // Check if already completed by this account
         const alreadyCompleted = (t.completedBy || []).includes(activeAccount.id);

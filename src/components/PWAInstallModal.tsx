@@ -78,7 +78,7 @@ Silakan buka dan pasang aplikasi resmi *SI-MANGGA* (Sistem Informasi & Administr
 4. Ikon aplikasi SI-MANGGA (Logo Pemko Medan) akan otomatis terpasang di layar utama HP layaknya aplikasi APK.
 5. Gunakan fitur *Dashboard Capaian* untuk memantau akumulasi PBB, Perlinsos, IKD, dan BPJS TK Anda.
 
-#SIKEPLINGMANGGA #MedanUntukSemua #SemuaUntukMedan`;
+#SIKEPLINGMANGGA #KelurahanMangga #PemkoMedan`;
 
     navigator.clipboard.writeText(waText);
     setIsCopiedWa(true);

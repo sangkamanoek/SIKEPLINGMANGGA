@@ -54,7 +54,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   onOpenUpdateModal,
   portalMode,
 }) => {
-  const isPkk = isPkkRole(activeAccount.role) || portalMode === 'pkk';
+  const isPkk = activeAccount ? isPkkRole(activeAccount.role) || portalMode === 'pkk' : portalMode === 'pkk';
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
   const [isHelperMenuOpen, setIsHelperMenuOpen] = useState(false);
@@ -191,63 +191,61 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
         </div>
 
         {/* Indikator Status Resmi Aplikasi (Online/Offline Real-Time) */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           {isSyncing ? (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-100 bg-amber-950/90 border border-amber-500/40 px-3 py-1 rounded-full shadow-md transition-all duration-300 transform scale-102">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-200 bg-amber-950/60 border border-amber-500/30 px-2.5 py-0.5 rounded">
               <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-              <span>MENYINKRONKAN KE FIREBASE...</span>
+              <span>Sinkronisasi Cloud...</span>
             </span>
           ) : isOnline ? (
-            <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${isPkk ? 'text-tosca-100 bg-tosca-950/80 border-tosca-500/30' : 'text-emerald-100 bg-emerald-950/80 border-emerald-500/30'} px-3 py-1 rounded-full shadow-xs transition-all duration-300`}>
-              <Wifi className={`w-3.5 h-3.5 ${isPkk ? 'text-tosca-400' : 'text-emerald-400'}`} />
-              <span className={`w-2 h-2 rounded-full ${isPkk ? 'bg-tosca-400' : 'bg-emerald-400'} animate-pulse`} />
-              <span>TERHUBUNG (ONLINE)</span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-200 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>Terhubung (Online)</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-100 bg-rose-950/90 border border-rose-500/40 px-3 py-1 rounded-full shadow-md animate-pulse transition-all duration-300">
-              <WifiOff className="w-3.5 h-3.5 text-rose-400" />
-              <span className="w-2 h-2 rounded-full bg-rose-500" />
-              <span>OFFLINE (ANTREAN SINKRONISASI)</span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-rose-200 bg-rose-950/70 border border-rose-500/40 px-2.5 py-0.5 rounded">
+              <span className="w-2 h-2 rounded-full bg-rose-400" />
+              <span>Offline (Tersimpan Lokal)</span>
             </span>
           )}
         </div>
       </div>
 
       {/* Main App Title in Professional Polish layout */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5 sm:gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5 sm:gap-4">
         {/* Brand & Identity (Left) */}
         <div className="flex items-center gap-3.5 sm:gap-4 shrink-0 min-w-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-1 shadow-md shrink-0 border border-white/20 overflow-hidden">
+            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1.5 shadow-xs shrink-0 border border-white/20 overflow-hidden">
               <img
                 src="/logo_pemko_medan.svg"
                 alt="Logo Pemko Medan"
-                className="w-full h-full object-contain scale-[1.05]"
+                className="w-full h-full object-contain"
               />
             </div>
             {isPkk && (
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl flex items-center justify-center p-1 shadow-md shrink-0 border border-white/20 animate-fade-in overflow-hidden">
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1.5 shadow-xs shrink-0 border border-white/20 overflow-hidden">
                 <img
                   src="/logo_pkk.jpg"
                   alt="Logo PKK"
-                  className="w-full h-full object-cover scale-[0.94] transform"
+                  className="w-full h-full object-cover"
                 />
               </div>
             )}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white drop-shadow-md uppercase whitespace-nowrap">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white uppercase whitespace-nowrap">
                 SI-MANGGA
               </h1>
               <span
-                className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full shadow-sm border border-white/20 whitespace-nowrap ${
+                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border whitespace-nowrap ${
                   activeAccount.role === 'super_admin'
-                    ? 'bg-amber-400 text-slate-950'
+                    ? 'bg-amber-400/90 text-slate-950 border-amber-300'
                     : activeAccount.role === 'kasi_pemerintahan'
-                    ? 'bg-teal-400 text-teal-950'
+                    ? 'bg-teal-500/20 text-teal-200 border-teal-500/40'
                     : activeAccount.role === 'kasi_pembangunan'
-                    ? 'bg-blue-400 text-blue-950'
+                    ? 'bg-blue-500/20 text-blue-200 border-blue-500/40'
                     : activeAccount.role === 'kasi_trantibum'
                     ? 'bg-orange-400 text-orange-950'
                     : activeAccount.role === 'ketua_pkk_kelurahan' ||
@@ -293,11 +291,8 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
         </div>
 
         {/* Header Actions Toolbar (Right) */}
-        <div className="flex items-center gap-1.5 sm:gap-2 justify-end w-auto">
-          {onOpenAbsenApel &&
-            activeAccount.role !== 'ketua_pkk_kelurahan' &&
-            activeAccount.role !== 'ketua_pokja' &&
-            activeAccount.role !== 'ketua_pkk_lingkungan' && (
+        <div className="flex items-center gap-2 sm:gap-3 justify-end shrink-0">
+          {onOpenAbsenApel && !isPkkRole(activeAccount.role) && (
             <button
               id="btn-open-absen-apel-header"
               type="button"
@@ -318,7 +313,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
           )}
 
           {/* Google Connection Status Button */}
-          <div className="hidden lg:flex items-center gap-1.5">
+          <div className="hidden lg:flex items-center gap-2 shrink-0">
             {user ? (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-100 font-bold text-xs shadow-xs">
                 <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
@@ -538,11 +533,12 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                   id="btn-logout-app"
                   type="button"
                   onClick={onLogout}
-                  className="p-1.5 rounded-lg bg-red-950/70 hover:bg-red-800 border border-red-500/50 text-red-200 hover:text-white transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-600/90 hover:bg-red-700 text-white font-bold text-xs transition-colors cursor-pointer border border-red-500 shadow-xs"
                   title="Keluar dari Sistem (Logout)"
-                  aria-label="Keluar"
+                  aria-label="Keluar dari Sistem"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden lg:inline">Keluar</span>
                 </button>
               )}
             </div>

@@ -1,1801 +1,1217 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { printOfficialDocument } from '../utils/printHelper';
-import { KopSuratResmi } from './KopSuratResmi';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { UserAccount } from '../types';
+import {
+  KunjunganWargaData,
+  subscribeKunjunganWarga,
+  deleteKunjunganWargaFromFirestore,
+  saveKunjunganWargaToFirestore,
+} from '../lib/kunjunganService';
+import { FormKunjunganWarga } from './FormKunjunganWarga';
+import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import {
   Users,
-  Calendar,
   Search,
-  Printer,
+  FileSpreadsheet,
+  Edit3,
   Trash2,
+  X,
   CheckCircle2,
   Share2,
-  Plus,
-  Download,
-  FileSpreadsheet,
-  X,
-  MapPin,
-  Send,
-  Archive,
-  Image as ImageIcon,
-  Sparkles,
-  RefreshCw,
-  Edit3,
-  TrendingUp,
-  BarChart3,
+  Calendar,
   Filter,
-  ChevronDown,
-  ChevronUp,
-  Layers,
-  Award,
-  Activity,
-  CalendarDays,
-  ArrowUpRight,
+  Download,
+  Printer,
+  Archive,
+  Send,
+  TrendingUp,
+  Image as ImageIcon,
+  Camera,
+  Eye,
+  Loader2,
+  Upload,
 } from 'lucide-react';
-import { UserAccount, isKelurahanAdmin, LaporanHarianItem } from '../types';
-import { KEPLING_ACCOUNTS } from '../data/keplingList';
-import { FormKunjunganWarga, KunjunganWargaData } from './FormKunjunganWarga';
-import { downloadImage, downloadMultipleImages } from '../lib/imageDownloader';
-import { exportKunjunganWargaToExcel, exportKunjunganWargaZipPackage } from '../lib/excelExport';
-import { safeGetLocalStorage, safeSetLocalStorage } from '../lib/safeStorage';
-import { getReportIsoDate, isReportMatchingDate, getTodayLocalIso, extractNomorLingkungan, toRoman } from '../lib/formatter';
+import { compressImageFile } from '../lib/imageCompressor';
+import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
 import {
-  subscribeKunjunganWarga,
-  deleteKunjunganWarga,
-  consolidateKunjunganWithReports,
-  isKunjunganOnDate,
-  getKunjunganIsoDate,
-  KUNJUNGAN_STORAGE_KEY,
-} from '../lib/kunjunganService';
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts';
+import { getTodayLocalIso, formatTanggalIndonesia } from '../lib/formatter';
 
 interface KunjunganHarianViewProps {
-  currentUser: UserAccount;
-  reports?: LaporanHarianItem[];
-  onNavigateToForm?: () => void;
+  currentUser?: UserAccount;
+  onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
+
+const ROMAN_NUMERALS = [
+  'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
+  'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX',
+  'XXI', 'XXII', 'XXIII', 'XXIV'
+];
+
+type PeriodFilterType =
+  | 'HARI_INI'
+  | 'KEMARIN'
+  | '7_HARI'
+  | '30_HARI'
+  | 'BULAN_INI'
+  | 'BULAN_LALU'
+  | 'CUSTOM'
+  | 'SEMUA';
 
 export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   currentUser,
-  reports = [],
+  onShowToast,
 }) => {
-  const isAdmin = isKelurahanAdmin(currentUser.role);
-  const todayStr = useMemo(() => getTodayLocalIso(), []);
-
-  // 1. Instant 0ms Load from Local Cache
-  const [records, setRecords] = useState<KunjunganWargaData[]>(() => {
-    return safeGetLocalStorage<KunjunganWargaData[]>(KUNJUNGAN_STORAGE_KEY, []);
-  });
-  const [dateFilterMode, setDateFilterMode] = useState<'SINGLE' | 'RANGE' | 'ALL'>('SINGLE');
-  const [activePreset, setActivePreset] = useState<'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'custom' | 'all'>('today');
-  const [showTrendPanel, setShowTrendPanel] = useState<boolean>(true);
-  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
-  const [startDate, setStartDate] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return getTodayLocalIso(d);
-  });
-  const [endDate, setEndDate] = useState<string>(todayStr);
-
-  // Quick Preset Selector Function for Lurah & Kasi
-  const applyPreset = useCallback((preset: 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'custom' | 'all') => {
-    setActivePreset(preset);
-    const now = new Date();
-    if (preset === 'today') {
-      setDateFilterMode('SINGLE');
-      setSelectedDate(todayStr);
-    } else if (preset === 'yesterday') {
-      const y = new Date();
-      y.setDate(y.getDate() - 1);
-      setDateFilterMode('SINGLE');
-      setSelectedDate(getTodayLocalIso(y));
-    } else if (preset === 'last7') {
-      const d = new Date();
-      d.setDate(d.getDate() - 6);
-      setDateFilterMode('RANGE');
-      setStartDate(getTodayLocalIso(d));
-      setEndDate(todayStr);
-    } else if (preset === 'last30') {
-      const d = new Date();
-      d.setDate(d.getDate() - 29);
-      setDateFilterMode('RANGE');
-      setStartDate(getTodayLocalIso(d));
-      setEndDate(todayStr);
-    } else if (preset === 'thisMonth') {
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      setDateFilterMode('RANGE');
-      setStartDate(`${year}-${month}-01`);
-      setEndDate(todayStr);
-    } else if (preset === 'lastMonth') {
-      const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-      setDateFilterMode('RANGE');
-      setStartDate(getTodayLocalIso(firstDayLastMonth));
-      setEndDate(getTodayLocalIso(lastDayLastMonth));
-    } else if (preset === 'all') {
-      setDateFilterMode('ALL');
-    } else if (preset === 'custom') {
-      setDateFilterMode('RANGE');
-    }
-  }, [todayStr]);
-
+  const [visits, setVisits] = useState<KunjunganWargaData[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedLingkungan, setSelectedLingkungan] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [showAddForm, setShowAddForm] = useState<boolean>(true);
-  const [editingItem, setEditingItem] = useState<KunjunganWargaData | null>(null);
-  const [copiedWA, setCopiedWA] = useState<boolean>(false);
-  const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false);
-  const [isSharingExcel, setIsSharingExcel] = useState<boolean>(false);
-  const [isExportingZip, setIsExportingZip] = useState<boolean>(false);
-  const [zipProgress, setZipProgress] = useState<{ current: number; total: number } | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [selectedKategori, setSelectedKategori] = useState<string>('ALL');
+  const [activePeriod, setActivePeriod] = useState<PeriodFilterType>('HARI_INI');
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayLocalIso());
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
-  // Label tampilan tanggal/periode terpilih untuk Laporan/WA/Print/Excel
-  const dateDisplayLabel = useMemo(() => {
-    if (dateFilterMode === 'SINGLE') {
-      if (selectedDate === todayStr) return `Hari Ini (${selectedDate})`;
-      return selectedDate ? selectedDate : 'Semua Tanggal';
-    } else if (dateFilterMode === 'RANGE') {
-      if (startDate && endDate) {
-        if (startDate === endDate) return startDate;
-        return `${startDate} s/d ${endDate}`;
-      } else if (startDate) {
-        return `Mulai ${startDate}`;
-      } else if (endDate) {
-        return `Sampai ${endDate}`;
-      }
-      return 'Sebagian Tanggal';
-    } else {
-      return 'Semua Periode (Keseluruhan)';
-    }
-  }, [dateFilterMode, selectedDate, startDate, endDate, todayStr]);
+  // Form Open State (Default open at the top for instant entry)
+  const [isFormOpen, setIsFormOpen] = useState(true);
+  const [editingVisit, setEditingVisit] = useState<KunjunganWargaData | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
 
-  // View mode for mobile (cards vs table)
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
+  const isKepling = currentUser?.role === 'kepling';
+  const userLingkungan = currentUser?.lingkungan || '';
+  const printAreaRef = useRef<HTMLDivElement>(null);
 
-  // Photo Lightbox Modal
-  const [previewPhotoItem, setPreviewPhotoItem] = useState<KunjunganWargaData | null>(null);
-  const [isBatchDownloading, setIsBatchDownloading] = useState<boolean>(false);
-  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
-
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-    const timer = setTimeout(() => setToastMessage(null), 3500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Online Fetch from Server Buffer & Real-time listener dari Firestore & Cross-tab Broadcast
   useEffect(() => {
-    const unsubscribe = subscribeKunjunganWarga((newList) => {
-      setRecords(newList);
+    const unsub = subscribeKunjunganWarga((list) => {
+      setVisits(list);
     });
     return () => {
-      unsubscribe();
+      unsub();
     };
   }, []);
 
-  const refreshKunjunganData = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      const res = await fetch(`/api/kunjungan?_t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (Array.isArray(json?.data)) {
-          setRecords((prev) => {
-            const map = new Map<string, KunjunganWargaData>();
-            json.data.forEach((k: KunjunganWargaData) => map.set(k.id, k));
-            prev.forEach((k) => {
-              if (!map.has(k.id)) map.set(k.id, k);
-            });
-            const merged = Array.from(map.values());
-            safeSetLocalStorage(KUNJUNGAN_STORAGE_KEY, JSON.stringify(merged));
-            return merged;
-          });
-          showToast('Data kunjungan warga berhasil diperbarui.');
-        }
-      }
-    } catch (err) {
-      console.warn('Notice refreshing kunjungan:', err);
-    } finally {
-      setIsRefreshing(false);
+  // Normalizer for Lingkungan number (1 - 24)
+  const getLingkunganIndex = (lingkunganStr?: string): number => {
+    if (!lingkunganStr) return 0;
+    const matchNum = lingkunganStr.match(/\d+/);
+    if (matchNum) {
+      const n = parseInt(matchNum[0], 10);
+      if (n >= 1 && n <= 24) return n;
     }
-  }, [showToast]);
-
-  const handleDelete = async (id: string, namaWarga: string) => {
-    if (!window.confirm(`Hapus catatan kunjungan ke ${namaWarga}?`)) return;
-    try {
-      await deleteKunjunganWarga(id);
-      setRecords((prev) => prev.filter((r) => r.id !== id));
-      showToast(`Catatan kunjungan ke ${namaWarga} berhasil dihapus.`);
-    } catch (e) {
-      alert('Gagal menghapus: ' + e);
+    for (let i = 0; i < ROMAN_NUMERALS.length; i++) {
+      const rom = ROMAN_NUMERALS[i];
+      const reg = new RegExp(`\\b${rom}\\b`, 'i');
+      if (reg.test(lingkunganStr)) return i + 1;
     }
+    return 0;
   };
 
-  // 🛡️ Gabungkan data kunjungan mandiri dengan data kunjungan yang diinput melalui Laporan Kinerja
-  const combinedRecords = useMemo(() => {
-    return consolidateKunjunganWithReports(records, reports);
-  }, [records, reports]);
-
-  // Filter records
-  const filtered = useMemo(() => {
-    const qLower = searchQuery.toLowerCase().trim();
-    return combinedRecords.filter((r) => {
-      let isDate = true;
-      const rIso = getKunjunganIsoDate(r);
-
-      if (dateFilterMode === 'SINGLE') {
-        if (selectedDate) {
-          isDate = isKunjunganOnDate(r, selectedDate);
-        } else {
-          isDate = true;
-        }
-      } else if (dateFilterMode === 'RANGE') {
-        if (startDate && endDate) {
-          isDate = (rIso >= startDate && rIso <= endDate) || (r.tanggal >= startDate && r.tanggal <= endDate);
-        } else if (startDate) {
-          isDate = rIso >= startDate || r.tanggal >= startDate;
-        } else if (endDate) {
-          isDate = rIso <= endDate || r.tanggal <= endDate;
-        }
-      } else if (dateFilterMode === 'ALL') {
-        isDate = true;
-      }
-
-      const rLingkunganNum =
-        r.lingkunganNomor ||
-        extractNomorLingkungan(r.lingkungan) ||
-        extractNomorLingkungan(r.keplingId);
-
-      const isLingkungan =
-        selectedLingkungan === 'ALL' ||
-        (rLingkunganNum !== null && Number(selectedLingkungan) === rLingkunganNum) ||
-        r.lingkunganNomor === Number(selectedLingkungan) ||
-        r.keplingId === selectedLingkungan ||
-        r.keplingId === `kepling_${selectedLingkungan}` ||
-        (r.lingkungan && (r.lingkungan.toLowerCase().includes(selectedLingkungan.toLowerCase()) || r.lingkungan.includes(String(selectedLingkungan))));
-
-      const isRole =
-        isAdmin ||
-        r.keplingId === currentUser.id ||
-        (rLingkunganNum !== null && currentUser.nomorLingkungan && rLingkunganNum === currentUser.nomorLingkungan) ||
-        r.lingkunganNomor === currentUser.nomorLingkungan ||
-        (r.namaKepling && currentUser.nama && r.namaKepling.trim().toLowerCase() === currentUser.nama.trim().toLowerCase());
-
-      const isSearch =
-        !qLower ||
-        (r.namaWarga && r.namaWarga.toLowerCase().includes(qLower)) ||
-        (r.alamat && r.alamat.toLowerCase().includes(qLower)) ||
-        (r.lingkungan && r.lingkungan.toLowerCase().includes(qLower)) ||
-        (r.namaKepling && r.namaKepling.toLowerCase().includes(qLower)) ||
-        (r.keterangan && r.keterangan.toLowerCase().includes(qLower));
-
-      return isDate && isLingkungan && isRole && isSearch;
-    });
-  }, [
-    combinedRecords,
-    dateFilterMode,
-    selectedDate,
-    startDate,
-    endDate,
-    selectedLingkungan,
-    searchQuery,
-    isAdmin,
-    currentUser.id,
-    currentUser.nomorLingkungan,
-    currentUser.nama,
-  ]);
-
-  const photosCount = useMemo(
-    () => filtered.filter((r) => Boolean(r.fotoDokumentasi)).length,
-    [filtered]
-  );
-
-  // Analisis Tren Kunjungan Warga Per Periode (Khusus Pemantauan Lurah & Kasi)
-  const trendAnalytics = useMemo(() => {
-    const dateCounts: Record<string, { total: number; perlinsosSudah: number; ikdSudah: number; pbbSudah: number }> = {};
-    const lingkunganCounts: Record<number, number> = {};
-    for (let i = 1; i <= 24; i++) {
-      lingkunganCounts[i] = 0;
-    }
-
-    let totalPerlinsosSudah = 0;
-    let totalPerlinsosBelum = 0;
-    let totalPerlinsosMenolak = 0;
-    let totalIkdSudah = 0;
-    let totalIkdBelum = 0;
-    let totalPbbSudah = 0;
-    let totalPbbBelum = 0;
-
-    filtered.forEach((r) => {
-      const iso = getKunjunganIsoDate(r) || r.tanggal || 'Tanpa Tanggal';
-      if (!dateCounts[iso]) {
-        dateCounts[iso] = { total: 0, perlinsosSudah: 0, ikdSudah: 0, pbbSudah: 0 };
-      }
-      dateCounts[iso].total += 1;
-
-      if (r.perlinsos === 'Sudah') {
-        dateCounts[iso].perlinsosSudah += 1;
-        totalPerlinsosSudah += 1;
-      } else if (r.perlinsos === 'Menolak') {
-        totalPerlinsosMenolak += 1;
-      } else {
-        totalPerlinsosBelum += 1;
-      }
-
-      if (r.ikd === 'Sudah') {
-        dateCounts[iso].ikdSudah += 1;
-        totalIkdSudah += 1;
-      } else {
-        totalIkdBelum += 1;
-      }
-
-      if (r.pbb === 'Sudah') {
-        dateCounts[iso].pbbSudah += 1;
-        totalPbbSudah += 1;
-      } else {
-        totalPbbBelum += 1;
-      }
-
-      let num: number | null = null;
-      if (r.lingkunganNomor !== undefined && r.lingkunganNomor !== null && String(r.lingkunganNomor) !== '') {
-        const n = Number(r.lingkunganNomor);
-        if (n >= 1 && n <= 24) num = n;
-      }
-      if (num === null) {
-        num = extractNomorLingkungan(r.lingkungan) || extractNomorLingkungan(r.keplingId);
-      }
-      if (num && num >= 1 && num <= 24) {
-        lingkunganCounts[num] = (lingkunganCounts[num] || 0) + 1;
-      }
-    });
-
-    // Timeline sorted chronologically
-    const sortedDates = Object.keys(dateCounts).sort();
-    const timeline = sortedDates.map((d) => ({
-      date: d,
-      ...dateCounts[d],
-    }));
-
-    // Find peak day
-    let peakDate = '-';
-    let peakCount = 0;
-    timeline.forEach((item) => {
-      if (item.total > peakCount) {
-        peakCount = item.total;
-        peakDate = item.date;
-      }
-    });
-
-    // Active lingkungan count (how many of 24 have >0 visits in this period)
-    const activeLingkunganCount = Object.values(lingkunganCounts).filter((c) => c > 0).length;
-
-    // Leaderboard
-    const leaderboard = Object.entries(lingkunganCounts)
-      .map(([ling, count]) => ({ lingkungan: Number(ling), count }))
-      .sort((a, b) => b.count - a.count);
-
-    // Days count in current filter
-    let daysCount = 1;
-    if (dateFilterMode === 'RANGE' && startDate && endDate) {
-      const s = new Date(startDate);
-      const e = new Date(endDate);
-      const diffTime = Math.abs(e.getTime() - s.getTime());
-      daysCount = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
-    } else if (dateFilterMode === 'ALL') {
-      daysCount = Math.max(1, sortedDates.length);
-    }
-
-    const avgPerDay = (filtered.length / daysCount).toFixed(1);
-
-    return {
-      timeline,
-      peakDate,
-      peakCount,
-      activeLingkunganCount,
-      leaderboard,
-      daysCount,
-      avgPerDay,
-      totalPerlinsosSudah,
-      totalPerlinsosBelum,
-      totalPerlinsosMenolak,
-      totalIkdSudah,
-      totalIkdBelum,
-      totalPbbSudah,
-      totalPbbBelum,
-    };
-  }, [filtered, dateFilterMode, startDate, endDate]);
-
-  // Rekapitulasi Kumulatif Kunjungan 24 Lingkungan (Sampai Dengan Hari Ini / Tanggal Terpilih)
-  const { cumulativeCounts, totalSeluruhKunjungan } = useMemo(() => {
-    const recordsToCount =
-      dateFilterMode === 'SINGLE' && selectedDate && selectedDate < todayStr
-        ? combinedRecords.filter((r) => {
-            const rIso = getKunjunganIsoDate(r);
-            return !rIso || rIso <= selectedDate;
-          })
-        : dateFilterMode === 'RANGE' && endDate && endDate < todayStr
-        ? combinedRecords.filter((r) => {
-            const rIso = getKunjunganIsoDate(r);
-            return !rIso || rIso <= endDate;
-          })
-        : combinedRecords;
-
-    const counts: Record<number, number> = {};
+  // 24 Lingkungan Counts calculation
+  const visitsPerLingkungan = useMemo(() => {
+    const counts: { [key: number]: number } = {};
     for (let i = 1; i <= 24; i++) {
       counts[i] = 0;
     }
-
-    recordsToCount.forEach((r) => {
-      let num: number | null = null;
-      if (r.lingkunganNomor !== undefined && r.lingkunganNomor !== null && String(r.lingkunganNomor) !== '') {
-        const n = Number(r.lingkunganNomor);
-        if (n >= 1 && n <= 24) num = n;
-      }
-      if (num === null) {
-        num =
-          extractNomorLingkungan(r.lingkungan) ||
-          extractNomorLingkungan((r as any).lingkunganNama) ||
-          extractNomorLingkungan(r.keplingId);
-      }
-      if (num === null && r.namaKepling) {
-        const kMatch = KEPLING_ACCOUNTS.find(
-          (k) => k.nama.trim().toLowerCase() === String(r.namaKepling).trim().toLowerCase()
-        );
-        if (kMatch && kMatch.nomorLingkungan) num = kMatch.nomorLingkungan;
-      }
-
-      if (num && num >= 1 && num <= 24) {
-        counts[num] = (counts[num] || 0) + 1;
+    visits.forEach((v) => {
+      const idx = getLingkunganIndex(v.lingkungan);
+      if (idx >= 1 && idx <= 24) {
+        counts[idx] = (counts[idx] || 0) + 1;
       }
     });
+    return counts;
+  }, [visits]);
 
-    const sumCounts = Object.values(counts).reduce((a, b) => a + b, 0);
-    const totalAll = Math.max(recordsToCount.length, sumCounts);
+  // Date filtering logic
+  const filteredVisits = useMemo(() => {
+    const todayIso = getTodayLocalIso();
+    const today = new Date();
 
-    return {
-      cumulativeCounts: counts,
-      totalSeluruhKunjungan: totalAll,
-    };
-  }, [combinedRecords, dateFilterMode, selectedDate, endDate, todayStr]);
+    return visits.filter((item) => {
+      // 1. Role restriction
+      if (isKepling && userLingkungan) {
+        if (!item.lingkungan || !item.lingkungan.toLowerCase().includes(userLingkungan.toLowerCase())) {
+          return false;
+        }
+      }
 
-  const handleCopyWA = () => {
-    let text = `*REKAP KUNJUNGAN HARIAN DOOR-TO-DOOR*\n`;
-    text += `*KELURAHAN MANGGA, KEC. MEDAN TUNTUNGAN*\n`;
-    text += `Periode / Tanggal: ${dateDisplayLabel}\n`;
-    text += `Total Kunjungan: ${filtered.length} Rumah\n\n`;
-    text += `----------------------------------------\n`;
+      // 2. Environment filter
+      if (selectedLingkungan !== 'ALL') {
+        const itemIdx = getLingkunganIndex(item.lingkungan);
+        const selectedIdx = getLingkunganIndex(selectedLingkungan);
+        if (itemIdx !== selectedIdx && item.lingkungan !== selectedLingkungan) {
+          return false;
+        }
+      }
 
-    // 1. Group records by lingkungan for the current filtered view
-    const grouped = filtered.reduce((acc, item) => {
-      const key = item.lingkungan || 'Tanpa Lingkungan';
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(item);
-      return acc;
-    }, {} as Record<string, KunjunganWargaData[]>);
+      // 3. Category filter
+      if (selectedKategori !== 'ALL' && item.kategoriBansos !== selectedKategori) {
+        return false;
+      }
 
-    // Sort lingkungan groups in Part 1 by nomor lingkungan
-    const sortedGroupKeys = Object.keys(grouped).sort((a, b) => {
-      const numA = extractNomorLingkungan(a) || 999;
-      const numB = extractNomorLingkungan(b) || 999;
-      return numA - numB;
+      // 4. Period Filter
+      const itemDate = item.tanggal ? item.tanggal.slice(0, 10) : '';
+      if (activePeriod === 'HARI_INI') {
+        if (itemDate !== (selectedDate || todayIso)) return false;
+      } else if (activePeriod === 'KEMARIN') {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yestIso = getTodayLocalIso(yesterday);
+        if (itemDate !== yestIso) return false;
+      } else if (activePeriod === '7_HARI') {
+        const d7 = new Date(today);
+        d7.setDate(d7.getDate() - 7);
+        const d7Iso = getTodayLocalIso(d7);
+        if (itemDate < d7Iso || itemDate > todayIso) return false;
+      } else if (activePeriod === '30_HARI') {
+        const d30 = new Date(today);
+        d30.setDate(d30.getDate() - 30);
+        const d30Iso = getTodayLocalIso(d30);
+        if (itemDate < d30Iso || itemDate > todayIso) return false;
+      } else if (activePeriod === 'BULAN_INI') {
+        const currentMonth = todayIso.slice(0, 7);
+        if (!itemDate.startsWith(currentMonth)) return false;
+      } else if (activePeriod === 'BULAN_LALU') {
+        const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const prevMonthPrefix = getTodayLocalIso(prevMonthDate).slice(0, 7);
+        if (!itemDate.startsWith(prevMonthPrefix)) return false;
+      } else if (activePeriod === 'CUSTOM') {
+        if (customStartDate && itemDate < customStartDate) return false;
+        if (customEndDate && itemDate > customEndDate) return false;
+      }
+
+      // 5. Search keyword
+      const term = searchTerm.toLowerCase();
+      const matchesSearch =
+        !searchTerm ||
+        (item.namaWarga || '').toLowerCase().includes(term) ||
+        (item.alamat || '').toLowerCase().includes(term) ||
+        (item.namaKepling || '').toLowerCase().includes(term) ||
+        (item.lingkungan || '').toLowerCase().includes(term) ||
+        (item.keterangan || '').toLowerCase().includes(term);
+
+      return matchesSearch;
     });
+  }, [
+    visits,
+    isKepling,
+    userLingkungan,
+    selectedLingkungan,
+    selectedKategori,
+    activePeriod,
+    selectedDate,
+    customStartDate,
+    customEndDate,
+    searchTerm,
+  ]);
 
-    if (sortedGroupKeys.length === 0) {
-      text += `_(Nihil / Belum ada kunjungan pada periode ini)_\n\n`;
-    } else {
-      sortedGroupKeys.forEach((lingkungan) => {
-        const items = grouped[lingkungan];
-        text += `*${lingkungan}*\n`;
-        text += `Total Kunjungan : ${items.length} Warga\n`;
-        text += `Rincian :\n`;
-        items.forEach((item) => {
-          text += `- ${(item.namaWarga || '').toUpperCase()} (${(item.alamat || '-').toUpperCase()})\n`;
-        });
-        text += `\n`;
-      });
+  // Photo count
+  const fotoCount = useMemo(() => {
+    return filteredVisits.filter((v) => !!v.fotoUrl).length;
+  }, [filteredVisits]);
+
+  // Chart data: daily visits over last 14 days
+  const dailyChartData = useMemo(() => {
+    const daysMap: { [key: string]: number } = {};
+    const days: string[] = [];
+    const base = new Date();
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(base);
+      d.setDate(d.getDate() - i);
+      const iso = getTodayLocalIso(d);
+      days.push(iso);
+      daysMap[iso] = 0;
     }
-
-    // 2. TOTAL KUNJUNGAN PER LINGKUNGAN SAMPAI DENGAN HARI INI
-    text += `*TOTAL KUNJUNGAN PER LINGKUNGAN SAMPAI DENGAN HARI INI:*\n`;
-    for (let i = 1; i <= 24; i++) {
-      const count = cumulativeCounts[i] || 0;
-      text += `- Lingkungan ${toRoman(i)}: ${count} Warga\n`;
-    }
-
-    text += `\n*TOTAL SELURUH KUNJUNGAN: ${totalSeluruhKunjungan} Warga*\n`;
-
-    navigator.clipboard.writeText(text);
-    setCopiedWA(true);
-    showToast('Teks rekapitulasi kunjungan berhasil disalin ke WhatsApp!');
-    setTimeout(() => setCopiedWA(false), 2500);
-  };
-
-  // Download Single Photo Handler
-  const handleDownloadPhoto = async (item: KunjunganWargaData) => {
-    if (!item.fotoDokumentasi) return;
-    const safeName = item.namaWarga.replace(/[^a-zA-Z0-9]/g, '_');
-    const safeLingk = `Lingkungan_${item.lingkunganNomor}`;
-    const fileName = `${safeLingk}_${safeName}_${item.tanggal}.jpg`;
-
-    // Create annotated image with overlay info
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = item.fotoDokumentasi;
-    
-    await new Promise((resolve) => { img.onload = resolve; });
-
-    const headerHeight = 120;
-    canvas.width = img.width;
-    canvas.height = img.height + headerHeight;
-
-    if (ctx) {
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, headerHeight);
-
-      ctx.fillStyle = '#1e293b';
-      ctx.font = 'bold 36px sans-serif';
-      ctx.fillText(`Foto Kunjungan: ${item.namaWarga.toUpperCase()}`, 20, 50);
-      
-      ctx.font = '24px sans-serif';
-      ctx.fillStyle = '#64748b';
-      ctx.fillText(`${item.lingkungan} • ${item.tanggal}`, 20, 90);
-    }
-
-    const annotatedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
-    const ok = await downloadImage(annotatedDataUrl, fileName);
-    if (ok) {
-      showToast(`Foto kunjungan ${item.namaWarga} berhasil diunduh.`);
-    } else {
-      showToast(`Gagal mengunduh foto ${item.namaWarga}.`);
-    }
-  };
-
-  // Batch Download All Photos for Admin
-  const handleBatchDownloadPhotos = async () => {
-    const itemsWithPhotos = filtered.filter((r) => Boolean(r.fotoDokumentasi));
-    if (itemsWithPhotos.length === 0) {
-      alert('Tidak ada foto dokumentasi untuk diunduh pada filter ini.');
-      return;
-    }
-
-    if (
-      !window.confirm(
-        `Unduh seluruh ${itemsWithPhotos.length} foto kunjungan warga (${dateDisplayLabel})?`
-      )
-    ) {
-      return;
-    }
-
-    setIsBatchDownloading(true);
-    setBatchProgress({ current: 0, total: itemsWithPhotos.length });
-
-    const photoList = itemsWithPhotos.map((item, idx) => {
-      const safeName = item.namaWarga.replace(/[^a-zA-Z0-9]/g, '_');
-      const safeLingk = item.lingkungan.replace(/[^a-zA-Z0-9]/g, '_');
+    visits.forEach((v) => {
+      const d = v.tanggal ? v.tanggal.slice(0, 10) : '';
+      if (daysMap[d] !== undefined) {
+        daysMap[d] += 1;
+      }
+    });
+    return days.map((dateIso) => {
+      const dayNum = dateIso.slice(8, 10);
+      const monthNum = dateIso.slice(5, 7);
       return {
-        url: item.fotoDokumentasi!,
-        fileName: `${idx + 1}_Lingkungan_${item.lingkunganNomor}_${safeName}_${item.tanggal}.jpg`,
+        tanggal: `${dayNum}/${monthNum}`,
+        fullDate: dateIso,
+        kunjungan: daysMap[dateIso] || 0,
       };
     });
+  }, [visits]);
 
-    const successCount = await downloadMultipleImages(photoList, (curr, tot) => {
-      setBatchProgress({ current: curr, total: tot });
-    });
-
-    setIsBatchDownloading(false);
-    setBatchProgress(null);
-    showToast(`Berhasil mengunduh ${successCount} dari ${photoList.length} foto kunjungan.`);
-  };
-
-  // Excel Export Handler (Download)
-  const handleExportExcel = async () => {
-    if (filtered.length === 0) {
-      alert('Tidak ada data untuk diexport ke Excel.');
-      return;
-    }
-    setIsExportingExcel(true);
+  const handleDelete = async (id: string) => {
     try {
-      await exportKunjunganWargaToExcel(filtered, dateDisplayLabel, false);
-      showToast('File Excel kunjungan warga berhasil diunduh.');
-    } catch (e) {
-      console.error(e);
-      alert('Gagal membuat file Excel: ' + e);
-    } finally {
-      setIsExportingExcel(false);
+      await deleteKunjunganWargaFromFirestore(id);
+      setDeleteConfirmId(null);
+      if (onShowToast) onShowToast('Data kunjungan warga berhasil dihapus.', 'success');
+    } catch {
+      if (onShowToast) onShowToast('Gagal menghapus data kunjungan.', 'error');
     }
   };
 
-  // Excel Share Handler (Web Share API to WhatsApp/Telegram/Email)
-  const handleShareExcel = async () => {
-    if (filtered.length === 0) {
-      alert('Tidak ada data untuk dibagikan.');
-      return;
-    }
-    setIsSharingExcel(true);
+  const handleInlinePhotoUpload = async (visit: KunjunganWargaData, file?: File) => {
+    if (!file) return;
+    setUploadingPhotoId(visit.id);
     try {
-      const result = await exportKunjunganWargaToExcel(filtered, dateDisplayLabel, true);
-      if (result.method === 'share' && result.success) {
-        showToast('Berhasil membuka menu share ke WhatsApp / Aplikasi HP!');
-      } else {
-        showToast('File Excel siap diunduh & teks rekapitulasi tersalin.');
+      const comp = await compressImageFile(file, 1024, 0.82);
+      let photoDataUrl = comp;
+      if (!photoDataUrl) {
+        photoDataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve((ev.target?.result as string) || '');
+          reader.readAsDataURL(file);
+        });
       }
-    } catch (e) {
-      console.error(e);
-      alert('Gagal membagikan Excel: ' + e);
+
+      if (!photoDataUrl) {
+        throw new Error('Gagal memproses file foto');
+      }
+
+      const updated: KunjunganWargaData = {
+        ...visit,
+        fotoUrl: photoDataUrl,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await saveKunjunganWargaToFirestore(updated);
+      if (onShowToast) {
+        onShowToast(`Foto dokumentasi warga ${visit.namaWarga} berhasil disimpan!`, 'success');
+      }
+    } catch (err: any) {
+      console.error('Error uploading photo:', err);
+      if (onShowToast) {
+        onShowToast('Gagal mengunggah foto: ' + (err.message || err), 'error');
+      } else {
+        alert('Gagal mengunggah foto: ' + (err.message || err));
+      }
     } finally {
-      setIsSharingExcel(false);
+      setUploadingPhotoId(null);
     }
   };
 
-  // ZIP Package Export Handler (Excel + Seluruh File Foto Asli Resolusi Penuh)
-  const handleExportZip = async () => {
-    if (filtered.length === 0) {
-      alert('Tidak ada data kunjungan untuk diekspor ke paket ZIP.');
-      return;
+  const handleCopyWa = () => {
+    let text = `*REKAPITULASI KUNJUNGAN PER LINGKUNGAN (SAMPAI DENGAN HARI INI)*\n`;
+    text += `*KELURAHAN MANGGA - KECAMATAN MEDAN TUNTUNGAN*\n`;
+    text += `Tanggal: ${formatTanggalIndonesia(new Date())}\n`;
+    text += `Total Seluruh Kunjungan: ${visits.length} Warga\n\n`;
+    text += `*RINCIAN 24 LINGKUNGAN:*\n`;
+    for (let i = 1; i <= 24; i++) {
+      const rom = ROMAN_NUMERALS[i - 1];
+      const count = visitsPerLingkungan[i] || 0;
+      text += `Lingkungan ${rom}: ${count} Warga\n`;
     }
-    const photosToPack = filtered.filter((r) => Boolean(r.fotoDokumentasi)).length;
-    setIsExportingZip(true);
-    setZipProgress({ current: 0, total: photosToPack });
+    text += `\n#MedanUntukSemua\n#SemuaUntukMedan`;
+
+    navigator.clipboard.writeText(text);
+    if (onShowToast) onShowToast('Rekapitulasi Kunjungan disalin untuk WhatsApp!', 'success');
+  };
+
+  const handleExportExcel = () => {
     try {
-      await exportKunjunganWargaZipPackage(filtered, dateDisplayLabel, (curr, tot) => {
-        setZipProgress({ current: curr, total: tot });
-      });
-      showToast('Paket ZIP lengkap (Excel + Folder Foto Asli) berhasil diunduh!');
-    } catch (e) {
-      console.error('Gagal mengemas paket ZIP:', e);
-      alert('Gagal membuat paket ZIP: ' + e);
-    } finally {
-      setIsExportingZip(false);
-      setZipProgress(null);
+      const rows = filteredVisits.map((v, idx) => ({
+        No: idx + 1,
+        Tanggal: v.tanggal,
+        Lingkungan: v.lingkungan,
+        'Nama Kepling': v.namaKepling,
+        'Nama Warga': v.namaWarga,
+        Alamat: v.alamat,
+        Perlinsos: v.perlinsos || '-',
+        IKD: v.ikd || '-',
+        'Pembayaran PBB': v.pbb || '-',
+        'Kategori Program': v.kategoriBansos || '-',
+        'Status Penyaluran': v.statusBansos || '-',
+        'Foto Dokumentasi': v.fotoUrl ? 'Ada' : 'Tidak Ada',
+        Keterangan: v.keterangan || '-',
+      }));
+
+      const ws = XLSX.utils.aoa_to_sheet([
+        ['PEMERINTAH KOTA MEDAN - KECAMATAN MEDAN TUNTUNGAN'],
+        ['KELURAHAN MANGGA'],
+        ['BUKU REKAPITULASI KUNJUNGAN HARIAN LAPANGAN (DOOR-TO-DOOR)'],
+        [`Dicetak pada: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}`],
+        ['#MedanUntukSemua | #SemuaUntukMedan'],
+        [],
+        [
+          'No',
+          'Tanggal',
+          'Lingkungan',
+          'Nama Kepling',
+          'Nama Warga',
+          'Alamat',
+          'Perlinsos',
+          'IKD',
+          'Pembayaran PBB',
+          'Kategori Program',
+          'Status Penyaluran',
+          'Foto Dokumentasi',
+          'Keterangan',
+        ],
+        ...rows.map((r, i) => [
+          i + 1,
+          r.Tanggal,
+          r.Lingkungan,
+          r['Nama Kepling'],
+          r['Nama Warga'],
+          r.Alamat,
+          r.Perlinsos,
+          r.IKD,
+          r['Pembayaran PBB'],
+          r['Kategori Program'],
+          r['Status Penyaluran'],
+          r['Foto Dokumentasi'],
+          r.Keterangan,
+        ]),
+      ]);
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Kunjungan Warga');
+      XLSX.writeFile(
+        wb,
+        `Rekap_Kunjungan_Warga_Kelurahan_Mangga_${new Date().toISOString().split('T')[0]}.xlsx`
+      );
+      if (onShowToast) onShowToast('File Excel Kunjungan Warga berhasil diunduh!', 'success');
+    } catch {
+      if (onShowToast) onShowToast('Gagal mengunduh file Excel.', 'error');
     }
+  };
+
+  const handleDownloadZip = async () => {
+    try {
+      if (onShowToast) onShowToast('Menyiapkan paket ZIP berkas dan foto...', 'info');
+      const zip = new JSZip();
+
+      // 1. Add Excel file to ZIP
+      const rows = filteredVisits.map((v, idx) => ({
+        No: idx + 1,
+        Tanggal: v.tanggal,
+        Lingkungan: v.lingkungan,
+        'Nama Kepling': v.namaKepling,
+        'Nama Warga': v.namaWarga,
+        Alamat: v.alamat,
+        Perlinsos: v.perlinsos || '-',
+        IKD: v.ikd || '-',
+        'Pembayaran PBB': v.pbb || '-',
+        'Status Penyaluran': v.statusBansos || '-',
+        Keterangan: v.keterangan || '-',
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Kunjungan Warga');
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      zip.file('Data_Kunjungan_Warga.xlsx', excelBuffer);
+
+      // 2. Add Photos folder
+      const imgFolder = zip.folder('Foto_Dokumentasi');
+      let addedPhotos = 0;
+      filteredVisits.forEach((v, idx) => {
+        const photo = v.fotoUrl || (v as any).foto || (v as any).fotoDokumentasi || (v as any).photoUrl;
+        if (photo && photo.startsWith('data:image')) {
+          const parts = photo.split(',');
+          if (parts[1]) {
+            const cleanName = (v.namaWarga || `warga_${idx}`).replace(/[^a-zA-Z0-9]/g, '_');
+            const cleanLingk = (v.lingkungan || `lingk_${idx}`).replace(/[^a-zA-Z0-9]/g, '_');
+            imgFolder?.file(`${cleanLingk}_${cleanName}_${idx + 1}.jpg`, parts[1], {
+              base64: true,
+            });
+            addedPhotos++;
+          }
+        }
+      });
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Paket_ZIP_Kunjungan_Kelurahan_Mangga_${new Date().toISOString().split('T')[0]}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      if (onShowToast)
+        onShowToast(
+          `Paket ZIP berhasil diunduh (${addedPhotos} foto + Excel)!`,
+          'success'
+        );
+    } catch {
+      if (onShowToast) onShowToast('Gagal membuat paket ZIP.', 'error');
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
-    <div id="lembar-cetak-kunjungan-harian" className="space-y-5">
-      {/* Kop Surat Resmi Pemko Medan (Gambar 1 - Hanya Tampak Saat Cetak PDF/Printer) */}
-      <div className="hidden print:block mb-4">
-        <KopSuratResmi />
-        <div className="mt-1 pt-1 text-center">
-          <h4 className="font-black text-sm uppercase tracking-wider text-slate-900">
-            BUKU REKAPITULASI KUNJUNGAN HARIAN LAPANGAN (DOOR-TO-DOOR)
-          </h4>
-          <p className="text-xs font-bold text-slate-700">
-            Periode / Tanggal: {dateDisplayLabel} • Total: {filtered.length} Kunjungan
-          </p>
-        </div>
-      </div>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 border border-slate-700 animate-in fade-in slide-in-from-bottom-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
-      {/* Header Banner Halaman */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 sm:p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-700 shrink-0">
-            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+    <div className="space-y-6 pb-12 animate-fade-in max-w-7xl mx-auto px-2 sm:px-4">
+      {/* 1. ATAS: FORM KUNJUNGAN WARGA SECTION (Siap diisi Kepling tanpa perlu scrolling) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="font-black text-slate-900 text-sm">Pencatatan Sambang Warga Baru (Door-to-Door)</h3>
+            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+              Form Aktif
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                Buku Kunjungan Harian Lapangan (Door-to-Door)
-              </h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 uppercase">
-                {filtered.length} Kunjungan
-              </span>
-            </div>
-            <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-              Pencatatan langsung sambang warga Kelurahan Mangga tersimpan ke Firestore koleksi: <code>kunjungan_warga</code>
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 self-stretch sm:self-auto">
-          {editingItem && (
-            <button
-              type="button"
-              onClick={() => setEditingItem(null)}
-              className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs transition-all cursor-pointer"
-              title="Batalkan mode koreksi"
-            >
-              <X className="w-4 h-4" />
-              <span>Batal Koreksi</span>
-            </button>
-          )}
           <button
             type="button"
-            onClick={() => {
-              if (showAddForm && editingItem) {
-                setEditingItem(null);
-              } else {
-                setShowAddForm(!showAddForm);
-              }
-            }}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
+            onClick={() => setIsFormOpen(!isFormOpen)}
+            className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>
-              {showAddForm
-                ? editingItem
-                  ? 'Batal Edit & Tutup'
-                  : 'Tutup Form Input'
-                : '+ Input Kunjungan'}
-            </span>
+            {isFormOpen ? 'Sembunyikan Form' : '+ Buka Form Kunjungan'}
           </button>
         </div>
-      </div>
 
-      {/* Komponen Form Kunjungan Warga (Tambah / Edit) */}
-      {showAddForm && (
-        <div id="form-kunjungan-container" className="scroll-mt-6">
+        {isFormOpen && (
           <FormKunjunganWarga
             currentUser={currentUser}
-            tanggalLaporan={selectedDate}
-            initialData={editingItem}
-            onSuccess={(saved) => {
-              showToast(
-                editingItem
-                  ? `Perubahan data "${saved.namaWarga}" berhasil disimpan!`
-                  : 'Catatan kunjungan baru berhasil disimpan!'
-              );
-              setEditingItem(null);
+            editItem={editingVisit}
+            onSuccess={() => {
+              setEditingVisit(null);
+              if (onShowToast) onShowToast('Data kunjungan warga berhasil disimpan!', 'success');
             }}
-            onCancel={() => {
-              setEditingItem(null);
+            onClose={() => {
+              setEditingVisit(null);
             }}
           />
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Filter & Action Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-3.5 sm:p-4 shadow-xs space-y-3.5">
-        {/* Row 1: Quick Period Presets for Lurah & Kasi */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none text-xs font-bold border-b border-slate-100">
-          <span className="text-[11px] text-slate-500 font-extrabold uppercase tracking-wider flex items-center gap-1 shrink-0 mr-1">
+      {/* 2. TENGAH: FILTER TOOLBAR & ACTION BAR (Exact matching screenshot 2) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3.5">
+        {/* Row 1: Filter Periode Pills */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <div className="flex items-center gap-1.5 text-slate-700 font-bold text-xs uppercase tracking-wide mr-1">
             <Filter className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Filter Periode:</span>
-          </span>
-
-          <button
-            type="button"
-            onClick={() => applyPreset('today')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              activePreset === 'today'
-                ? 'bg-emerald-700 text-white shadow-xs font-black ring-2 ring-emerald-400'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            Hari Ini
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('yesterday')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              activePreset === 'yesterday'
-                ? 'bg-emerald-700 text-white shadow-xs font-black ring-2 ring-emerald-400'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            Kemarin
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('last7')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              activePreset === 'last7'
-                ? 'bg-emerald-700 text-white shadow-xs font-black ring-2 ring-emerald-400'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            7 Hari Terakhir
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('last30')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              activePreset === 'last30'
-                ? 'bg-emerald-700 text-white shadow-xs font-black ring-2 ring-emerald-400'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            30 Hari Terakhir
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('thisMonth')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              activePreset === 'thisMonth'
-                ? 'bg-teal-700 text-white shadow-xs font-black ring-2 ring-teal-400'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            Bulan Ini
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('lastMonth')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              activePreset === 'lastMonth'
-                ? 'bg-teal-700 text-white shadow-xs font-black ring-2 ring-teal-400'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            Bulan Lalu
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('custom')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              activePreset === 'custom'
-                ? 'bg-indigo-600 text-white shadow-xs font-black ring-2 ring-indigo-400'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            Rentang Kustom...
-          </button>
-          <button
-            type="button"
-            onClick={() => applyPreset('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              activePreset === 'all'
-                ? 'bg-slate-800 text-white shadow-xs font-black ring-2 ring-slate-500'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            Semua Periode
-          </button>
-        </div>
-
-        {/* Row 2: Detailed Date Controls & Scope */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            {/* Opsi Filter Tanggal */}
-            <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 flex-1 sm:flex-initial">
-              <div className="flex items-center gap-1 px-1.5 py-0.5">
-                <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
-                <select
-                  value={dateFilterMode}
-                  onChange={(e) => {
-                    const mode = e.target.value as 'SINGLE' | 'RANGE' | 'ALL';
-                    setDateFilterMode(mode);
-                    setActivePreset('custom');
-                  }}
-                  className="bg-transparent font-extrabold text-slate-800 focus:outline-none cursor-pointer text-xs pr-1"
-                >
-                  <option value="SINGLE">Tanggal Tertentu</option>
-                  <option value="RANGE">Rentang / Sebagian Tanggal</option>
-                  <option value="ALL">Semua Tanggal</option>
-                </select>
-              </div>
-
-              {/* Dynamic Inputs Based on Date Mode */}
-              {dateFilterMode === 'SINGLE' && (
-                <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-2xs">
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => {
-                      setSelectedDate(e.target.value);
-                      if (e.target.value === todayStr) {
-                        setActivePreset('today');
-                      } else {
-                        setActivePreset('custom');
-                      }
-                    }}
-                    className="bg-transparent font-extrabold text-slate-800 focus:outline-none cursor-pointer text-xs"
-                  />
-                </div>
-              )}
-
-              {dateFilterMode === 'RANGE' && (
-                <div className="flex flex-wrap items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-2xs">
-                  <span className="text-[10px] text-slate-500 font-semibold">Dari:</span>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
-                      setActivePreset('custom');
-                    }}
-                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
-                  />
-                  <span className="text-[10px] text-slate-400 font-extrabold">s/d</span>
-                  <span className="text-[10px] text-slate-500 font-semibold">Sampai:</span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value);
-                      setActivePreset('custom');
-                    }}
-                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
-                  />
-                </div>
-              )}
-
-              {dateFilterMode === 'ALL' && (
-                <div className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-lg text-[11px] font-extrabold">
-                  Semua Data ({records.length} total)
-                </div>
-              )}
-            </div>
-
-            {/* Filter Lingkungan (Super Admin & Kasi) */}
-            {isAdmin && (
-              <select
-                value={selectedLingkungan}
-                onChange={(e) => setSelectedLingkungan(e.target.value)}
-                className="bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 focus:outline-none flex-1 sm:flex-initial"
-              >
-                <option value="ALL">Semua 24 Lingkungan</option>
-                {KEPLING_ACCOUNTS.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.lingkungan} - {k.nama}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Search Input */}
-            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-200 text-xs w-full sm:w-48 lg:w-56">
-              <Search className="w-4 h-4 text-slate-400 shrink-0" />
-              <input
-                type="text"
-                placeholder="Cari nama warga, alamat..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent focus:outline-none w-full text-slate-800 placeholder:text-slate-400 text-xs font-medium"
-              />
-            </div>
+            <span>FILTER PERIODE:</span>
           </div>
 
-          {/* View Mode Toggle */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
+          {[
+            { id: 'HARI_INI', label: 'Hari Ini' },
+            { id: 'KEMARIN', label: 'Kemarin' },
+            { id: '7_HARI', label: '7 Hari Terakhir' },
+            { id: '30_HARI', label: '30 Hari Terakhir' },
+            { id: 'BULAN_INI', label: 'Bulan Ini' },
+            { id: 'BULAN_LALU', label: 'Bulan Lalu' },
+            { id: 'CUSTOM', label: 'Rentang Kustom...' },
+            { id: 'SEMUA', label: 'Semua Periode' },
+          ].map((tab) => (
             <button
               type="button"
-              onClick={() => setViewMode('table')}
-              className={`px-2.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                viewMode === 'table'
-                  ? 'bg-white text-slate-900 shadow-2xs font-black'
-                  : 'text-slate-500 hover:text-slate-800'
+              key={tab.id}
+              onClick={() => setActivePeriod(tab.id as PeriodFilterType)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activePeriod === tab.id
+                  ? 'bg-[#1f5f4b] text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80'
               }`}
             >
-              Tabel
+              {tab.label}
             </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('cards')}
-              className={`px-2.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                viewMode === 'cards'
-                  ? 'bg-white text-slate-900 shadow-2xs font-black'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Kartu (HP)
-            </button>
-          </div>
+          ))}
         </div>
 
-        {/* Row 2: Action Buttons */}
-        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-          {/* Photos summary & batch download for Admin */}
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-500 font-medium">
-              Dokumentasi: <strong className="text-slate-800">{photosCount} foto</strong> dari {filtered.length} kunjungan
-            </span>
-            {isAdmin && photosCount > 0 && (
+        {/* Row 2: Date Picker, Environment Dropdown, Search Input, View Mode Toggle */}
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center pt-1 border-t border-slate-100">
+          {/* Tanggal Tertentu */}
+          <div className="sm:col-span-4 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+            <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Tanggal Tertentu</span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                setSelectedDate(e.target.value);
+                setActivePeriod('HARI_INI');
+              }}
+              className="bg-transparent text-xs font-medium text-slate-800 outline-none w-full cursor-pointer ml-auto text-right"
+            />
+          </div>
+
+          {/* Environment dropdown */}
+          <div className="sm:col-span-3">
+            <select
+              value={selectedLingkungan}
+              onChange={(e) => setSelectedLingkungan(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 font-bold outline-none cursor-pointer"
+            >
+              <option value="ALL">Semua 24 Lingkungan</option>
+              {KEPLING_ACCOUNTS.map((k) => (
+                <option key={k.id} value={k.lingkungan}>
+                  {k.lingkungan} - {k.nama}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Search box */}
+          <div className="sm:col-span-3 relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Cari nama warga, alamat..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          {/* View Mode Toggle: Tabel | Kartu (HP) */}
+          <div className="sm:col-span-2 flex items-center justify-end">
+            <div className="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200 text-xs font-bold">
               <button
                 type="button"
-                onClick={handleBatchDownloadPhotos}
-                disabled={isBatchDownloading}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-800 font-bold text-[11px] transition-colors cursor-pointer disabled:opacity-50"
-                title="Download seluruh foto dokumentasi kunjungan hari ini sekaligus"
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  viewMode === 'table' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                <Download className="w-3 h-3 text-teal-700" />
-                <span>
-                  {isBatchDownloading
-                    ? `Mengunduh (${batchProgress?.current}/${batchProgress?.total})...`
-                    : 'Unduh Semua Foto'}
-                </span>
+                Tabel
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  viewMode === 'cards' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Kartu (HP)
+              </button>
+            </div>
           </div>
+        </div>
 
-          {/* Export & Sharing Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto justify-start sm:justify-end">
-            {/* Share / Bagikan Excel Bergambar ke WA / HP */}
+        {/* Custom Date Range if active */}
+        {activePeriod === 'CUSTOM' && (
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 text-xs">
+            <span className="font-bold text-emerald-900">Rentang Tanggal:</span>
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white"
+            />
+            <span>s.d.</span>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white"
+            />
+          </div>
+        )}
+
+        {/* Row 3: Action Buttons (Unduh Semua Foto, Share Excel, ZIP, Salin WA, Cetak) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 text-xs text-slate-600">
+            <span>
+              Dokumentasi: <strong className="text-slate-900">{fotoCount} foto</strong> dari{' '}
+              <strong className="text-slate-900">{filteredVisits.length} kunjungan</strong>
+            </span>
             <button
               type="button"
-              onClick={handleShareExcel}
-              disabled={isSharingExcel}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
-              title="Bagikan file Excel dengan FOTO ASLI langsung tertanam di dalam sel ke WhatsApp / HP"
+              onClick={handleDownloadZip}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 font-bold text-xs cursor-pointer transition-all"
             >
-              <Send className="w-3.5 h-3.5 text-emerald-200" />
-              <span>{isSharingExcel ? 'Menyematkan Foto...' : 'Share Excel Bergambar'}</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>Unduh Semua Foto</span>
             </button>
+          </div>
 
-            {/* Unduh File Excel Bergambar */}
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleExportExcel}
-              disabled={isExportingExcel}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-400 text-emerald-950 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
-              title="Unduh tabel Excel (.xlsx) dengan foto dokumentasi langsung tertanam di dalam sel"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#2e7d5e] hover:bg-[#256a4f] text-white font-bold text-xs shadow-xs cursor-pointer transition-all"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
-              <span className="flex items-center gap-1">
-                <span>{isExportingExcel ? 'Menyematkan Foto...' : 'Unduh Excel (.xlsx)'}</span>
-                <span className="hidden md:inline-block px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-200 text-emerald-900">
-                  + FOTO
-                </span>
-              </span>
+              <Send className="w-3.5 h-3.5" />
+              <span>Share Excel Bergambar</span>
             </button>
 
-            {/* Unduh Paket Lengkap ZIP: Excel + Folder Foto Asli */}
-            {photosCount > 0 && (
-              <button
-                type="button"
-                onClick={handleExportZip}
-                disabled={isExportingZip}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-950 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
-                title="Unduh satu paket arsip ZIP berisi file Excel + folder seluruh file foto asli resolusi tinggi"
-              >
-                <Archive className="w-3.5 h-3.5 text-amber-700" />
-                <span>
-                  {isExportingZip
-                    ? `Packing ZIP (${zipProgress?.current}/${zipProgress?.total})...`
-                    : 'Paket ZIP (Excel + Semua Foto)'}
-                </span>
-              </button>
-            )}
-
-            {/* Salin Format Teks WA */}
             <button
               type="button"
-              onClick={handleCopyWA}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs shadow-2xs cursor-pointer"
-              title="Salin ringkasan teks untuk dikirim ke grup WhatsApp"
+              onClick={handleExportExcel}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50/50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs cursor-pointer transition-all"
             >
-              <Share2 className="w-3.5 h-3.5 text-slate-600" />
-              <span>{copiedWA ? 'Tersalin!' : 'Salin WA'}</span>
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Unduh Excel (.xlsx) + FOTO</span>
             </button>
 
-            {/* Cetak Tabel */}
             <button
               type="button"
-              onClick={() => printOfficialDocument('lembar-cetak-kunjungan-harian', `REKAP_KUNJUNGAN_HARIAN_${dateDisplayLabel.replace(/[/\\?%*:|"<> ]/g, '_')}`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-xs cursor-pointer"
-              title="Cetak tabel kunjungan ke PDF atau printer fisik"
+              onClick={handleDownloadZip}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs cursor-pointer transition-all"
+            >
+              <Archive className="w-3.5 h-3.5" />
+              <span>Paket ZIP (Excel + Semua Foto)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyWa}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs cursor-pointer transition-all"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Salin WA</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs cursor-pointer transition-all"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Cetak Tabel</span>
-              <span className="sm:hidden">Cetak</span>
+              <span>Cetak Tabel</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* DASHBOARD TREN KUNJUNGAN WARGA PER PERIODE (PEMKAB / LURAH & KASI) */}
-      <div className="bg-gradient-to-br from-slate-900 via-teal-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 border border-teal-500/30 shadow-lg space-y-4">
-        {/* Header & Toggle */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-400/30 flex items-center justify-center text-teal-300 shrink-0">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-sm sm:text-base font-black tracking-tight text-white flex items-center gap-2">
-                  <span>Tren Kunjungan Warga Per Periode</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-400/20 text-teal-300 border border-teal-400/30">
-                    LURAH &amp; KASI
+      {/* 3. DAFTAR KUNJUNGAN: TABEL ATAU KARTU */}
+      <div ref={printAreaRef} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        {filteredVisits.length === 0 ? (
+          <div className="p-12 text-center space-y-3">
+            <Users className="w-12 h-12 text-slate-300 mx-auto" />
+            <h3 className="text-sm font-bold text-slate-700">Belum ada data kunjungan warga</h3>
+            <p className="text-xs text-slate-500">
+              Gunakan form di atas untuk mencatat sambang warga atau sesuaikan kriteria filter.
+            </p>
+          </div>
+        ) : viewMode === 'table' ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-900 text-white text-[11px] font-black uppercase tracking-wider">
+                  <th className="p-3.5 text-center w-12">No</th>
+                  <th className="p-3.5">Tanggal</th>
+                  <th className="p-3.5">Lingkungan / Kepling</th>
+                  <th className="p-3.5">Nama Warga</th>
+                  <th className="p-3.5">Alamat</th>
+                  <th className="p-3.5 text-center">Perlinsos</th>
+                  <th className="p-3.5 text-center">IKD</th>
+                  <th className="p-3.5 text-center">PBB</th>
+                  <th className="p-3.5 text-center">Foto</th>
+                  <th className="p-3.5">Catatan</th>
+                  <th className="p-3.5 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {filteredVisits.map((item, idx) => (
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="p-3.5 text-center font-mono text-slate-500">{idx + 1}</td>
+                    <td className="p-3.5 whitespace-nowrap font-medium text-slate-700">{item.tanggal}</td>
+                    <td className="p-3.5 whitespace-nowrap">
+                      <div className="font-bold text-slate-900">{item.lingkungan}</div>
+                      <div className="text-[10px] text-slate-500">{item.namaKepling}</div>
+                    </td>
+                    <td className="p-3.5 font-bold text-slate-900">{item.namaWarga}</td>
+                    <td className="p-3.5 text-slate-700 max-w-[180px] truncate" title={item.alamat}>
+                      {item.alamat}
+                    </td>
+                    <td className="p-3.5 text-center whitespace-nowrap">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          item.perlinsos === 'Sudah'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : item.perlinsos === 'Belum'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {item.perlinsos || '-'}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-center whitespace-nowrap">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          item.ikd === 'Sudah'
+                            ? 'bg-blue-100 text-blue-800'
+                            : item.ikd === 'Proses'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {item.ikd || '-'}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-center whitespace-nowrap">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          item.pbb === 'Sudah' || item.pbb === 'Lunas'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}
+                      >
+                        {item.pbb || '-'}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-center whitespace-nowrap">
+                      {(() => {
+                        const photoSrc =
+                          item.fotoUrl ||
+                          (item as any).foto ||
+                          (item as any).fotoDokumentasi ||
+                          (item as any).photoUrl;
+
+                        if (photoSrc) {
+                          return (
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewPhotoUrl(photoSrc)}
+                                className="group relative w-12 h-12 rounded-xl overflow-hidden border-2 border-emerald-400/60 shadow-xs hover:shadow-md hover:scale-105 transition-all cursor-pointer bg-slate-100 flex items-center justify-center shrink-0"
+                                title="Klik untuk memperbesar foto dokumentasi"
+                              >
+                                <img
+                                  src={photoSrc}
+                                  alt={item.namaWarga}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                  <Eye className="w-4 h-4" />
+                                </div>
+                              </button>
+                              <label
+                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors cursor-pointer"
+                                title="Ganti / Perbarui Foto"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  disabled={uploadingPhotoId === item.id}
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (f) handleInlinePhotoUpload(item, f);
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="flex flex-col items-center justify-center gap-1">
+                            <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+                              Belum Ada Foto
+                            </span>
+                            <label className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black shadow-xs cursor-pointer transition-all hover:scale-105">
+                              {uploadingPhotoId === item.id ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span>Menyimpan...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Camera className="w-3 h-3" />
+                                  <span>+ Foto</span>
+                                </>
+                              )}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={uploadingPhotoId === item.id}
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) handleInlinePhotoUpload(item, f);
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="p-3.5 text-slate-600 max-w-[200px] truncate" title={item.keterangan}>
+                      {item.keterangan || '-'}
+                    </td>
+                    <td className="p-3.5 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingVisit(item);
+                            setIsFormOpen(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors cursor-pointer"
+                          title="Edit Kunjungan"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteConfirmId(item.id)}
+                          className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors cursor-pointer"
+                          title="Hapus Kunjungan"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* Cards View (Mobile Friendly) */
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredVisits.map((item, idx) => (
+              <div
+                key={item.id}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      {item.lingkungan}
+                    </span>
+                    <h4 className="text-sm font-black text-slate-900 mt-1">{item.namaWarga}</h4>
+                    <p className="text-[11px] text-slate-500 font-medium">{item.alamat}</p>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap">
+                    {item.tanggal}
                   </span>
-                </h3>
-              </div>
-              <p className="text-xs text-teal-200/80 mt-0.5">
-                Periode Terpilih: <strong className="text-white font-bold">{dateDisplayLabel}</strong> • {filtered.length} rumah dikunjungi
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowTrendPanel(!showTrendPanel)}
-            className="inline-flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-teal-200 text-xs font-bold border border-teal-500/20 transition-all cursor-pointer shadow-xs"
-          >
-            <BarChart3 className="w-3.5 h-3.5 text-teal-400" />
-            <span>{showTrendPanel ? 'Sembunyikan Grafik Tren' : 'Buka Analisis Tren'}</span>
-            {showTrendPanel ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-
-        {/* 4 Key Metric Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-          <div className="bg-slate-800/80 border border-teal-500/20 rounded-xl p-3 shadow-inner">
-            <span className="text-[10px] sm:text-[11px] font-bold text-teal-300 uppercase tracking-wider block">
-              Total Kunjungan
-            </span>
-            <div className="flex items-baseline gap-1.5 mt-1">
-              <span className="text-xl sm:text-2xl font-black text-white">{filtered.length}</span>
-              <span className="text-xs text-slate-300 font-semibold">Rumah</span>
-            </div>
-            <span className="text-[10px] text-teal-200/70 block mt-1">
-              Dalam {trendAnalytics.daysCount} hari periode
-            </span>
-          </div>
-
-          <div className="bg-slate-800/80 border border-teal-500/20 rounded-xl p-3 shadow-inner">
-            <span className="text-[10px] sm:text-[11px] font-bold text-emerald-300 uppercase tracking-wider block">
-              Rata-Rata Harian
-            </span>
-            <div className="flex items-baseline gap-1.5 mt-1">
-              <span className="text-xl sm:text-2xl font-black text-emerald-400">{trendAnalytics.avgPerDay}</span>
-              <span className="text-xs text-slate-300 font-semibold">Rumah/Hari</span>
-            </div>
-            <span className="text-[10px] text-emerald-200/70 block mt-1">
-              Laju aktivitas sambang
-            </span>
-          </div>
-
-          <div className="bg-slate-800/80 border border-teal-500/20 rounded-xl p-3 shadow-inner">
-            <span className="text-[10px] sm:text-[11px] font-bold text-amber-300 uppercase tracking-wider block">
-              Cakupan Wilayah
-            </span>
-            <div className="flex items-baseline gap-1.5 mt-1">
-              <span className="text-xl sm:text-2xl font-black text-amber-400">{trendAnalytics.activeLingkunganCount}</span>
-              <span className="text-xs text-slate-300 font-semibold">/ 24 Aktif</span>
-            </div>
-            <span className="text-[10px] text-amber-200/70 block mt-1">
-              {Math.round((trendAnalytics.activeLingkunganCount / 24) * 100)}% lingkungan terlayani
-            </span>
-          </div>
-
-          <div className="bg-slate-800/80 border border-teal-500/20 rounded-xl p-3 shadow-inner">
-            <span className="text-[10px] sm:text-[11px] font-bold text-purple-300 uppercase tracking-wider block">
-              Puncak Kunjungan
-            </span>
-            <div className="flex items-baseline gap-1.5 mt-1">
-              <span className="text-xl sm:text-2xl font-black text-purple-300">{trendAnalytics.peakCount}</span>
-              <span className="text-xs text-slate-300 font-semibold">Rumah</span>
-            </div>
-            <span className="text-[10px] text-purple-200/70 block mt-1 truncate" title={trendAnalytics.peakDate}>
-              Puncak: {trendAnalytics.peakDate}
-            </span>
-          </div>
-        </div>
-
-        {/* Expandable Trend Details: Visual Chart, Sektoral Status, and Leaderboard */}
-        {showTrendPanel && (
-          <div className="space-y-4 pt-2 border-t border-teal-500/20 animate-in fade-in duration-200">
-            {/* 1. Visual Daily Trend Bar Chart */}
-            <div className="bg-slate-950/70 rounded-xl p-3.5 sm:p-4 border border-teal-500/20 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-teal-200 flex items-center gap-1.5">
-                  <BarChart3 className="w-4 h-4 text-teal-400" />
-                  <span>Grafik Distribusi Kunjungan Harian</span>
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  {trendAnalytics.timeline.length} hari kegiatan tercatat
-                </span>
-              </div>
-
-              {trendAnalytics.timeline.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400">
-                  Belum ada catatan kunjungan pada periode {dateDisplayLabel}.
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-end gap-2 overflow-x-auto pb-4 pt-6 min-h-[140px] px-1 scrollbar-thin">
-                    {trendAnalytics.timeline.map((item) => {
-                      const maxVal = Math.max(1, trendAnalytics.peakCount);
-                      const heightPercent = Math.max(14, Math.round((item.total / maxVal) * 100));
-                      const isPeak = item.total === trendAnalytics.peakCount && item.total > 0;
-                      
-                      return (
-                        <div key={item.date} className="flex flex-col items-center gap-1.5 shrink-0 group">
-                          <span className={`text-[10px] font-mono font-black ${isPeak ? 'text-amber-300 font-bold' : 'text-teal-200'}`}>
-                            {item.total}
-                          </span>
-                          <div className="w-8 sm:w-10 bg-slate-800 rounded-t-lg h-24 flex items-end justify-center p-0.5">
-                            <div
-                              style={{ height: `${heightPercent}%` }}
-                              className={`w-full rounded-t-md transition-all duration-300 ${
-                                isPeak
-                                  ? 'bg-gradient-to-t from-amber-500 to-amber-300 shadow-md ring-1 ring-amber-300'
-                                  : 'bg-gradient-to-t from-teal-600 to-emerald-400 hover:brightness-110'
-                              }`}
-                              title={`${item.date}: ${item.total} kunjungan warga`}
-                            />
-                          </div>
-                          <span className="text-[10px] font-medium text-slate-300 whitespace-nowrap rotate-[-30deg] origin-top-left mt-2 block">
-                            {item.date.slice(5)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
 
-            {/* 2. Sektoral Summary & Leaderboard Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Sektoral Status (Perlinsos, IKD, PBB) */}
-              <div className="bg-slate-950/70 rounded-xl p-3.5 border border-teal-500/20 space-y-2.5">
-                <span className="text-xs font-bold text-teal-200 flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-teal-400" />
-                  <span>Kebutuhan Sektoral Warga Periode Ini</span>
-                </span>
+                {(() => {
+                  const photoSrc =
+                    item.fotoUrl ||
+                    (item as any).foto ||
+                    (item as any).fotoDokumentasi ||
+                    (item as any).photoUrl;
 
-                <div className="space-y-2 text-xs">
-                  {/* Perlinsos */}
-                  <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-white block">Perlindungan Sosial (Bansos)</span>
-                      <span className="text-[11px] text-slate-400">
-                        {trendAnalytics.totalPerlinsosSudah} Menerima • {trendAnalytics.totalPerlinsosBelum} Belum • {trendAnalytics.totalPerlinsosMenolak} Menolak
-                      </span>
-                    </div>
-                    <span className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[11px]">
-                      {filtered.length > 0 ? Math.round((trendAnalytics.totalPerlinsosSudah / filtered.length) * 100) : 0}% Tercover
-                    </span>
-                  </div>
-
-                  {/* IKD */}
-                  <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-white block">Aktivasi IKD (KTP Digital)</span>
-                      <span className="text-[11px] text-slate-400">
-                        {trendAnalytics.totalIkdSudah} Sudah Aktivasi • {trendAnalytics.totalIkdBelum} Belum Aktivasi
-                      </span>
-                    </div>
-                    <span className="px-2 py-1 rounded bg-blue-500/20 text-blue-300 font-bold text-[11px]">
-                      {filtered.length > 0 ? Math.round((trendAnalytics.totalIkdSudah / filtered.length) * 100) : 0}% Aktivasi
-                    </span>
-                  </div>
-
-                  {/* PBB */}
-                  <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-white block">Pajak Bumi &amp; Bangunan (PBB-P2)</span>
-                      <span className="text-[11px] text-slate-400">
-                        {trendAnalytics.totalPbbSudah} Lunas / Sudah Bayar • {trendAnalytics.totalPbbBelum} Belum Lunas
-                      </span>
-                    </div>
-                    <span className="px-2 py-1 rounded bg-teal-500/20 text-teal-300 font-bold text-[11px]">
-                      {filtered.length > 0 ? Math.round((trendAnalytics.totalPbbSudah / filtered.length) * 100) : 0}% Lunas
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Top 5 Lingkungan Teraktif Periode Ini */}
-              <div className="bg-slate-950/70 rounded-xl p-3.5 border border-teal-500/20 space-y-2.5">
-                <span className="text-xs font-bold text-teal-200 flex items-center gap-1.5">
-                  <Award className="w-4 h-4 text-amber-400" />
-                  <span>Top Lingkungan Teraktif (Periode Ini)</span>
-                </span>
-
-                <div className="space-y-1.5">
-                  {trendAnalytics.leaderboard.slice(0, 5).map((item, idx) => {
-                    const maxL = Math.max(1, trendAnalytics.leaderboard[0]?.count || 1);
-                    const barPercent = Math.round((item.count / maxL) * 100);
-
+                  if (photoSrc) {
                     return (
-                      <div key={item.lingkungan} className="p-2 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3 text-xs">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 ${
-                            idx === 0 ? 'bg-amber-400 text-slate-950 font-black' : idx === 1 ? 'bg-slate-300 text-slate-950' : idx === 2 ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-300'
-                          }`}>
-                            {idx + 1}
-                          </span>
-                          <span className="font-bold text-white truncate">
-                            Lingkungan {toRoman(item.lingkungan)}
-                          </span>
+                      <div className="relative rounded-xl overflow-hidden h-40 bg-slate-100 group">
+                        <img
+                          src={photoSrc}
+                          alt={item.namaWarga}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-pointer"
+                          onClick={() => setPreviewPhotoUrl(photoSrc)}
+                        />
+                        <div
+                          onClick={() => setPreviewPhotoUrl(photoSrc)}
+                          className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold cursor-pointer gap-1.5"
+                        >
+                          <Eye className="w-4 h-4" />
+                          <span>Klik untuk perbesar</span>
                         </div>
-
-                        <div className="flex items-center gap-2.5 shrink-0">
-                          <div className="w-20 bg-slate-800 rounded-full h-2 hidden sm:block">
-                            <div
-                              style={{ width: `${barPercent}%` }}
-                              className="bg-emerald-500 h-2 rounded-full"
-                            />
-                          </div>
-                          <span className="font-mono font-black text-emerald-400 text-xs">
-                            {item.count} <span className="text-[10px] font-normal text-slate-400">Kunjungan</span>
-                          </span>
-                        </div>
+                        <label className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 hover:bg-black/80 backdrop-blur-xs text-white text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer">
+                          <Camera className="w-3 h-3" />
+                          <span>Ganti Foto</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={uploadingPhotoId === item.id}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleInlinePhotoUpload(item, f);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
                       </div>
                     );
-                  })}
+                  }
+
+                  return (
+                    <div className="rounded-xl border-2 border-dashed border-amber-200 bg-amber-50/50 p-3.5 flex flex-col items-center justify-center text-center space-y-2">
+                      <span className="text-[11px] text-amber-800 font-bold">
+                        Foto dokumentasi belum dilampirkan
+                      </span>
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm cursor-pointer transition-colors">
+                        {uploadingPhotoId === item.id ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Menyimpan Foto...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>+ Ambil / Unggah Foto</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploadingPhotoId === item.id}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleInlinePhotoUpload(item, f);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    </div>
+                  );
+                })()}
+
+                <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                    <div className="text-slate-400 font-medium">Perlinsos</div>
+                    <div className="font-bold text-slate-800">{item.perlinsos || '-'}</div>
+                  </div>
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                    <div className="text-slate-400 font-medium">IKD</div>
+                    <div className="font-bold text-slate-800">{item.ikd || '-'}</div>
+                  </div>
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                    <div className="text-slate-400 font-medium">PBB</div>
+                    <div className="font-bold text-slate-800">{item.pbb || '-'}</div>
+                  </div>
+                </div>
+
+                {item.keterangan && (
+                  <p className="text-[11px] text-slate-600 bg-slate-50/70 p-2 rounded-xl italic">
+                    "{item.keterangan}"
+                  </p>
+                )}
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                  <span className="text-[10px] text-slate-400">Kepling: {item.namaKepling}</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingVisit(item);
+                        setIsFormOpen(true);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirmId(item.id)}
+                      className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* VIEW MODE 1: MOBILE CARDS VIEW */}
-      {viewMode === 'cards' ? (
-        <div className="space-y-3">
-          {filtered.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 font-medium">
-              Belum ada catatan kunjungan pada {dateDisplayLabel}. Gunakan formulir di atas untuk menambahkan.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {filtered.map((item, index) => (
-                <div
-                  key={`${item.id}_card_${index}`}
-                  className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3 hover:border-emerald-300 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
-                        {index + 1}
-                      </span>
-                      <div>
-                        <h4 className="font-extrabold text-slate-900 text-sm leading-tight uppercase">
-                          {item.namaWarga}
-                        </h4>
-                        <span className="text-[11px] text-slate-500 font-semibold block">
-                          {item.lingkungan} • {item.namaKepling}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-black block mt-1 bg-slate-100 px-1.5 py-0.5 rounded w-max">
-                          📅 {item.tanggal || '-'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full font-bold text-[10.5px] uppercase shrink-0 ${
-                        item.keterangan === 'Sudah'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          : item.keterangan === 'Belum'
-                          ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                          : item.keterangan === 'Menolak'
-                          ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                          : 'bg-amber-100 text-amber-800 border border-amber-200'
-                      }`}
-                    >
-                      {item.keterangan}
-                    </span>
-                  </div>
-
-                  <div className="bg-slate-50 rounded-xl p-2.5 text-xs text-slate-700 flex items-start gap-2 border border-slate-100">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                    <span className="leading-relaxed font-medium uppercase">{item.alamat}</span>
-                  </div>
-
-                  {/* Badges: Perlinsos, IKD, PBB */}
-                  <div className="flex flex-wrap items-center gap-1.5 text-[10.5px]">
-                    <span
-                      className={`px-2 py-0.5 rounded-full font-bold uppercase whitespace-nowrap ${
-                        item.perlinsos === 'Sudah'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          : item.perlinsos === 'Menolak'
-                          ? 'bg-rose-100 text-rose-800 border border-rose-300 font-extrabold'
-                          : 'bg-slate-100 text-slate-700 border border-slate-200'
-                      }`}
-                    >
-                      Perlinsos: {item.perlinsos || 'Belum'}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full font-bold uppercase whitespace-nowrap ${
-                        item.ikd === 'Sudah'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          : 'bg-slate-100 text-slate-700 border border-slate-200'
-                      }`}
-                    >
-                      IKD: {item.ikd || 'Belum'}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full font-bold uppercase whitespace-nowrap ${
-                        item.pbb === 'Sudah'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          : 'bg-slate-100 text-slate-700 border border-slate-200'
-                      }`}
-                    >
-                      PBB: {item.pbb || 'Belum'}
-                    </span>
-                  </div>
-
-                  {/* Foto & Actions row */}
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                    <div>
-                      {item.fotoDokumentasi ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setPreviewPhotoItem(item)}
-                            className="w-12 h-12 rounded-xl overflow-hidden border border-slate-200 shadow-2xs hover:scale-105 transition-transform cursor-pointer shrink-0"
-                            title="Klik untuk melihat foto lebih besar"
-                          >
-                            <img
-                              src={item.fotoDokumentasi}
-                              alt={item.namaWarga}
-                              className="w-full h-full object-cover"
-                            />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadPhoto(item)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold transition-colors cursor-pointer"
-                            title="Unduh foto dokumentasi ini"
-                          >
-                            <Download className="w-3.5 h-3.5 text-teal-700" />
-                            <span>Unduh Foto</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">Tanpa Dokumentasi Foto</span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingItem(item);
-                          setShowAddForm(true);
-                          setTimeout(() => {
-                            const el = document.getElementById('form-kunjungan-container');
-                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                          }, 50);
-                        }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-colors cursor-pointer"
-                        title="Edit / Koreksi Data Kunjungan"
-                      >
-                        <Edit3 className="w-3.5 h-3.5 text-amber-700" />
-                        <span>Edit</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(item.id, item.namaWarga)}
-                        className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-rose-200"
-                        title="Hapus Kunjungan"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* VIEW MODE 2: TABLE VIEW */
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-100 border-b border-slate-200 font-extrabold text-slate-700">
-                  <th className="py-3 px-3 w-10 text-center">NO</th>
-                  <th className="py-3 px-3">TANGGAL KUNJUNGAN</th>
-                  <th className="py-3 px-3">NAMA WARGA</th>
-                  <th className="py-3 px-3">ALAMAT LENGKAP</th>
-                  <th className="py-3 px-3 text-center">LINGKUNGAN</th>
-                  <th className="py-3 px-3 text-center">PERLINSOS</th>
-                  <th className="py-3 px-3 text-center">IKD</th>
-                  <th className="py-3 px-3 text-center">PBB</th>
-                  <th className="py-3 px-3 text-center">DOKUMENTASI FOTO</th>
-                  <th className="py-3 px-3 text-center">AKSI</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="py-10 text-center text-slate-400 font-medium">
-                      Belum ada catatan kunjungan pada {dateDisplayLabel}. Gunakan formulir di atas untuk menambahkan.
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((item, index) => (
-                    <tr key={`${item.id}_${index}`} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-3 text-center font-bold text-slate-500">{index + 1}</td>
-                      <td className="py-3 px-3 font-bold text-slate-700 whitespace-nowrap">
-                        {item.tanggal || '-'}
-                      </td>
-                      <td className="py-3 px-3 font-extrabold text-slate-900 whitespace-nowrap uppercase">
-                        {item.namaWarga}
-                      </td>
-                      <td className="py-3 px-3 text-slate-700 font-medium max-w-xs uppercase">
-                        {item.alamat}
-                      </td>
-                      <td className="py-3 px-3 text-center font-bold text-slate-800 whitespace-nowrap">
-                        {item.lingkungan}
-                        <div className="text-[10px] text-slate-400 font-normal">{item.namaKepling}</div>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase whitespace-nowrap ${
-                            item.perlinsos === 'Sudah'
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                              : item.perlinsos === 'Menolak'
-                              ? 'bg-rose-100 text-rose-800 border border-rose-300 font-extrabold'
-                              : 'bg-slate-100 text-slate-700 border border-slate-200'
-                          }`}
-                        >
-                          {item.perlinsos || 'Belum'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase whitespace-nowrap ${item.ikd === 'Sudah' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                          {item.ikd}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase whitespace-nowrap ${item.pbb === 'Sudah' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                          {item.pbb}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        {item.fotoDokumentasi ? (
-                          <div className="inline-flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setPreviewPhotoItem(item)}
-                              className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 shadow-2xs hover:scale-105 transition-transform cursor-pointer shrink-0"
-                              title="Lihat foto preview"
-                            >
-                              <img
-                                src={item.fotoDokumentasi}
-                                alt="Dokumentasi"
-                                className="w-full h-full object-cover"
-                              />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadPhoto(item)}
-                              className="p-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 transition-colors cursor-pointer"
-                              title="Download Foto Langsung"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic">Tanpa Foto</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingItem(item);
-                              setShowAddForm(true);
-                              setTimeout(() => {
-                                const el = document.getElementById('form-kunjungan-container');
-                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                              }, 50);
-                            }}
-                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                            title="Edit / Koreksi Data Kunjungan"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          {item.fotoDokumentasi && (
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadPhoto(item)}
-                              className="p-1.5 text-teal-700 hover:bg-teal-50 rounded-lg transition-colors cursor-pointer"
-                              title="Unduh Foto (.jpg)"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(item.id, item.namaWarga)}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="Hapus Kunjungan"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* REKAPITULASI TOTAL KUNJUNGAN PER LINGKUNGAN & TOTAL SELURUH KUNJUNGAN */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200 shrink-0">
-              <CheckCircle2 className="w-5 h-5" />
+      {/* 4. BAWAH: REKAPITULASI KUNJUNGAN PER LINGKUNGAN (Exact matching screenshot 1) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm sm:text-base text-slate-900">
+              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
                 Rekapitulasi Kunjungan Per Lingkungan (Sampai Dengan Hari Ini)
-              </h3>
-              <p className="text-xs text-slate-500">
+              </h2>
+              <p className="text-xs text-slate-500 font-medium">
                 Total akumulasi sambang warga door-to-door se-Kelurahan Mangga (24 Lingkungan)
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <div className="bg-gradient-to-r from-emerald-700 to-teal-700 text-white px-4 py-2 rounded-xl text-center shadow-xs">
-              <span className="text-[10px] uppercase font-bold tracking-wider block text-emerald-100">
-                Total Seluruh Kunjungan
-              </span>
-              <span className="text-base sm:text-lg font-black tracking-tight">
-                {totalSeluruhKunjungan} Warga
-              </span>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="bg-[#1f5f4b] text-white px-5 py-2.5 rounded-xl text-center shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-200">
+                TOTAL SELURUH KUNJUNGAN
+              </div>
+              <div className="text-lg font-black tracking-tight">{visits.length} Warga</div>
             </div>
+
             <button
               type="button"
-              onClick={handleCopyWA}
-              className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer"
-              title="Salin rekapitulasi lengkap ke WhatsApp"
+              onClick={handleCopyWa}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
-              <Share2 className="w-4 h-4 text-slate-600" />
-              <span className="hidden sm:inline">{copiedWA ? 'Tersalin!' : 'Salin WA'}</span>
+              <Share2 className="w-4 h-4 text-emerald-600" />
+              <span>Salin WA</span>
             </button>
           </div>
         </div>
 
         {/* 24 Lingkungan Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-2.5">
-          {Array.from({ length: 24 }, (_, i) => i + 1).map((lingNum) => {
-            const count = cumulativeCounts[lingNum] || 0;
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {Array.from({ length: 24 }).map((_, idx) => {
+            const lingkNum = idx + 1;
+            const rom = ROMAN_NUMERALS[idx];
+            const count = visitsPerLingkungan[lingkNum] || 0;
+            const isSelected = selectedLingkungan === `Lingkungan ${rom}` || selectedLingkungan === `Lingkungan ${lingkNum}`;
+
             return (
-              <div
-                key={`ui_ling_${lingNum}`}
-                className={`p-2.5 rounded-xl border text-center transition-all ${
-                  count > 0
-                    ? 'bg-emerald-50/70 border-emerald-200 text-slate-900 shadow-2xs'
-                    : 'bg-slate-50/80 border-slate-200/80 text-slate-400'
+              <button
+                type="button"
+                key={lingkNum}
+                onClick={() => {
+                  if (isSelected) {
+                    setSelectedLingkungan('ALL');
+                  } else {
+                    setSelectedLingkungan(`Lingkungan ${rom}`);
+                  }
+                }}
+                className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer ${
+                  isSelected
+                    ? 'border-emerald-500 bg-emerald-100/70 shadow-sm ring-2 ring-emerald-400'
+                    : count > 0
+                    ? 'border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50'
+                    : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 opacity-80'
                 }`}
               >
-                <span className="text-[11px] font-bold block text-slate-600">
-                  Lingkungan {toRoman(lingNum)}
-                </span>
-                <span className={`text-sm sm:text-base font-black block mt-0.5 ${count > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
-                  {count} <span className="text-[10px] font-semibold text-slate-500">Warga</span>
-                </span>
-              </div>
+                <div className="text-[11px] font-bold text-slate-700 mb-0.5">
+                  Lingkungan {rom}
+                </div>
+                <div className="text-xs">
+                  <span className={`font-black text-sm ${count > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                    {count}
+                  </span>{' '}
+                  <span className="text-[11px] text-slate-500 font-medium">Warga</span>
+                </div>
+              </button>
             );
           })}
         </div>
 
-        {/* REKAPITULASI TOTAL SELURUH KUNJUNGAN */}
-        <div className="mt-5 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl p-4 sm:p-5 text-white shadow-lg border border-emerald-500/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shrink-0">
-              <Users className="w-7 h-7 text-white" />
+        {/* Big Green Banner at Bottom of Rekapitulasi */}
+        <div className="bg-[#1e614d] text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-700/60 flex items-center justify-center text-white shrink-0">
+              <Users className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="text-sm sm:text-base font-black uppercase tracking-wider">TOTAL SELURUH KUNJUNGAN</h4>
-              <p className="text-[10px] sm:text-xs text-emerald-100 font-bold opacity-90 uppercase">
-                AKUMULASI SAMBANG WARGA 24 LINGKUNGAN ({dateDisplayLabel})
-              </p>
+              <div className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-100">
+                TOTAL SELURUH KUNJUNGAN
+              </div>
+              <div className="text-[11px] text-emerald-200 font-semibold">
+                AKUMULASI SAMBANG WARGA 24 LINGKUNGAN (HARI INI ({getTodayLocalIso()}))
+              </div>
             </div>
           </div>
-          <div className="text-center sm:text-right">
-            <span className="text-3xl sm:text-4xl font-black tracking-tighter drop-shadow-md">
-              {totalSeluruhKunjungan} <span className="text-sm sm:text-lg font-bold text-emerald-100/80 uppercase">Warga</span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl sm:text-4xl font-black tracking-tight">{visits.length}</span>
+            <span className="text-sm sm:text-base font-extrabold uppercase tracking-wider text-emerald-200">
+              WARGA
             </span>
           </div>
         </div>
       </div>
 
-      {/* LIGHTBOX PHOTO MODAL */}
-      {previewPhotoItem && previewPhotoItem.fotoDokumentasi && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 space-y-0 animate-in fade-in zoom-in-95 duration-200">
-            {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-extrabold text-sm sm:text-base">
-                  Foto Kunjungan: {previewPhotoItem.namaWarga}
-                </h3>
-                <p className="text-xs text-slate-300">
-                  {previewPhotoItem.lingkungan} • {previewPhotoItem.tanggal}
-                </p>
-              </div>
+      {/* 5. TREN KUNJUNGAN HARIAN (Chart Section) */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-900">Tren Kunjungan Harian (14 Hari Terakhir)</h3>
+              <p className="text-[11px] text-slate-500">Aktivitas kunjungan door-to-door se-Kelurahan Mangga</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              Volume Kunjungan Harian
+            </span>
+          </div>
+        </div>
+
+        <div className="h-48 w-full pt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={dailyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="tanggal" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-slate-900 text-white text-xs p-2.5 rounded-xl shadow-lg border border-slate-800">
+                        <div className="font-bold">{data.fullDate}</div>
+                        <div className="text-emerald-400 font-black mt-1">
+                          {data.kunjungan} Kunjungan Warga
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Bar dataKey="kunjungan" fill="#059669" radius={[6, 6, 0, 0]} maxBarSize={32} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Photo Preview Modal */}
+      {previewPhotoUrl && (
+        <div
+          onClick={() => setPreviewPhotoUrl(null)}
+          className="modal-preview p-4 bg-black/80 backdrop-blur-xs flex items-center justify-center cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-4 max-w-lg w-full shadow-2xl space-y-3"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span className="font-bold text-sm text-slate-900">Foto Dokumentasi Kunjungan</span>
               <button
                 type="button"
-                onClick={() => setPreviewPhotoItem(null)}
-                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                onClick={() => setPreviewPhotoUrl(null)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-500 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-
-            {/* Photo Preview */}
-            <div className="bg-slate-950 flex items-center justify-center max-h-[60vh] overflow-hidden">
-              <img
-                src={previewPhotoItem.fotoDokumentasi}
-                alt={previewPhotoItem.namaWarga}
-                className="max-h-[60vh] w-auto object-contain"
-              />
+            <div className="rounded-2xl overflow-hidden bg-slate-900 max-h-[70vh] flex items-center justify-center">
+              <img src={previewPhotoUrl} alt="Preview" className="max-w-full max-h-[70vh] object-contain" />
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Modal Info & Download Action */}
-            <div className="p-4 sm:p-5 bg-white space-y-4">
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Nama Warga:</span>
-                  <span className="font-bold text-slate-900 uppercase">{previewPhotoItem.namaWarga}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Alamat:</span>
-                  <span className="font-bold text-slate-900 text-right uppercase">{previewPhotoItem.alamat}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Kepala Lingkungan:</span>
-                  <span className="font-bold text-slate-900">{previewPhotoItem.namaKepling}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Perlinsos:</span>
-                  <span className={`font-bold ${previewPhotoItem.perlinsos === 'Sudah' ? 'text-emerald-700' : 'text-rose-700'}`}>{previewPhotoItem.perlinsos}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">IKD:</span>
-                  <span className={`font-bold ${previewPhotoItem.ikd === 'Sudah' ? 'text-emerald-700' : 'text-rose-700'}`}>{previewPhotoItem.ikd}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">PBB:</span>
-                  <span className={`font-bold ${previewPhotoItem.pbb === 'Sudah' ? 'text-emerald-700' : 'text-rose-700'}`}>{previewPhotoItem.pbb}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const itemToEdit = previewPhotoItem;
-                    setPreviewPhotoItem(null);
-                    setEditingItem(itemToEdit);
-                    setShowAddForm(true);
-                    setTimeout(() => {
-                      const el = document.getElementById('form-kunjungan-container');
-                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 50);
-                  }}
-                  className="flex items-center justify-center gap-1.5 py-3 px-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer"
-                  title="Koreksi / Edit data kunjungan ini"
-                >
-                  <Edit3 className="w-4 h-4" />
-                  <span>Edit Data</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleDownloadPhoto(previewPhotoItem);
-                    setPreviewPhotoItem(null);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-extrabold text-xs shadow-md transition-all cursor-pointer"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Unduh Foto (.JPG)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewPhotoItem(null)}
-                  className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer"
-                >
-                  Tutup
-                </button>
-              </div>
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="modal-preview p-4 bg-black/60 backdrop-blur-xs flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="font-black text-slate-900 text-base">Hapus Data Kunjungan?</h4>
+              <p className="text-xs text-slate-500 mt-1">
+                Data yang dihapus tidak dapat dipulihkan kembali dari basis data.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(deleteConfirmId)}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md cursor-pointer"
+              >
+                Hapus Sekarang
+              </button>
             </div>
           </div>
         </div>

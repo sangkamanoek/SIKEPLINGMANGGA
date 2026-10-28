@@ -1,314 +1,211 @@
-import { KunjunganWargaData } from '../components/FormKunjunganWarga';
 import { db } from './firebase';
 import {
   collection,
-  query,
-  orderBy,
-  onSnapshot,
+  doc,
+  getDocs,
   setDoc,
   deleteDoc,
-  doc,
+  onSnapshot,
+  query,
+  orderBy,
   Unsubscribe,
 } from 'firebase/firestore';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
-import { getReportIsoDate, isReportMatchingDate, getTodayLocalIso, extractNomorLingkungan, isKunjunganMatchingKepling } from './formatter';
-import { LaporanHarianItem, UserAccount } from '../types';
-import { KEPLING_ACCOUNTS } from '../data/keplingList';
 
-export const KUNJUNGAN_STORAGE_KEY = 'sikepling_kunjungan_harian_list_v1';
-export const KUNJUNGAN_BROADCAST_CHANNEL = 'sikepling_kunjungan_channel';
-export const KUNJUNGAN_CUSTOM_EVENT = 'kunjungan-data-updated';
+export const KUNJUNGAN_COLLECTION = 'kunjungan_warga';
+export const KUNJUNGAN_STORAGE_KEY = 'sikepling_kunjungan_warga_v2';
+export const KUNJUNGAN_DELETED_KEY = 'sikepling_kunjungan_deleted_v2';
+export const KUNJUNGAN_CHANNEL = 'sikepling_kunjungan_channel';
 
-/**
- * Normalisasi data kunjungan ke ISO Date (YYYY-MM-DD)
- */
-export function getKunjunganIsoDate(k: any): string {
-  if (!k) return '';
-  const iso = getReportIsoDate(k);
-  if (iso) return iso;
-  if (k.tanggal && String(k.tanggal).match(/^\d{4}-\d{2}-\d{2}$/)) {
-    return String(k.tanggal);
+export interface KunjunganWargaData {
+  id: string;
+  tanggal: string;
+  namaWarga: string;
+  nik?: string;
+  alamat: string;
+  lingkungan: string;
+  namaKepling: string;
+  perlinsos?: string;
+  ikd?: string;
+  pbb?: string;
+  kategoriBansos?: string;
+  statusBansos?: 'Sudah' | 'Belum' | 'Menolak' | 'Layak' | 'Tidak Layak';
+  keterangan?: string;
+  telepon?: string;
+  fotoUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+let memoryKunjungan: KunjunganWargaData[] = [];
+let deletedKunjunganIdsCache: string[] = safeGetLocalStorage<string[]>(KUNJUNGAN_DELETED_KEY, []);
+
+export const getDeletedKunjunganIds = (): string[] => {
+  if (!Array.isArray(deletedKunjunganIdsCache)) deletedKunjunganIdsCache = [];
+  return deletedKunjunganIdsCache;
+};
+
+export const markKunjunganDeleted = (id: string): void => {
+  const current = getDeletedKunjunganIds();
+  if (!current.includes(id)) {
+    current.push(id);
+    deletedKunjunganIdsCache = current;
+    safeSetLocalStorage(KUNJUNGAN_DELETED_KEY, JSON.stringify(current));
   }
-  if (k.createdAt && typeof k.createdAt === 'string') {
-    const createdIso = k.createdAt.split('T')[0];
-    if (createdIso.match(/^\d{4}-\d{2}-\d{2}$/)) return createdIso;
-  }
-  return '';
-}
+};
 
-/**
- * Validasi apakah kunjungan cocok dengan tanggal target ISO
- */
-export function isKunjunganOnDate(k: any, targetDateIso: string): boolean {
-  if (!k || !targetDateIso) return true;
-  const kIso = getKunjunganIsoDate(k);
-  if (kIso && kIso === targetDateIso) return true;
-  if (isReportMatchingDate(k, targetDateIso)) return true;
-  if (k.tanggal === targetDateIso) return true;
-  if (k.createdAt && typeof k.createdAt === 'string' && k.createdAt.startsWith(targetDateIso)) return true;
-  return false;
-}
-
-/**
- * Ambil data Kunjungan instan dari Local Storage (0ms)
- */
-export function getLocalKunjunganList(): KunjunganWargaData[] {
-  return safeGetLocalStorage<KunjunganWargaData[]>(KUNJUNGAN_STORAGE_KEY, []);
-}
-
-/**
- * Simpan data Kunjungan ke Local Storage & Broadcast ke tab lain
- */
-export function setLocalKunjunganList(list: KunjunganWargaData[]): void {
-  safeSetLocalStorage(KUNJUNGAN_STORAGE_KEY, JSON.stringify(list));
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(KUNJUNGAN_CUSTOM_EVENT, { detail: list }));
-  }
-}
-
-/**
- * Broadcast event simpan / update kunjungan seketika
- */
-export function broadcastKunjunganChange(item: KunjunganWargaData): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.dispatchEvent(new CustomEvent(KUNJUNGAN_CUSTOM_EVENT, { detail: item }));
-    const bc = new BroadcastChannel(KUNJUNGAN_BROADCAST_CHANNEL);
-    bc.postMessage({ type: 'KUNJUNGAN_SAVED', item, timestamp: Date.now() });
-    setTimeout(() => {
-      try {
-        bc.close();
-      } catch {}
-    }, 200);
-  } catch {}
-}
-
-/**
- * Ambil data dari Server Buffer Express
- */
-export async function fetchKunjunganFromServerBuffer(): Promise<KunjunganWargaData[]> {
-  try {
-    const res = await fetch(`/api/kunjungan?_t=${Date.now()}`, {
-      cache: 'no-store',
-      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' },
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (Array.isArray(json?.data)) {
-        return json.data as KunjunganWargaData[];
-      }
-    }
-  } catch (err) {
-    console.warn('Notice fetching kunjungan from server:', err);
+export const getLocalKunjunganList = (): KunjunganWargaData[] => {
+  const deletedSet = new Set(getDeletedKunjunganIds());
+  const stored = safeGetLocalStorage<KunjunganWargaData[]>(KUNJUNGAN_STORAGE_KEY, []);
+  if (Array.isArray(stored)) {
+    const cleaned = stored.filter((x) => x && x.id && !deletedSet.has(x.id));
+    memoryKunjungan = cleaned;
+    return cleaned;
   }
   return [];
-}
+};
 
-/**
- * Simpan 1 catatan Kunjungan secara Dual-Tier (0ms Local + Broadcast + Server Buffer + Firestore)
- */
-export async function saveKunjunganWargaToFirestore(data: KunjunganWargaData): Promise<void> {
-  const normalizedData: KunjunganWargaData = {
-    ...data,
-    namaWarga: (data.namaWarga || '').trim().toUpperCase(),
-    alamat: (data.alamat || '').trim().toUpperCase(),
-  };
-
-  // 1. Instant 0ms update di local state & storage
-  const current = getLocalKunjunganList();
-  const exists = current.some((x) => x.id === normalizedData.id);
-  const updated = exists ? current.map((x) => (x.id === normalizedData.id ? normalizedData : x)) : [normalizedData, ...current];
-  setLocalKunjunganList(updated);
-  broadcastKunjunganChange(normalizedData);
-
-  // 2. Kirim ke Server API buffer
-  fetch('/api/kunjungan', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ item: normalizedData }),
-  }).catch((err) => {
-    console.warn('Notice saving kunjungan to server buffer:', err);
-  });
-
-  // 3. Simpan ke Firestore
-  if (db) {
-    try {
-      const docRef = doc(db, 'kunjungan_warga', normalizedData.id);
-      await setDoc(docRef, normalizedData);
-    } catch (err) {
-      console.warn('Firestore setDoc notice for kunjungan_warga:', err);
-    }
-  }
-}
-
-/**
- * Hapus 1 catatan Kunjungan (Local + Server + Firestore)
- */
-export async function deleteKunjunganWarga(id: string): Promise<void> {
-  const current = getLocalKunjunganList();
-  const updated = current.filter((x) => x.id !== id);
-  setLocalKunjunganList(updated);
-
-  if (typeof window !== 'undefined') {
-    try {
-      const bc = new BroadcastChannel(KUNJUNGAN_BROADCAST_CHANNEL);
-      bc.postMessage({ type: 'KUNJUNGAN_DELETED', id, timestamp: Date.now() });
-      setTimeout(() => bc.close(), 200);
-    } catch {}
-  }
-
-  fetch(`/api/kunjungan/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch((err) => {
-    console.warn('Notice deleting kunjungan from server:', err);
-  });
-
-  if (db) {
-    try {
-      await deleteDoc(doc(db, 'kunjungan_warga', id));
-    } catch (err) {
-      console.warn('Firestore deleteDoc notice for kunjungan_warga:', err);
-    }
-  }
-}
-
-/**
- * Ultra-fast Real-time listener & Dual-tier sync untuk Kunjungan Warga
- */
-export function subscribeKunjunganWarga(
-  onSuccess: (data: KunjunganWargaData[]) => void,
-  onError?: (err: Error) => void
-): Unsubscribe {
-  // 1. 0ms instant local cache
-  const initialLocal = getLocalKunjunganList();
-  if (initialLocal.length > 0) {
-    onSuccess(initialLocal);
-  }
-
-  // 2. Fetch server buffer immediately
-  fetchKunjunganFromServerBuffer().then((serverItems) => {
-    if (serverItems.length > 0) {
-      const current = getLocalKunjunganList();
-      const map = new Map<string, KunjunganWargaData>();
-      serverItems.forEach((it) => map.set(it.id, it));
-      current.forEach((it) => {
-        if (!map.has(it.id)) map.set(it.id, it);
-      });
-      const merged = Array.from(map.values());
-      setLocalKunjunganList(merged);
-      onSuccess(merged);
-    }
-  });
-
-  // 3. Cross-tab BroadcastChannel listener
-  let bc: BroadcastChannel | null = null;
+export const setLocalKunjunganList = (items: KunjunganWargaData[]): void => {
+  const deletedSet = new Set(getDeletedKunjunganIds());
+  const cleaned = items.filter((x) => x && x.id && !deletedSet.has(x.id));
+  memoryKunjungan = cleaned;
+  safeSetLocalStorage(KUNJUNGAN_STORAGE_KEY, JSON.stringify(cleaned));
   try {
-    bc = new BroadcastChannel(KUNJUNGAN_BROADCAST_CHANNEL);
-    bc.onmessage = (event) => {
-      if (event?.data?.type === 'KUNJUNGAN_SAVED' && event.data.item) {
-        const item = event.data.item as KunjunganWargaData;
-        const current = getLocalKunjunganList();
-        const exists = current.some((x) => x.id === item.id);
-        const updated = exists ? current.map((x) => (x.id === item.id ? item : x)) : [item, ...current];
-        setLocalKunjunganList(updated);
-        onSuccess(updated);
-      } else if (event?.data?.type === 'KUNJUNGAN_DELETED' && event.data.id) {
-        const id = event.data.id;
-        const current = getLocalKunjunganList();
-        const updated = current.filter((x) => x.id !== id);
-        setLocalKunjunganList(updated);
-        onSuccess(updated);
-      }
-    };
-  } catch {}
-
-  // 4. Same-window custom event listener
-  const handleCustomEvent = (e: any) => {
-    const detail = e?.detail;
-    if (Array.isArray(detail)) {
-      onSuccess(detail);
-    } else if (detail && detail.id) {
-      const current = getLocalKunjunganList();
-      const exists = current.some((x) => x.id === detail.id);
-      const updated = exists ? current.map((x) => (x.id === detail.id ? detail : x)) : [detail, ...current];
-      setLocalKunjunganList(updated);
-      onSuccess(updated);
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel(KUNJUNGAN_CHANNEL);
+      bc.postMessage({ type: 'SYNC_KUNJUNGAN', items: cleaned });
+      bc.close();
     }
+  } catch (e) {}
+};
+
+export const saveKunjunganWargaToFirestore = async (item: KunjunganWargaData): Promise<KunjunganWargaData> => {
+  const dataToSave: KunjunganWargaData = {
+    ...item,
+    id: item.id || `visit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
-  if (typeof window !== 'undefined') {
-    window.addEventListener(KUNJUNGAN_CUSTOM_EVENT, handleCustomEvent);
+
+  // 1. Update local state
+  const current = getLocalKunjunganList();
+  const idx = current.findIndex((p) => p.id === dataToSave.id);
+  let updatedList = [...current];
+  if (idx >= 0) {
+    updatedList[idx] = dataToSave;
+  } else {
+    updatedList = [dataToSave, ...updatedList];
+  }
+  setLocalKunjunganList(updatedList);
+
+  // 2. Save to Firestore if connected
+  try {
+    if (db) {
+      await setDoc(doc(db, KUNJUNGAN_COLLECTION, dataToSave.id), dataToSave, { merge: true });
+    }
+  } catch (err) {
+    console.warn('[kunjunganService] Firestore save error:', err);
   }
 
-  // 5. Firestore real-time snapshot
-  let unsubFirestore: (() => void) | null = null;
-  if (db) {
-    try {
-      const q = query(collection(db, 'kunjungan_warga'), orderBy('createdAt', 'desc'));
-      unsubFirestore = onSnapshot(
+  // 3. Save to server API buffer
+  try {
+    await fetch('/api/kunjungan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dataToSave),
+    });
+  } catch (e) {}
+
+  return dataToSave;
+};
+
+export const deleteKunjunganWargaFromFirestore = async (id: string): Promise<void> => {
+  markKunjunganDeleted(id);
+  const current = getLocalKunjunganList();
+  const filtered = current.filter((p) => p.id !== id);
+  setLocalKunjunganList(filtered);
+
+  try {
+    if (db) {
+      await deleteDoc(doc(db, KUNJUNGAN_COLLECTION, id));
+    }
+  } catch (err) {
+    console.warn('[kunjunganService] Firestore delete error:', err);
+  }
+
+  try {
+    await fetch(`/api/kunjungan/${id}`, { method: 'DELETE' });
+  } catch (e) {}
+};
+
+export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => void): (() => void) => {
+  // Initial local emit
+  cb(getLocalKunjunganList());
+
+  let unsub: Unsubscribe | null = null;
+  try {
+    if (db) {
+      const q = query(collection(db, KUNJUNGAN_COLLECTION), orderBy('createdAt', 'desc'));
+      unsub = onSnapshot(
         q,
         (snapshot) => {
-          const map = new Map<string, KunjunganWargaData>();
-          snapshot.forEach((d) => {
-            const data = d.data() as KunjunganWargaData;
-            if (data && (data.id || d.id)) {
-              const fullData = { ...data, id: data.id || d.id };
-              map.set(fullData.id, fullData);
-            }
+          const remoteItems: KunjunganWargaData[] = [];
+          snapshot.forEach((docSnap) => {
+            const dat = docSnap.data() as KunjunganWargaData;
+            if (dat && dat.id) remoteItems.push(dat);
           });
-          const list = Array.from(map.values());
-          if (list.length > 0) {
-            setLocalKunjunganList(list);
-            onSuccess(list);
+          if (remoteItems.length > 0) {
+            const deletedSet = new Set(getDeletedKunjunganIds());
+            const local = getLocalKunjunganList();
+            const map = new Map<string, KunjunganWargaData>();
+            local.forEach((l) => map.set(l.id, l));
+            remoteItems.forEach((r) => {
+              if (!deletedSet.has(r.id)) {
+                map.set(r.id, r);
+              }
+            });
+            const merged = Array.from(map.values()).sort((a, b) =>
+              (b.createdAt || '').localeCompare(a.createdAt || '')
+            );
+            setLocalKunjunganList(merged);
+            cb(merged);
           }
         },
-        (err: any) => {
-          console.warn('Firestore snapshot error for kunjungan_warga:', err);
-          if (
-            err?.code === 'resource-exhausted' ||
-            err?.message?.includes('Quota exceeded') ||
-            err?.message?.includes('resource-exhausted')
-          ) {
-            console.warn('Firestore quota exhausted for kunjungan_warga, detaching listener.');
-            if (unsubFirestore) {
-              try { unsubFirestore(); } catch {}
-            }
-          }
-          if (onError) onError(err);
+        (err) => {
+          console.warn('[kunjunganService] Snapshot listener error:', err);
         }
       );
-    } catch (e: any) {
-      console.warn('Error setting up firestore snapshot on kunjungan_warga:', e);
-      if (onError) onError(e);
     }
-  }
+  } catch (e) {}
+
+  // Broadcast channel sync
+  let bc: BroadcastChannel | null = null;
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      bc = new BroadcastChannel(KUNJUNGAN_CHANNEL);
+      bc.onmessage = (event) => {
+        if (event.data && event.data.type === 'SYNC_KUNJUNGAN' && Array.isArray(event.data.items)) {
+          cb(event.data.items);
+        }
+      };
+    }
+  } catch (e) {}
 
   return () => {
-    if (bc) {
-      try {
-        bc.close();
-      } catch {}
-    }
-    if (typeof window !== 'undefined') {
-      window.removeEventListener(KUNJUNGAN_CUSTOM_EVENT, handleCustomEvent);
-    }
-    if (unsubFirestore) {
-      unsubFirestore();
-    }
+    if (unsub) unsub();
+    if (bc) bc.close();
   };
-}
+};
 
-/**
- * 🛡️ KONSOLIDASI GANDA: Menggabungkan data kunjungan form mandiri (kunjungan_warga)
- * dengan data kunjungan yang diinput Kepling melalui Laporan Kinerja Harian (kinerja.perlinsosKk).
- * Ini memastikan jika Kepling 11 (atau Kepling mana pun) mengisi kunjungan di laporan harian
- * ataupun di form kunjungan terpisah, Super Admin PASTI melihatnya dan TIDAK PERNAH NIHIL!
- */
-export function consolidateKunjunganWithReports(
-  kunjunganList: KunjunganWargaData[] | any[],
-  reports: LaporanHarianItem[] | any[]
-): KunjunganWargaData[] {
-  // Sync completely severed: return independent kunjunganList only
-  return (kunjunganList || []).sort((a, b) => {
-    const tA = new Date(a.createdAt || a.tanggal || '').getTime();
-    const tB = new Date(b.createdAt || b.tanggal || '').getTime();
-    return tB - tA;
-  });
-}
+export const subscribeKunjungan = subscribeKunjunganWarga;
+export const saveKunjungan = saveKunjunganWargaToFirestore;
+export const saveKunjunganWarga = saveKunjunganWargaToFirestore;
+
+export const isKunjunganOnDate = (item: KunjunganWargaData, dateIso: string): boolean => {
+  if (!item || !item.tanggal) return false;
+  return item.tanggal.slice(0, 10) === dateIso.slice(0, 10);
+};
+
+export const consolidateKunjunganWithReports = (visits: KunjunganWargaData[], reports: any[]): any[] => {
+  return visits;
+};

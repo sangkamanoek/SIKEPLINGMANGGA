@@ -1,9 +1,7 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root {
-  --color-tosca-50: #f0fdfa;
+@theme {
+  --color-tosca-50: #f0fdf9;
   --color-tosca-100: #ccfbf1;
   --color-tosca-200: #99f6e4;
   --color-tosca-300: #5eead4;
@@ -16,194 +14,25 @@
   --color-tosca-950: #042f2e;
 }
 
-@media print {
-  @page {
-    size: A4 portrait;
-    margin: 6mm 6mm 6mm 6mm;
-  }
-
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-    width: 100% !important;
-    height: auto !important;
-    min-height: auto !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  /* 1. KETIKA MODE CETAK RESMI AKTIF: SEMBUNYIKAN SELURUH ELEMEN APLIKASI DI LUAR PRINT PORTAL */
-  body[data-print-mode="true"] #root,
-  body[data-print-mode="true"] > *:not(#print-portal-container) {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
-  }
-
-  body[data-print-mode="true"] #print-portal-container {
-    display: block !important;
-    visibility: visible !important;
-    position: static !important;
-    width: 100% !important;
-    max-width: 198mm !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-  }
-
-  /* Hilangkan efek blur, shadow, background yang tidak diinginkan */
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    box-shadow: none !important;
-    text-shadow: none !important;
-  }
-
-  /* Sembunyikan elemen non-cetak */
-  .no-print,
-  .print\:hidden,
-  nav,
-  header,
-  footer,
-  aside,
-  button,
-  input,
-  textarea,
-  select,
-  .modal-backdrop,
-  .bg-black\/50,
-  .bg-black\/60,
-  .bg-slate-900\/60,
-  .backdrop-blur-sm,
-  .backdrop-blur-md,
-  [role="dialog"] > div:first-child:not([id*="lembar-cetak"]) {
-    display: none !important;
-  }
-
-  /* Tampilkan lembar cetak standar jika dipanggil langsung */
-  #lembar-cetak-laporan-kepling,
-  #lembar-cetak-laporan-pembangunan,
-  #lembar-cetak-surat-kedinasan,
-  #lembar-cetak-rekap-absensi,
-  #lembar-cetak-rekap-pbb,
-  #lembar-cetak-rekap-perlinsos,
-  #lembar-cetak-rekap-trantibum,
-  #lembar-cetak-kunjungan-harian,
-  #lembar-cetak-rekap-capaian,
-  #lembar-cetak-keuangan-pkk,
-  #lembar-cetak-tabulasi-wilayah,
-  #lembar-cetak-kegiatan-pkk,
-  #lembar-cetak-database-keluarga,
-  .print\:block {
-    display: block !important;
-    visibility: visible !important;
-    width: 100% !important;
-    max-width: 198mm !important;
-    margin: 0 auto !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-    box-shadow: none !important;
-    border: none !important;
-  }
-
-  /* Hilangkan overflow clipping pada semua kontainer pembungkus tabel saat dicetak */
-  .overflow-x-auto,
-  .overflow-hidden,
-  .overflow-x-scroll,
-  div {
-    overflow: visible !important;
-    max-width: 100% !important;
-  }
-
-  /* Optimasi Tabel Cetak A4: Mencegah Terpotong dan Menyesuaikan Ukuran Kolom Secara Otomatis */
-  table {
-    width: 100% !important;
-    max-width: 100% !important;
-    table-layout: auto !important;
-    font-size: 7.5pt !important;
-    line-height: 1.15 !important;
-    border-collapse: collapse !important;
-  }
-
-  th, td {
-    padding: 2.5px 3.5px !important;
-    font-size: 7.5pt !important;
-    word-wrap: break-word !important;
-    word-break: normal !important;
-    white-space: normal !important;
-    box-sizing: border-box !important;
-  }
-
-  /* Sesuaikan Lencana / Badge Status di dalam Tabel Cetak */
-  td span, th span, .inline-block, .rounded, .rounded-full, .rounded-md, .rounded-lg {
-    white-space: normal !important;
-    max-width: 100% !important;
-    word-break: break-word !important;
-    display: inline-block !important;
-    font-size: 7pt !important;
-    padding: 1px 3px !important;
-    line-height: 1.1 !important;
-  }
-
-  /* Kontainer wajib pas lembar kertas A4 */
-  .page-print-single {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    box-sizing: border-box !important;
-  }
-
-  /* Cegah pemotongan halaman di dalam tabel */
-  table, tr, td, th, .avoid-break {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  .page-break-after {
-    page-break-after: always !important;
-    break-after: page !important;
-  }
-
-  .print-table {
-    border-collapse: collapse !important;
-    width: 100% !important;
-  }
-
-  .print-table th,
-  .print-table td {
-    border: 1px solid #000000 !important;
-    padding: 3px 5px !important;
+@layer base {
+  body {
+    color: #1e293b;
+    background-color: #f8fafc;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
-/* Smooth modern tab horizontal slide transition */
-@keyframes tabSlideHorizontal {
-  0% {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.animate-tab-fade {
-  animation: tabSlideHorizontal 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-tab-fade {
-    animation: none !important;
-  }
+/* Class CSS untuk modal/pop-up pratinjau */
+.modal-pratinjau, .modal-preview {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999; /* Agar muncul di lapisan paling atas */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-y: auto; /* Untuk antisipasi jika HP terlalu pendek */
 }
 

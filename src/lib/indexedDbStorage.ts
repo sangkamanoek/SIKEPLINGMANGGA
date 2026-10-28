@@ -1,13 +1,14 @@
-import { LaporanHarianItem, DataKeluarga } from '../types';
+import { LaporanHarianItem, DataKeluarga, SuratKedinasanItem } from '../types';
 import { SpptPbbItem } from '../data/pbbSampleData';
 
 const DB_NAME = 'sikepling_offline_db';
-const DB_VERSION = 4; // Incremented version to add new stores
+const DB_VERSION = 5; // Incremented version to add surat_store
 const STORE_REPORTS = 'reports_store';
 const STORE_KELUARGA = 'family_store';
 const STORE_PBB = 'pbb_store';
 const STORE_VISITS = 'visits_store';
 const STORE_HISTORY = 'history_store';
+const STORE_SURAT = 'surat_store';
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -33,6 +34,9 @@ function openDatabase(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_HISTORY)) {
         db.createObjectStore(STORE_HISTORY, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_SURAT)) {
+        db.createObjectStore(STORE_SURAT, { keyPath: 'id' });
       }
     };
 
@@ -370,3 +374,104 @@ export async function deleteReportFromIndexedDB(id: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Save all surat kedinasan items to IndexedDB (supports large PDF attachments without quota limit)
+ */
+export async function saveSuratToIndexedDB(data: SuratKedinasanItem[]): Promise<boolean> {
+  if (!Array.isArray(data)) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_SURAT, 'readwrite');
+      const store = tx.objectStore(STORE_SURAT);
+
+      store.clear();
+      if (data.length > 0) {
+        data.forEach((item) => {
+          if (item && item.id) {
+            store.put(item);
+          }
+        });
+      }
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error saving surat data:', err);
+    return false;
+  }
+}
+
+/**
+ * Read all surat kedinasan items from IndexedDB
+ */
+export async function getSuratFromIndexedDB(): Promise<SuratKedinasanItem[] | null> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_SURAT, 'readonly');
+      const store = tx.objectStore(STORE_SURAT);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const result = request.result;
+        if (Array.isArray(result) && result.length > 0) {
+          resolve(result as SuratKedinasanItem[]);
+        } else {
+          resolve(null);
+        }
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error getting surat data:', err);
+    return null;
+  }
+}
+
+/**
+ * Save single surat item with attached PDF to IndexedDB
+ */
+export async function saveSingleSuratToIndexedDB(item: SuratKedinasanItem): Promise<boolean> {
+  if (!item || !item.id) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_SURAT, 'readwrite');
+      const store = tx.objectStore(STORE_SURAT);
+      store.put(item);
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error saving single surat item:', err);
+    return false;
+  }
+}
+
+/**
+ * Delete single surat from IndexedDB
+ */
+export async function deleteSuratFromIndexedDB(id: string): Promise<boolean> {
+  if (!id) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_SURAT, 'readwrite');
+      const store = tx.objectStore(STORE_SURAT);
+      store.delete(id);
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error deleting surat item from IndexedDB:', err);
+    return false;
+  }
+}
+

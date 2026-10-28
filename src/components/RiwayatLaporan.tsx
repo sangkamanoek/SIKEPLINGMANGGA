@@ -240,19 +240,28 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     return list;
   }, [items]);
 
+  const isKepling = activeAccount?.role === 'kepling';
+  const keplingLingkungan = activeAccount?.lingkungan || '';
+  const keplingNama = activeAccount?.nama || '';
+
   // Scoped items based on active role (Domain Partitioning)
   const domainScopedItems = useMemo(() => {
-    if (isKasiPem) {
-      return items.filter(isReportForPemerintahan);
+    let base = items;
+    if (isKepling) {
+      base = base.filter((item) => {
+        const matchLingkungan = keplingLingkungan && item.lingkungan && item.lingkungan.toLowerCase().includes(keplingLingkungan.toLowerCase());
+        const matchNama = keplingNama && item.namaKepling && item.namaKepling.toLowerCase().includes(keplingNama.toLowerCase());
+        return Boolean(matchLingkungan || matchNama);
+      });
+    } else if (isKasiPem) {
+      base = base.filter(isReportForPemerintahan);
+    } else if (isKasiBang) {
+      base = base.filter(isReportForPembangunan);
+    } else if (isKasiTrantib) {
+      base = base.filter(isReportForTrantibum);
     }
-    if (isKasiBang) {
-      return items.filter(isReportForPembangunan);
-    }
-    if (isKasiTrantib) {
-      return items.filter(isReportForTrantibum);
-    }
-    return items;
-  }, [items, isKasiPem, isKasiBang, isKasiTrantib]);
+    return base;
+  }, [items, isKepling, keplingLingkungan, keplingNama, isKasiPem, isKasiBang, isKasiTrantib]);
 
   // Comprehensive multi-criteria filtering
   const filtered = useMemo(() => {

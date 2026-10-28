@@ -241,7 +241,7 @@ export const RekapAbsensiSuperAdmin: React.FC<RekapAbsensiSuperAdminProps> = ({
       </div>
 
       {/* Kontainer Cetak Resmi Terisolasi */}
-      <div id="lembar-cetak-rekap-absensi" className="space-y-4">
+      <div id="lembar-cetak-rekap-absensi" className="space-y-4 uppercase">
         {/* Kop Surat Resmi Pemko Medan (Tampak Saat Cetak) */}
         <KopSuratResmi />
         <div className="mt-2 pt-1 border-t border-black text-center">

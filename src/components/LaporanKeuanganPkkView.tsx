@@ -1182,7 +1182,7 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
 
               {/* Official BKU Table */}
               <div className="overflow-x-auto w-full">
-                <table className="w-full text-[10pt] border-collapse border border-black min-w-[600px] sm:min-w-full">
+                <table className="w-full text-[10pt] border-collapse border border-black min-w-[600px] sm:min-w-full uppercase">
                 <thead>
                   <tr className="bg-gray-100 text-center font-bold">
                     <th className="border border-black p-1.5 w-8">No</th>
@@ -1240,16 +1240,18 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
                   <p>Mengetahui,</p>
                   <p className="font-bold">Ketua Tim Penggerak PKK</p>
                   <p>Kelurahan Mangga</p>
-                  <div className="h-20" />
-                  <p className="font-bold underline uppercase">( ............................................ )</p>
+                  <div className="h-16" />
+                  <p className="font-bold underline uppercase">Ny. Fransiska Fery Arapenta Tarigan</p>
+                  <p className="text-[10px] text-slate-500 font-normal">Ketua Tim Penggerak PKK Kelurahan Mangga</p>
                 </div>
 
                 <div>
                   <p>Medan, {formatTanggalIndonesia(new Date())}</p>
-                  <p className="font-bold">Bendahara Tim Penggerak PKK</p>
+                  <p className="font-bold">Sekretaris / Bendahara Tim Penggerak PKK</p>
                   <p>Kelurahan Mangga</p>
-                  <div className="h-20" />
-                  <p className="font-bold underline uppercase">( ............................................ )</p>
+                  <div className="h-16" />
+                  <p className="font-bold underline uppercase">Nur Aisyah Dewi, A.Md</p>
+                  <p className="text-[10px] text-slate-500 font-normal">Sekretaris Tim Penggerak PKK Kelurahan Mangga</p>
                 </div>
               </div>
             </div>

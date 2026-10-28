@@ -28,6 +28,41 @@ import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument } from '../utils/printHelper';
 import { compressMultipleFiles } from '../lib/imageCompressor';
 
+const formatProperWriting = (text: string): string => {
+  if (!text) return '';
+  let formatted = text.replace(/(^\s*|[.!?]\s+)([a-z])/g, (m) => m.toUpperCase());
+  const keywords = [
+    { pattern: /\bpkk\b/gi, replacement: 'PKK' },
+    { pattern: /\btp-pkk\b/gi, replacement: 'TP-PKK' },
+    { pattern: /\blurah\b/gi, replacement: 'Lurah' },
+    { pattern: /\bkelurahan\b/gi, replacement: 'Kelurahan' },
+    { pattern: /\bmangga\b/gi, replacement: 'Mangga' },
+    { pattern: /\bkepling\b/gi, replacement: 'Kepling' },
+    { pattern: /\bkepala lingkungan\b/gi, replacement: 'Kepala Lingkungan' },
+    { pattern: /\btaman pkk\b/gi, replacement: 'Taman PKK' },
+    { pattern: /\btoga\b/gi, replacement: 'TOGA' },
+    { pattern: /\bpoltekkes\b/gi, replacement: 'Poltekkes' },
+    { pattern: /\bkemenkes\b/gi, replacement: 'Kemenkes' },
+    { pattern: /\bpkl\b/gi, replacement: 'PKL' },
+    { pattern: /\bgizi\b/gi, replacement: 'Gizi' },
+    { pattern: /\bdawis\b/gi, replacement: 'Dawis' },
+    { pattern: /\bdasa wisma\b/gi, replacement: 'Dasa Wisma' },
+    { pattern: /\bposyandu\b/gi, replacement: 'Posyandu' },
+  ];
+  keywords.forEach((kw) => {
+    formatted = formatted.replace(kw.pattern, kw.replacement);
+  });
+  return formatted;
+};
+
+const normalizePetugasNama = (name: string): string => {
+  if (!name) return name;
+  if (name.includes('Ny. Sekretaris') || name === 'Ny. Sekretaris PKK Kelurahan Mangga' || name === 'sekretaris_pkk') {
+    return 'Nur Aisyah Dewi, A.Md';
+  }
+  return name;
+};
+
 interface PkkPosyanduViewProps {
   currentUser: UserAccount;
   onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
@@ -352,14 +387,14 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
 
                 {report.posyanduKeterangan && (
                   <p className="text-xs text-slate-600 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    "{report.posyanduKeterangan}"
+                    "{formatProperWriting(report.posyanduKeterangan)}"
                   </p>
                 )}
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-500 font-semibold text-[11px]">
-                  Petugas: {report.namaPetugas}
+                  Petugas: {normalizePetugasNama(report.namaPetugas)}
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -376,12 +411,12 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                             <p class="text-xs font-bold">${report.posyanduNama} — ${report.lingkungan}</p>
                             <p class="text-xs">Tanggal: ${report.tanggal}</p>
                           </div>
-                          <table class="w-full text-xs border-collapse border border-black my-4">
-                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Nama Posyandu</td><td class="p-2 border border-black">${report.posyanduNama}</td></tr>
-                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Lokasi / Lingkungan</td><td class="p-2 border border-black">${report.posyanduLokasi} (${report.lingkungan})</td></tr>
+                          <table class="w-full text-xs border-collapse border border-black my-4 uppercase">
+                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Nama Posyandu</td><td class="p-2 border border-black">${(report.posyanduNama || '').toUpperCase()}</td></tr>
+                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Lokasi / Lingkungan</td><td class="p-2 border border-black">${(report.posyanduLokasi || '').toUpperCase()} (${(report.lingkungan || '').toUpperCase()})</td></tr>
                             <tr><td class="p-2 border border-black font-bold bg-slate-100">Total Warga Dilayani</td><td class="p-2 border border-black font-bold">${report.posyanduJumlahWargaTotal} Orang</td></tr>
-                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Keterangan / Catatan</td><td class="p-2 border border-black">${report.posyanduKeterangan || '-'}</td></tr>
-                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Petugas Pelapor</td><td class="p-2 border border-black">${report.namaPetugas}</td></tr>
+                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Keterangan / Catatan</td><td class="p-2 border border-black">${(report.posyanduKeterangan || '-').toUpperCase()}</td></tr>
+                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Petugas Pelapor</td><td class="p-2 border border-black">${normalizePetugasNama(report.namaPetugas).toUpperCase()}</td></tr>
                           </table>
                         </div>
                       `;

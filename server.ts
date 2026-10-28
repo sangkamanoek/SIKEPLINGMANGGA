@@ -4,7 +4,8 @@ import fs from 'fs';
 import { GoogleGenAI } from '@google/genai';
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const isProd = process.env.NODE_ENV === 'production';
+const PORT = isProd && process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Performance-Optimized Cache Headers: Cache hashed static assets, keep API and HTML fresh
 app.use((req, res, next) => {
@@ -1022,6 +1023,16 @@ app.get('/api/surat', (req, res) => {
   });
 });
 
+app.get('/api/surat/:id', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  const { id } = req.params;
+  const item = suratCache.find((s) => s.id === id);
+  if (!item) {
+    return res.status(404).json({ success: false, message: 'Surat tidak ditemukan' });
+  }
+  return res.json({ success: true, data: item });
+});
+
 app.post('/api/surat', (req, res) => {
   try {
     const rawBody = req.body;
@@ -1957,7 +1968,7 @@ async function startServer() {
   } else {
     console.log('Running in production mode, serving static files from:', distPath);
     app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
+    app.get(/^(?!\/api).*/, (_req, res) => {
       const indexPath = path.join(distPath, 'index.html');
       if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);

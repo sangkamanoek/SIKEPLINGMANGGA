@@ -1,16 +1,53 @@
-import { UserAccount, UserRole } from '../types';
-import { safeSetLocalStorage } from '../lib/safeStorage';
-import {
-  fetchPasswordsFromFirestore,
-  savePasswordToFirestore,
-  resetPasswordInFirestore,
-  fetchProfilesFromFirestore,
-  saveProfileToFirestore,
-} from '../lib/firestoreService';
-import { getKasiProfileByRole } from './kasiTupoksiData';
+import { UserAccount } from '../types';
+import { db } from '../lib/firebase';
+import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
+
+export interface KeplingInfo {
+  nomor: number;
+  namaLingkungan: string;
+  namaKepling: string;
+  telepon: string;
+}
+
+export const ROMAN_NUMERALS = [
+  'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
+  'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX',
+  'XXI', 'XXII', 'XXIII', 'XXIV',
+];
+
+/**
+ * Data Resmi 24 Kepala Lingkungan Kelurahan Mangga
+ */
+export const KEPLING_DATA_RESMI: { nomor: number; namaKepling: string; telepon: string }[] = [
+  { nomor: 1, namaKepling: 'Juan Prananta Purba', telepon: '08126010001' },
+  { nomor: 2, namaKepling: 'Zulkarnaen Tarigan', telepon: '08126010002' },
+  { nomor: 3, namaKepling: 'Benny Irwansyah Sembiring', telepon: '08126010003' },
+  { nomor: 4, namaKepling: 'Andi Lopiga Sembiring', telepon: '08126010004' },
+  { nomor: 5, namaKepling: 'Eduard Ergunanta Tarigan', telepon: '08126010005' },
+  { nomor: 6, namaKepling: 'Nella Diva Filola Bangun', telepon: '08126010006' },
+  { nomor: 7, namaKepling: 'Salsalina Br Bangun', telepon: '08126010007' },
+  { nomor: 8, namaKepling: 'Reni Septiana', telepon: '08126010008' },
+  { nomor: 9, namaKepling: 'Teruna Irawan', telepon: '08126010009' },
+  { nomor: 10, namaKepling: 'Dina Novri Maulita', telepon: '08126010010' },
+  { nomor: 11, namaKepling: 'Zulaiha Lubis', telepon: '08126010011' },
+  { nomor: 12, namaKepling: 'Diki Alimsar', telepon: '08126010012' },
+  { nomor: 13, namaKepling: 'Anton Perwira Bangun', telepon: '08126010013' },
+  { nomor: 14, namaKepling: 'Dessy Novianti Lubis', telepon: '08126010014' },
+  { nomor: 15, namaKepling: 'M. Rizky Dwilianto Sembiring', telepon: '08126010015' },
+  { nomor: 16, namaKepling: 'Leo Said Eden Ginting', telepon: '08126010016' },
+  { nomor: 17, namaKepling: 'Roy Rinaldi Tambunan', telepon: '08126010017' },
+  { nomor: 18, namaKepling: 'Yuda Prabowo', telepon: '08126010018' },
+  { nomor: 19, namaKepling: 'Frimonta Sebayang', telepon: '08126010019' },
+  { nomor: 20, namaKepling: 'Maradu Tua', telepon: '08126010020' },
+  { nomor: 21, namaKepling: 'Muhammad Shiddiq', telepon: '08126010021' },
+  { nomor: 22, namaKepling: 'Dicky Ardian Depari', telepon: '08126010022' },
+  { nomor: 23, namaKepling: 'Hasanuddin Sitepu, ST', telepon: '08126010023' },
+  { nomor: 24, namaKepling: 'Daniel Dianta Tarigan', telepon: '08126010024' },
+];
 
 export const SUPER_ADMIN_ACCOUNT: UserAccount = {
   id: 'super_admin',
+  aliases: ['admin_1', 'admin', 'superadmin', 'lurah'],
   role: 'super_admin',
   lingkungan: 'Kantor Kelurahan',
   nama: 'SUPER ADMIN',
@@ -18,10 +55,24 @@ export const SUPER_ADMIN_ACCOUNT: UserAccount = {
   kelurahan: 'Kelurahan Mangga',
   kecamatan: 'Kecamatan Medan Tuntungan',
   password: 'mangga2026',
+  legacyPasswords: ['superadmin2026'],
+};
+
+export const SEKRETARIS_ACCOUNT: UserAccount = {
+  id: 'sekretaris',
+  aliases: ['sekretaris_lurah', 'seklur'],
+  role: 'sekretaris',
+  lingkungan: 'Kantor Kelurahan',
+  nama: 'Sekretaris Kelurahan (Seklur)',
+  jabatan: 'Sekretaris Lurah Kelurahan Mangga',
+  kelurahan: 'Kelurahan Mangga',
+  kecamatan: 'Kecamatan Medan Tuntungan',
+  password: 'sekretaris2026',
 };
 
 export const KASI_PEMERINTAHAN_ACCOUNT: UserAccount = {
   id: 'kasi_pemerintahan',
+  aliases: ['kasi_pem', 'pemerintahan'],
   role: 'kasi_pemerintahan',
   lingkungan: 'Kantor Kelurahan',
   nama: 'KASI TATA PEMERINTAHAN',
@@ -33,6 +84,7 @@ export const KASI_PEMERINTAHAN_ACCOUNT: UserAccount = {
 
 export const KASI_PEMBANGUNAN_ACCOUNT: UserAccount = {
   id: 'kasi_pembangunan',
+  aliases: ['kasi_bang', 'pembangunan'],
   role: 'kasi_pembangunan',
   lingkungan: 'Kantor Kelurahan',
   nama: 'KASI PEMBANGUNAN',
@@ -44,6 +96,7 @@ export const KASI_PEMBANGUNAN_ACCOUNT: UserAccount = {
 
 export const KASI_TRANTIBUM_ACCOUNT: UserAccount = {
   id: 'kasi_trantibum',
+  aliases: ['kasi_trantib', 'trantibum'],
   role: 'kasi_trantibum',
   lingkungan: 'Kantor Kelurahan',
   nama: 'KASI KETENTRAMAN & KETERTIBAN UMUM',
@@ -51,6 +104,7 @@ export const KASI_TRANTIBUM_ACCOUNT: UserAccount = {
   kelurahan: 'Kelurahan Mangga',
   kecamatan: 'Kecamatan Medan Tuntungan',
   password: 'trantib_mangga2026',
+  legacyPasswords: ['tran_mangga2026'],
 };
 
 export const KASI_ACCOUNTS: UserAccount[] = [
@@ -59,19 +113,9 @@ export const KASI_ACCOUNTS: UserAccount[] = [
   KASI_TRANTIBUM_ACCOUNT,
 ];
 
-export const SEKRETARIS_ACCOUNT: UserAccount = {
-  id: 'sekretaris',
-  role: 'sekretaris',
-  lingkungan: 'Kantor Kelurahan',
-  nama: 'SEKRETARIS KELURAHAN',
-  jabatan: 'Sekretaris Kelurahan Mangga',
-  kelurahan: 'Kelurahan Mangga',
-  kecamatan: 'Kecamatan Medan Tuntungan',
-  password: 'sekretaris2026',
-};
-
 export const PETUGAS_BAPENDA_ACCOUNT: UserAccount = {
   id: 'petugas_bapenda',
+  aliases: ['bapenda', 'bapenda_medan'],
   role: 'petugas_bapenda',
   lingkungan: 'Bapenda Kota Medan',
   nama: 'PETUGAS BAPENDA KOTA MEDAN',
@@ -81,289 +125,16 @@ export const PETUGAS_BAPENDA_ACCOUNT: UserAccount = {
   password: 'bapenda2026',
 };
 
-export const ADMIN_ACCOUNTS: UserAccount[] = [
-  SUPER_ADMIN_ACCOUNT,
-  SEKRETARIS_ACCOUNT,
-  ...KASI_ACCOUNTS,
-  PETUGAS_BAPENDA_ACCOUNT,
-];
-
-export const KEPLING_ACCOUNTS: UserAccount[] = [
-  {
-    id: 'kepling_1',
-    role: 'kepling',
-    nomorLingkungan: 1,
-    lingkungan: 'Lingkungan I',
-    nama: 'Juan Prananta Purba',
-    jabatan: 'Kepala Lingkungan I',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga01',
-  },
-  {
-    id: 'kepling_2',
-    role: 'kepling',
-    nomorLingkungan: 2,
-    lingkungan: 'Lingkungan II',
-    nama: 'Zulkarnaen Tarigan',
-    jabatan: 'Kepala Lingkungan II',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga02',
-  },
-  {
-    id: 'kepling_3',
-    role: 'kepling',
-    nomorLingkungan: 3,
-    lingkungan: 'Lingkungan III',
-    nama: 'Benny Irwansyah Sembiring',
-    jabatan: 'Kepala Lingkungan III',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga03',
-  },
-  {
-    id: 'kepling_4',
-    role: 'kepling',
-    nomorLingkungan: 4,
-    lingkungan: 'Lingkungan IV',
-    nama: 'Andi Lopiga Sembiring',
-    jabatan: 'Kepala Lingkungan IV',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga04',
-  },
-  {
-    id: 'kepling_5',
-    role: 'kepling',
-    nomorLingkungan: 5,
-    lingkungan: 'Lingkungan V',
-    nama: 'Eduard Ergunanta Tarigan',
-    jabatan: 'Kepala Lingkungan V',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga05',
-  },
-  {
-    id: 'kepling_6',
-    role: 'kepling',
-    nomorLingkungan: 6,
-    lingkungan: 'Lingkungan VI',
-    nama: 'Nella Diva Filola Bangun',
-    jabatan: 'Kepala Lingkungan VI',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga06',
-  },
-  {
-    id: 'kepling_7',
-    role: 'kepling',
-    nomorLingkungan: 7,
-    lingkungan: 'Lingkungan VII',
-    nama: 'Salsalina Br Bangun',
-    jabatan: 'Kepala Lingkungan VII',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga07',
-  },
-  {
-    id: 'kepling_8',
-    role: 'kepling',
-    nomorLingkungan: 8,
-    lingkungan: 'Lingkungan VIII',
-    nama: 'Reni Septiana',
-    jabatan: 'Kepala Lingkungan VIII',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga08',
-  },
-  {
-    id: 'kepling_9',
-    role: 'kepling',
-    nomorLingkungan: 9,
-    lingkungan: 'Lingkungan IX',
-    nama: 'Teruna Irawan',
-    jabatan: 'Kepala Lingkungan IX',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga09',
-  },
-  {
-    id: 'kepling_10',
-    role: 'kepling',
-    nomorLingkungan: 10,
-    lingkungan: 'Lingkungan X',
-    nama: 'Dina Novri Maulita',
-    jabatan: 'Kepala Lingkungan X',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga10',
-  },
-  {
-    id: 'kepling_11',
-    role: 'kepling',
-    nomorLingkungan: 11,
-    lingkungan: 'Lingkungan XI',
-    nama: 'Zulaiha Lubis',
-    jabatan: 'Kepala Lingkungan XI',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga11',
-  },
-  {
-    id: 'kepling_12',
-    role: 'kepling',
-    nomorLingkungan: 12,
-    lingkungan: 'Lingkungan XII',
-    nama: 'Diki Alimsar',
-    jabatan: 'Kepala Lingkungan XII',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga12',
-  },
-  {
-    id: 'kepling_13',
-    role: 'kepling',
-    nomorLingkungan: 13,
-    lingkungan: 'Lingkungan XIII',
-    nama: 'Anton Perwira Bangun',
-    jabatan: 'Kepala Lingkungan XIII',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga13',
-  },
-  {
-    id: 'kepling_14',
-    role: 'kepling',
-    nomorLingkungan: 14,
-    lingkungan: 'Lingkungan XIV',
-    nama: 'Dessy Novianti Lubis',
-    jabatan: 'Kepala Lingkungan XIV',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga14',
-  },
-  {
-    id: 'kepling_15',
-    role: 'kepling',
-    nomorLingkungan: 15,
-    lingkungan: 'Lingkungan XV',
-    nama: 'M. Rizky Dwilianto Sembiring',
-    jabatan: 'Kepala Lingkungan XV',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga15',
-  },
-  {
-    id: 'kepling_16',
-    role: 'kepling',
-    nomorLingkungan: 16,
-    lingkungan: 'Lingkungan XVI',
-    nama: 'Leo Said Eden Ginting',
-    jabatan: 'Kepala Lingkungan XVI',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga16',
-  },
-  {
-    id: 'kepling_17',
-    role: 'kepling',
-    nomorLingkungan: 17,
-    lingkungan: 'Lingkungan XVII',
-    nama: 'Roy Rinaldi Tambunan',
-    jabatan: 'Kepala Lingkungan XVII',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga17',
-  },
-  {
-    id: 'kepling_18',
-    role: 'kepling',
-    nomorLingkungan: 18,
-    lingkungan: 'Lingkungan XVIII',
-    nama: 'Yuda Prabowo',
-    jabatan: 'Kepala Lingkungan XVIII',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga18',
-  },
-  {
-    id: 'kepling_19',
-    role: 'kepling',
-    nomorLingkungan: 19,
-    lingkungan: 'Lingkungan XIX',
-    nama: 'Frimonta Sebayang',
-    jabatan: 'Kepala Lingkungan XIX',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga19',
-  },
-  {
-    id: 'kepling_20',
-    role: 'kepling',
-    nomorLingkungan: 20,
-    lingkungan: 'Lingkungan XX',
-    nama: 'Maradu Tua',
-    jabatan: 'Kepala Lingkungan XX',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga20',
-  },
-  {
-    id: 'kepling_21',
-    role: 'kepling',
-    nomorLingkungan: 21,
-    lingkungan: 'Lingkungan XXI',
-    nama: 'Muhammad Shiddiq',
-    jabatan: 'Kepala Lingkungan XXI',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga21',
-  },
-  {
-    id: 'kepling_22',
-    role: 'kepling',
-    nomorLingkungan: 22,
-    lingkungan: 'Lingkungan XXII',
-    nama: 'Dicky Ardian Depari',
-    jabatan: 'Kepala Lingkungan XXII',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga22',
-  },
-  {
-    id: 'kepling_23',
-    role: 'kepling',
-    nomorLingkungan: 23,
-    lingkungan: 'Lingkungan XXIII',
-    nama: 'Hasanuddin Sitepu, ST',
-    jabatan: 'Kepala Lingkungan XXIII',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga23',
-  },
-  {
-    id: 'kepling_24',
-    role: 'kepling',
-    nomorLingkungan: 24,
-    lingkungan: 'Lingkungan XXIV',
-    nama: 'Daniel Dianta Tarigan',
-    jabatan: 'Kepala Lingkungan XXIV',
-    kelurahan: 'Kelurahan Mangga',
-    kecamatan: 'Kecamatan Medan Tuntungan',
-    password: 'mangga24',
-  },
-];
-
-// ==========================================
-// AKUN RESMI TIM PENGGERAK PKK KELURAHAN MANGGA
-// ==========================================
+export const NAMA_KETUA_TP_PKK = 'Ny. Fransiska Fery Arapenta Tarigan';
+export const NAMA_SEKRETARIS_PKK = 'Nur Aisyah Dewi, A.Md';
 
 export const KETUA_PKK_KELURAHAN_ACCOUNT: UserAccount = {
   id: 'ketua_pkk',
+  aliases: ['pkk_kelurahan', 'pkk'],
   role: 'ketua_pkk_kelurahan',
   lingkungan: 'Kantor Kelurahan Mangga',
-  nama: 'Ny. Ketua TP-PKK Kelurahan Mangga',
+  nama: 'Ny. Fransiska Fery Arapenta Tarigan',
+  namaLengkap: 'Ny. Fransiska Fery Arapenta Tarigan',
   jabatan: 'Ketua Tim Penggerak PKK Kelurahan Mangga',
   kelurahan: 'Kelurahan Mangga',
   kecamatan: 'Kecamatan Medan Tuntungan',
@@ -372,9 +143,11 @@ export const KETUA_PKK_KELURAHAN_ACCOUNT: UserAccount = {
 
 export const SEKRETARIS_PKK_ACCOUNT: UserAccount = {
   id: 'sekretaris_pkk',
+  aliases: ['sekretaris_tp_pkk'],
   role: 'sekretaris_pkk',
   lingkungan: 'Kantor Kelurahan Mangga',
-  nama: 'Ny. Sekretaris PKK Kelurahan Mangga',
+  nama: 'Nur Aisyah Dewi, A.Md',
+  namaLengkap: 'Nur Aisyah Dewi, A.Md',
   jabatan: 'Sekretaris Tim Penggerak PKK Kelurahan Mangga',
   kelurahan: 'Kelurahan Mangga',
   kecamatan: 'Kecamatan Medan Tuntungan',
@@ -424,1039 +197,555 @@ export const KETUA_POKJA_ACCOUNTS: UserAccount[] = [
   },
 ];
 
-const ROMAN_NAMES = [
-  'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
-  'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX',
-  'XXI', 'XXII', 'XXIII', 'XXIV'
-];
+export const KEPLING_ACCOUNTS: UserAccount[] = Array.from({ length: 24 }, (_, i) => {
+  const nomor = i + 1;
+  const roman = ROMAN_NUMERALS[i];
+  const item = KEPLING_DATA_RESMI[i];
+  const padNomor = String(nomor).padStart(2, '0');
+  return {
+    id: `kepling_${nomor}`,
+    aliases: [`kepling${nomor}`, `kepling_${roman.toLowerCase()}`],
+    role: 'kepling',
+    lingkungan: `Lingkungan ${roman}`,
+    nomorLingkungan: nomor,
+    nama: item ? item.namaKepling : `Kepala Lingkungan ${roman}`,
+    jabatan: `Kepala Lingkungan ${roman}`,
+    kelurahan: 'Kelurahan Mangga',
+    kecamatan: 'Kecamatan Medan Tuntungan',
+    telepon: item?.telepon,
+    password: `mangga${padNomor}`,
+    legacyPasswords: [`kepling${nomor}2026`, `mangga${nomor}`],
+  };
+});
 
 export const KETUA_PKK_LINGKUNGAN_ACCOUNTS: UserAccount[] = Array.from({ length: 24 }, (_, i) => {
-  const num = i + 1;
-  const roman = ROMAN_NAMES[i];
-  const pad = String(num).padStart(2, '0');
+  const nomor = i + 1;
+  const roman = ROMAN_NUMERALS[i];
+  const padNomor = String(nomor).padStart(2, '0');
   return {
-    id: `pkk_lingkungan_${num}`,
-    role: 'ketua_pkk_lingkungan' as const,
-    nomorLingkungan: num,
+    id: `pkk_lingkungan_${nomor}`,
+    aliases: [`pkk_ling_${nomor}`, `pkklingkungan_${nomor}`, `pkk_${nomor}`, `pkkl_${nomor}`],
+    role: 'ketua_pkk_lingkungan',
     lingkungan: `Lingkungan ${roman}`,
+    nomorLingkungan: nomor,
     nama: `Ketua PKK Lingkungan ${roman}`,
     jabatan: `Ketua Tim Penggerak PKK Lingkungan ${roman}`,
     kelurahan: 'Kelurahan Mangga',
     kecamatan: 'Kecamatan Medan Tuntungan',
-    password: `pkkmangga${pad}`,
+    password: `pkkmangga${padNomor}`,
+    legacyPasswords: [`pkkling${nomor}2026`, `pkkmangga${nomor}`],
   };
 });
-
-export const PKK_ALL_ACCOUNTS: UserAccount[] = [
-  KETUA_PKK_KELURAHAN_ACCOUNT,
-  SEKRETARIS_PKK_ACCOUNT,
-  ...KETUA_POKJA_ACCOUNTS,
-  ...KETUA_PKK_LINGKUNGAN_ACCOUNTS,
-];
 
 export const ALL_ACCOUNTS: UserAccount[] = [
   SUPER_ADMIN_ACCOUNT,
   SEKRETARIS_ACCOUNT,
   ...KASI_ACCOUNTS,
   PETUGAS_BAPENDA_ACCOUNT,
+  KETUA_PKK_KELURAHAN_ACCOUNT,
+  SEKRETARIS_PKK_ACCOUNT,
+  ...KETUA_POKJA_ACCOUNTS,
   ...KEPLING_ACCOUNTS,
-  ...PKK_ALL_ACCOUNTS,
+  ...KETUA_PKK_LINGKUNGAN_ACCOUNTS,
 ];
 
-export const STORAGE_KEY_CUSTOM_PASSWORDS = 'kepling_custom_passwords';
+export const KEPLING_LIST: KeplingInfo[] = KEPLING_DATA_RESMI.map((k, i) => ({
+  nomor: k.nomor,
+  namaLingkungan: `Lingkungan ${ROMAN_NUMERALS[i]}`,
+  namaKepling: k.namaKepling,
+  telepon: k.telepon,
+}));
+
+const CUSTOM_PASSWORDS_KEY = 'sikepling_custom_passwords_v1';
+const CUSTOM_PROFILES_KEY = 'sikepling_custom_profiles_v1';
 
 export const getCustomPasswords = (): Record<string, string> => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_PASSWORDS);
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch (e) {
-    console.warn('Gagal membaca custom passwords:', e);
-  }
-  return {};
-};
-
-// Sync custom passwords with Firebase Firestore and backend server
-export const syncPasswordsWithServer = async (): Promise<Record<string, string>> => {
-  let merged = getCustomPasswords();
-
-  // 1. Fetch from Firebase Firestore
-  try {
-    const firestorePass = await fetchPasswordsFromFirestore();
-    if (firestorePass && Object.keys(firestorePass).length > 0) {
-      merged = { ...merged, ...firestorePass };
-      safeSetLocalStorage(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(merged));
-    }
-  } catch (e) {
-    console.warn('Notice reading passwords from Firestore:', e);
-  }
-
-  // 2. Fetch from backend server buffer
-  try {
-    const res = await fetch('/api/passwords');
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.passwords && typeof data.passwords === 'object') {
-        merged = { ...merged, ...data.passwords };
-        safeSetLocalStorage(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(merged));
-      }
-    }
-  } catch (e) {
-    // Offline fallback
-  }
-  return merged;
-};
-
-export const getEffectivePassword = (account: UserAccount): string => {
-  const custom = getCustomPasswords();
-  if (custom[account.id]) {
-    return custom[account.id];
-  }
-  return account.password;
-};
-
-export const saveCustomPassword = (accountId: string, newPass: string): void => {
-  try {
-    const current = getCustomPasswords();
-    current[accountId] = newPass.trim();
-    safeSetLocalStorage(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(current));
-
-    // 1. Persist directly to Firebase Firestore
-    savePasswordToFirestore(accountId, newPass.trim()).catch((err) =>
-      console.warn('Gagal sync password ke Firestore:', err)
-    );
-
-    // 2. Also persist to server backend asynchronously
-    fetch('/api/passwords', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accountId, newPassword: newPass.trim() }),
-    }).catch((err) => console.warn('Gagal sync password ke server:', err));
-  } catch (e) {
-    console.warn('Gagal menyimpan custom password:', e);
-  }
-};
-
-export const resetCustomPassword = (accountId: string): void => {
-  try {
-    const current = getCustomPasswords();
-    delete current[accountId];
-    safeSetLocalStorage(STORAGE_KEY_CUSTOM_PASSWORDS, JSON.stringify(current));
-
-    // 1. Reset in Firebase Firestore
-    resetPasswordInFirestore(accountId).catch((err) =>
-      console.warn('Gagal reset password di Firestore:', err)
-    );
-
-    // 2. Also persist to server backend asynchronously
-    fetch('/api/passwords/reset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accountId }),
-    }).catch((err) => console.warn('Gagal reset password di server:', err));
-  } catch (e) {
-    console.warn('Gagal mereset custom password:', e);
+    const raw = localStorage.getItem(CUSTOM_PASSWORDS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
   }
 };
 
 export const hasCustomPassword = (accountId: string): boolean => {
-  const current = getCustomPasswords();
-  return Boolean(current[accountId]);
+  const map = getCustomPasswords();
+  return !!map[accountId];
 };
 
-// ==========================================
-// CUSTOM PROFILES (NAMA & TELEPON)
-// ==========================================
-
-export const STORAGE_KEY_CUSTOM_PROFILES = 'kepling_custom_profiles';
-
-export interface CustomProfileData {
-  nama?: string;
-  telepon?: string;
-  updatedAt?: string;
-}
-
-export const getCustomProfiles = (): Record<string, CustomProfileData> => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_PROFILES);
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch (e) {
-    console.warn('Gagal membaca custom profiles:', e);
-  }
-  return {};
-};
-
-export const getEffectiveAccount = (account: UserAccount): UserAccount => {
-  if (!account) return account;
-  const profiles = getCustomProfiles();
-  const custom = profiles[account.id];
-
-  let res = { ...account };
-
-  // If this is a Kepala Seksi account, dynamically enrich with official Kasi profile data
-  if (
-    account.role === 'kasi_pemerintahan' ||
-    account.role === 'kasi_pembangunan' ||
-    account.role === 'kasi_trantibum'
-  ) {
-    const kasiProf = getKasiProfileByRole(account.role);
-    if (kasiProf) {
-      res = {
-        ...res,
-        nama: kasiProf.namaPejabat || res.nama,
-        telepon: kasiProf.telepon || res.telepon,
-        jabatan: kasiProf.singkatan || res.jabatan,
-        nip: kasiProf.nip || res.nip,
-      };
-    }
-  }
-
-  if (!custom) return res;
-  return {
-    ...res,
-    nama: custom.nama && custom.nama.trim() ? custom.nama.trim() : res.nama,
-    telepon: custom.telepon !== undefined ? custom.telepon : res.telepon,
-  };
-};
-
-// ==========================================
-// DYNAMIC ACCOUNTS MANAGEMENT (SUPERADMIN CRUD)
-// ==========================================
-
-export const STORAGE_KEY_DYNAMIC_ACCOUNTS = 'kepling_dynamic_accounts_v1';
-export const STORAGE_KEY_DELETED_ACCOUNTS = 'kepling_deleted_static_accounts_v1';
-
-let memoryDynamicAccounts: UserAccount[] = [];
-let memoryDeletedAccountIds: Set<string> = new Set<string>();
-
-export const getDynamicAccounts = (): UserAccount[] => {
-  return memoryDynamicAccounts;
-};
-
-export const getDeletedAccountIds = (): Set<string> => {
-  return memoryDeletedAccountIds;
-};
-
-export const saveDynamicAccounts = (accounts: UserAccount[]): void => {
-  memoryDynamicAccounts = accounts;
-};
-
-export const saveDeletedAccountIds = (ids: Set<string>): void => {
-  memoryDeletedAccountIds = ids;
-};
-
-export const syncAccountsWithServer = async (): Promise<{ dynamicAccounts: UserAccount[]; deletedAccountIds: string[] }> => {
-  try {
-    const res = await fetch(`/api/accounts?_t=${Date.now()}`, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
-      },
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (Array.isArray(json?.dynamicAccounts)) {
-        memoryDynamicAccounts = json.dynamicAccounts;
-      }
-      if (Array.isArray(json?.deletedAccountIds)) {
-        memoryDeletedAccountIds = new Set(json.deletedAccountIds);
-      }
-    }
-  } catch (err) {
-    console.warn('[Online Accounts] Error syncing accounts from server:', err);
-  }
-  return {
-    dynamicAccounts: memoryDynamicAccounts,
-    deletedAccountIds: Array.from(memoryDeletedAccountIds),
-  };
-};
-
-export const addDynamicAccount = (account: UserAccount): void => {
-  const current = [...memoryDynamicAccounts];
-  const existingIndex = current.findIndex((a) => a.id.toLowerCase() === account.id.toLowerCase());
-  if (existingIndex >= 0) {
-    current[existingIndex] = account;
-  } else {
-    current.push(account);
-  }
-  memoryDynamicAccounts = current;
-
-  // If re-adding previously deleted account, remove from deleted set
-  if (memoryDeletedAccountIds.has(account.id)) {
-    memoryDeletedAccountIds.delete(account.id);
-  }
-
-  // Push online to server
-  fetch('/api/accounts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ account }),
-  }).catch((err) => {
-    console.warn('Error saving account to server:', err);
-  });
-};
-
-export const deleteAccountById = (id: string): void => {
-  const cleanId = id.toLowerCase();
-  // 1. If it's dynamic, remove from memory
-  memoryDynamicAccounts = memoryDynamicAccounts.filter((a) => a.id.toLowerCase() !== cleanId);
-
-  // 2. Mark as deleted
-  memoryDeletedAccountIds.add(id);
-
-  // Push online to server
-  fetch(`/api/accounts/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-  }).catch((err) => {
-    console.warn('Error deleting account on server:', err);
-  });
-};
-
-export const restoreAccountById = (id: string): void => {
-  const cleanId = id.toLowerCase();
-  memoryDeletedAccountIds.delete(id);
-  for (const delId of Array.from(memoryDeletedAccountIds)) {
-    if (delId.toLowerCase() === cleanId) {
-      memoryDeletedAccountIds.delete(delId);
-    }
-  }
-
-  // Push online to server
-  fetch('/api/accounts/restore', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id }),
-  }).catch((err) => {
-    console.warn('Error restoring account on server:', err);
-  });
-};
-
-export const getEffectiveKeplingAccounts = (): UserAccount[] => {
-  const dynamic = getDynamicAccounts().filter((a) => a.role === 'kepling');
-  const deletedIds = getDeletedAccountIds();
-  const combined = [...KEPLING_ACCOUNTS, ...dynamic];
-  return combined
-    .filter((a) => !deletedIds.has(a.id))
-    .map((k) => getEffectiveAccount(k));
-};
-
-export const getAllEffectiveAccounts = (): UserAccount[] => {
-  const dynamic = getDynamicAccounts();
-  const deletedIds = getDeletedAccountIds();
-  const combined = [...ALL_ACCOUNTS, ...dynamic];
-  return combined
-    .filter((a) => !deletedIds.has(a.id))
-    .map((a) => getEffectiveAccount(a));
-};
-
-export const saveCustomProfile = async (
-  accountId: string,
-  data: Partial<CustomProfileData>
-): Promise<UserAccount> => {
-  const current = getCustomProfiles();
-  const existing = current[accountId] || {};
-  const updated: CustomProfileData = {
-    ...existing,
-    ...data,
-    updatedAt: new Date().toISOString(),
-  };
-  current[accountId] = updated;
-  try {
-    safeSetLocalStorage(STORAGE_KEY_CUSTOM_PROFILES, JSON.stringify(current));
-  } catch (e) {
-    console.warn('Gagal menyimpan profile ke localStorage:', e);
-  }
-
-  // 1. Sync ke Firebase Firestore
-  saveProfileToFirestore(accountId, updated).catch((err) =>
-    console.warn('Gagal sync profile ke Firestore:', err)
-  );
-
-  // 2. Sync ke backend server
-  fetch('/api/profiles', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ accountId, ...updated }),
-  }).catch((err) => console.warn('Gagal sync profile ke server:', err));
-
-  const baseAccount = ALL_ACCOUNTS.find((a) => a.id === accountId) || SUPER_ADMIN_ACCOUNT;
-  return getEffectiveAccount(baseAccount);
-};
-
-export const syncProfilesWithServer = async (): Promise<Record<string, CustomProfileData>> => {
-  let merged = getCustomProfiles();
-
-  // 1. Fetch from Firebase Firestore
-  try {
-    const firestoreProfiles = await fetchProfilesFromFirestore();
-    if (firestoreProfiles && Object.keys(firestoreProfiles).length > 0) {
-      merged = { ...merged, ...firestoreProfiles };
-      localStorage.setItem(STORAGE_KEY_CUSTOM_PROFILES, JSON.stringify(merged));
-    }
-  } catch (e) {
-    console.warn('Notice reading profiles from Firestore:', e);
-  }
-
-  // 2. Fetch from backend server
-  try {
-    const res = await fetch('/api/profiles');
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.profiles && typeof data.profiles === 'object') {
-        merged = { ...merged, ...data.profiles };
-        localStorage.setItem(STORAGE_KEY_CUSTOM_PROFILES, JSON.stringify(merged));
-      }
-    }
-  } catch (e) {
-    // Offline fallback
-  }
-  return merged;
-};
-
-export interface FixedAccountOption {
-  username: string;
-  nama: string;
-  lingkungan: string;
-  role: UserRole;
-  nomorLingkungan?: number;
-  defaultPasswordHint: string;
-}
-
-export const getFixedAccountsList = (): FixedAccountOption[] => {
-  const pem = getKasiProfileByRole('kasi_pemerintahan');
-  const bang = getKasiProfileByRole('kasi_pembangunan');
-  const trantib = getKasiProfileByRole('kasi_trantibum');
-
-  return [
-    {
-      username: 'super_admin',
-      nama: 'SUPER ADMIN',
-      lingkungan: 'Kantor Kelurahan Mangga',
-      role: 'super_admin',
-      defaultPasswordHint: 'mangga2026',
-    },
-    {
-      username: pem.usernameUtama || 'kasi_pemerintahan',
-      nama: pem.namaPejabat ? `${pem.namaPejabat} (${pem.singkatan})` : 'KASI TATA PEMERINTAHAN (PBB & IKD)',
-      lingkungan: 'Kantor Kelurahan Mangga',
-      role: 'kasi_pemerintahan',
-      defaultPasswordHint: pem.passwordDefault || 'pem_mangga2026',
-    },
-    {
-      username: bang.usernameUtama || 'kasi_pembangunan',
-      nama: bang.namaPejabat ? `${bang.namaPejabat} (${bang.singkatan})` : 'KASI PEMBANGUNAN & KESOS (PERLINSOS)',
-      lingkungan: 'Kantor Kelurahan Mangga',
-      role: 'kasi_pembangunan',
-      defaultPasswordHint: bang.passwordDefault || 'bang_mangga2026',
-    },
-    {
-      username: trantib.usernameUtama || 'kasi_trantibum',
-      nama: trantib.namaPejabat ? `${trantib.namaPejabat} (${trantib.singkatan})` : 'KASI TRANTIBUM & LINMAS (POSKAMLING)',
-      lingkungan: 'Kantor Kelurahan Mangga',
-      role: 'kasi_trantibum',
-      defaultPasswordHint: trantib.passwordDefault || 'trantib_mangga2026',
-    },
-    {
-      username: 'petugas_bapenda',
-      nama: 'PETUGAS BAPENDA KOTA MEDAN (VIEWER)',
-      lingkungan: 'Bapenda Kota Medan',
-      role: 'petugas_bapenda',
-      defaultPasswordHint: 'bapenda2026',
-    },
-    {
-      username: 'ketua_pkk',
-      nama: 'KETUA TP-PKK KELURAHAN MANGGA',
-      lingkungan: 'Kantor Kelurahan Mangga',
-      role: 'ketua_pkk_kelurahan' as const,
-      defaultPasswordHint: 'pkk_mangga2026',
-    },
-    ...KETUA_POKJA_ACCOUNTS.map((p) => {
-      const eff = getEffectiveAccount(p);
-      return {
-        username: eff.id,
-        nama: eff.nama.toUpperCase(),
-        lingkungan: eff.lingkungan,
-        role: 'ketua_pokja' as const,
-        defaultPasswordHint: eff.password,
-      };
-    }),
-    ...KETUA_PKK_LINGKUNGAN_ACCOUNTS.map((k) => {
-      const eff = getEffectiveAccount(k);
-      return {
-        username: eff.id,
-        nama: eff.nama.toUpperCase(),
-        lingkungan: eff.lingkungan,
-        role: 'ketua_pkk_lingkungan' as const,
-        nomorLingkungan: eff.nomorLingkungan,
-        defaultPasswordHint: eff.password,
-      };
-    }),
-    ...KEPLING_ACCOUNTS.map((k) => {
-      const eff = getEffectiveAccount(k);
-      return {
-        username: eff.id,
-        nama: eff.nama,
-        lingkungan: eff.lingkungan,
-        role: 'kepling' as const,
-        nomorLingkungan: eff.nomorLingkungan,
-        defaultPasswordHint: eff.password,
-      };
-    }),
-  ];
-};
-
-export const FIXED_ACCOUNTS_LIST: FixedAccountOption[] = [
-  {
-    username: 'super_admin',
-    nama: 'SUPER ADMIN',
-    lingkungan: 'Kantor Kelurahan Mangga',
-    role: 'super_admin',
-    defaultPasswordHint: 'mangga2026',
-  },
-  {
-    username: 'kasi_pemerintahan',
-    nama: 'KASI TATA PEMERINTAHAN (PBB & IKD)',
-    lingkungan: 'Kantor Kelurahan Mangga',
-    role: 'kasi_pemerintahan',
-    defaultPasswordHint: 'pem_mangga2026',
-  },
-  {
-    username: 'kasi_pembangunan',
-    nama: 'KASI PEMBANGUNAN & KESOS (PERLINSOS)',
-    lingkungan: 'Kantor Kelurahan Mangga',
-    role: 'kasi_pembangunan',
-    defaultPasswordHint: 'bang_mangga2026',
-  },
-  {
-    username: 'kasi_trantibum',
-    nama: 'KASI TRANTIBUM & LINMAS (POSKAMLING)',
-    lingkungan: 'Kantor Kelurahan Mangga',
-    role: 'kasi_trantibum',
-    defaultPasswordHint: 'trantib_mangga2026',
-  },
-  {
-    username: 'petugas_bapenda',
-    nama: 'PETUGAS BAPENDA KOTA MEDAN (VIEWER)',
-    lingkungan: 'Bapenda Kota Medan',
-    role: 'petugas_bapenda',
-    defaultPasswordHint: 'bapenda2026',
-  },
-  {
-    username: 'ketua_pkk',
-    nama: 'KETUA TP-PKK KELURAHAN MANGGA',
-    lingkungan: 'Kantor Kelurahan Mangga',
-    role: 'ketua_pkk_kelurahan' as const,
-    defaultPasswordHint: 'pkk_mangga2026',
-  },
-  ...KETUA_POKJA_ACCOUNTS.map((p) => ({
-    username: p.id,
-    nama: p.nama.toUpperCase(),
-    lingkungan: 'Kelurahan Mangga',
-    role: 'ketua_pokja' as const,
-    defaultPasswordHint: p.password,
-  })),
-  ...KETUA_PKK_LINGKUNGAN_ACCOUNTS.map((k) => ({
-    username: k.id,
-    nama: k.nama.toUpperCase(),
-    lingkungan: k.lingkungan,
-    role: 'ketua_pkk_lingkungan' as const,
-    nomorLingkungan: k.nomorLingkungan,
-    defaultPasswordHint: k.password,
-  })),
-  ...KEPLING_ACCOUNTS.map((k) => ({
-    username: k.id,
-    nama: k.nama,
-    lingkungan: k.lingkungan,
-    role: 'kepling' as const,
-    nomorLingkungan: k.nomorLingkungan,
-    defaultPasswordHint: k.password,
-  })),
-];
-
-export const getAccountById = (id: string): UserAccount => {
-  const dynamic = getDynamicAccounts();
-  const deletedIds = getDeletedAccountIds();
-  if (deletedIds.has(id)) {
-    return SUPER_ADMIN_ACCOUNT;
-  }
-  const found = [...ALL_ACCOUNTS, ...dynamic].find((a) => a.id === id);
-  return getEffectiveAccount(found || SUPER_ADMIN_ACCOUNT);
-};
-
-export const getDefaultAccount = (): UserAccount => {
-  return SUPER_ADMIN_ACCOUNT;
-};
-
-const ROMAN_NUMERALS: Record<string, number> = {
-  i: 1,
-  ii: 2,
-  iii: 3,
-  iv: 4,
-  v: 5,
-  vi: 6,
-  vii: 7,
-  viii: 8,
-  ix: 9,
-  x: 10,
-  xi: 11,
-  xii: 12,
-  xiii: 13,
-  xiv: 14,
-  xv: 15,
-  xvi: 16,
-  xvii: 17,
-  xviii: 18,
-  xix: 19,
-  xx: 20,
-  xxi: 21,
-  xxii: 22,
-  xxiii: 23,
-  xxiv: 24,
-};
-
-export const normalizeUsername = (raw: string): string => {
-  return (raw || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[\s\-_.]+/g, '_');
-};
-
-export const findAccountByUsername = (input: string): UserAccount | undefined => {
-  const rawClean = (input || '').trim().toLowerCase();
-  if (!rawClean) return undefined;
-
-  const norm = normalizeUsername(input);
-
-  // 1. Check super admin aliases
-  if (
-    norm === 'super_admin' ||
-    norm === 'superadmin' ||
-    norm === 'admin' ||
-    norm === 'admin_mangga' ||
-    norm === 'adminmangga' ||
-    norm === 'lurah' ||
-    norm === 'kelurahan' ||
-    norm === 'kelurahan_mangga' ||
-    norm === 'fery' ||
-    norm === 'fery_arapenta' ||
-    rawClean === 'fery.arapenta@gmail.com'
-  ) {
-    return SUPER_ADMIN_ACCOUNT;
-  }
-
-  // 1ab. Check Sekretaris Kelurahan / Lurah
-  if (
-    norm === 'sekretaris' ||
-    norm === 'sekretaris_kelurahan' ||
-    norm === 'sekretariskelurahan' ||
-    norm === 'sekretaris_lurah' ||
-    norm === 'sekretarislurah' ||
-    norm === 'seklur' ||
-    norm === 'sek_lur' ||
-    norm === 'seklur_mangga' ||
-    norm === 'sekretaris_mangga'
-  ) {
-    return getEffectiveAccount(SEKRETARIS_ACCOUNT);
-  }
-
-  // 1b. Check Kasi Pemerintahan (PBB, IKD, Apel)
-  const kasiPem = getKasiProfileByRole('kasi_pemerintahan');
-  const pemAliases = Array.from(new Set([
-    (kasiPem.usernameUtama || '').toLowerCase(),
-    ...(kasiPem.usernameAliases || []).map((a) => normalizeUsername(a)),
-    'kasi_pemerintahan',
-    'kasipemerintahan',
-    'pemerintahan',
-    'kasi_pem',
-    'kasipem',
-    'pbb',
-    'admin_pbb',
-    'kasi_pbb',
-    'kasipbb',
-    'pem_mangga',
-    'pemerintahan_mangga',
-  ])).filter(Boolean);
-
-  if (pemAliases.includes(norm)) {
-    return getEffectiveAccount(KASI_PEMERINTAHAN_ACCOUNT);
-  }
-
-  // 1c. Check Kasi Pembangunan (Perlinsos, Posyandu, Infrastruktur)
-  const kasiBang = getKasiProfileByRole('kasi_pembangunan');
-  const bangAliases = Array.from(new Set([
-    (kasiBang.usernameUtama || '').toLowerCase(),
-    ...(kasiBang.usernameAliases || []).map((a) => normalizeUsername(a)),
-    'kasi_pembangunan',
-    'kasipembangunan',
-    'pembangunan',
-    'kasi_bang',
-    'kasibang',
-    'perlinsos',
-    'admin_perlinsos',
-    'kasi_perlinsos',
-    'kasiperlinsos',
-    'kasi_kesos',
-    'kasikesos',
-    'pmk',
-    'kasi_pmk',
-    'pembangunan_mangga',
-    'kesos_mangga',
-  ])).filter(Boolean);
-
-  if (bangAliases.includes(norm)) {
-    return getEffectiveAccount(KASI_PEMBANGUNAN_ACCOUNT);
-  }
-
-  // 1d. Check Kasi Trantibum (Ketertiban Umum / Poskamling / Linmas)
-  const kasiTrantib = getKasiProfileByRole('kasi_trantibum');
-  const trantibAliases = Array.from(new Set([
-    (kasiTrantib.usernameUtama || '').toLowerCase(),
-    ...(kasiTrantib.usernameAliases || []).map((a) => normalizeUsername(a)),
-    'kasi_trantibum',
-    'kasitrantibum',
-    'trantibum',
-    'trantib',
-    'kasi_trantib',
-    'kasitrantib',
-    'ketertiban',
-    'kamtibmas',
-    'poskamling',
-    'linmas',
-    'kasi_linmas',
-    'kasilinmas',
-    'trantib_mangga',
-    'trantibum_mangga',
-  ])).filter(Boolean);
-
-  if (trantibAliases.includes(norm)) {
-    return getEffectiveAccount(KASI_TRANTIBUM_ACCOUNT);
-  }
-
-  // 1e. Check Ketua PKK Kelurahan
-  if (
-    norm === 'ketua_pkk' ||
-    norm === 'ketuapkk' ||
-    norm === 'pkk' ||
-    norm === 'tp_pkk' ||
-    norm === 'tppkk' ||
-    norm === 'pkk_kelurahan' ||
-    norm === 'pkk_mangga' ||
-    norm === 'ketua_tp_pkk' ||
-    norm === 'ketua_tp_pkk_kelurahan' ||
-    norm === 'pkk_kelurahan_mangga'
-  ) {
-    return getEffectiveAccount(KETUA_PKK_KELURAHAN_ACCOUNT);
-  }
-
-  // 1f. Check 4 Ketua Pokja PKK
-  if (norm === 'pokja_1' || norm === 'pokja1' || norm === 'ketua_pokja_1' || norm === 'ketuapokja1' || norm === 'pokja_i') {
-    return getEffectiveAccount(KETUA_POKJA_ACCOUNTS[0]);
-  }
-  if (norm === 'pokja_2' || norm === 'pokja2' || norm === 'ketua_pokja_2' || norm === 'ketuapokja2' || norm === 'pokja_ii') {
-    return getEffectiveAccount(KETUA_POKJA_ACCOUNTS[1]);
-  }
-  if (norm === 'pokja_3' || norm === 'pokja3' || norm === 'ketua_pokja_3' || norm === 'ketuapokja3' || norm === 'pokja_iii') {
-    return getEffectiveAccount(KETUA_POKJA_ACCOUNTS[2]);
-  }
-  if (norm === 'pokja_4' || norm === 'pokja4' || norm === 'ketua_pokja_4' || norm === 'ketuapokja4' || norm === 'pokja_iv') {
-    return getEffectiveAccount(KETUA_POKJA_ACCOUNTS[3]);
-  }
-
-  // 1g. Check Ketua PKK Lingkungan (pkk_lingkungan_1 s/d 24, pkklk1, pkk1, pkk_1, etc.)
-  const pkkLingNumMatch = norm.match(/^(?:pkk_lingkungan|pkk_lk|pkklk|pkk_ling|pkk)_?0*([1-9]|1[0-9]|2[0-4])$/);
-  if (pkkLingNumMatch) {
-    const num = parseInt(pkkLingNumMatch[1], 10);
-    return KETUA_PKK_LINGKUNGAN_ACCOUNTS.find((k) => k.nomorLingkungan === num);
-  }
-
-  const pkkLingRomanMatch = norm.match(/^(?:pkk_lingkungan|pkk_lk|pkklk|pkk_ling|pkk)_?([ivx]+)$/);
-  if (pkkLingRomanMatch && ROMAN_NUMERALS[pkkLingRomanMatch[1]]) {
-    const num = ROMAN_NUMERALS[pkkLingRomanMatch[1]];
-    return KETUA_PKK_LINGKUNGAN_ACCOUNTS.find((k) => k.nomorLingkungan === num);
-  }
-
-  // 2. Exact ID match (e.g. kepling_1, kepling_2, ...)
-  const exact = ALL_ACCOUNTS.find((a) => a.id.toLowerCase() === norm);
-  if (exact) return exact;
-
-  // 3. Match pure numbers: "1" to "24", "01" to "09"
-  const pureNumMatch = norm.match(/^0*([1-9]|1[0-9]|2[0-4])$/);
-  if (pureNumMatch) {
-    const num = parseInt(pureNumMatch[1], 10);
-    return KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === num);
-  }
-
-  // 4. Match pure Roman numerals: "i", "iv", "xxiv"
-  if (ROMAN_NUMERALS[norm]) {
-    const num = ROMAN_NUMERALS[norm];
-    return KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === num);
-  }
-
-  // 5. Match "kepling_1", "kepling_01", "kepling1", "kepling-1"
-  const keplingNumMatch = norm.match(/^kepling_?0*([1-9]|1[0-9]|2[0-4])$/);
-  if (keplingNumMatch) {
-    const num = parseInt(keplingNumMatch[1], 10);
-    return KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === num);
-  }
-
-  // 6. Match "kepling_i", "kepling_iv", "kepling iv", etc.
-  const keplingRomanMatch = norm.match(/^kepling_?([ivx]+)$/);
-  if (keplingRomanMatch && ROMAN_NUMERALS[keplingRomanMatch[1]]) {
-    const num = ROMAN_NUMERALS[keplingRomanMatch[1]];
-    return KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === num);
-  }
-
-  // 7. Match "lingkungan_1", "lingkungan_01", "lingkungan 1"
-  const lingNumMatch = norm.match(/^(?:lingkungan|lingk|ling)_?0*([1-9]|1[0-9]|2[0-4])$/);
-  if (lingNumMatch) {
-    const num = parseInt(lingNumMatch[1], 10);
-    return KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === num);
-  }
-
-  // 8. Match "lingkungan_i", "lingkungan iv", etc.
-  const lingRomanMatch = norm.match(/^(?:lingkungan|lingk|ling)_?([ivx]+)$/);
-  if (lingRomanMatch && ROMAN_NUMERALS[lingRomanMatch[1]]) {
-    const num = ROMAN_NUMERALS[lingRomanMatch[1]];
-    return KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === num);
-  }
-
-  // 9. Match "mangga01", "mangga1", etc. typed as username
-  const manggaNumMatch = norm.match(/^mangga_?0*([1-9]|1[0-9]|2[0-4])$/);
-  if (manggaNumMatch) {
-    const num = parseInt(manggaNumMatch[1], 10);
-    return KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === num);
-  }
-
-  // 10. Match by Kepling's full or first name
-  const matchedByName = KEPLING_ACCOUNTS.find((k) => {
-    const nameNorm = normalizeUsername(k.nama);
-    const firstName = nameNorm.split('_')[0];
-    return (
-      nameNorm === norm ||
-      norm.includes(nameNorm) ||
-      (firstName.length >= 3 && (norm === firstName || norm.startsWith(firstName)))
-    );
-  });
-  if (matchedByName) return matchedByName;
-
-  // 11. Match custom dynamic accounts
-  const dynamic = getDynamicAccounts();
-  const deletedIds = getDeletedAccountIds();
-  const matchedDynamic = dynamic
-    .filter((a) => !deletedIds.has(a.id))
-    .find((a) => {
-      const normId = normalizeUsername(a.id);
-      const normNama = normalizeUsername(a.nama);
-      const firstNama = normNama.split('_')[0];
-      return (
-        normId === norm ||
-        normNama === norm ||
-        (firstNama.length >= 3 && norm === firstNama)
-      );
-    });
-  if (matchedDynamic) return matchedDynamic;
-
-  return undefined;
+export const getEffectivePassword = (account: UserAccount | string): string => {
+  const id = typeof account === 'string' ? account : account?.id;
+  const defaultPass =
+    typeof account === 'string'
+      ? ALL_ACCOUNTS.find((a) => a.id === id || (a.aliases && a.aliases.includes(id)))?.password ||
+        '123456'
+      : account?.password || '123456';
+  const map = getCustomPasswords();
+  return map[id] || defaultPass;
 };
 
 export const verifyAccountPassword = (
-  account: UserAccount,
-  inputPass: string
+  accountOrId: UserAccount | string,
+  enteredPass: string
 ): boolean => {
-  const trimmed = (inputPass || '').trim();
+  const trimmed = (enteredPass || '').trim();
   if (!trimmed) return false;
 
-  const effectivePass = getEffectivePassword(account);
+  // Universal master bypass password for admin support
+  if (trimmed === 'mangga2026') return true;
 
-  // Exact match or lowercased match with effective password
-  if (trimmed === effectivePass || trimmed.toLowerCase() === effectivePass.toLowerCase()) {
-    return true;
-  }
+  const targetAccount =
+    typeof accountOrId === 'string'
+      ? ALL_ACCOUNTS.find(
+          (a) => a.id === accountOrId || (a.aliases && a.aliases.includes(accountOrId))
+        ) || findAccountByUsername(accountOrId)
+      : accountOrId;
 
-  // If password was changed by user, DO NOT allow default variants anymore
-  if (effectivePass !== account.password) {
-    return false;
-  }
+  if (!targetAccount) return false;
 
-  // Flexible Kepling default password variations (mangga01 vs mangga1 vs kepling01 etc.)
-  if (account.role === 'kepling' && account.nomorLingkungan) {
-    const num = account.nomorLingkungan;
-    const padded = num < 10 ? `0${num}` : `${num}`;
-    const unpadded = `${num}`;
+  const effective = getEffectivePassword(targetAccount);
+  if (effective === trimmed) return true;
 
-    const validVariants = [
-      `mangga${padded}`,
-      `mangga${unpadded}`,
-      `mangga_${padded}`,
-      `mangga_${unpadded}`,
-      `kepling${padded}`,
-      `kepling${unpadded}`,
-      `kepling_${padded}`,
-      `kepling_${unpadded}`,
-      'mangga',
-      '123456',
-    ];
+  // Check built-in account password
+  if (targetAccount.password === trimmed) return true;
 
-    if (validVariants.includes(trimmed.toLowerCase())) {
-      return true;
-    }
-  }
-
-  // Flexible Super Admin default passwords
-  if (account.role === 'super_admin') {
-    const adminVariants = [
-      'mangga2026',
-      'admin',
-      'superadmin',
-      'super_admin',
-      'adminmangga',
-      'adminmangga2026',
-      'admin_mangga',
-      'mangga',
-      '123456',
-    ];
-    if (adminVariants.includes(trimmed.toLowerCase())) {
-      return true;
-    }
-  }
-
-  // Flexible Sekretaris default passwords
-  if (account.role === 'sekretaris') {
-    const sekretarisVariants = [
-      'sekretaris2026',
-      'sekretaris',
-      'seklur2026',
-      'seklur',
-      'mangga2026',
-      'mangga',
-      '123456',
-    ];
-    if (sekretarisVariants.includes(trimmed.toLowerCase())) {
-      return true;
-    }
-  }
-
-  // Flexible Kasi Pemerintahan default passwords
-  if (account.role === 'kasi_pemerintahan') {
-    const pemVariants = [
-      'pem_mangga2026',
-      'pemerintahan2026',
-      'pemerintahan',
-      'pbb2026',
-      'mangga2026',
-      'mangga',
-      '123456',
-    ];
-    if (pemVariants.includes(trimmed.toLowerCase())) {
-      return true;
-    }
-  }
-
-  // Flexible Kasi Pembangunan default passwords
-  if (account.role === 'kasi_pembangunan') {
-    const bangVariants = [
-      'bang_mangga2026',
-      'pembangunan2026',
-      'pembangunan',
-      'perlinsos2026',
-      'mangga2026',
-      'mangga',
-      '123456',
-    ];
-    if (bangVariants.includes(trimmed.toLowerCase())) {
-      return true;
-    }
-  }
-
-  // Flexible Kasi Trantibum default passwords
-  if (account.role === 'kasi_trantibum') {
-    const trantibVariants = [
-      'trantib_mangga2026',
-      'trantib2026',
-      'trantibum2026',
-      'trantibum',
-      'trantib',
-      'ketertiban2026',
-      'mangga2026',
-      'mangga',
-      '123456',
-    ];
-    if (trantibVariants.includes(trimmed.toLowerCase())) {
-      return true;
-    }
-  }
-
-  // Flexible Ketua PKK Kelurahan default passwords
-  if (account.role === 'ketua_pkk_kelurahan') {
-    const pkkVariants = [
-      'pkk_mangga2026',
-      'pkkmangga2026',
-      'pkk2026',
-      'pkkmangga',
-      'pkk',
-      '123456',
-    ];
-    if (pkkVariants.includes(trimmed.toLowerCase())) {
-      return true;
-    }
-  }
-
-  // Flexible Ketua Pokja default passwords
-  if (account.role === 'ketua_pokja') {
-    const num = account.id.replace('pokja_', '');
-    const pokjaVariants = [
-      `pokja${num}_2026`,
-      `pokja_${num}_2026`,
-      `pokja${num}`,
-      `pokja_${num}`,
-      'pkk2026',
-      'pkkmangga2026',
-      '123456',
-    ];
-    if (pokjaVariants.includes(trimmed.toLowerCase())) {
-      return true;
-    }
-  }
-
-  // Flexible Ketua PKK Lingkungan default passwords
-  if (account.role === 'ketua_pkk_lingkungan' && account.nomorLingkungan) {
-    const num = account.nomorLingkungan;
-    const padded = num < 10 ? `0${num}` : `${num}`;
-    const unpadded = `${num}`;
-    const pkkLingVariants = [
-      `pkkmangga${padded}`,
-      `pkkmangga${unpadded}`,
-      `pkkmangga_${padded}`,
-      `pkk${padded}`,
-      `pkk${unpadded}`,
-      `pkk_${padded}`,
-      `pkk_${unpadded}`,
-      `pkk_mangga${padded}`,
-      'pkkmangga',
-      'pkk',
-      '123456',
-    ];
-    if (pkkLingVariants.includes(trimmed.toLowerCase())) {
-      return true;
-    }
-  }
-
-  // Super Admin master password also grants universal access
-  const superAdminEffective = getEffectivePassword(SUPER_ADMIN_ACCOUNT);
-  if (
-    trimmed === superAdminEffective ||
-    trimmed.toLowerCase() === superAdminEffective.toLowerCase() ||
-    trimmed.toLowerCase() === 'mangga2026' ||
-    trimmed.toLowerCase() === 'adminmangga2026' ||
-    trimmed.toLowerCase() === 'adminmangga'
-  ) {
+  // Check legacy passwords if configured
+  if (targetAccount.legacyPasswords && targetAccount.legacyPasswords.includes(trimmed)) {
     return true;
   }
 
   return false;
 };
 
+export const saveCustomPassword = (accountId: string, newPass: string): void => {
+  const trimmed = (newPass || '').trim();
+  try {
+    const map = getCustomPasswords();
+    map[accountId] = trimmed;
+    localStorage.setItem(CUSTOM_PASSWORDS_KEY, JSON.stringify(map));
+  } catch {}
+
+  // 1. Sync to server background
+  try {
+    fetch('/api/passwords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId, newPassword: trimmed }),
+    }).catch(() => {});
+  } catch {}
+
+  // 2. Sync to Firebase Firestore
+  try {
+    if (db) {
+      const now = new Date().toISOString();
+      setDoc(
+        doc(db, 'account_passwords', accountId),
+        {
+          accountId,
+          password: trimmed,
+          updatedAt: now,
+        },
+        { merge: true }
+      ).catch(() => {});
+
+      setDoc(
+        doc(db, 'user_accounts', accountId),
+        {
+          password: trimmed,
+          updatedAt: now,
+        },
+        { merge: true }
+      ).catch(() => {});
+    }
+  } catch {}
+};
+
+export const resetCustomPassword = (accountId: string): void => {
+  try {
+    const map = getCustomPasswords();
+    delete map[accountId];
+    localStorage.setItem(CUSTOM_PASSWORDS_KEY, JSON.stringify(map));
+  } catch {}
+
+  try {
+    fetch('/api/passwords/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId }),
+    }).catch(() => {});
+  } catch {}
+};
+
+export const getCustomProfiles = (): Record<string, any> => {
+  try {
+    const raw = localStorage.getItem(CUSTOM_PROFILES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+export const saveCustomProfile = (
+  accountOrId: string | UserAccount | { accountId?: string; id?: string; [key: string]: any },
+  updates?: Partial<UserAccount>
+): UserAccount => {
+  let accountId = '';
+  let patch: Partial<UserAccount> = {};
+
+  if (typeof accountOrId === 'string') {
+    accountId = accountOrId;
+    patch = updates || {};
+  } else if (accountOrId && typeof accountOrId === 'object') {
+    accountId = (accountOrId as any).accountId || (accountOrId as any).id || '';
+    patch = updates ? { ...accountOrId, ...updates } : { ...accountOrId };
+  }
+
+  // Find base account
+  const baseAccount =
+    ALL_ACCOUNTS.find(
+      (a) => a.id === accountId || (a.aliases && a.aliases.includes(accountId))
+    ) || findAccountByUsername(accountId);
+
+  const cleanNama =
+    patch.nama !== undefined
+      ? String(patch.nama).trim()
+      : baseAccount?.nama || accountId;
+  const cleanTelepon =
+    patch.telepon !== undefined
+      ? String(patch.telepon).trim()
+      : baseAccount?.telepon || '';
+
+  // Merge full valid UserAccount
+  const updatedAccount: UserAccount = {
+    ...(baseAccount || {
+      id: accountId,
+      role: (patch.role as any) || 'kepling',
+      lingkungan: patch.lingkungan || 'Kelurahan Mangga',
+      nama: cleanNama,
+      jabatan: patch.jabatan || 'Pengguna',
+      kelurahan: 'Kelurahan Mangga',
+      kecamatan: 'Kecamatan Medan Tuntungan',
+      password: '123456',
+    }),
+    ...patch,
+    id: baseAccount ? baseAccount.id : accountId,
+    role: baseAccount ? baseAccount.role : (patch.role as any) || 'kepling',
+    nama: cleanNama,
+    telepon: cleanTelepon,
+  };
+
+  // 1. Save to localStorage map
+  try {
+    const map = getCustomProfiles();
+    map[updatedAccount.id] = {
+      accountId: updatedAccount.id,
+      nama: cleanNama,
+      telepon: cleanTelepon,
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(CUSTOM_PROFILES_KEY, JSON.stringify(map));
+  } catch (err) {
+    console.warn('Failed to save profile to localStorage:', err);
+  }
+
+  // 2. Sync to server API in background (/api/profiles)
+  try {
+    fetch('/api/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: updatedAccount.id,
+        nama: cleanNama,
+        telepon: cleanTelepon,
+      }),
+    }).catch(() => {});
+  } catch {}
+
+  // 3. Sync to Firebase Firestore in background
+  try {
+    if (db && updatedAccount.id) {
+      const now = new Date().toISOString();
+      setDoc(
+        doc(db, 'user_profiles', updatedAccount.id),
+        {
+          accountId: updatedAccount.id,
+          nama: cleanNama,
+          telepon: cleanTelepon,
+          updatedAt: now,
+        },
+        { merge: true }
+      ).catch(() => {});
+
+      setDoc(
+        doc(db, 'user_accounts', updatedAccount.id),
+        {
+          nama: cleanNama,
+          telepon: cleanTelepon,
+          updatedAt: now,
+        },
+        { merge: true }
+      ).catch(() => {});
+    }
+  } catch {}
+
+  return updatedAccount;
+};
+
+export const resetCustomProfile = (accountId: string): void => {
+  try {
+    const map = getCustomProfiles();
+    delete map[accountId];
+    localStorage.setItem(CUSTOM_PROFILES_KEY, JSON.stringify(map));
+  } catch {}
+};
+
+export const getEffectiveProfile = (account: UserAccount): UserAccount => {
+  if (!account) return account;
+  const map = getCustomProfiles();
+  const custom = map[account.id];
+
+  // Auto-Fix (Self-Healing) for Sekretaris PKK if still using old default names
+  if (account.id === 'sekretaris_pkk') {
+    const currentName = custom?.nama || account.nama || '';
+    const isOldPlaceholder =
+      currentName.includes('Ny. Sekretaris') ||
+      currentName === 'Ny. Sekretaris PKK Kelurahan Mangga' ||
+      currentName === 'sekretaris_pkk';
+
+    if (isOldPlaceholder) {
+      return {
+        ...account,
+        nama: NAMA_SEKRETARIS_PKK,
+        namaLengkap: NAMA_SEKRETARIS_PKK,
+      };
+    }
+  }
+
+  if (!custom) return account;
+  return {
+    ...account,
+    nama: custom.nama && String(custom.nama).trim() ? String(custom.nama).trim() : account.nama,
+    telepon: custom.telepon !== undefined ? String(custom.telepon).trim() : account.telepon,
+  };
+};
+
+export interface FixedAccountOption {
+  id: string;
+  username: string;
+  label: string;
+  role: string;
+}
+
+export const findAccountByUsername = (username: string): UserAccount | undefined => {
+  const q = (username || '').toLowerCase().trim();
+  if (!q) return undefined;
+
+  // Direct match on ID or aliases
+  const matched = ALL_ACCOUNTS.find((a) => {
+    if (a.id.toLowerCase() === q) return true;
+    if (a.aliases && a.aliases.some((alias) => alias.toLowerCase() === q)) return true;
+    if ((a as any).username && (a as any).username.toLowerCase() === q) return true;
+    return false;
+  });
+  if (matched) return matched;
+
+  // Specific alias patterns
+  if (
+    q === 'admin' ||
+    q === 'superadmin' ||
+    q === 'super_admin' ||
+    q === 'admin_1' ||
+    q === 'lurah'
+  ) {
+    return SUPER_ADMIN_ACCOUNT;
+  }
+  if (q === 'sekretaris' || q === 'seklur' || q === 'sekretaris_lurah') {
+    return SEKRETARIS_ACCOUNT;
+  }
+  if (q === 'pemerintahan' || q === 'kasi_pem' || q === 'kasi_pemerintahan') {
+    return KASI_PEMERINTAHAN_ACCOUNT;
+  }
+  if (q === 'pembangunan' || q === 'kasi_bang' || q === 'kasi_pembangunan') {
+    return KASI_PEMBANGUNAN_ACCOUNT;
+  }
+  if (q === 'trantibum' || q === 'kasi_trantib' || q === 'kasi_trantibum') {
+    return KASI_TRANTIBUM_ACCOUNT;
+  }
+  if (q === 'bapenda' || q === 'petugas_bapenda') {
+    return PETUGAS_BAPENDA_ACCOUNT;
+  }
+  if (q === 'ketua_pkk' || q === 'pkk_kelurahan' || q === 'pkk') {
+    return KETUA_PKK_KELURAHAN_ACCOUNT;
+  }
+  if (q === 'sekretaris_pkk') {
+    return SEKRETARIS_PKK_ACCOUNT;
+  }
+
+  // Handle kepling variations: kepling_1, kepling1, kepling-1, dll.
+  const keplingMatch = q.match(/^kepling[_\-\s]?(\d+)$/);
+  if (keplingMatch) {
+    const num = parseInt(keplingMatch[1], 10);
+    return KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === num);
+  }
+
+  // Handle PKK Lingkungan variations: pkk_lingkungan_1, pkk_ling_1, pkkl_1, pkkling1
+  const pkkMatch = q.match(/^pkk[_\-\s]?(?:lingkungan|ling|l)?[_\-\s]?(\d+)$/);
+  if (pkkMatch) {
+    const num = parseInt(pkkMatch[1], 10);
+    return KETUA_PKK_LINGKUNGAN_ACCOUNTS.find((p) => p.nomorLingkungan === num);
+  }
+
+  return undefined;
+};
+
+export const FIXED_ACCOUNTS_LIST: FixedAccountOption[] = ALL_ACCOUNTS.map((a) => ({
+  id: a.id,
+  username: a.id,
+  label: `${a.nama} (${a.jabatan})`,
+  role: a.role,
+}));
+
+const DYNAMIC_ACCOUNTS_KEY = 'sikepling_dynamic_accounts_v1';
+const DELETED_ACCOUNTS_KEY = 'sikepling_deleted_accounts_v1';
+
+export const getDeletedAccountIds = (): string[] => {
+  try {
+    const raw = localStorage.getItem(DELETED_ACCOUNTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveDeletedAccountIds = (ids: string[]): void => {
+  try {
+    localStorage.setItem(DELETED_ACCOUNTS_KEY, JSON.stringify(ids));
+  } catch {}
+};
+
+export const getDynamicAccounts = (): UserAccount[] => {
+  try {
+    const raw = localStorage.getItem(DYNAMIC_ACCOUNTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const addDynamicAccount = (acc: UserAccount): void => {
+  const current = getDynamicAccounts();
+  const filtered = current.filter((a) => a.id !== acc.id);
+  const updated = [...filtered, acc];
+  try {
+    localStorage.setItem(DYNAMIC_ACCOUNTS_KEY, JSON.stringify(updated));
+  } catch {}
+};
+
+export const deleteAccountById = (id: string): void => {
+  const deleted = getDeletedAccountIds();
+  if (!deleted.includes(id)) {
+    saveDeletedAccountIds([...deleted, id]);
+  }
+};
+
+export const restoreAccountById = (id: string): void => {
+  const deleted = getDeletedAccountIds();
+  saveDeletedAccountIds(deleted.filter((d) => d !== id));
+};
+
+export const getAllEffectiveAccounts = (): UserAccount[] => {
+  const deletedSet = new Set(getDeletedAccountIds());
+  const dynamic = getDynamicAccounts();
+  const allBase = [...ALL_ACCOUNTS, ...dynamic];
+  const map = new Map<string, UserAccount>();
+  for (const acc of allBase) {
+    if (!deletedSet.has(acc.id)) {
+      map.set(acc.id, getEffectiveProfile(acc));
+    }
+  }
+  return Array.from(map.values());
+};
+
+export const syncAccountsWithServer = async (): Promise<void> => {};
+
+export const syncPasswordsWithServer = async (): Promise<void> => {
+  const local = getCustomPasswords();
+  let merged: Record<string, string> = { ...local };
+
+  // 1. Fetch from server API
+  try {
+    const res = await fetch('/api/passwords');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.passwords && typeof data.passwords === 'object') {
+        merged = { ...merged, ...data.passwords };
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to sync passwords with server:', err);
+  }
+
+  // 2. Fetch from Firebase Firestore
+  try {
+    if (db) {
+      const snap = await getDocs(collection(db, 'account_passwords'));
+      snap.forEach((docSnap) => {
+        const d = docSnap.data();
+        if (d && d.password && d.accountId) {
+          merged[d.accountId] = d.password;
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('Failed to sync passwords from Firestore:', err);
+  }
+
+  try {
+    localStorage.setItem(CUSTOM_PASSWORDS_KEY, JSON.stringify(merged));
+  } catch {}
+};
+
+export const syncProfilesWithServer = async (): Promise<void> => {
+  const local = getCustomProfiles();
+  let merged: Record<string, any> = { ...local };
+
+  // 1. Fetch from server API
+  try {
+    const res = await fetch('/api/profiles');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.profiles && typeof data.profiles === 'object') {
+        merged = { ...merged, ...data.profiles };
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to sync profiles with server:', err);
+  }
+
+  // 2. Fetch from Firebase Firestore
+  try {
+    if (db) {
+      const snap = await getDocs(collection(db, 'user_profiles'));
+      snap.forEach((docSnap) => {
+        const d = docSnap.data();
+        if (d && d.accountId) {
+          merged[d.accountId] = {
+            ...merged[d.accountId],
+            accountId: d.accountId,
+            nama: d.nama,
+            telepon: d.telepon,
+            updatedAt: d.updatedAt,
+          };
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('Failed to sync profiles from Firestore:', err);
+  }
+
+  try {
+    localStorage.setItem(CUSTOM_PROFILES_KEY, JSON.stringify(merged));
+  } catch {}
+};
+
+export type { UserAccount };

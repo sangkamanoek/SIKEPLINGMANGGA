@@ -10,21 +10,22 @@
       "DOM.Iterable"
     ],
     "skipLibCheck": true,
+    "strict": false,
+    "noImplicitAny": false,
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
+    "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["src/*"]
     },
     "types": [
       "vite/client",
       "vite-plugin-pwa/client"
     ],
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": false
   }
 }

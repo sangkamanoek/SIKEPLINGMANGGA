@@ -524,8 +524,8 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
           <div className="bg-slate-900 text-white p-3 rounded-2xl border border-emerald-500/40 flex items-center justify-between text-[11px]">
             <span className="font-bold text-emerald-300">"Satu Laporan Nyata untuk Pelayanan Masyarakat Kelurahan Mangga"</span>
             <div className="flex gap-1.5">
-              <span className="bg-[#991B1B] text-white px-2 py-0.5 rounded text-[9px] font-bold">#MEDANUNTUKSEMUA</span>
-              <span className="bg-[#1E3A8A] text-white px-2 py-0.5 rounded text-[9px] font-bold">#SEMUAUNTUKMEDAN</span>
+              <span className="bg-emerald-800 text-white px-2 py-0.5 rounded text-[9px] font-bold">#SIKEPLINGMANGGA</span>
+              <span className="bg-blue-800 text-white px-2 py-0.5 rounded text-[9px] font-bold">#KELURAHANMANGGA</span>
             </div>
           </div>
         </div>
@@ -589,7 +589,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
         { text: `Rilis Pembaruan: ${CURRENT_RELEASE_DATE} • Edisi Terpadu Modern Digital`, options: { fontSize: 10, italic: true, color: '94A3B8' } }
       ], { x: 2.6, y: 4.9, w: 8.13, h: 1.2, align: 'center' });
 
-      s1.addText('#MEDANUNTUKSEMUA  •  #SEMUAUNTUKMEDAN', {
+      s1.addText('#SIKEPLINGMANGGA  •  #KELURAHANMANGGA', {
         x: 1.0, y: 6.8, w: 11.33, h: 0.4,
         fontSize: 12, bold: true, color: '34D399', align: 'center', charSpacing: 2
       });
@@ -626,7 +626,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
           x: 0.8, y: 7.15, w: 8.0, h: 0.3,
           fontSize: 9, bold: true, color: '64748B'
         });
-        slide.addText('#MEDANUNTUKSEMUA  #SEMUAUNTUKMEDAN', {
+        slide.addText('#SIKEPLINGMANGGA  #KELURAHANMANGGA', {
           x: 9.0, y: 7.15, w: 3.5, h: 0.3,
           fontSize: 9, bold: true, color: '059669', align: 'right'
         });
@@ -1034,7 +1034,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
         fontSize: 18, italic: true, bold: true, color: 'A7F3D0', align: 'center'
       });
 
-      s12.addText('#MEDANUNTUKSEMUA  •  #SEMUAUNTUKMEDAN', {
+      s12.addText('#SIKEPLINGMANGGA  •  #KELURAHANMANGGA', {
         x: 1.0, y: 6.2, w: 11.33, h: 0.4,
         fontSize: 14, bold: true, color: 'FFFFFF', align: 'center', charSpacing: 2
       });
@@ -1052,7 +1052,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
   const slide = slidesData[currentSlide];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+    <div className="modal-preview p-2 sm:p-4 md:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
       <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-slate-200/80 animate-scale-up">
         
         {/* Header Modal */}
@@ -1121,9 +1121,9 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
             <div className="bg-slate-50 border-t border-slate-200/80 px-5 py-2.5 flex items-center justify-between text-[11px] text-slate-500 shrink-0">
               <span className="font-bold uppercase tracking-tight text-[10px]">SI-MANGGA • SISTEM INFORMASI & ADMINISTRASI KELURAHAN MANGGA</span>
               <div className="flex items-center gap-2 font-bold">
-                <span className="text-[#991B1B]">#MEDANUNTUKSEMUA</span>
+                <span className="text-emerald-800">#SIKEPLINGMANGGA</span>
                 <span className="text-slate-300">•</span>
-                <span className="text-[#1E3A8A]">#SEMUAUNTUKMEDAN</span>
+                <span className="text-blue-800">#KELURAHANMANGGA</span>
               </div>
             </div>
 

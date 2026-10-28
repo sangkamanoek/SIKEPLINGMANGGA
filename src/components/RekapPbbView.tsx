@@ -2009,7 +2009,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
       {/* SUB-TAB 1: REKAPITULASI LINGKUNGAN */}
       {activeSubTab === 'rekap_lingkungan' && (
-        <div id="lembar-cetak-rekap-pbb" className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-5 space-y-4">
+        <div id="lembar-cetak-rekap-pbb" className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-5 space-y-4 uppercase">
           <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
             <div className="flex items-center gap-2">
               <SlidersHorizontal className="w-4 h-4 text-slate-500" />

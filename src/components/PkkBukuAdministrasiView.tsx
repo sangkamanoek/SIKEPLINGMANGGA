@@ -235,7 +235,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
     try {
       if (activeBook === 1) {
         const item: PkkBuku1Anggota = {
-          id: editingItem?.id || '',
+          id: editingItem?.id || 'b1_' + Date.now(),
           nama: b1Nama,
           jabatan: b1Jabatan,
           jenisKelamin: b1Gender,
@@ -256,19 +256,19 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
         // Agenda Surat Masuk/Keluar
         const isMasuk = b2Jenis === 'SURAT_MASUK';
         const item: SuratKedinasanItem = {
-          id: editingItem?.id || '',
+          id: editingItem?.id || 'surat_' + Date.now(),
           nomorSurat: b2Nomor,
           tanggalSurat: b2Tanggal,
           jenisSurat: b2Jenis,
           perihal: b2Perihal,
-          asalSurat: isMasuk ? b2AsalTujuan : 'Sekretaris PKK Kelurahan Mangga',
+          asalSurat: isMasuk ? b2AsalTujuan : 'Nur Aisyah Dewi, A.Md (Sekretaris Tim Penggerak PKK)',
           tujuanSurat: isMasuk ? 'PKK Kelurahan Mangga' : b2AsalTujuan,
           sifat: 'BIASA',
           status: 'DISETUJUI',
           isiRingkas: b2Keterangan,
           fileUrl: b2FileUrl,
           fileName: b2FileName,
-          penandatangan: 'Ketua TP-PKK Kelurahan Mangga',
+          penandatangan: 'Ny. Fransiska Fery Arapenta Tarigan (Ketua Tim Penggerak PKK)',
           createdAt: editingItem?.createdAt || new Date().toISOString(),
         };
         await saveSuratItem(item);
@@ -290,7 +290,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       } else if (activeBook === 4) {
         // Notulen
         const item: PkkBuku4Notulen = {
-          id: editingItem?.id || '',
+          id: editingItem?.id || 'b4_' + Date.now(),
           tanggalRapat: b4Tanggal,
           agenda: b4Agenda,
           pimpinanRapat: b4Pimpinan,
@@ -303,7 +303,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       } else if (activeBook === 5) {
         // Inventaris
         const item: PkkBuku5Inventaris = {
-          id: editingItem?.id || '',
+          id: editingItem?.id || 'b5_' + Date.now(),
           namaBarang: b5Nama,
           asalBarang: b5Asal,
           tanggalPerolehan: b5Tanggal,
@@ -522,7 +522,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       </div>
 
       {/* Main Data Table Area (Printable with Official Kop Surat) */}
-      <div id="lembar-cetak-buku-pkk" className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden p-4 sm:p-6">
+      <div id="lembar-cetak-buku-pkk" className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden p-4 sm:p-6 uppercase">
         {/* Printable Kop Surat - Only Visible when printing or formatted */}
         <div className="hidden print:block mb-4">
           <KopSuratPkk />
@@ -1067,7 +1067,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                     </div>
                     <div className="space-y-1">
                       <label className="font-extrabold text-slate-700">Pimpinan Pertemuan</label>
-                      <input type="text" value={b4Pimpinan} onChange={(e) => setB4Pimpinan(e.target.value)} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="cth. Ketua TP-PKK Kelurahan" />
+                      <input type="text" value={b4Pimpinan} onChange={(e) => setB4Pimpinan(e.target.value)} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="cth. Ny. Fransiska Fery Arapenta Tarigan (Ketua Tim Penggerak PKK)" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">

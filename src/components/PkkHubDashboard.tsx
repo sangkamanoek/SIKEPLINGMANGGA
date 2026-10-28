@@ -21,7 +21,7 @@ import {
   Layers,
   Baby,
   RefreshCw,
-  CloudUpload,
+  UploadCloud as CloudUpload,
   Database,
   Smartphone,
   X,
@@ -50,6 +50,14 @@ interface PkkHubDashboardProps {
   onNavigateTab: (tab: 'keuangan_pkk' | 'kegiatan_pkk' | 'dasa_wisma' | 'posyandu_pkk') => void;
   onOpenUpdateModal?: () => void;
 }
+
+const normalizePelaporNama = (name: string): string => {
+  if (!name) return name;
+  if (name.includes('Ny. Sekretaris') || name === 'Ny. Sekretaris PKK Kelurahan Mangga' || name === 'sekretaris_pkk') {
+    return 'Nur Aisyah Dewi, A.Md';
+  }
+  return name;
+};
 
 export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
   currentUser,
@@ -134,7 +142,10 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
   // Determine user title badge
   const userRoleLabel = useMemo(() => {
     if (currentUser.role === 'ketua_pkk_kelurahan') {
-      return 'Ketua TP-PKK Kelurahan';
+      return 'Ketua Tim Penggerak PKK Kelurahan';
+    }
+    if (currentUser.role === 'sekretaris_pkk') {
+      return 'Sekretaris Tim Penggerak PKK Kelurahan';
     }
     if (currentUser.role === 'ketua_pokja') {
       return 'Ketua Pokja PKK';
@@ -142,7 +153,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
     if (currentUser.role === 'ketua_pkk_lingkungan') {
       return `Ketua PKK ${currentUser.lingkungan}`;
     }
-    return 'Pengurus TP-PKK';
+    return 'Pengurus Tim Penggerak PKK';
   }, [currentUser]);
 
   return (
@@ -584,7 +595,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                   </p>
                   <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
                     <span>📍 {act.lokasi}</span>
-                    <span>Pelapor: {act.pelaporNama}</span>
+                    <span>Pelapor: {normalizePelaporNama(act.pelaporNama)}</span>
                   </div>
                 </div>
               ))}

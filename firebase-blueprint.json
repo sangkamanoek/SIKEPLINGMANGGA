@@ -88,6 +88,23 @@
       },
       "required": ["accountId"]
     },
+    "UserAccount": {
+      "title": "Akun Pengguna Resmi",
+      "description": "Basis data akun resmi 59 pengguna (Lurah, Seklur, Kasi, Bapenda, 24 Kepling, dan PKK).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "role": { "type": "string" },
+        "nama": { "type": "string" },
+        "jabatan": { "type": "string" },
+        "lingkungan": { "type": "string" },
+        "password": { "type": "string" },
+        "nomorLingkungan": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "username", "role", "nama", "password"]
+    },
     "DataKeluarga": {
       "title": "Data Keluarga (Kartu Keluarga)",
       "description": "Basis data kependudukan, demografi, tingkat kesejahteraan (desil/bansos), dan sanitasi keluarga.",
@@ -219,7 +236,11 @@
     },
     "account_passwords/{accountId}": {
       "schema": "AccountPassword",
-      "description": "Penyimpanan sandi kustom."
+      "description": "Penyimpanan sandi kustom dan sinkronisasi kata sandi akun."
+    },
+    "user_accounts/{accountId}": {
+      "schema": "UserAccount",
+      "description": "Basis data akun resmi 59 pengguna (Lurah, Seklur, Kasi, Bapenda, 24 Kepling, dan PKK)."
     },
     "account_profiles/{accountId}": {
       "schema": "AccountProfile",

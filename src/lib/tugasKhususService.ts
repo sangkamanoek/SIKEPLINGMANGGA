@@ -57,6 +57,19 @@ const DEFAULT_TASKS: TugasKhusus[] = [
     createdAt: new Date().toISOString(),
     completedBy: [],
   },
+  {
+    id: 'tugas_pkk_default_1',
+    judul: 'Validasi & Rekapitulasi Data Dasa Wisma Lingkungan',
+    deskripsi: 'Kepada seluruh Pengurus TP-PKK Kelurahan dan PKK Lingkungan agar memastikan pencatatan data Dasa Wisma (Buku I s/d VI) serta data Posyandu di lingkungan masing-masing telah terisi lengkap.',
+    targetAccountId: 'ALL_PKK',
+    targetRole: 'pkk',
+    pemberiTugas: 'Ketua TP-PKK / Lurah Kelurahan Mangga',
+    tanggalMulai: new Date().toISOString().split('T')[0],
+    deadline: '2026-11-15',
+    status: 'aktif',
+    createdAt: new Date().toISOString(),
+    completedBy: [],
+  },
 ];
 
 /**

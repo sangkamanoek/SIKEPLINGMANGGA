@@ -285,10 +285,13 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     }
   };
 
+  const isKeplingRole = currentUser.role === 'kepling' || Boolean(currentUser.nomorLingkungan);
+  const keplingLingkStr = currentUser.nomorLingkungan ? String(currentUser.nomorLingkungan) : 'all';
+
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [filterJenis, setFilterJenis] = useState<string>('all');
-  const [filterLingkungan, setFilterLingkungan] = useState<string>('all');
+  const [filterLingkungan, setFilterLingkungan] = useState<string>(isKeplingRole ? keplingLingkStr : 'all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
@@ -352,7 +355,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
   const [editingMonitoringItem, setEditingMonitoringItem] = useState<LaporanMonitoringInfrastruktur | null>(null);
   const [monitoringToDelete, setMonitoringToDelete] = useState<LaporanMonitoringInfrastruktur | null>(null);
   const [searchMonitoring, setSearchMonitoring] = useState('');
-  const [filterMonitoringLingkungan, setFilterMonitoringLingkungan] = useState('all');
+  const [filterMonitoringLingkungan, setFilterMonitoringLingkungan] = useState<string>(isKeplingRole ? keplingLingkStr : 'all');
   const [filterMonitoringKategori, setFilterMonitoringKategori] = useState('all');
   const [filterMonitoringStatus, setFilterMonitoringStatus] = useState('all');
   const [monitoringPreviewPhoto, setMonitoringPreviewPhoto] = useState<{
@@ -548,19 +551,14 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     setShowUrlInputAfter(false);
   };
 
-  // Lock lingkungan if user is Kepling
-  const isKeplingRole = currentUser.role === 'kepling' || Boolean(currentUser.nomorLingkungan);
-
   // Filtered List
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       // Filter Lingkungan
-      if (filterLingkungan !== 'all' && item.lingkunganNomor !== Number(filterLingkungan)) {
-        return false;
-      }
-      // Kepling view restriction if desired or show all with highlight
-      if (isKeplingRole && currentUser.nomorLingkungan && filterLingkungan === 'my_lingkungan') {
+      if (isKeplingRole && currentUser.nomorLingkungan) {
         if (item.lingkunganNomor !== currentUser.nomorLingkungan) return false;
+      } else if (filterLingkungan !== 'all' && item.lingkunganNomor !== Number(filterLingkungan)) {
+        return false;
       }
 
       // Filter Jenis
@@ -635,7 +633,9 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
   // Filtered Monitoring Items
   const filteredMonitoring = useMemo(() => {
     return monitoringItems.filter((item) => {
-      if (filterMonitoringLingkungan !== 'all' && item.lingkunganNomor !== Number(filterMonitoringLingkungan)) {
+      if (isKeplingRole && currentUser.nomorLingkungan) {
+        if (item.lingkunganNomor !== currentUser.nomorLingkungan) return false;
+      } else if (filterMonitoringLingkungan !== 'all' && item.lingkunganNomor !== Number(filterMonitoringLingkungan)) {
         return false;
       }
       if (filterMonitoringKategori !== 'all' && item.kategoriIsu !== filterMonitoringKategori) {
@@ -1003,8 +1003,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
-      {/* TWO SIDE-BY-SIDE TABS (GRID 2 COLS FOR BALANCED LAYOUT ON MOBILE & DESKTOP) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-slate-900 rounded-2xl border border-slate-800 shadow-md">
+      {/* TWO SIDE-BY-SIDE TABS (BRIGHT MODERN CLEAN THEME) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2.5 bg-white rounded-2xl border border-slate-200 shadow-sm">
         <div className="grid grid-cols-2 gap-2 w-full sm:w-auto">
           {/* Tab 1: Realisasi Pembangunan Fisik (Professional Blue) */}
           <button
@@ -1013,15 +1013,15 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
             onClick={() => setActiveSubTab('realisasi')}
             className={`flex items-center justify-center sm:justify-start gap-2 px-3 sm:px-5 py-3 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer ${
               activeSubTab === 'realisasi'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-2 ring-blue-400'
-                : 'bg-slate-800/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-300'
+                : 'bg-slate-100/90 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 shadow-2xs'
             }`}
           >
-            <Wrench className={`w-4 h-4 shrink-0 ${activeSubTab === 'realisasi' ? 'text-white' : 'text-blue-400'}`} />
+            <Wrench className={`w-4 h-4 shrink-0 ${activeSubTab === 'realisasi' ? 'text-white' : 'text-blue-600'}`} />
             <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 text-left">
               <span className="truncate">Pembangunan Fisik</span>
-              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
-                activeSubTab === 'realisasi' ? 'bg-blue-800 text-blue-100' : 'bg-slate-700 text-slate-300'
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                activeSubTab === 'realisasi' ? 'bg-white/20 text-white border border-white/25' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
               }`}>
                 {items.length} Proyek
               </span>
@@ -1035,15 +1035,15 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
             onClick={() => setActiveSubTab('monitoring')}
             className={`flex items-center justify-center sm:justify-start gap-2 px-3 sm:px-5 py-3 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer ${
               activeSubTab === 'monitoring'
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-2 ring-emerald-400'
-                : 'bg-slate-800/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/25 ring-2 ring-emerald-300'
+                : 'bg-slate-100/90 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200/80 shadow-2xs'
             }`}
           >
-            <Camera className={`w-4 h-4 shrink-0 ${activeSubTab === 'monitoring' ? 'text-white' : 'text-emerald-400'}`} />
+            <Camera className={`w-4 h-4 shrink-0 ${activeSubTab === 'monitoring' ? 'text-white' : 'text-emerald-600'}`} />
             <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 text-left">
               <span className="truncate">Monitoring Lapangan</span>
-              <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
-                activeSubTab === 'monitoring' ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-700 text-slate-300'
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                activeSubTab === 'monitoring' ? 'bg-white/20 text-white border border-white/25' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
               }`}>
                 {monitoringItems.length} Laporan
               </span>
@@ -1052,13 +1052,13 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         </div>
 
         {/* Desktop Split View Mode Toggle (For desktop monitors) */}
-        <div className="hidden xl:flex items-center gap-1.5 px-2 py-1 bg-slate-800/90 rounded-xl border border-slate-700/60 text-slate-300 text-xs font-bold">
-          <span className="text-[11px] text-slate-400 mr-1">Tampilan Desktop:</span>
+        <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold">
+          <span className="text-[11px] font-bold text-slate-500 mr-1">Tampilan Desktop:</span>
           <button
             type="button"
             onClick={() => setLayoutMode('tab')}
-            className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-xs ${
-              layoutMode === 'tab' ? 'bg-blue-600 text-white font-black' : 'hover:text-white'
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer text-xs ${
+              layoutMode === 'tab' ? 'bg-blue-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-blue-700 hover:bg-white'
             }`}
           >
             Tab Tunggal
@@ -1066,8 +1066,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
           <button
             type="button"
             onClick={() => setLayoutMode('split')}
-            className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-xs ${
-              layoutMode === 'split' ? 'bg-emerald-600 text-white font-black' : 'hover:text-white'
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer text-xs ${
+              layoutMode === 'split' ? 'bg-emerald-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-emerald-700 hover:bg-white'
             }`}
           >
             2 Kolom Berdampingan
@@ -1082,20 +1082,20 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         {(layoutMode === 'split' || activeSubTab === 'realisasi') && (
           <div className="space-y-6 bg-blue-950/10 p-4 sm:p-5 rounded-3xl border border-blue-200 shadow-sm animate-fade-in">
           {/* HEADER BANNER */}
-          <div className="p-6 sm:p-7 rounded-2xl bg-slate-900 text-white shadow-md relative overflow-hidden border border-slate-800 space-y-5">
-        <div className="absolute -top-24 -right-24 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="p-6 sm:p-7 rounded-2xl bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 text-white shadow-md relative overflow-hidden border border-blue-500/30 space-y-5">
+        <div className="absolute -top-24 -right-24 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
         
         {/* Top Metadata & Title */}
         <div className="space-y-2 relative z-10">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 font-medium">
-            <span className="flex items-center gap-1.5 text-blue-300">
-              <Wrench className="w-3.5 h-3.5 text-blue-400" />
+          <div className="flex flex-wrap items-center gap-2 text-xs text-blue-200 font-medium">
+            <span className="flex items-center gap-1.5 text-blue-200">
+              <Wrench className="w-3.5 h-3.5 text-blue-300" />
               <span>Seksi Pembangunan &amp; Fasilitas Publik</span>
             </span>
             <span aria-hidden="true">·</span>
             <span>Kelurahan Mangga</span>
             <span aria-hidden="true">·</span>
-            <span className="flex items-center gap-1 text-emerald-400">
+            <span className="flex items-center gap-1 text-emerald-300">
               <Database className="w-3.5 h-3.5" />
               <span>Database Terhubung</span>
             </span>
@@ -1105,18 +1105,18 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
             Realisasi Pembangunan Infrastruktur Wilayah
           </h1>
 
-          <p className="text-xs sm:text-sm text-slate-300 max-w-3xl font-normal leading-relaxed">
+          <p className="text-xs sm:text-sm text-blue-100 max-w-3xl font-normal leading-relaxed">
             Monitoring realisasi perbaikan jalan, normalisasi drainase, perbaikan lampu LPJU, dan penambahan tiang LPJU baru secara akuntabel di 24 Lingkungan.
           </p>
         </div>
 
         {/* Action Toolbar */}
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800">
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-blue-600/50">
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
               onClick={openAddModal}
-              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              className="px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-2 cursor-pointer active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>+ Input Realisasi Baru</span>
@@ -1125,18 +1125,18 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               type="button"
               onClick={handleManualSync}
               disabled={isSyncing}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+              className="px-3.5 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
               title="Sinkronkan seluruh data ke database Firestore dan server"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isSyncing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-cyan-300 ${isSyncing ? 'animate-spin' : ''}`} />
               <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan DB'}</span>
             </button>
             <button
               type="button"
               onClick={handleExportExcel}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
               <span>Ekspor Excel</span>
             </button>
           </div>
@@ -1155,50 +1155,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
         </div>
       </div>
 
-      {/* KPI PROGRESS FISIK & REALISASI ANGGARAN STRIP */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4 rounded-2xl bg-white border border-blue-200 shadow-2xs">
-        <div className="space-y-1">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Pagu Anggaran Total</span>
-          <div className="text-base sm:text-lg font-black text-slate-900 font-mono tabular-nums">
-            Rp {stats.totalPagu.toLocaleString('id-ID')}
-          </div>
-          <span className="text-[10px] text-slate-500 font-medium">Alokasi 24 Lingkungan</span>
-        </div>
-
-        <div className="space-y-1">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Realisasi Dana</span>
-          <div className="text-base sm:text-lg font-black text-emerald-700 font-mono tabular-nums">
-            Rp {stats.totalRealisasi.toLocaleString('id-ID')}
-          </div>
-          <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-800">
-            <span className="px-1.5 py-0.2 rounded bg-emerald-100 font-black">{stats.persenSerapan}%</span>
-            <span>Serapan Anggaran</span>
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Rata-Rata Kemajuan Fisik</span>
-          <div className="text-base sm:text-lg font-black text-blue-700 font-mono tabular-nums">
-            {stats.rataRataFisik}%
-          </div>
-          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
-            <div
-              className={`h-full rounded-full transition-all duration-300 ${stats.rataRataFisik >= 80 ? 'bg-emerald-600' : stats.rataRataFisik >= 50 ? 'bg-blue-600' : 'bg-amber-500'}`}
-              style={{ width: `${Math.min(100, Math.max(0, stats.rataRataFisik))}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Penyelesaian Proyek</span>
-          <div className="text-base sm:text-lg font-black text-slate-900 font-mono tabular-nums">
-            {stats.countSelesai} / {stats.totalProyek} Proyek
-          </div>
-          <span className="text-[10px] text-blue-600 font-bold">
-            {stats.totalProyek > 0 ? `${Math.round((stats.countSelesai / stats.totalProyek) * 100)}% Proyek Tuntas` : '0%'}
-          </span>
-        </div>
-      </div>
 
       {/* SUMMARY STATS GRID */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -1862,14 +1818,14 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       {/* COLUMN 2: LAPORAN MONITORING LAPANGAN (FRESH GREEN THEME) */}
       {(layoutMode === 'split' || activeSubTab === 'monitoring') && (
         <div className="space-y-6 bg-emerald-950/10 p-4 sm:p-5 rounded-3xl border border-emerald-200 shadow-sm animate-fade-in">
-          {/* HEADER BANNER MONITORING (FRESH GREEN THEME) */}
-          <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-emerald-950 via-slate-900 to-emerald-900 text-white shadow-md relative overflow-hidden border border-emerald-800/80 space-y-4">
-            <div className="absolute -top-24 -right-24 w-60 h-60 bg-emerald-600/20 rounded-full blur-3xl pointer-events-none" />
+          {/* HEADER BANNER MONITORING (FRESH VIBRANT GREEN THEME) */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-emerald-700 via-teal-800 to-emerald-900 text-white shadow-md relative overflow-hidden border border-emerald-500/30 space-y-4">
+            <div className="absolute -top-24 -right-24 w-60 h-60 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none" />
 
             <div className="space-y-1.5 relative z-10">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-emerald-300 font-bold">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-emerald-200 font-bold">
                 <span className="flex items-center gap-1.5">
-                  <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                  <Eye className="w-3.5 h-3.5 text-emerald-300" />
                   <span>Monitoring &amp; Pengawasan Lapangan</span>
                 </span>
                 <span aria-hidden="true">·</span>
@@ -1880,18 +1836,18 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                 Laporan Monitoring Infrastruktur &amp; Fasilitas
               </h1>
 
-              <p className="text-xs sm:text-sm text-slate-300 max-w-3xl font-normal leading-relaxed">
+              <p className="text-xs sm:text-sm text-emerald-100 max-w-3xl font-normal leading-relaxed">
                 Pencatatan hasil monitoring kondisi LPJU padam, jalan rusak, saluran drainase tersumbat, dan aduan fasilitas publik dengan pelacakan titik koordinat GPS &amp; 3 sudut pandang foto dokumentasi.
               </p>
             </div>
 
             {/* Action Toolbar Monitoring */}
-            <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800">
+            <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-emerald-600/50">
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"
                   onClick={handleOpenAddMonitoring}
-                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-2 cursor-pointer active:scale-95"
                 >
                   <Plus className="w-4 h-4" />
                   <span>+ Buat Laporan Monitoring Baru</span>
@@ -1899,9 +1855,9 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                 <button
                   type="button"
                   onClick={handleExportMonitoringExcel}
-                  className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
                   <span>Ekspor Excel</span>
                 </button>
               </div>

@@ -262,6 +262,8 @@ export interface UserAccount {
   password: string; // Password / PIN akun
   telepon?: string; // Optional contact number
   nip?: string; // NIP Pejabat ASN
+  aliases?: string[];
+  legacyPasswords?: string[];
 }
 
 export interface UserProfileCustom {

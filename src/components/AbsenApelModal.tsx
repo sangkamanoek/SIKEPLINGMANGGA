@@ -23,7 +23,7 @@ import {
   Lock,
   Download,
 } from 'lucide-react';
-import { AbsenApelItem, StatusAbsenApel, UserAccount } from '../types';
+import { AbsenApelItem, StatusAbsenApel, UserAccount, isPkkRole } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
 import {
   getTodayDateString,
@@ -61,6 +61,9 @@ export const AbsenApelModal: React.FC<AbsenApelModalProps> = ({
   onRefreshAttendance,
   showToast,
 }) => {
+  if (isPkkRole(activeAccount.role)) {
+    return null;
+  }
   const [activeTab, setActiveTab] = useState<'form' | 'monitoring'>('form');
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
   const [searchQuery, setSearchQuery] = useState('');

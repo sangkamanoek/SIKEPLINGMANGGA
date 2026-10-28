@@ -26,6 +26,9 @@ import {
   FixedAccountOption,
   syncPasswordsWithServer,
   ALL_ACCOUNTS,
+  getEffectiveProfile,
+  KETUA_PKK_KELURAHAN_ACCOUNT,
+  SEKRETARIS_PKK_ACCOUNT,
 } from '../data/keplingList';
 
 interface LoginPageProps {
@@ -301,7 +304,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               ) : (
                 <p className="text-[10.5px] text-slate-500 leading-tight">
-                  Format resmi: <strong className="text-slate-700">kepling_1</strong> s/d <strong className="text-slate-700">kepling_24</strong>, <strong className="text-slate-700">kasi_pemerintahan</strong>, <strong className="text-slate-700">kasi_pembangunan</strong>, <strong className="text-slate-700">kasi_trantibum</strong>, atau <strong className="text-slate-700">super_admin</strong>.
+                  Format resmi: <strong className="text-slate-700">super_admin</strong>, <strong className="text-slate-700">kepling_1</strong> s/d <strong className="text-slate-700">kepling_24</strong>, Kasi (<strong className="text-slate-700">kasi_pemerintahan</strong>, dll.), PKK (<strong className="text-slate-700">ketua_pkk</strong>, <strong className="text-slate-700">pkk_lingkungan_1</strong>..24), atau <strong className="text-slate-700">petugas_bapenda</strong>.
                 </p>
               )}
             </div>
@@ -441,16 +444,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   onChange={(e) => setChangeUserSelect(e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 font-semibold text-slate-900 focus:bg-white focus:outline-emerald-600 cursor-pointer"
                 >
-                  <option value="super_admin">🔑 super_admin</option>
-                  <optgroup label="Kepala Seksi (Kasi)">
+                  <option value="super_admin">🔑 super_admin (Super Admin Kelurahan)</option>
+                  <option value="sekretaris">🏢 sekretaris (Sekretaris Kelurahan)</option>
+                  <optgroup label="Kepala Seksi (Kasi) & Pengawas">
                     <option value="kasi_pemerintahan">🏛️ kasi_pemerintahan</option>
                     <option value="kasi_pembangunan">🏗️ kasi_pembangunan</option>
                     <option value="kasi_trantibum">🛡️ kasi_trantibum</option>
+                    <option value="petugas_bapenda">📊 petugas_bapenda</option>
+                  </optgroup>
+                  <optgroup label="TP-PKK Kelurahan">
+                    <option value="ketua_pkk">🌸 ketua_pkk ({getEffectiveProfile(KETUA_PKK_KELURAHAN_ACCOUNT).nama})</option>
+                    <option value="sekretaris_pkk">🌸 sekretaris_pkk ({getEffectiveProfile(SEKRETARIS_PKK_ACCOUNT).nama})</option>
+                    <option value="pokja_1">🌸 pokja_1</option>
+                    <option value="pokja_2">🌸 pokja_2</option>
+                    <option value="pokja_3">🌸 pokja_3</option>
+                    <option value="pokja_4">🌸 pokja_4</option>
                   </optgroup>
                   <optgroup label="24 Kepala Lingkungan">
                     {FIXED_ACCOUNTS_LIST.filter((a) => a.role === 'kepling').map((acc) => (
                       <option key={acc.username} value={acc.username}>
-                        📍 {acc.username}
+                        📍 {acc.username} - {acc.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="24 TP-PKK Lingkungan">
+                    {FIXED_ACCOUNTS_LIST.filter((a) => a.role === 'ketua_pkk_lingkungan').map((acc) => (
+                      <option key={acc.username} value={acc.username}>
+                        🌺 {acc.username}
                       </option>
                     ))}
                   </optgroup>
@@ -582,8 +602,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   <p>• Sekretaris Kelurahan (Seklur) : <span className="font-bold text-indigo-800">sekretaris</span> (atau <span className="font-bold text-indigo-800">seklur</span> / <span className="font-bold text-indigo-800">sekretaris_lurah</span>)</p>
                   <p>• Kepala Seksi (Kasi) : <span className="font-bold text-blue-800">kasi_pemerintahan</span>, <span className="font-bold text-blue-800">kasi_pembangunan</span>, <span className="font-bold text-blue-800">kasi_trantibum</span></p>
                   <p>• Kepala Lingkungan : <span className="font-bold text-emerald-800">kepling_1</span> s/d <span className="font-bold text-emerald-800">kepling_24</span></p>
-                  <p>• Ketua TP-PKK Kelurahan : <span className="font-bold text-teal-800">ketua_pkk</span></p>
-                  <p>• Sekretaris PKK Kelurahan : <span className="font-bold text-teal-800">sekretaris_pkk</span></p>
+                  <p>• Ketua Tim Penggerak PKK Kelurahan : <span className="font-bold text-teal-800">ketua_pkk</span></p>
+                  <p>• Sekretaris Tim Penggerak PKK Kelurahan : <span className="font-bold text-teal-800">sekretaris_pkk</span></p>
                   <p>• Ketua Pokja PKK : <span className="font-bold text-teal-800">pokja_1</span> s/d <span className="font-bold text-teal-800">pokja_4</span></p>
                   <p>• Ketua PKK Lingkungan : <span className="font-bold text-teal-800">pkk_lingkungan_1</span> s/d <span className="font-bold text-teal-800">24</span></p>
                 </div>

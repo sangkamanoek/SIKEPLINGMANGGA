@@ -794,7 +794,6 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     lines.push(`🛡️ BPJS Ketenagakerjaan : ${totalStats.totalBpjsOrang} Orang`);
     lines.push(`🚨 Poskamling Aktif     : ${totalStats.totalPoskamlingAktif} Titik`);
     lines.push('');
-    lines.push('#KelurahanManggaBergerak');
     lines.push('#MedanUntukSemua');
     lines.push('#SemuaUntukMedan');
 
@@ -849,8 +848,8 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     }
     lines.push('');
     lines.push(`Demikian ringkasan tren statistik mingguan kinerja Kelurahan Mangga untuk bahan evaluasi kepemimpinan.`);
-    lines.push('#KelurahanManggaBergerak');
-    lines.push('#MedanBerkah');
+    lines.push('#MedanUntukSemua');
+    lines.push('#SemuaUntukMedan');
 
     const fullText = lines.join('\n');
     navigator.clipboard

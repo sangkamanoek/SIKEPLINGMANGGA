@@ -1,96 +1,84 @@
-import React, { ReactNode } from 'react';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
-  fallbackTitle?: string;
 }
 
 interface State {
   hasError: boolean;
-  errorMessage: string;
+  error: Error | null;
 }
 
-class RawErrorBoundary extends (React.Component as any) {
-  props: Props;
-  state: State = {
+export class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
     hasError: false,
-    errorMessage: '',
+    error: null,
   };
 
-  constructor(props: Props) {
-    super(props);
-    this.props = props;
+  public static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
   }
 
-  static getDerivedStateFromError(error: Error): State {
-    const msg = error?.message || '';
-    if (
-      msg.includes('Importing a module script failed') ||
-      msg.includes('Failed to fetch dynamically imported module') ||
-      msg.includes('error loading dynamically imported module')
-    ) {
-      try {
-        const hasAutoReloaded = sessionStorage.getItem('chunk_load_auto_reload');
-        if (!hasAutoReloaded) {
-          sessionStorage.setItem('chunk_load_auto_reload', 'true');
-          window.location.reload();
-        }
-      } catch {}
-    }
-    return {
-      hasError: true,
-      errorMessage: msg || 'Terjadi kesalahan sistem yang tidak terduga.',
-    };
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Uncaught error caught by ErrorBoundary:', error, errorInfo);
   }
 
-  componentDidCatch(error: Error, errorInfo: any) {
-    console.error('Captured in ErrorBoundary:', error, errorInfo);
-  }
+  private handleReload = () => {
+    window.location.reload();
+  };
 
-  handleReset = () => {
+  private handleReset = () => {
     try {
-      sessionStorage.removeItem('chunk_load_auto_reload');
-    } catch {}
-    this.setState({ hasError: false, errorMessage: '' });
+      // Clear possible corrupted transient state but preserve auth if possible
+      window.location.href = '/';
+    } catch {
+      window.location.reload();
+    }
   };
 
-  render() {
+  public render() {
     if (this.state.hasError) {
       return (
-        <div className="p-6 bg-red-50 border border-red-200 rounded-2xl max-w-lg mx-auto my-8 text-center shadow-lg space-y-4">
-          <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
-            <AlertTriangle className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-red-900">
-              {this.props.fallbackTitle || 'Gagal Memuat Tampilan'}
-            </h3>
-            <p className="text-xs text-red-700 mt-1 font-mono break-words">
-              {this.state.errorMessage || 'Terjadi kesalahan saat merender data.'}
-            </p>
-          </div>
-          <div className="flex justify-center gap-2">
-            <button
-              type="button"
-              onClick={this.handleReset}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Coba Muat Ulang</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  sessionStorage.removeItem('chunk_load_auto_reload');
-                } catch {}
-                window.location.reload();
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
-            >
-              <span>Refresh Halaman</span>
-            </button>
+        <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700/80 text-center space-y-5">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <h1 className="text-xl font-bold text-white tracking-tight">
+                Terjadi Kendala Tampilan
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                Sistem mengalami kendala saat memproses tampilan. Data Anda tetap aman. Silakan muat ulang halaman untuk melanjutkan.
+              </p>
+            </div>
+
+            {this.state.error && (
+              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-left overflow-x-auto text-[11px] font-mono text-rose-300">
+                {this.state.error.message || 'Unknown runtime error'}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                type="button"
+                onClick={this.handleReload}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer shadow-lg shadow-emerald-900/30"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Muat Ulang Halaman</span>
+              </button>
+              <button
+                type="button"
+                onClick={this.handleReset}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-xs transition-colors cursor-pointer"
+              >
+                <Home className="w-4 h-4" />
+                <span>Beranda</span>
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -99,6 +87,3 @@ class RawErrorBoundary extends (React.Component as any) {
     return this.props.children;
   }
 }
-
-export const ErrorBoundary = RawErrorBoundary as unknown as React.ComponentType<Props>;
-

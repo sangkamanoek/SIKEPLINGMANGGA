@@ -1,5 +1,6 @@
-import { SuratKedinasanItem, JenisSuratKedinasan } from '../types';
+import { SuratKedinasanItem } from '../types';
 import { db } from './firebase';
+import { cleanFirestoreData } from './firestoreService';
 import {
   collection,
   query,
@@ -8,338 +9,391 @@ import {
   setDoc,
   deleteDoc,
   doc,
-  getDocs,
   Unsubscribe,
 } from 'firebase/firestore';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
+import {
+  saveSuratToIndexedDB,
+  getSuratFromIndexedDB,
+  saveSingleSuratToIndexedDB,
+  deleteSuratFromIndexedDB,
+} from './indexedDbStorage';
 
-import { getAccessToken } from './firebase';
-import { syncSuratFileToDrive } from './driveSync';
-
-export const SURAT_STORAGE_KEY = 'si_mangga_surat_kedinasan_list_v2';
 export const SURAT_COLLECTION = 'surat_kedinasan';
-export const SURAT_CHANNEL = 'si_mangga_surat_channel';
-export const SURAT_CUSTOM_EVENT = 'si-mangga-surat-updated';
+export const SURAT_STORAGE_KEY = 'sikepling_surat_kedinasan_v1';
+export const SURAT_DELETED_KEY = 'sikepling_surat_deleted_v1';
+export const SURAT_CHANNEL = 'sikepling_surat_channel';
 
-// Helper to identify generated dummy sample surat items
-export const isDummySurat = (item: Partial<SuratKedinasanItem> | null | undefined): boolean => {
-  if (!item) return false;
-  const idStr = String(item.id || '');
-  return /^surat_[1-9]$/.test(idStr);
-};
-
-// Initial surat list is strictly empty for real official correspondence
-export const INITIAL_SURAT_LIST: SuratKedinasanItem[] = [];
+// 650,000 characters base64 is ~480KB binary, safely below Firestore 1,048,576 byte hard limit
+const FIRESTORE_MAX_ATTACHMENT_BASE64_LEN = 650_000;
 
 let memorySurat: SuratKedinasanItem[] = [];
+let deletedSuratIdsCache: string[] = safeGetLocalStorage<string[]>(SURAT_DELETED_KEY, []);
 
-export const getLocalSuratList = (): SuratKedinasanItem[] => {
-  if (memorySurat.length > 0) {
-    return memorySurat.filter((x) => !isDummySurat(x));
+export const getDeletedSuratIds = (): string[] => {
+  if (!Array.isArray(deletedSuratIdsCache)) deletedSuratIdsCache = [];
+  return deletedSuratIdsCache;
+};
+
+export const markSuratDeleted = (id: string): void => {
+  const current = getDeletedSuratIds();
+  if (!current.includes(id)) {
+    current.push(id);
+    deletedSuratIdsCache = current;
+    safeSetLocalStorage(SURAT_DELETED_KEY, JSON.stringify(current));
   }
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('si_mangga_surat_kedinasan_list');
-    }
-  } catch {}
+};
 
-  const stored = safeGetLocalStorage<SuratKedinasanItem[]>(SURAT_STORAGE_KEY, []);
-  if (stored && Array.isArray(stored)) {
-    const cleaned = stored.filter((x) => !isDummySurat(x));
+/**
+ * Get current cached surat list from memory or localStorage
+ */
+export const getLocalSuratList = (): SuratKedinasanItem[] => {
+  const deletedSet = new Set(getDeletedSuratIds());
+  if (memorySurat.length > 0) {
+    const cleaned = memorySurat.filter((x) => x && x.id && !deletedSet.has(x.id));
     memorySurat = cleaned;
-    if (cleaned.length !== stored.length) {
-      safeSetLocalStorage(SURAT_STORAGE_KEY, JSON.stringify(cleaned));
-    }
     return cleaned;
   }
-  memorySurat = [];
+  const stored = safeGetLocalStorage<SuratKedinasanItem[]>(SURAT_STORAGE_KEY, []);
+  if (stored && Array.isArray(stored) && stored.length > 0) {
+    const cleaned = stored.filter((x) => x && x.id && !deletedSet.has(x.id));
+    memorySurat = cleaned;
+    return cleaned;
+  }
   return [];
 };
 
+/**
+ * Save to in-memory, IndexedDB, and broadcast channel
+ */
 export const setLocalSuratList = (items: SuratKedinasanItem[]): void => {
-  const cleaned = items.filter((x) => !isDummySurat(x));
-  memorySurat = cleaned;
-  safeSetLocalStorage(SURAT_STORAGE_KEY, JSON.stringify(cleaned));
+  memorySurat = items;
+  safeSetLocalStorage(SURAT_STORAGE_KEY, JSON.stringify(items));
+  saveSuratToIndexedDB(items).catch(() => {});
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(SURAT_CHANNEL);
-      bc.postMessage({ type: 'SYNC_SURAT', items: cleaned });
+      bc.postMessage({ type: 'SYNC_SURAT', items });
       bc.close();
     }
+  } catch (e) {}
+};
+
+/**
+ * Merge lists while preserving file attachments and honoring deletions
+ */
+export const smartMergeSurat = (
+  local: SuratKedinasanItem[],
+  remote: SuratKedinasanItem[]
+): SuratKedinasanItem[] => {
+  const deletedSet = new Set(getDeletedSuratIds());
+  const map = new Map<string, SuratKedinasanItem>();
+
+  for (const item of local) {
+    if (item && item.id && !deletedSet.has(item.id)) {
+      map.set(item.id, item);
+    }
+  }
+
+  for (const item of remote) {
+    if (item && item.id && !deletedSet.has(item.id)) {
+      const existing = map.get(item.id);
+      if (existing) {
+        // Retain attachment from local if remote stripped it due to Firestore size limits
+        const fileUrl = existing.fileUrl || item.fileUrl;
+        const fileName = existing.fileName || item.fileName;
+        const fileSize = existing.fileSize || item.fileSize;
+        const fileType = existing.fileType || item.fileType;
+        map.set(item.id, {
+          ...existing,
+          ...item,
+          fileUrl,
+          fileName,
+          fileSize,
+          fileType,
+        });
+      } else {
+        map.set(item.id, item);
+      }
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => {
+    const dateA = a.tanggalSurat || a.createdAt || '';
+    const dateB = b.tanggalSurat || b.createdAt || '';
+    if (dateB !== dateA) return dateB.localeCompare(dateA);
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
+  });
+};
+
+/**
+ * Fetch all surat from Server API (/api/surat) and IndexedDB
+ */
+export const fetchSuratFromServer = async (): Promise<SuratKedinasanItem[]> => {
+  let serverItems: SuratKedinasanItem[] = [];
+
+  // 1. Fetch from server API
+  try {
+    const res = await fetch('/api/surat', {
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        serverItems = json.data;
+      }
+    }
+  } catch (err) {
+    console.warn('[suratService] Server API fetch error:', err);
+  }
+
+  // 2. Fetch from IndexedDB
+  let idbItems: SuratKedinasanItem[] = [];
+  try {
+    const fromIdb = await getSuratFromIndexedDB();
+    if (Array.isArray(fromIdb) && fromIdb.length > 0) {
+      idbItems = fromIdb;
+    }
+  } catch (err) {
+    console.warn('[suratService] IndexedDB read error:', err);
+  }
+
+  const currentLocal = getLocalSuratList();
+  const merged = smartMergeSurat(smartMergeSurat(currentLocal, idbItems), serverItems);
+  setLocalSuratList(merged);
+  return merged;
+};
+
+/**
+ * Fetch complete single surat item (including heavy PDF attachment)
+ * checks in-memory -> IndexedDB -> Server /api/surat/:id
+ */
+export const getSuratWithAttachment = async (id: string): Promise<SuratKedinasanItem | null> => {
+  if (!id) return null;
+
+  // 1. Check in-memory list first
+  const inMem = memorySurat.find((s) => s.id === id);
+  if (inMem && inMem.fileUrl) {
+    return inMem;
+  }
+
+  // 2. Check IndexedDB
+  try {
+    const idbItems = await getSuratFromIndexedDB();
+    if (Array.isArray(idbItems)) {
+      const found = idbItems.find((s) => s.id === id);
+      if (found && found.fileUrl) {
+        // Update in-memory
+        memorySurat = memorySurat.map((s) => (s.id === id ? { ...s, fileUrl: found.fileUrl } : s));
+        return found;
+      }
+    }
+  } catch (e) {}
+
+  // 3. Check Server API
+  try {
+    const res = await fetch(`/api/surat/${encodeURIComponent(id)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.data) {
+        const item = json.data as SuratKedinasanItem;
+        if (item.fileUrl) {
+          saveSingleSuratToIndexedDB(item).catch(() => {});
+          memorySurat = memorySurat.map((s) => (s.id === id ? { ...s, fileUrl: item.fileUrl } : s));
+          return item;
+        }
+      }
+    }
+  } catch (e) {}
+
+  return inMem || null;
+};
+
+/**
+ * Subscribe to real-time updates from IndexedDB, Server API, and Firestore
+ */
+export const subscribeSurat = (
+  onUpdate: (items: SuratKedinasanItem[]) => void,
+  onError?: (error: any) => void
+): (() => void) => {
+  // Initial immediate update
+  const initial = getLocalSuratList();
+  onUpdate(initial);
+
+  // Load from IndexedDB and server asynchronously
+  (async () => {
+    try {
+      const fromIdb = await getSuratFromIndexedDB();
+      if (Array.isArray(fromIdb) && fromIdb.length > 0) {
+        const merged = smartMergeSurat(getLocalSuratList(), fromIdb);
+        setLocalSuratList(merged);
+        onUpdate(merged);
+      }
+    } catch {}
+
+    try {
+      const res = await fetch('/api/surat');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const merged = smartMergeSurat(getLocalSuratList(), json.data);
+          setLocalSuratList(merged);
+          onUpdate(merged);
+        }
+      }
+    } catch {}
+  })();
+
+  let unsubscribeFirestore: Unsubscribe | undefined;
+
+  try {
+    if (db) {
+      const q = query(collection(db, SURAT_COLLECTION), orderBy('tanggalSurat', 'desc'));
+      unsubscribeFirestore = onSnapshot(
+        q,
+        (snapshot) => {
+          const remoteItems: SuratKedinasanItem[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as SuratKedinasanItem;
+            if (data && data.id) remoteItems.push(data);
+          });
+          const currentLocal = getLocalSuratList();
+          const merged = smartMergeSurat(currentLocal, remoteItems);
+          setLocalSuratList(merged);
+          onUpdate(merged);
+        },
+        (error) => {
+          console.warn('Firestore surat subscription error (falling back to local):', error);
+          if (onError) onError(error);
+        }
+      );
+    }
   } catch (e) {
-    console.warn(e);
+    console.warn('Firestore not initialized for surat:', e);
+    if (onError) onError(e);
+  }
+
+  let channel: BroadcastChannel | undefined;
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      channel = new BroadcastChannel(SURAT_CHANNEL);
+      channel.onmessage = (event) => {
+        if (event.data && event.data.type === 'SYNC_SURAT' && Array.isArray(event.data.items)) {
+          const merged = smartMergeSurat(getLocalSuratList(), event.data.items);
+          setLocalSuratList(merged);
+          onUpdate(merged);
+        }
+      };
+    }
+  } catch (e) {}
+
+  const handleStorageEvent = (event: StorageEvent) => {
+    if (event.key === SURAT_STORAGE_KEY && event.newValue) {
+      try {
+        const parsed = JSON.parse(event.newValue);
+        if (Array.isArray(parsed)) {
+          const merged = smartMergeSurat(getLocalSuratList(), parsed);
+          onUpdate(merged);
+        }
+      } catch (e) {}
+    }
+  };
+  window.addEventListener('storage', handleStorageEvent);
+
+  return () => {
+    if (unsubscribeFirestore) unsubscribeFirestore();
+    if (channel) channel.close();
+    window.removeEventListener('storage', handleStorageEvent);
+  };
+};
+
+/**
+ * Save surat item to Memory, IndexedDB, Server API (/api/surat), and Firestore
+ */
+export const saveSuratItem = async (item: SuratKedinasanItem): Promise<void> => {
+  const current = getLocalSuratList();
+  const index = current.findIndex((x) => x.id === item.id);
+  const payload: SuratKedinasanItem = {
+    ...item,
+    updatedAt: new Date().toISOString(),
+  };
+
+  let updated: SuratKedinasanItem[];
+  if (index >= 0) {
+    updated = current.map((x) => (x.id === item.id ? payload : x));
+  } else {
+    updated = [payload, ...current];
+  }
+
+  // 1. Save to in-memory and trigger LocalStorage & IndexedDB
+  setLocalSuratList(updated);
+
+  // 2. Save explicitly to IndexedDB with full attachment
+  await saveSingleSuratToIndexedDB(payload);
+
+  // 3. Save to Server REST API (/api/surat) - supports up to 50MB
+  try {
+    const res = await fetch('/api/surat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item: payload }),
+    });
+    if (!res.ok) {
+      console.warn('[suratService] Server API responded with non-200:', res.status);
+    }
+  } catch (serverErr) {
+    console.warn('[suratService] Server API save failed (offline or network error):', serverErr);
+  }
+
+  // 4. Save to Firestore with intelligent payload size protection
+  try {
+    if (db) {
+      const clean = cleanFirestoreData(payload);
+      const isFileHeavy = clean.fileUrl && String(clean.fileUrl).length > FIRESTORE_MAX_ATTACHMENT_BASE64_LEN;
+
+      let firestorePayload = clean;
+      if (isFileHeavy) {
+        // Strip heavy base64 string for Firestore to avoid 1MB limit violation
+        // Metadata (nomor, perihal, fileName, fileSize, dll.) is fully preserved
+        firestorePayload = {
+          ...clean,
+          fileUrl: undefined,
+          hasServerAttachment: true,
+        };
+      }
+
+      await setDoc(doc(db, SURAT_COLLECTION, item.id), firestorePayload);
+    }
+  } catch (firestoreErr) {
+    console.warn('[suratService] Firestore save notice (data safely kept in Server/IndexedDB):', firestoreErr);
   }
 };
 
 /**
- * Fetch surat from Server Buffer Express (/api/surat)
+ * Delete surat item from Memory, IndexedDB, Server API, and Firestore
  */
-export async function fetchSuratFromServerBuffer(): Promise<SuratKedinasanItem[]> {
-  try {
-    const res = await fetch(`/api/surat?_t=${Date.now()}`, {
-      cache: 'no-store',
-      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' },
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (Array.isArray(json?.data)) {
-        return (json.data as SuratKedinasanItem[]).filter((x) => !isDummySurat(x));
-      }
-    }
-  } catch (err) {
-    console.warn('Notice fetching surat from server buffer:', err);
-  }
-  return [];
-}
-
-/**
- * Fetch from both Server Buffer and Firestore, merging seamlessly
- */
-export async function fetchSuratFromServer(): Promise<SuratKedinasanItem[]> {
-  const map = new Map<string, SuratKedinasanItem>();
-
-  // 1. Fetch from Firestore (Primary source of truth)
-  if (db) {
-    try {
-      const q = query(collection(db, SURAT_COLLECTION), orderBy('tanggalSurat', 'desc'));
-      const snap = await getDocs(q);
-      snap.forEach((d) => {
-        const itm = d.data() as SuratKedinasanItem;
-        if (!isDummySurat(itm) && itm.id) {
-          map.set(itm.id, itm);
-        }
-      });
-    } catch (err) {
-      console.warn('Notice fetching surat from Firestore:', err);
-    }
-  }
-
-  // 2. Fetch server buffer (Secondary source, might contain large PDFs not in Firestore)
-  try {
-    const serverItems = await fetchSuratFromServerBuffer();
-    serverItems.forEach((s) => {
-      const existing = map.get(s.id);
-      if (existing) {
-        // Merge to preserve larger fileUrl from server if needed
-        if (s.fileUrl && !existing.fileUrl) {
-          map.set(s.id, { ...existing, fileUrl: s.fileUrl });
-        }
-      } else {
-        // If it's in server buffer but not Firestore, it might be new or strictly server-side
-        map.set(s.id, s);
-      }
-    });
-  } catch {}
-
-  const merged = Array.from(map.values()).sort((a, b) => {
-    return (b.tanggalSurat || '').localeCompare(a.tanggalSurat || '');
-  });
-
-  // Always update local list, even if empty
-  setLocalSuratList(merged);
-  return merged;
-}
-
-/**
- * Save surat with dual-tier sync (0ms local + Server Buffer + Firestore with size protection)
- */
-export async function saveSuratItem(item: SuratKedinasanItem): Promise<void> {
-  let itemToSave = item;
-
-  // 0. Sync to Drive if connected
-  try {
-    const activeToken = await getAccessToken();
-    if (activeToken) {
-      itemToSave = await syncSuratFileToDrive(item, activeToken);
-    }
-  } catch (err) {
-    console.warn('Drive sync for surat failed:', err);
-  }
-
-  // 1. Local update (0ms instant)
-  const current = getLocalSuratList();
-  const existsIndex = current.findIndex((x) => x.id === itemToSave.id);
-  const updated = existsIndex >= 0
-    ? current.map((x) => (x.id === itemToSave.id ? itemToSave : x))
-    : [itemToSave, ...current];
-
-  setLocalSuratList(updated);
-
-  // 2. Save to Server Buffer (handles any size, even large PDF attachments)
-  fetch('/api/surat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ item: itemToSave }),
-  }).catch((err) => {
-    console.warn('Notice saving surat to server buffer:', err);
-  });
-
-  // 3. Save to Firestore Cloud (with 1MB document boundary protection)
-  if (db) {
-    try {
-      // Check if fileUrl exceeds safe Firestore document size (approx 850KB base64)
-      const isFileTooLargeForFirestore = itemToSave.fileUrl && itemToSave.fileUrl.length > 900000 && itemToSave.fileUrl.startsWith('data:');
-      
-      if (isFileTooLargeForFirestore) {
-        // Save metadata without oversized base64
-        const safeFirestoreDoc = {
-          ...itemToSave,
-          fileUrl: '', // Full PDF preserved in server buffer / Drive
-          fileStoredOnServer: true,
-        };
-        await setDoc(doc(db, SURAT_COLLECTION, itemToSave.id), safeFirestoreDoc);
-      } else {
-        try {
-          await setDoc(doc(db, SURAT_COLLECTION, itemToSave.id), itemToSave);
-        } catch (setErr: any) {
-          console.warn('Firestore setDoc failed, saving safe metadata fallback:', setErr);
-          const safeFirestoreDoc = {
-            ...itemToSave,
-            fileUrl: itemToSave.fileUrl?.startsWith('http') ? itemToSave.fileUrl : '', // Keep Drive URL if it's already an HTTP link
-            fileStoredOnServer: !itemToSave.fileUrl?.startsWith('http'),
-          };
-          await setDoc(doc(db, SURAT_COLLECTION, itemToSave.id), safeFirestoreDoc);
-        }
-      }
-    } catch (err) {
-      console.warn('Failed saving surat to Firestore:', err);
-    }
-  }
-
-  // 4. Dispatch event for same-tab reactive UI
-  try {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(SURAT_CUSTOM_EVENT, { detail: itemToSave }));
-    }
-  } catch {}
-}
-
-export async function deleteSuratItem(id: string): Promise<void> {
+export const deleteSuratItem = async (id: string): Promise<void> => {
+  markSuratDeleted(id);
   const current = getLocalSuratList();
   const updated = current.filter((x) => x.id !== id);
   setLocalSuratList(updated);
 
-  // Delete from Server Buffer
-  fetch(`/api/surat/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch((err) => {
-    console.warn('Notice deleting surat from server buffer:', err);
-  });
+  // 1. Delete from IndexedDB
+  await deleteSuratFromIndexedDB(id);
 
-  // Delete from Firestore
-  if (db) {
-    try {
-      await deleteDoc(doc(db, SURAT_COLLECTION, id));
-    } catch (err) {
-      console.warn('Failed deleting surat from Firestore:', err);
-    }
-  }
-}
-
-export function subscribeSurat(
-  onSuccess: (data: SuratKedinasanItem[]) => void,
-  onError?: (err: Error) => void
-): Unsubscribe {
-  // 1. Instant 0ms load
-  const initial = getLocalSuratList();
-  if (initial.length > 0) {
-    onSuccess(initial);
-  }
-
-  // 2. Fetch server buffer immediately
-  fetchSuratFromServerBuffer().then((serverItems) => {
-    if (serverItems.length > 0) {
-      const current = getLocalSuratList();
-      const map = new Map<string, SuratKedinasanItem>();
-      serverItems.forEach((it) => map.set(it.id, it));
-      current.forEach((it) => {
-        if (!map.has(it.id)) map.set(it.id, it);
-      });
-      const merged = Array.from(map.values()).sort((a, b) => (b.tanggalSurat || '').localeCompare(a.tanggalSurat || ''));
-      setLocalSuratList(merged);
-      onSuccess(merged);
-    }
-  });
-
-  // 3. Broadcast channel
-  let bc: BroadcastChannel | null = null;
+  // 2. Delete from Server API
   try {
-    if (typeof BroadcastChannel !== 'undefined') {
-      bc = new BroadcastChannel(SURAT_CHANNEL);
-      bc.onmessage = (event) => {
-        if (event.data && event.data.items) {
-          memorySurat = event.data.items;
-          onSuccess(event.data.items);
-        }
-      };
-    }
-  } catch {}
-
-  // 4. Custom event
-  const handleCustomEvent = (e: any) => {
-    if (e && e.detail) {
-      const current = getLocalSuratList();
-      onSuccess(current);
-    }
-  };
-  if (typeof window !== 'undefined') {
-    window.addEventListener(SURAT_CUSTOM_EVENT, handleCustomEvent);
+    await fetch(`/api/surat/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  } catch (serverErr) {
+    console.warn('[suratService] Server delete notice:', serverErr);
   }
 
-  // 5. Firestore real-time snapshot
-  let unsubFirestore: (() => void) | null = null;
-  if (db) {
-    try {
-      const q = query(collection(db, SURAT_COLLECTION), orderBy('tanggalSurat', 'desc'));
-      unsubFirestore = onSnapshot(
-        q,
-        (snapshot) => {
-          const map = new Map<string, SuratKedinasanItem>();
-          
-          // 1. Start with the Firestore snapshot as the base truth
-          snapshot.forEach((d) => {
-            const itm = d.data() as SuratKedinasanItem;
-            if (!isDummySurat(itm) && itm.id) {
-              map.set(itm.id, itm);
-            }
-          });
-
-          // 2. Merge with local/server items only to preserve fields not in Firestore (like large PDF blobs)
-          const localItems = getLocalSuratList();
-          localItems.forEach((existing) => {
-            if (map.has(existing.id)) {
-              const itm = map.get(existing.id)!;
-              // Preserve fileUrl from local/server if Firestore stripped it due to size
-              if (existing.fileUrl && !itm.fileUrl) {
-                map.set(itm.id, { ...itm, fileUrl: existing.fileUrl });
-              }
-            }
-          });
-
-          const items = Array.from(map.values()).sort((a, b) => (b.tanggalSurat || '').localeCompare(a.tanggalSurat || ''));
-          
-          // Always update local list and trigger success, even if list is empty (handles deletions)
-          setLocalSuratList(items);
-          onSuccess(items);
-        },
-        (err) => {
-          console.warn('Firestore snapshot error on surat_kedinasan:', err);
-          if (onError) onError(err);
-        }
-      );
-    } catch (e: any) {
-      console.warn('Error setting up firestore snapshot on surat_kedinasan:', e);
-      if (onError) onError(e);
+  // 3. Delete from Firestore
+  try {
+    if (db) {
+      await deleteDoc(doc(db, SURAT_COLLECTION, id));
     }
+  } catch (firestoreErr) {
+    console.warn('[suratService] Firestore delete notice:', firestoreErr);
   }
-
-  return () => {
-    if (bc) {
-      try { bc.close(); } catch {}
-    }
-    if (typeof window !== 'undefined') {
-      window.removeEventListener(SURAT_CUSTOM_EVENT, handleCustomEvent);
-    }
-    if (unsubFirestore) {
-      unsubFirestore();
-    }
-  };
-}
+};

@@ -27,6 +27,7 @@ import {
   KASI_PEMERINTAHAN_ACCOUNT,
   KASI_PEMBANGUNAN_ACCOUNT,
   KASI_TRANTIBUM_ACCOUNT,
+  PETUGAS_BAPENDA_ACCOUNT,
   KEPLING_ACCOUNTS,
   ALL_ACCOUNTS,
   KETUA_PKK_KELURAHAN_ACCOUNT,
@@ -36,6 +37,7 @@ import {
   verifyAccountPassword,
   getEffectivePassword,
   hasCustomPassword,
+  getEffectiveProfile,
 } from '../data/keplingList';
 
 interface AccountSelectorModalProps {
@@ -141,6 +143,17 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
             >
               Tutup
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                window.dispatchEvent(new CustomEvent('open-account-selector-full'));
+              }}
+              className="w-full py-2 text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-slate-200"
+            >
+              Ganti Akun / Pilih Pengguna Lain
+            </button>
           </div>
         </div>
       </div>
@@ -148,7 +161,7 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
   }
 
   const searchLower = String(search || '').toLowerCase();
-  const filteredKepling = KEPLING_ACCOUNTS.filter(
+  const filteredKepling = KEPLING_ACCOUNTS.map(getEffectiveProfile).filter(
     (k) =>
       String(k.lingkungan || '').toLowerCase().includes(searchLower) ||
       String(k.nama || '').toLowerCase().includes(searchLower) ||
@@ -517,7 +530,7 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {KASI_ACCOUNTS.map((kasi) => {
+                      {KASI_ACCOUNTS.map(getEffectiveProfile).map((kasi) => {
                         const isSelected = activeAccount.id === kasi.id;
                         const isPem = kasi.role === 'kasi_pemerintahan';
                         const isBang = kasi.role === 'kasi_pembangunan';
@@ -664,7 +677,7 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
 
                     {/* Ketua, Sekretaris PKK Kelurahan & 4 Pokja */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-                      {[KETUA_PKK_KELURAHAN_ACCOUNT, SEKRETARIS_PKK_ACCOUNT, ...KETUA_POKJA_ACCOUNTS].map((pkkAcc) => {
+                      {[KETUA_PKK_KELURAHAN_ACCOUNT, SEKRETARIS_PKK_ACCOUNT, ...KETUA_POKJA_ACCOUNTS].map(getEffectiveProfile).map((pkkAcc) => {
                         const isSelected = activeAccount.id === pkkAcc.id;
                         return (
                           <button
@@ -722,7 +735,7 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
                       24 Ketua PKK Tingkat Lingkungan
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
-                      {KETUA_PKK_LINGKUNGAN_ACCOUNTS.filter(
+                      {KETUA_PKK_LINGKUNGAN_ACCOUNTS.map(getEffectiveProfile).filter(
                         (k) =>
                           !search ||
                           k.lingkungan.toLowerCase().includes(search.toLowerCase()) ||
@@ -927,7 +940,7 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
                   </tr>
 
                   {/* Kasi accounts rows */}
-                  {KASI_ACCOUNTS.map((kasi) => {
+                  {KASI_ACCOUNTS.map(getEffectiveProfile).map((kasi) => {
                     const effPass = getEffectivePassword(kasi);
                     const isCustom = hasCustomPassword(kasi.id);
                     return (
@@ -978,8 +991,54 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
                     );
                   })}
 
+                  {/* Petugas Bapenda row */}
+                  <tr className="bg-sky-50/50 font-medium">
+                    <td className="p-2.5 font-bold text-sky-950">
+                      {PETUGAS_BAPENDA_ACCOUNT.jabatan}
+                    </td>
+                    <td className="p-2.5">
+                      <code className="text-[11px] font-mono font-bold text-sky-900 bg-sky-100/60 border border-sky-300 px-2 py-0.5 rounded">
+                        {PETUGAS_BAPENDA_ACCOUNT.id}
+                      </code>
+                    </td>
+                    <td className="p-2.5 font-semibold text-slate-800">
+                      {PETUGAS_BAPENDA_ACCOUNT.nama}
+                    </td>
+                    <td className="p-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <code className="bg-white border border-sky-300 text-sky-900 px-2 py-0.5 rounded font-mono font-bold">
+                          {getEffectivePassword(PETUGAS_BAPENDA_ACCOUNT)}
+                        </code>
+                        {hasCustomPassword(PETUGAS_BAPENDA_ACCOUNT.id) && (
+                          <span className="text-[9px] bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded font-bold">
+                            Kustom
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPassword(getEffectivePassword(PETUGAS_BAPENDA_ACCOUNT), PETUGAS_BAPENDA_ACCOUNT.id)}
+                        className="px-2 py-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        {copiedId === PETUGAS_BAPENDA_ACCOUNT.id ? (
+                          <>
+                            <Check className="w-3 h-3 text-tosca-600" />
+                            <span className="text-tosca-700">Tersalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Salin</span>
+                          </>
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+
                   {/* 24 Kepling rows */}
-                  {KEPLING_ACCOUNTS.map((k) => {
+                  {KEPLING_ACCOUNTS.map(getEffectiveProfile).map((k) => {
                     const effPass = getEffectivePassword(k);
                     const isCustom = hasCustomPassword(k.id);
                     return (
@@ -1014,6 +1073,110 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
                             className="px-2 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
                           >
                             {copiedId === k.id ? (
+                              <>
+                                <Check className="w-3 h-3 text-tosca-600" />
+                                <span className="text-tosca-700">Tersalin</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3 text-slate-400" />
+                                <span>Salin</span>
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* TP-PKK Kelurahan & Pokja rows */}
+                  {[KETUA_PKK_KELURAHAN_ACCOUNT, SEKRETARIS_PKK_ACCOUNT, ...KETUA_POKJA_ACCOUNTS].map(getEffectiveProfile).map((pkk) => {
+                    const effPass = getEffectivePassword(pkk);
+                    const isCustom = hasCustomPassword(pkk.id);
+                    return (
+                      <tr key={pkk.id} className="bg-teal-50/40 hover:bg-teal-50/70 transition-colors">
+                        <td className="p-2.5 font-bold text-teal-950">
+                          {pkk.jabatan}
+                        </td>
+                        <td className="p-2.5">
+                          <code className="text-[11px] font-mono font-bold text-teal-900 bg-teal-100/60 border border-teal-300 px-2 py-0.5 rounded">
+                            {pkk.id}
+                          </code>
+                        </td>
+                        <td className="p-2.5 font-semibold text-slate-800">
+                          {pkk.nama}
+                        </td>
+                        <td className="p-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <code className="bg-white border border-teal-300 text-teal-900 px-2 py-0.5 rounded font-mono font-bold">
+                              {effPass}
+                            </code>
+                            {isCustom && (
+                              <span className="text-[9px] bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded font-bold">
+                                Kustom
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyPassword(effPass, pkk.id)}
+                            className="px-2 py-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            {copiedId === pkk.id ? (
+                              <>
+                                <Check className="w-3 h-3 text-tosca-600" />
+                                <span className="text-tosca-700">Tersalin</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Salin</span>
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* 24 PKK Lingkungan rows */}
+                  {KETUA_PKK_LINGKUNGAN_ACCOUNTS.map(getEffectiveProfile).map((p) => {
+                    const effPass = getEffectivePassword(p);
+                    const isCustom = hasCustomPassword(p.id);
+                    return (
+                      <tr key={p.id} className="bg-emerald-50/20 hover:bg-emerald-50/50 transition-colors">
+                        <td className="p-2.5 font-bold text-teal-900">
+                          PKK {p.lingkungan}
+                        </td>
+                        <td className="p-2.5">
+                          <code className="text-[11px] font-mono font-bold text-teal-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                            {p.id}
+                          </code>
+                        </td>
+                        <td className="p-2.5 font-semibold text-slate-800">
+                          {p.nama}
+                        </td>
+                        <td className="p-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <code className="bg-slate-100 border border-slate-200 text-teal-800 px-2 py-0.5 rounded font-mono font-bold">
+                              {effPass}
+                            </code>
+                            {isCustom && (
+                              <span className="text-[9px] bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded font-bold">
+                                Kustom
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyPassword(effPass, p.id)}
+                            className="px-2 py-1 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            {copiedId === p.id ? (
                               <>
                                 <Check className="w-3 h-3 text-tosca-600" />
                                 <span className="text-tosca-700">Tersalin</span>

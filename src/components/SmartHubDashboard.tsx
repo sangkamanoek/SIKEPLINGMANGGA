@@ -538,21 +538,17 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             },
           ]
         : []),
-      ...(isAdmin
-        ? [
-            {
-              id: 'realisasi_pembangunan',
-              title: 'Realisasi Pembangunan Infrastruktur',
-              desc: 'Monitoring realisasi perbaikan jalan, drainase, pemasangan paving blok, lampu LPJU, dan penambahan tiang baru.',
-              category: 'laporan',
-              icon: Wrench,
-              iconBg: 'bg-indigo-50 text-indigo-700',
-              badge: 'PEMBANGUNAN',
-              badgeColor: 'bg-indigo-100 text-indigo-900',
-              action: () => onNavigate('realisasi_pembangunan'),
-            },
-          ]
-        : []),
+      {
+        id: 'realisasi_pembangunan',
+        title: 'MONITORING & REALISASI PEMBANGUNAN WILAYAH',
+        desc: 'Monitoring realisasi perbaikan jalan, drainase, pemasangan paving blok, lampu LPJU, dan penambahan tiang baru di wilayah masing-masing.',
+        category: 'laporan',
+        icon: Wrench,
+        iconBg: 'bg-indigo-50 text-indigo-700',
+        badge: 'PEMBANGUNAN',
+        badgeColor: 'bg-indigo-100 text-indigo-900',
+        action: () => onNavigate('realisasi_pembangunan'),
+      },
 
       // 3. INSIGHT & MONITORING (INSIGHT & MONITORING)
       {
@@ -614,35 +610,33 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
   });
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto px-1 animate-fade-in">
-      {/* Top Welcome Banner */}
-      <div className="bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-950 text-white rounded-2xl p-5 sm:p-6 border border-emerald-800/80 shadow-lg relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:16px_16px]" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2.5">
+    <div className="space-y-6 max-w-7xl mx-auto px-1 animate-fade-in">
+      {/* Top Executive Banner */}
+      <div className="bg-slate-900 text-white rounded-xl p-5 sm:p-6 border border-slate-800 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-emerald-400" />
-                <span>Pusat Kendali Modern SI-KEPLING</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/70 border border-emerald-800/80 px-2 py-0.5 rounded">
+                Pusat Kendali Eksekutif
               </span>
-              <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-slate-700">
+              <span className="text-slate-400 text-xs">·</span>
+              <span className="text-slate-300 text-xs font-semibold">
                 {activeAccount.jabatan}
               </span>
 
               {/* Layout Mode Toggler */}
-              <div className="inline-flex bg-slate-950/70 p-0.5 rounded-lg border border-slate-700 text-[10px] font-black">
+              <div className="inline-flex bg-slate-950 p-0.5 rounded border border-slate-800 text-[10px] font-bold ml-2">
                 <button
                   type="button"
                   onClick={() => handleStyleChange('consolidated')}
                   className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
                     dashboardStyle === 'consolidated'
-                      ? 'bg-emerald-600 text-white font-extrabold'
+                      ? 'bg-emerald-600 text-white font-bold'
                       : 'text-slate-400 hover:text-white'
                   }`}
-                  title="Gaya dashboard bento modern yang ramah laptop dan hemat memori"
+                  title="Gaya dashboard bento modern terstruktur"
                 >
-                  🌟 Terkonsolidasi
+                  Terkonsolidasi
                 </button>
                 <button
                   type="button"
@@ -652,15 +646,15 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                       ? 'bg-slate-800 text-slate-200'
                       : 'text-slate-400 hover:text-white'
                   }`}
-                  title="Gaya dashboard menu klasik lama"
+                  title="Gaya dashboard menu klasik"
                 >
-                  🏛️ Klasik
+                  Klasik
                 </button>
               </div>
             </div>
             
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight">
-              Selamat Datang, <span className="text-emerald-400">{activeAccount.nama}</span>
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white">
+              Selamat Datang, <span className="text-emerald-400 font-extrabold">{activeAccount.nama}</span>
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 font-medium max-w-2xl">
               SI-MANGGA • Sistem Informasi & Administrasi Kelurahan Mangga. 
@@ -705,28 +699,30 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       <DeadlineNotifAlert activeAccount={activeAccount} reports={reports} onNavigate={onNavigate} />
 
       {/* 3 Pilar Utama SI-MANGGA Banner Quick Navigation */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-2xs">
+        <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5">
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-600" />
-            <h3 className="text-xs sm:text-sm font-black uppercase text-slate-900 tracking-wider">
+            <Layers className="w-4 h-4 text-emerald-700" />
+            <h3 className="text-xs sm:text-sm font-bold uppercase text-slate-900 tracking-wider">
               3 Pilar Layanan Utama SI-MANGGA
             </h3>
           </div>
-          <span className="text-[10px] font-bold text-slate-400">Sistem Informasi & Administrasi Kelurahan Mangga</span>
+          <span className="text-[11px] font-medium text-slate-500 hidden sm:inline">
+            Kelurahan Mangga · Medan Tuntungan
+          </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div 
             onClick={() => onNavigate(isKepling ? 'form' : 'dashboard_kasi')}
-            className="p-3 bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200 rounded-xl transition-all cursor-pointer group flex items-center gap-3"
+            className="p-3.5 bg-slate-50/80 hover:bg-emerald-50/60 border border-slate-200/90 hover:border-emerald-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
           >
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-102">
               <FileText className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-black text-emerald-800 uppercase block">Pilar 1</span>
+              <span className="text-[10px] font-bold text-emerald-800 uppercase block tracking-wider">Pilar 1</span>
               <h4 className="text-xs font-bold text-slate-900 truncate">Kinerja Kepling & Layanan</h4>
-              <p className="text-[10px] text-slate-600 truncate">Presensi, Laporan Harian &amp; PBB</p>
+              <p className="text-[11px] text-slate-500 truncate">Presensi, Laporan Harian & PBB</p>
             </div>
           </div>
 
@@ -734,15 +730,15 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             onClick={() => {
               window.dispatchEvent(new CustomEvent('switch-to-pkk-role'));
             }}
-            className="p-3 bg-tosca-50/70 hover:bg-tosca-100/70 border border-tosca-200 rounded-xl transition-all cursor-pointer group flex items-center gap-3"
+            className="p-3.5 bg-slate-50/80 hover:bg-teal-50/60 border border-slate-200/90 hover:border-teal-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
           >
-            <div className="w-10 h-10 rounded-xl bg-tosca-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-lg bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-102">
               <Users className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-black text-tosca-800 uppercase block">Pilar 2</span>
+              <span className="text-[10px] font-bold text-teal-800 uppercase block tracking-wider">Pilar 2</span>
               <h4 className="text-xs font-bold text-slate-900 truncate">Kegiatan TP-PKK</h4>
-              <p className="text-[10px] text-slate-600 truncate">Pusat Menu, Laporan & Dasa Wisma</p>
+              <p className="text-[11px] text-slate-500 truncate">Pusat Menu, Laporan & Dasa Wisma</p>
             </div>
           </div>
 
@@ -750,15 +746,15 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             onClick={() => {
               window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'surat_kedinasan' }));
             }}
-            className="p-3 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200 rounded-xl transition-all cursor-pointer group flex items-center gap-3"
+            className="p-3.5 bg-slate-50/80 hover:bg-blue-50/60 border border-slate-200/90 hover:border-blue-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
           >
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-lg bg-blue-700 text-white flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-102">
               <FileText className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] font-black text-blue-800 uppercase block">Pilar 3</span>
+              <span className="text-[10px] font-bold text-blue-800 uppercase block tracking-wider">Pilar 3</span>
               <h4 className="text-xs font-bold text-slate-900 truncate">Surat Kedinasan</h4>
-              <p className="text-[10px] text-slate-600 truncate">Arsip Surat Masuk, Keluar & SK</p>
+              <p className="text-[11px] text-slate-500 truncate">Arsip Surat Masuk, Keluar & SK</p>
             </div>
           </div>
         </div>

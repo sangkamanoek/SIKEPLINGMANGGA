@@ -166,9 +166,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     setBpjsKetenagakerjaanOrang('0');
     setSelectedLainnyaOptions([]);
     setKegiatanLainnyaCustomText('');
-    setInfrastrukturAdaGiat(false);
-    setInfrastrukturSubjek('');
-    setInfrastrukturTitikKoordinat('');
   };
 
   // Tugas Tambahan POSKAMLING / SISKAMLING
@@ -207,61 +204,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     setKegiatanLainnya(formatted);
   }, [selectedLainnyaOptions, kegiatanLainnyaCustomText]);
 
-  // Poin 6: Kegiatan Pemantauan Kondisi Infrastruktur Wilayah
-  const getNomorLkText = (accLingkungan?: string, accJabatan?: string) => {
-    if (accLingkungan) {
-      return accLingkungan.replace(/lingkungan\s*/i, 'Lk ');
-    }
-    if (accJabatan) {
-      const match = accJabatan.match(/Lingkungan\s+([A-Z0-9]+)/i);
-      if (match) return `Lk ${match[1]}`;
-    }
-    return 'Lk ..';
-  };
 
-  const formatLokasiInfrastruktur = (jalanStr: string, lkStr: string) => {
-    let cleanJalan = jalanStr.trim();
-    // Hilangkan kata 'Jalan' atau 'Jl.' di awal agar tidak dobel seperti "( Jalan Jl. ... )"
-    cleanJalan = cleanJalan.replace(/^jalan\s+/i, '').replace(/^jl\.?\s+/i, '');
-    const displayJalan = cleanJalan || '...';
-    return `( Jalan ${displayJalan} ${lkStr} Kelurahan Mangga Kecamatan Medan Tuntungan )`;
-  };
-
-  // Poin 6: Kegiatan Pemantauan Kondisi Infrastruktur Wilayah (Default false / Manual, tidak otomatis centang)
-  const [infrastrukturAdaGiat, setInfrastrukturAdaGiat] = useState<boolean>(false);
-  const [infrastrukturSubjek, setInfrastrukturSubjek] = useState<string>('Jalan Berlubang / Rusak');
-  const [infrastrukturNamaJalan, setInfrastrukturNamaJalan] = useState<string>('');
-  const [infrastrukturLokasi, setInfrastrukturLokasi] = useState<string>(() =>
-    formatLokasiInfrastruktur('', getNomorLkText(initialAccount.lingkungan, initialAccount.jabatan))
-  );
-  const [infrastrukturTitikKoordinat, setInfrastrukturTitikKoordinat] = useState<string>('');
-  const [infrastrukturTanggalPelaporan, setInfrastrukturTanggalPelaporan] = useState<string>(() =>
-    formatTanggalIndonesia(today)
-  );
-  const [isDetectingGps, setIsDetectingGps] = useState<boolean>(false);
-
-  // GPS Coordinates detection for Poin 6
-  const handleGetGpsCoordinates = async () => {
-    setIsDetectingGps(true);
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (p) => {
-            const lat = p.coords.latitude.toFixed(6);
-            const lng = p.coords.longitude.toFixed(6);
-            setInfrastrukturTitikKoordinat(`https://maps.google.com/?q=${lat},${lng}`);
-            setIsDetectingGps(false);
-          },
-          (e) => {
-            alert('Gagal mengambil titik GPS: ' + (e.message || 'Izin lokasi perangkat dibutuhkan'));
-            setIsDetectingGps(false);
-          },
-          { enableHighAccuracy: true, timeout: 8000 }
-        );
-      } else {
-        alert('Perangkat tidak mendukung geolokasi atau izin lokasi belum aktif.');
-        setIsDetectingGps(false);
-      }
-  };
 
   // Dokumentasi Foto state
   const [fotoList, setFotoList] = useState<FotoDokumentasi[]>([]);
@@ -342,8 +285,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       if (acc.lingkungan) {
         setPoskamlingLokasi(`Pos Ronda ${acc.lingkungan}`);
       }
-      const lkTxt = getNomorLkText(acc.lingkungan, acc.jabatan);
-      setInfrastrukturLokasi(formatLokasiInfrastruktur(infrastrukturNamaJalan, lkTxt));
     }
   }, [preselectedKepling, activeAccount]);
 
@@ -388,7 +329,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       const tglStr = formatTanggalIndonesia(selected);
       setHari(getNamaHariIndonesia(selected));
       setTanggalText(tglStr);
-      setInfrastrukturTanggalPelaporan(tglStr);
     }
   };
 
@@ -559,12 +499,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       poskamlingKeterangan: poskamlingAdaGiat ? poskamlingKeterangan.trim() : '',
 
       kegiatanLainnya: kegiatanLainnya.trim(),
-      infrastrukturAdaGiat: false,
-      infrastrukturSubjek: '',
-      infrastrukturLokasi: '',
-      infrastrukturTitikKoordinat: '',
-      infrastrukturTanggalPelaporan: '',
-      infrastrukturPelapor: '',
     };
 
     return {
@@ -627,9 +561,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       setKegiatanLainnya('');
       setSelectedLainnyaOptions([]);
       setKegiatanLainnyaCustomText('');
-      setInfrastrukturAdaGiat(false);
-      setInfrastrukturNamaJalan('');
-      setInfrastrukturTitikKoordinat('');
       setFotoList([]);
       setShowPhotoValidationModal(false);
     } catch (err) {
@@ -1960,16 +1891,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                 {kegiatanLainnya && (
                   <p className="text-slate-300 mt-1">5. LAINNYA  : {kegiatanLainnya}</p>
                 )}
-                {infrastrukturAdaGiat && (
-                  <div className="text-emerald-300 mt-1 text-[11px] space-y-0.5">
-                    <p className="font-bold">6. PEMANTAUAN INFRASTRUKTUR :</p>
-                    <p className="pl-3">- Subjek: {infrastrukturSubjek || '-'}</p>
-                    <p className="pl-3">- Lokasi: {infrastrukturLokasi || '-'}</p>
-                    {infrastrukturTitikKoordinat && <p className="pl-3 truncate">- Koordinat: {infrastrukturTitikKoordinat}</p>}
-                    <p className="pl-3">- Tanggal: {infrastrukturTanggalPelaporan || tanggalText}</p>
-                    <p className="pl-3">- Pelapor: {namaKepling || 'Kepling'}</p>
-                  </div>
-                )}
+
                 {poskamlingAdaGiat && (
                   <p className="text-amber-300 mt-1">
                     7. POSKAMLING: <span className="text-amber-200 font-bold">{poskamlingStatus}</span>
