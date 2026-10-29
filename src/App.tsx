@@ -41,6 +41,7 @@ import { PWAInstallModal } from './components/PWAInstallModal';
 import { AppUpdateToastBanner } from './components/AppUpdateToastBanner';
 import { LoginPage } from './components/LoginPage';
 import { TopNavigationBar } from './components/TopNavigationBar';
+import { SyncVerificationModal } from './components/SyncVerificationModal';
 
 import { getDefaultTargetsCapaianMap } from './data/targetsData';
 import { fetchAllReports, saveReportToServer } from './lib/reportsApi';
@@ -99,6 +100,7 @@ export default function App() {
   const [isPPTModalOpen, setIsPPTModalOpen] = useState(false);
   const [isAppUpdateOpen, setIsAppUpdateOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isSyncVerificationOpen, setIsSyncVerificationOpen] = useState(false);
 
   useEffect(() => {
     const handleOpenFullSelector = () => setIsAccountModalOpen(true);
@@ -231,6 +233,7 @@ export default function App() {
         onOpenUbahPassword={() => setIsUbahPasswordOpen(true)}
         onOpenEditProfile={() => setIsEditProfileOpen(true)}
         onOpenPPTModal={() => setIsPPTModalOpen(true)}
+        onOpenSyncVerification={() => setIsSyncVerificationOpen(true)}
         onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
         onOpenUpdateModal={() => setIsAppUpdateOpen(true)}
         onLogout={handleLogout}
@@ -496,6 +499,18 @@ export default function App() {
       <PWAInstallModal
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
+      />
+
+      <SyncVerificationModal
+        isOpen={isSyncVerificationOpen}
+        onClose={() => setIsSyncVerificationOpen(false)}
+        localReports={reports}
+        currentUser={activeAccount}
+        onSyncComplete={(updated) => {
+          setReports(updated);
+          safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(updated));
+        }}
+        showToast={showToast}
       />
 
       {/* Floating Toast Notification */}

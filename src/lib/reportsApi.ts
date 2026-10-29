@@ -99,6 +99,50 @@ export const seedInitialReports = async (): Promise<LaporanHarianItem[]> => {
   return [];
 };
 
+export interface ReportDiffResult {
+  localOnly: LaporanHarianItem[];
+  serverOnly: LaporanHarianItem[];
+  synced: LaporanHarianItem[];
+  conflicted: { local: LaporanHarianItem; server: LaporanHarianItem }[];
+}
+
+export const compareLocalVsServerReports = async (localReports: LaporanHarianItem[]): Promise<ReportDiffResult> => {
+  const serverReports = await fetchAllReports();
+  const serverMap = new Map<string, LaporanHarianItem>();
+  serverReports.forEach(r => serverMap.set(r.id, r));
+
+  const localMap = new Map<string, LaporanHarianItem>();
+  localReports.forEach(r => localMap.set(r.id, r));
+
+  const localOnly: LaporanHarianItem[] = [];
+  const serverOnly: LaporanHarianItem[] = [];
+  const synced: LaporanHarianItem[] = [];
+  const conflicted: { local: LaporanHarianItem; server: LaporanHarianItem }[] = [];
+
+  localReports.forEach(localItem => {
+    const serverItem = serverMap.get(localItem.id);
+    if (!serverItem) {
+      localOnly.push(localItem);
+    } else {
+      const localTime = new Date(localItem.createdAt || 0).getTime();
+      const serverTime = new Date(serverItem.createdAt || 0).getTime();
+      if (Math.abs(localTime - serverTime) > 1000 && JSON.stringify(localItem) !== JSON.stringify(serverItem)) {
+        conflicted.push({ local: localItem, server: serverItem });
+      } else {
+        synced.push(localItem);
+      }
+    }
+  });
+
+  serverReports.forEach(serverItem => {
+    if (!localMap.has(serverItem.id)) {
+      serverOnly.push(serverItem);
+    }
+  });
+
+  return { localOnly, serverOnly, synced, conflicted };
+};
+
 /**
  * Create or Update single report strictly online (Server Buffer + Firebase Firestore)
  */

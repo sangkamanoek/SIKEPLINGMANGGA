@@ -34,6 +34,7 @@ interface HeaderBannerProps {
   onOpenPPTModal?: () => void;
   onOpenAbsenApel?: () => void;
   onOpenUpdateModal?: () => void;
+  onOpenSyncVerification?: () => void;
   portalMode?: 'kelurahan' | 'pkk';
 }
 
@@ -414,6 +415,20 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                       {hasNewUpdate && (
                         <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
                       )}
+                    </button>
+                  )}
+
+                  {onOpenSyncVerification && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHelperMenuOpen(false);
+                        onOpenSyncVerification();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-sky-300 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <RefreshCw className="w-4 h-4 text-sky-400 shrink-0" />
+                      <span>Verifikasi & Cek Data Cloud</span>
                     </button>
                   )}
 
