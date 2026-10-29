@@ -66,7 +66,7 @@ export interface PkkBuku5Inventaris {
 }
 
 // BUKU 1 SERVICE
-const BUKU1_COL = 'pkk_buku_1';
+const BUKU1_COL = 'pkk_buku_1_anggota';
 const BUKU1_KEY = 'sikepling_pkk_buku_1_v1';
 const BUKU1_CHAN = 'sikepling_buku_1_chan';
 
@@ -169,7 +169,7 @@ export const deleteBuku1Item = async (id: string) => {
 };
 
 // BUKU 4 SERVICE
-const BUKU4_COL = 'pkk_buku_4';
+const BUKU4_COL = 'pkk_buku_4_notulen';
 const BUKU4_KEY = 'sikepling_pkk_buku_4_v1';
 const BUKU4_CHAN = 'sikepling_buku_4_chan';
 
@@ -238,7 +238,7 @@ export const deleteBuku4Item = async (id: string) => {
 };
 
 // BUKU 5 SERVICE
-const BUKU5_COL = 'pkk_buku_5';
+const BUKU5_COL = 'pkk_buku_5_inventaris';
 const BUKU5_KEY = 'sikepling_pkk_buku_5_v1';
 const BUKU5_CHAN = 'sikepling_buku_5_chan';
 

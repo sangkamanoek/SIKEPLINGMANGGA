@@ -5,7 +5,8 @@ import { cleanFirestoreData } from './firestoreService';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import { AgendaKelurahanItem, StatusAgendaType } from '../types';
 
-const AGENDA_STORAGE_KEY = 'sikepling_agenda_kelurahan_v1';
+const AGENDA_STORAGE_KEY = 'sikepling_agenda_kelurahan_v2';
+const AGENDA_DELETED_KEY = 'sikepling_agenda_deleted_v1';
 
 export const SAMPLE_AGENDA_ITEMS: AgendaKelurahanItem[] = [
   {
@@ -66,14 +67,48 @@ export const SAMPLE_AGENDA_ITEMS: AgendaKelurahanItem[] = [
   },
 ];
 
-export const getLocalAgendaList = (): AgendaKelurahanItem[] => {
-  const local = safeGetLocalStorage<AgendaKelurahanItem[]>(AGENDA_STORAGE_KEY, []);
-  if (local && local.length > 0) {
-    return local;
+let deletedAgendaIdsCache: string[] = safeGetLocalStorage<string[]>(AGENDA_DELETED_KEY, []);
+
+export const getDeletedAgendaIds = (): string[] => {
+  if (!Array.isArray(deletedAgendaIdsCache)) deletedAgendaIdsCache = [];
+  return deletedAgendaIdsCache;
+};
+
+export const markAgendaDeleted = (id: string): void => {
+  const current = getDeletedAgendaIds();
+  if (!current.includes(id)) {
+    current.push(id);
+    deletedAgendaIdsCache = current;
+    safeSetLocalStorage(AGENDA_DELETED_KEY, JSON.stringify(current));
   }
-  // Seed initial sample data if empty
-  safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(SAMPLE_AGENDA_ITEMS));
-  return SAMPLE_AGENDA_ITEMS;
+};
+
+export const getLocalAgendaList = (): AgendaKelurahanItem[] => {
+  const deletedSet = new Set(getDeletedAgendaIds());
+  const local = safeGetLocalStorage<AgendaKelurahanItem[]>(AGENDA_STORAGE_KEY, []);
+  
+  if (local && Array.isArray(local) && local.length > 0) {
+    return local.filter(x => !deletedSet.has(x.id));
+  }
+
+  // If local is empty but NOT due to user deletion, we can seed.
+  // However, to be safe, if deletedSet is NOT empty, it means the user has interacted.
+  if (deletedSet.size > 0) return [];
+
+  // Migration from v1
+  const v1 = safeGetLocalStorage<AgendaKelurahanItem[]>('sikepling_agenda_kelurahan_v1', []);
+  if (v1 && v1.length > 0) {
+    const cleaned = v1.filter(x => !deletedSet.has(x.id));
+    safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(cleaned));
+    return cleaned;
+  }
+
+  // Seed initial sample data if completely fresh
+  const filteredSamples = SAMPLE_AGENDA_ITEMS.filter(x => !deletedSet.has(x.id));
+  if (filteredSamples.length > 0) {
+    safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(filteredSamples));
+  }
+  return filteredSamples;
 };
 
 export const fetchAgendaFromFirestore = async (): Promise<AgendaKelurahanItem[]> => {
@@ -81,11 +116,12 @@ export const fetchAgendaFromFirestore = async (): Promise<AgendaKelurahanItem[]>
   if (!db) return local;
 
   try {
+    const deletedSet = new Set(getDeletedAgendaIds());
     const snap = await getDocs(collection(db, 'agenda_kelurahan'));
     const firestoreList: AgendaKelurahanItem[] = [];
     snap.forEach((d) => {
       const data = d.data() as AgendaKelurahanItem;
-      if (data && d.id) {
+      if (data && d.id && !deletedSet.has(d.id)) {
         firestoreList.push({ ...data, id: d.id });
       }
     });
@@ -155,6 +191,7 @@ export const updateAgendaStatus = async (
 };
 
 export const deleteAgendaItem = async (id: string): Promise<boolean> => {
+  markAgendaDeleted(id);
   const current = getLocalAgendaList();
   const updated = current.filter((a) => a.id !== id);
   safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(updated));
@@ -183,10 +220,11 @@ export const subscribeAgendaFromFirestore = (cb: (items: AgendaKelurahanItem[]) 
     return onSnapshot(
       q,
       (snapshot) => {
+        const deletedSet = new Set(getDeletedAgendaIds());
         const firestoreItems: AgendaKelurahanItem[] = [];
         snapshot.forEach((docSnap) => {
           const d = docSnap.data() as AgendaKelurahanItem;
-          if (d && docSnap.id) {
+          if (d && docSnap.id && !deletedSet.has(docSnap.id)) {
             firestoreItems.push({ ...d, id: docSnap.id });
           }
         });

@@ -840,6 +840,39 @@ Kembalikan jawaban HANYA dalam format JSON valid tanpa markdown backtick:
   }
 });
 
+// PKK Description Improvement Endpoint
+app.post('/api/gemini/improve-pkk', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || text.trim().length < 5) {
+      return res.json({ success: true, improvedText: text });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.json({ success: true, improvedText: text });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: `Tolong perbaiki dan buatkan uraian kegiatan PKK berikut menjadi Bahasa Indonesia yang baik, benar, formal, dan informatif. Pertahankan inti informasinya:\n\n"${text}"`,
+      config: {
+        temperature: 0.7,
+        topP: 0.95,
+        maxOutputTokens: 500,
+      }
+    });
+
+    const improvedText = response.text || text;
+    return res.json({ success: true, improvedText });
+  } catch (err: any) {
+    console.error('Gemini PKK Improvement Error:', err);
+    return res.json({ success: false, message: err.message, improvedText: req.body.text });
+  }
+});
+
+
 // DELETE kunjungan by ID
 app.delete('/api/kunjungan/:id', (req, res) => {
   try {

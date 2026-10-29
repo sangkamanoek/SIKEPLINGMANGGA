@@ -225,17 +225,17 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
     if (!text || text.trim().length < 5) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/gemini/formalize-pkk', {
+      const res = await fetch('/api/gemini/improve-pkk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
       const data = await res.json();
-      if (data.success && data.formalizedText) {
-        setter(data.formalizedText);
-        showAlert('Teks berhasil diformalkan dengan AI!', 'success');
+      if (data.success && data.improvedText) {
+        setter(data.improvedText);
+        showAlert('Uraian berhasil diperbaiki otomatis dengan AI!', 'success');
       } else {
-        showAlert(data.message || 'Gagal memformalkan teks.', 'error');
+        showAlert(data.message || 'Gagal memperbaiki teks secara otomatis.', 'error');
       }
     } catch (err) {
       showAlert('Koneksi AI terganggu.', 'error');
@@ -243,6 +243,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
       setLoading(false);
     }
   };
+
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

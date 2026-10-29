@@ -55,22 +55,31 @@ export const syncPkkDeviceDataToLiveFirestore = async (
     const b1 = safeGetLocalStorage<PkkBuku1Anggota[]>('sikepling_pkk_buku_1_v1', []);
     stats.buku1.total = b1.length;
     for (const item of b1) {
-      await setDoc(doc(db, 'pkk_buku_1', item.id), cleanFirestoreData(item), { merge: true });
+      await setDoc(doc(db, 'pkk_buku_1_anggota', item.id), cleanFirestoreData(item), { merge: true });
       stats.buku1.synced++;
     }
     
     const b4 = safeGetLocalStorage<PkkBuku4Notulen[]>('sikepling_pkk_buku_4_v1', []);
     stats.buku4.total = b4.length;
     for (const item of b4) {
-      await setDoc(doc(db, 'pkk_buku_4', item.id), cleanFirestoreData(item), { merge: true });
+      await setDoc(doc(db, 'pkk_buku_4_notulen', item.id), cleanFirestoreData(item), { merge: true });
       stats.buku4.synced++;
     }
 
     const b5 = safeGetLocalStorage<PkkBuku5Inventaris[]>('sikepling_pkk_buku_5_v1', []);
     stats.buku5.total = b5.length;
     for (const item of b5) {
-      await setDoc(doc(db, 'pkk_buku_5', item.id), cleanFirestoreData(item), { merge: true });
+      await setDoc(doc(db, 'pkk_buku_5_inventaris', item.id), cleanFirestoreData(item), { merge: true });
       stats.buku5.synced++;
+    }
+
+    // Posyandu
+    onProgress('Menyinkronkan Laporan Posyandu...');
+    const posyanduData = safeGetLocalStorage<any[]>('sikepling_pkk_posyandu_v1', []);
+    stats.posyandu.total = posyanduData.length;
+    for (const item of posyanduData) {
+      await setDoc(doc(db, 'pkk_posyandu_reports', item.id), cleanFirestoreData(item), { merge: true });
+      stats.posyandu.synced++;
     }
 
     onProgress('Selesai!');
