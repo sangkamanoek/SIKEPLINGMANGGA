@@ -43,6 +43,7 @@ import { LoginPage } from './components/LoginPage';
 import { TopNavigationBar } from './components/TopNavigationBar';
 
 import { getDefaultTargetsCapaianMap } from './data/targetsData';
+import { fetchAllReports, saveReportToServer } from './lib/reportsApi';
 import { getTodayLocalIso } from './lib/formatter';
 import { safeGetLocalStorage, safeSetLocalStorage } from './lib/safeStorage';
 
@@ -110,6 +111,13 @@ export default function App() {
     syncProfilesWithServer().then(() => {
       setActiveAccount((prev) => (prev ? getEffectiveProfile(prev) : prev));
     }).catch(() => {});
+
+    fetchAllReports().then((fetched) => {
+      if (Array.isArray(fetched) && fetched.length > 0) {
+        setReports(fetched);
+        safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(fetched));
+      }
+    }).catch(() => {});
   }, []);
 
   // Toast
@@ -163,7 +171,8 @@ export default function App() {
     const updated = [item, ...reports.filter((r) => r.id !== item.id)];
     setReports(updated);
     safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(updated));
-    showToast('Laporan harian berhasil disimpan!', 'success');
+    await saveReportToServer(item).catch(() => {});
+    showToast('Laporan harian berhasil disimpan dan disinkronkan!', 'success');
     handleTabChange('riwayat');
   };
 
