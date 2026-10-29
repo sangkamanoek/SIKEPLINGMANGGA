@@ -16,6 +16,7 @@ import {
   BookOpen,
   Mail,
   Award,
+  Calendar,
 } from 'lucide-react';
 import { AppTabType } from './MobileBottomNav';
 import { UserAccount, isPkkRole } from '../types';
@@ -60,6 +61,7 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
   // Standard Kelurahan & Kepling Navigation Menu Items
   const standardMenuItems: MenuItemConfig[] = [
     { id: 'hub', label: 'Pusat Menu', icon: Compass },
+    { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
     ...(!isKepling ? [{ id: 'monitoring' as AppTabType, label: 'Monitoring', icon: ShieldCheck }] : []),
     { id: 'capaian', label: 'Capaian Target', icon: Trophy },
     { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' as const },
@@ -70,6 +72,7 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
     { id: 'realisasi_pembangunan', label: 'Monitoring & Realisasi Pembangunan Wilayah', icon: Wrench },
   ];
+
 
   const menuItems = isPkk ? pkkMenuItems : standardMenuItems;
 

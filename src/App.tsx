@@ -19,6 +19,8 @@ import { SuratKedinasanView } from './components/SuratKedinasanView';
 import { DatabaseKeluargaView } from './components/DatabaseKeluargaView';
 import { RealisasiPembangunanView } from './components/RealisasiPembangunanView';
 import { DaftarTugasKhususView } from './components/DaftarTugasKhususView';
+import { AgendaKelurahanView } from './components/AgendaKelurahanView';
+
 import { AbsenKegiatanKhusus } from './components/AbsenKegiatanKhusus';
 import { KunjunganHarianView } from './components/KunjunganHarianView';
 import { DashboardPbbKasi } from './components/DashboardPbbKasi';
@@ -365,6 +367,15 @@ export default function App() {
             currentUser={activeAccount}
           />
         )}
+
+        {/* TAB: Agenda Kelurahan */}
+        {activeTab === 'agenda' && (
+          <AgendaKelurahanView
+            currentUser={activeAccount}
+            onShowToast={showToast}
+          />
+        )}
+
 
         {/* TAB: Presensi Apel & Kegiatan Khusus */}
         {activeTab === 'kegiatan_khusus' && (

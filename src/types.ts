@@ -785,3 +785,22 @@ export interface SuratKedinasanItem {
   updatedAt?: string;
 }
 
+export type StatusAgendaType = 'BELUM' | 'PROSES' | 'SELESAI' | 'BATAL';
+
+export interface AgendaKelurahanItem {
+  id: string;
+  namaKegiatan: string;
+  tanggalKegiatan: string; // YYYY-MM-DD
+  jamKegiatan?: string; // e.g. "09:00 WIB"
+  lokasi: string;
+  peserta: string; // Target participants / audience
+  statusSelesai: StatusAgendaType;
+  catatan?: string; // Notes or additional descriptions
+  penanggungJawab?: string;
+  createdByName?: string;
+  createdByRole?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+

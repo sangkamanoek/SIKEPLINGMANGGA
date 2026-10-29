@@ -136,11 +136,37 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   const [selectedKegiatan, setSelectedKegiatan] = useState<FilterKegiatanType>('ALL');
   const [selectedKategoriIsu, setSelectedKategoriIsu] = useState<FilterKategoriIsuType>('ALL');
   const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('ALL');
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('ALL');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  // Dynamic monthly list available for fast archive filtering
+  const availableMonthsList = useMemo(() => {
+    const set = new Set<string>();
+    const today = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const year = d.getFullYear();
+      const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+      set.add(`${year}-${monthStr}`);
+    }
+    items.forEach((item) => {
+      const iso = getReportIsoDate(item);
+      if (iso && iso.length >= 7) {
+        set.add(iso.slice(0, 7));
+      }
+    });
+    const array = Array.from(set).sort().reverse();
+    return array.map((prefix) => {
+      const [y, m] = prefix.split('-');
+      const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+      const label = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+      return { prefix, label };
+    });
+  }, [items]);
 
   // Performance Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -304,7 +330,12 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
         }
       }
 
-      // 3. Filter by Date Range Mode
+      // 3. Filter by Specific Month & Date Range Mode
+      if (selectedMonthFilter !== 'ALL') {
+        const reportIso = getReportIsoDate(item);
+        if (!reportIso || !reportIso.startsWith(selectedMonthFilter)) return false;
+      }
+
       if (dateFilterMode !== 'ALL') {
         const reportIso = getReportIsoDate(item);
         if (!reportIso) return false;
@@ -477,6 +508,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     setSelectedKegiatan('ALL');
     setSelectedKategoriIsu('ALL');
     setDateFilterMode('ALL');
+    setSelectedMonthFilter('ALL');
     setStartDate('');
     setEndDate('');
     setSelectedDate('');
@@ -488,6 +520,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     selectedKegiatan !== 'ALL' ||
     selectedKategoriIsu !== 'ALL' ||
     dateFilterMode !== 'ALL' ||
+    selectedMonthFilter !== 'ALL' ||
     startDate !== '' ||
     endDate !== '' ||
     selectedDate !== '';
@@ -495,7 +528,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   // Reset pagination to page 1 on filter/search change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedPetugas, selectedKegiatan, selectedKategoriIsu, dateFilterMode, startDate, endDate, selectedDate, pageSize]);
+  }, [searchTerm, selectedPetugas, selectedKegiatan, selectedKategoriIsu, dateFilterMode, selectedMonthFilter, startDate, endDate, selectedDate, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / (pageSize === -1 ? filtered.length || 1 : pageSize)));
   const paginatedItems = useMemo(() => {
@@ -670,7 +703,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
         </div>
 
         {/* Input Bar & Dropdowns Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {/* Keyword Search */}
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
@@ -682,6 +715,29 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
               placeholder="Cari lokasi, nama kepling, ringkasan..."
               className="w-full pl-10 pr-4 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
             />
+          </div>
+
+          {/* Filter by Arsip Bulan Spesifik */}
+          <div>
+            <select
+              id="filter-arsip-bulan"
+              value={selectedMonthFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedMonthFilter(val);
+                if (val !== 'ALL') {
+                  setDateFilterMode('ALL');
+                }
+              }}
+              className="w-full px-3 py-2.5 text-xs border border-emerald-300 rounded-xl bg-emerald-50/70 hover:bg-emerald-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-900 font-bold cursor-pointer"
+            >
+              <option value="ALL">🗓️ Semua Arsip Bulanan</option>
+              {availableMonthsList.map((m) => (
+                <option key={m.prefix} value={m.prefix}>
+                  📁 Arsip {m.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Filter by Kategori Isu Bidang */}
@@ -733,7 +789,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
               }}
               className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-bold"
             >
-              <option value="ALL">📅 Semua Rentang Waktu</option>
+              <option value="ALL">📅 Rentang Cepat</option>
               <option value="TODAY">⚡ Hari Ini ({todayIso})</option>
               <option value="LAST_7_DAYS">⏱️ 7 Hari Terakhir</option>
               <option value="LAST_30_DAYS">📆 30 Hari Terakhir</option>
@@ -1022,6 +1078,36 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Monthly Archive Summary Banner */}
+      {selectedMonthFilter !== 'ALL' && (
+        <div className="p-4 bg-gradient-to-r from-emerald-800 to-teal-900 text-white rounded-2xl shadow-md border border-emerald-600/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 font-bold shrink-0">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase text-amber-300 tracking-wider block">
+                📁 Arsip Laporan Bulanan Terpilih
+              </span>
+              <h3 className="text-sm font-bold text-white">
+                {availableMonthsList.find((m) => m.prefix === selectedMonthFilter)?.label || selectedMonthFilter}
+              </h3>
+              <p className="text-xs text-emerald-200 mt-0.5">
+                Ditemukan <strong>{filtered.length} laporan harian</strong> tersimpan dalam periode ini.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedMonthFilter('ALL')}
+            className="self-start sm:self-center px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+          >
+            <X className="w-4 h-4 text-rose-300" />
+            <span>Tampilkan Semua Bulan</span>
+          </button>
+        </div>
+      )}
 
       {/* List of Filtered Reports with Virtual Windowing */}
       {filtered.length > 0 ? (

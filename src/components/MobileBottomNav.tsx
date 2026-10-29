@@ -38,7 +38,9 @@ export type AppTabType =
   | 'posyandu_pkk'
   | 'surat_kedinasan'
   | 'buku_pkk'
-  | 'daftar_tugas_khusus';
+  | 'daftar_tugas_khusus'
+  | 'agenda';
+
 
 interface MobileBottomNavProps {
   activeTab: AppTabType;

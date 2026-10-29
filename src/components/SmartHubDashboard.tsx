@@ -46,7 +46,8 @@ interface SmartHubDashboardProps {
   reports: LaporanHarianItem[];
   attendanceList: AbsenApelItem[];
   unreadCounts?: Record<string, number>;
-  onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan' | 'daftar_tugas_khusus') => void;
+  onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan' | 'daftar_tugas_khusus' | 'agenda' | string) => void;
+
   onOpenAbsenApel: () => void;
   onOpenPPTModal: () => void;
   onOpenUpdateModal?: () => void;
@@ -524,6 +525,17 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         action: () => onNavigate('kegiatan_khusus'),
       },
       {
+        id: 'agenda',
+        title: 'Agenda & Jadwal Kegiatan Kelurahan',
+        desc: 'Jadwal rapat, gotong royong, posyandu, dan agenda resmi kelurahan lengkap dengan status selesai, lokasi, peserta, & ekspor Excel.',
+        category: 'laporan',
+        icon: Calendar,
+        iconBg: 'bg-emerald-50 text-emerald-700',
+        badge: 'AGENDA RESMI',
+        badgeColor: 'bg-emerald-100 text-emerald-900',
+        action: () => onNavigate('agenda'),
+      },
+      {
         id: 'daftar_tugas_khusus',
         title: 'Daftar Tugas Khusus & Dokumentasi',
         desc: 'Lihat seluruh perintah & instruksi dari Lurah serta unggah foto bukti dokumentasi pelaksanaannya di lapangan.',
@@ -534,6 +546,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         badgeColor: 'bg-amber-100 text-amber-900',
         action: () => onNavigate('daftar_tugas_khusus'),
       },
+
 
       // 2. DATA & LAYANAN (DATA & SERVICES)
       {
