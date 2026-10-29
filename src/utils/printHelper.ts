@@ -30,7 +30,7 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
         <style>
           @page {
             size: A4 portrait;
-            margin: 10mm 14mm 14mm 14mm;
+            margin: 10mm 12mm 12mm 12mm;
           }
           * {
             box-sizing: border-box;
@@ -42,12 +42,12 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
             padding: 0;
             background: #ffffff !important;
             color: #0f172a;
-            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Times New Roman', Times, serif, 'Segoe UI', sans-serif;
             font-size: 11px;
             line-height: 1.5;
           }
           body {
-            padding: 12px 16px;
+            padding: 10px 14px;
           }
           img {
             max-width: 100%;
@@ -60,16 +60,16 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
             border-collapse: collapse;
           }
           th, td {
-            border: 1px solid #cbd5e1;
-            padding: 7px 10px;
+            border: 1px solid #000000;
+            padding: 6px 8px;
             text-align: left;
-            font-size: 11px;
+            font-size: 10px;
             vertical-align: top;
           }
           th {
             background-color: #f1f5f9;
             font-weight: 700;
-            color: #1e293b;
+            color: #000000;
           }
           .avoid-break {
             page-break-inside: avoid !important;
@@ -124,7 +124,7 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
             setTimeout(() => {
               window.focus();
               window.print();
-            }, 350);
+            }, 300);
           }
 
           if (document.readyState === 'complete') {
@@ -137,8 +137,14 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
     </html>
   `;
 
-  // Try opening a popup window
-  const w = window.open('', '_blank');
+  // Try opening a popup window first
+  let w: Window | null = null;
+  try {
+    w = window.open('', '_blank');
+  } catch {
+    w = null;
+  }
+
   if (w) {
     w.document.open();
     w.document.write(printHtml);
@@ -171,4 +177,64 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
   }
 };
 
+/**
+ * Directly downloads the HTML report element as a .pdf file using html2pdf.js
+ */
+export const downloadPdfDocument = async (targetIdOrHtml: string, filename = 'Dokumen_PKK.pdf') => {
+  let elementToRender: HTMLElement | null = null;
+  let tempCreated = false;
 
+  if (targetIdOrHtml.startsWith('<')) {
+    elementToRender = document.createElement('div');
+    elementToRender.innerHTML = targetIdOrHtml;
+    elementToRender.style.padding = '15px';
+    elementToRender.style.background = '#ffffff';
+    document.body.appendChild(elementToRender);
+    tempCreated = true;
+  } else {
+    elementToRender = document.getElementById(targetIdOrHtml);
+  }
+
+  if (!elementToRender) {
+    console.warn('Element not found for PDF download:', targetIdOrHtml);
+    printOfficialDocument(targetIdOrHtml, filename);
+    return;
+  }
+
+  try {
+    // Preload & decode images inside element
+    const imgs = Array.from(elementToRender.querySelectorAll('img'));
+    await Promise.all(
+      imgs.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      })
+    );
+
+    const cleanFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+
+    const opt = {
+      margin: [8, 10, 10, 10], // top, left, bottom, right in mm
+      filename: cleanFilename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    };
+
+    // Dynamic import html2pdf
+    // @ts-ignore
+    const html2pdfModule = await import('html2pdf.js');
+    const html2pdfFn = html2pdfModule.default || html2pdfModule;
+    await html2pdfFn().set(opt).from(elementToRender).save();
+  } catch (err) {
+    console.warn('html2pdf download warning, falling back to print Official Document:', err);
+    printOfficialDocument(targetIdOrHtml, filename);
+  } finally {
+    if (tempCreated && elementToRender && document.body.contains(elementToRender)) {
+      document.body.removeChild(elementToRender);
+    }
+  }
+};

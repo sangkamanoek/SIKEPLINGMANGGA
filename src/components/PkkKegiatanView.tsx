@@ -31,8 +31,9 @@ import {
 } from '../lib/pkkKegiatanService';
 import { KopSuratPkk } from './KopSuratPkk';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
-import { printOfficialDocument } from '../utils/printHelper';
+import { printOfficialDocument, downloadPdfDocument } from '../utils/printHelper';
 import { compressMultipleFiles } from '../lib/imageCompressor';
+
 
 interface PkkKegiatanViewProps {
   currentUser: UserAccount;
@@ -344,6 +345,21 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
           <button
             type="button"
             onClick={() =>
+              downloadPdfDocument(
+                'lembar-cetak-rekap-semua-pkk',
+                `REKAPITULASI_KEGIATAN_PKK_KELURAHAN_MANGGA_${new Date().toISOString().split('T')[0]}.pdf`
+              )
+            }
+            className="px-3.5 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-extrabold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-2xs"
+            title="Unduh Berkas PDF Rekapitulasi Resmi Seluruh Kegiatan PKK"
+          >
+            <Download className="w-4 h-4 text-emerald-700" />
+            <span>Unduh PDF (.pdf)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
               printOfficialDocument(
                 'lembar-cetak-rekap-semua-pkk',
                 `REKAPITULASI_KEGIATAN_PKK_KELURAHAN_MANGGA_${new Date().toISOString().split('T')[0]}`
@@ -353,8 +369,9 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
             title="Cetak PDF Rekapitulasi Resmi Seluruh Kegiatan PKK Beserta Foto & Ringkasan"
           >
             <Printer className="w-4 h-4 text-emerald-700" />
-            <span>Cetak PDF Rekap PKK</span>
+            <span>Cetak / Pratinjau</span>
           </button>
+
 
           <button
             type="button"
@@ -703,13 +720,23 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => downloadPdfDocument('lembar-cetak-pkk-kegiatan', `LAPORAN_PKK_${selectedDetail.namaKegiatan.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`)}
+                  className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-black rounded-xl text-xs cursor-pointer flex items-center gap-1.5 shadow-sm transition-all"
+                  title="Unduh Berkas PDF Surat Resmi"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Unduh PDF</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => printOfficialDocument('lembar-cetak-pkk-kegiatan', `LAPORAN_PKK_${selectedDetail.namaKegiatan.replace(/[^a-zA-Z0-9]/g, '_')}`)}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs cursor-pointer flex items-center gap-2 shadow-sm transition-all"
+                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs cursor-pointer flex items-center gap-1.5 shadow-sm transition-all"
                   title="Cetak Surat Resmi Kegiatan PKK Lengkap dengan Foto & Kop Resmi"
                 >
                   <Printer className="w-4 h-4" />
-                  <span>Cetak Surat Resmi</span>
+                  <span>Cetak Surat</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setSelectedDetail(null)}
