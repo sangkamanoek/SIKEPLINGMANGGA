@@ -102,6 +102,20 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
 
   const filteredList = useMemo(() => {
     return suratList.filter((item) => {
+      // 1. Separation Logic: PKK vs Kelurahan
+      const itemIsPkk = isPkkRole(item.dibuatOlehRole || '') || 
+                        (item.asalSurat || '').toLowerCase().includes('pkk') || 
+                        (item.nomorSurat || '').toLowerCase().includes('pkk');
+      
+      const userIsPkk = isPkkRole(currentUser.role);
+      const userIsSuperAdmin = currentUser.role === 'super_admin';
+
+      if (!userIsSuperAdmin) {
+        if (userIsPkk && !itemIsPkk) return false;
+        if (!userIsPkk && itemIsPkk) return false;
+      }
+
+      // 2. Regular Filters
       if (filterJenis !== 'ALL' && item.jenisSurat !== filterJenis) return false;
       if (filterSifat !== 'ALL' && item.sifat !== filterSifat) return false;
       if (searchQuery.trim()) {
@@ -115,16 +129,16 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
       }
       return true;
     });
-  }, [suratList, filterJenis, filterSifat, searchQuery]);
+  }, [suratList, filterJenis, filterSifat, searchQuery, currentUser.role]);
 
   const stats = useMemo(() => {
-    const total = suratList.length;
-    const masuk = suratList.filter((x) => x.jenisSurat === 'SURAT_MASUK').length;
-    const keluar = suratList.filter((x) => x.jenisSurat === 'SURAT_KELUAR' || x.jenisSurat === 'NOTA_DINAS' || x.jenisSurat === 'SURAT_EDARAN').length;
-    const sk = suratList.filter((x) => x.jenisSurat === 'SK_LURAH' || x.jenisSurat === 'UNDANGAN').length;
-    const withPdf = suratList.filter((x) => !!x.fileUrl).length;
+    const total = filteredList.length;
+    const masuk = filteredList.filter((x) => x.jenisSurat === 'SURAT_MASUK').length;
+    const keluar = filteredList.filter((x) => x.jenisSurat === 'SURAT_KELUAR' || x.jenisSurat === 'NOTA_DINAS' || x.jenisSurat === 'SURAT_EDARAN').length;
+    const sk = filteredList.filter((x) => x.jenisSurat === 'SK_LURAH' || x.jenisSurat === 'UNDANGAN').length;
+    const withPdf = filteredList.filter((x) => !!x.fileUrl).length;
     return { total, masuk, keluar, sk, withPdf };
-  }, [suratList]);
+  }, [filteredList]);
 
   const handleOpenAdd = () => {
     setEditingSurat(null);

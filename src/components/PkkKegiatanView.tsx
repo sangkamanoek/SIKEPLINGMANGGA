@@ -218,6 +218,32 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
     e.target.value = '';
   };
 
+  const [isFormalizingUraian, setIsFormalizingUraian] = useState(false);
+  const [isFormalizingTindakLanjut, setIsFormalizingTindakLanjut] = useState(false);
+
+  const formalizeText = async (text: string, setter: (val: string) => void, setLoading: (val: boolean) => void) => {
+    if (!text || text.trim().length < 5) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/gemini/formalize-pkk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (data.success && data.formalizedText) {
+        setter(data.formalizedText);
+        showAlert('Teks berhasil diformalkan dengan AI!', 'success');
+      } else {
+        showAlert(data.message || 'Gagal memformalkan teks.', 'error');
+      }
+    } catch (err) {
+      showAlert('Koneksi AI terganggu.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNamaKegiatan.trim()) {
@@ -1194,7 +1220,23 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Uraian Hasil Kegiatan</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700">Uraian Hasil Kegiatan</label>
+                  <button
+                    type="button"
+                    onClick={() => formalizeText(formUraian, setFormUraian, setIsFormalizingUraian)}
+                    disabled={isFormalizingUraian || formUraian.trim().length < 5}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-tosca-50 text-tosca-700 hover:bg-tosca-100 border border-tosca-200 text-[10px] font-black transition-all cursor-pointer disabled:opacity-50"
+                    title="Otomatis perbaiki bahasa menjadi formal & profesional dengan AI"
+                  >
+                    {isFormalizingUraian ? (
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3 h-3" />
+                    )}
+                    <span>{isFormalizingUraian ? 'Memproses...' : 'Formalkan Bahasa (AI Magic)'}</span>
+                  </button>
+                </div>
                 <textarea
                   rows={3}
                   value={formUraian}
@@ -1206,7 +1248,23 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Rencana Tindak Lanjut (Opsional)</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700">Rencana Tindak Lanjut (Opsional)</label>
+                  <button
+                    type="button"
+                    onClick={() => formalizeText(formTindakLanjut, setFormTindakLanjut, setIsFormalizingTindakLanjut)}
+                    disabled={isFormalizingTindakLanjut || formTindakLanjut.trim().length < 5}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-tosca-50 text-tosca-700 hover:bg-tosca-100 border border-tosca-200 text-[10px] font-black transition-all cursor-pointer disabled:opacity-50"
+                    title="Otomatis perbaiki bahasa menjadi formal & profesional dengan AI"
+                  >
+                    {isFormalizingTindakLanjut ? (
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3 h-3" />
+                    )}
+                    <span>{isFormalizingTindakLanjut ? 'Memproses...' : 'Formalkan Bahasa (AI Magic)'}</span>
+                  </button>
+                </div>
                 <input
                   type="text"
                   value={formTindakLanjut}

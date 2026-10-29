@@ -1933,6 +1933,54 @@ app.get('/api/reverse-geocode', async (req, res) => {
   }
 });
 
+// AI Formalize Text Endpoint for PKK Reports
+app.post('/api/gemini/formalize-pkk', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || typeof text !== 'string' || text.trim().length < 5) {
+      return res.status(400).json({ success: false, message: 'Teks terlalu pendek atau tidak valid.' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ success: false, message: 'AI Service tidak terkonfigurasi (API Key missing).' });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const systemInstruction = `Anda adalah asisten administrasi profesional untuk Tim Penggerak PKK Kelurahan Mangga.
+Tugas Anda: Mengubah catatan kegiatan yang tidak formal, penuh singkatan, dan berantakan menjadi kalimat Bahasa Indonesia yang formal, baku (sesuai PUEBI), profesional, dan mudah dipahami untuk laporan resmi.
+
+Aturan Penting:
+1. Perbaiki singkatan umum (tp -> Tim Penggerak, pkk -> PKK, kel -> Kelurahan, lk -> Lingkungan, ttg -> tentang, utk -> untuk, jg -> juga, dsb).
+2. Gunakan nada bicara yang sopan dan administratif.
+3. Pastikan nama jabatan dan instansi ditulis dengan huruf kapital yang benar.
+4. Pertahankan substansi informasi tanpa menambah informasi fiktif.
+5. Jika teks sudah formal, lakukan perbaikan tata bahasa minor jika diperlukan.
+
+Kembalikan HANYA teks hasil perbaikan tanpa penjelasan tambahan atau tanda kutip pembungkus.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text }],
+        },
+      ],
+      config: {
+        systemInstruction,
+        temperature: 0.1,
+      },
+    });
+
+    const formalizedText = response.text?.trim() || text;
+    return res.json({ success: true, formalizedText });
+  } catch (err: any) {
+    console.error('Error in /api/gemini/formalize-pkk:', err);
+    return res.status(500).json({ success: false, message: 'Gagal memproses teks dengan AI.' });
+  }
+});
+
 // Fallback catch-all for any unhandled /api requests on Vercel/Cloud Run
 app.use('/api', (_req, res) => {
   res.status(200).json({
