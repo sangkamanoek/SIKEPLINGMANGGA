@@ -42,7 +42,7 @@ export const isReportDeleted = (r: LaporanHarianItem): boolean => {
 export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   const map = new Map<string, LaporanHarianItem>();
 
-  // 1. Fetch online directly from Server API buffer (/api/reports) - fastest, lightweight for low-end mobile
+  // 1. Fetch directly from Server API buffer (/api/reports)
   try {
     const res = await fetch(`/api/reports?light=true&_t=${Date.now()}`, {
       cache: 'no-store',
@@ -54,7 +54,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     if (res.ok) {
       const json = await res.json();
       const serverReports = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
-      if (Array.isArray(serverReports) && serverReports.length > 0) {
+      if (Array.isArray(serverReports)) {
         serverReports.forEach((r: LaporanHarianItem) => {
           if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
             map.set(r.id, r);
@@ -66,26 +66,39 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     console.warn('[Online API] Error reading /api/reports:', e);
   }
 
-  // 2. Only if Server API returned 0 reports, fallback to Firebase Firestore getDocs to conserve mobile RAM/bandwidth
-  if (map.size === 0) {
-    try {
-      const firestoreReports = await fetchReportsFromFirestore();
-      if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
-        firestoreReports.forEach((r) => {
-          if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
+  // 2. ALWAYS fetch from Firestore ('reports' & 'laporan_harian' collections) to ensure old reports are retrieved
+  try {
+    const firestoreReports = await fetchReportsFromFirestore();
+    if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
+      firestoreReports.forEach((r) => {
+        if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
+          const existing = map.get(r.id);
+          map.set(r.id, existing ? { ...r, ...existing } : r);
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('[Online Firestore] Error reading Firestore reports:', err);
+  }
+
+  // 3. ALSO merge local storage reports
+  try {
+    const localRaw = safeGetLocalStorage<LaporanHarianItem[]>(LOCAL_STORAGE_KEY_LAPORAN, []);
+    if (Array.isArray(localRaw)) {
+      localRaw.forEach((r) => {
+        if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
+          if (!map.has(r.id)) {
             map.set(r.id, r);
           }
-        });
-      }
-    } catch (err) {
-      console.warn('[Online Firestore] Error reading Firestore reports:', err);
+        }
+      });
     }
-  }
+  } catch (e) {}
 
   const merged = Array.from(map.values());
   merged.sort((a, b) => {
-    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.tanggal ? new Date(a.tanggal).getTime() : 0);
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.tanggal ? new Date(b.tanggal).getTime() : 0);
     return timeB - timeA;
   });
 

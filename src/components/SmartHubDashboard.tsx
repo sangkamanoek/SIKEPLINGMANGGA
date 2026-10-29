@@ -23,7 +23,11 @@ import {
   FileSpreadsheet,
   Wrench,
   Wallet,
+  RefreshCw,
+  Database,
 } from 'lucide-react';
+import { saveReportToFirestore } from '../lib/firestoreService';
+import { fetchAllReports } from '../lib/reportsApi';
 import { UserAccount, LaporanHarianItem, AbsenApelItem } from '../types';
 import { DeadlineNotifAlert } from './DeadlineNotifAlert';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
@@ -95,6 +99,28 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
     } catch {}
     return DEFAULT_PBB_YEAR;
   });
+
+  const [isSyncingFirestore, setIsSyncingFirestore] = useState(false);
+
+  const handleSyncFirestore = async () => {
+    setIsSyncingFirestore(true);
+    try {
+      for (const r of reports) {
+        if (r && r.id) {
+          await saveReportToFirestore(r).catch(() => {});
+        }
+      }
+      const fresh = await fetchAllReports();
+      if (onForceSyncAll) {
+        await onForceSyncAll();
+      }
+      alert(`Berhasil menyinkronkan ${fresh.length} data laporan harian ke Cloud Firestore!`);
+    } catch (err) {
+      alert('Gagal menyinkronkan data ke Firestore.');
+    } finally {
+      setIsSyncingFirestore(false);
+    }
+  };
 
   // Reactive live SPPT list state
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => {
@@ -540,7 +566,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         : []),
       {
         id: 'realisasi_pembangunan',
-        title: 'MONITORING & REALISASI PEMBANGUNAN WILAYAH',
+        title: 'Monitoring & Realisasi Pembangunan Wilayah',
         desc: 'Monitoring realisasi perbaikan jalan, drainase, pemasangan paving blok, lampu LPJU, dan penambahan tiang baru di wilayah masing-masing.',
         category: 'laporan',
         icon: Wrench,
@@ -676,6 +702,16 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                 <span>Info Update</span>
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleSyncFirestore}
+              disabled={isSyncingFirestore}
+              className="flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+              title="Sinkronkan seluruh data laporan harian ke Cloud Firestore"
+            >
+              <RefreshCw className={`w-4 h-4 text-indigo-200 ${isSyncingFirestore ? 'animate-spin' : ''}`} />
+              <span>{isSyncingFirestore ? 'Menyinkronkan...' : 'Sinkronkan Firestore'}</span>
+            </button>
             <button
               onClick={onOpenPPTModal}
               className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer"

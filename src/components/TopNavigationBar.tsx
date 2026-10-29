@@ -68,7 +68,7 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     ...(!isKepling ? [{ id: 'surat_kedinasan' as AppTabType, label: 'Surat Kedinasan', icon: FileText }] : []),
     { id: 'database_keluarga', label: 'Data Keluarga', icon: Building2 },
     { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
-    { id: 'realisasi_pembangunan', label: 'MONITORING & REALISASI PEMBANGUNAN WILAYAH', icon: Wrench },
+    { id: 'realisasi_pembangunan', label: 'Monitoring & Realisasi Pembangunan Wilayah', icon: Wrench },
   ];
 
   const menuItems = isPkk ? pkkMenuItems : standardMenuItems;
