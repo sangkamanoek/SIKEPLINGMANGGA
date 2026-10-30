@@ -46,7 +46,8 @@ import { TopNavigationBar } from './components/TopNavigationBar';
 import { SyncVerificationModal } from './components/SyncVerificationModal';
 
 import { getDefaultTargetsCapaianMap } from './data/targetsData';
-import { fetchAllReports, saveReportToServer } from './lib/reportsApi';
+import { fetchAllReports, saveReportToServer, subscribeReportsFromFirestore } from './lib/reportsApi';
+import { subscribeKunjungan, KunjunganWargaData } from './lib/kunjunganService';
 import { getTodayLocalIso } from './lib/formatter';
 import { safeGetLocalStorage, safeSetLocalStorage } from './lib/safeStorage';
 
@@ -90,6 +91,7 @@ export default function App() {
   const [reports, setReports] = useState<LaporanHarianItem[]>(() => {
     return safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_LOCAL_KEY, []);
   });
+  const [kunjunganList, setKunjunganList] = useState<KunjunganWargaData[]>([]);
   const [attendanceList, setAttendanceList] = useState<AbsenApelItem[]>([]);
   const [targetsMap] = useState(getDefaultTargetsCapaianMap);
   const [selectedRiwayatKepling, setSelectedRiwayatKepling] = useState<string>('');
@@ -116,15 +118,33 @@ export default function App() {
       setActiveAccount((prev) => (prev ? getEffectiveProfile(prev) : prev));
     }).catch(() => {});
 
-    fetchAllReports().then((fetched) => {
-      if (Array.isArray(fetched) && fetched.length > 0) {
+    // Use real-time subscription for reports
+    const unsub = subscribeReportsFromFirestore((fetched) => {
+      if (Array.isArray(fetched)) {
         setReports(fetched);
         safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(fetched));
       }
-    }).catch(() => {});
+    });
+
+    // Use real-time subscription for kunjungan
+    const unsubKunjungan = subscribeKunjungan((fetched) => {
+      // Logic to update kunjunganList state
+      setKunjunganList(fetched);
+    });
     
-    // Trigger silent background sync
+    // Trigger silent background sync for other data
+    const syncInterval = setInterval(() => {
+      import('./lib/syncManager').then(m => m.runSilentBackgroundSync()).catch(console.error);
+    }, 600000); // 10 minutes
+    
+    // Initial sync
     import('./lib/syncManager').then(m => m.runSilentBackgroundSync()).catch(console.error);
+    
+    return () => {
+      unsub();
+      unsubKunjungan();
+      clearInterval(syncInterval);
+    };
   }, []);
 
   // Toast
@@ -392,6 +412,7 @@ export default function App() {
         {activeTab === 'kunjungan' && (
           <KunjunganHarianView
             currentUser={activeAccount}
+            kunjunganList={kunjunganList}
           />
         )}
 

@@ -137,6 +137,19 @@ export const SyncVerificationModal: React.FC<SyncVerificationModalProps> = ({
               <RefreshCw className={`w-3.5 h-3.5 text-tosca-600 ${isLoading ? 'animate-spin' : ''}`} />
               <span>{isLoading ? 'Memeriksa...' : 'Periksa Ulang Data'}</span>
             </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const { runDiagnosticReport } = await import('../lib/syncDiagnostics');
+                const nowIso = new Date().toISOString().split('T')[0].substring(0, 7);
+                runDiagnosticReport(nowIso);
+                showToast('Laporan diagnostik telah dibuat di console!', 'info');
+              }}
+              className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5 text-purple-600" />
+              <span>Diagnostik</span>
+            </button>
             <span className="text-xs text-slate-500 font-medium hidden sm:inline">
               Status: {totalIssues === 0 ? '✨ Semua Data Sinkron' : `⚠️ Ditemukan ${totalIssues} Perbedaan`}
             </span>
