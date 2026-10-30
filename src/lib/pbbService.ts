@@ -456,20 +456,11 @@ export async function deletePbbFromApi(id: string, year: number = DEFAULT_PBB_YE
  */
 export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR): Promise<SpptPbbItem[]> {
   let currentList: SpptPbbItem[] = [];
+  const colName = `${PBB_COLLECTION_PREFIX}${year}`;
 
-  // 1. Fetch from Express Server Buffer (/api/pbb)
+  // 1. Fetch from Firebase Firestore (Priority)
   try {
-    const apiItems = await fetchPbbFromApi(year);
-    if (apiItems.length > 0) {
-      currentList = smartMergeSpptItems(currentList, apiItems);
-    }
-  } catch (err) {
-    console.warn(`Notice reading PBB server buffer for ${year}:`, err);
-  }
-
-  // 2. Fetch from Firebase Firestore
-  try {
-    const colName = `${PBB_COLLECTION_PREFIX}${year}`;
+    console.log(`[PBB Fetch] Fetching from Firestore: ${colName}`);
     const colRef = collection(db, colName);
     const snapshot = await getDocs(colRef);
     const firestoreItems: SpptPbbItem[] = [];
@@ -481,16 +472,30 @@ export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR)
       }
     });
 
+    console.log(`[PBB Fetch] Firestore returned ${firestoreItems.length} items for ${colName}`);
+
     if (firestoreItems.length > 0) {
       currentList = smartMergeSpptItems(currentList, firestoreItems);
-      return currentList;
+    } else if (snapshot.size === 0) {
+      console.warn(`[PBB Fetch] Firestore collection ${colName} is empty.`);
     }
-
-    return currentList;
   } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, `${PBB_COLLECTION_PREFIX}${year}`);
-    return currentList;
+    console.error(`[PBB Fetch] Firestore error for ${colName}:`, err);
+    handleFirestoreError(err, OperationType.LIST, colName);
   }
+
+  // 2. Fetch from Express Server Buffer (/api/pbb) (Fallback/Merge)
+  try {
+    const apiItems = await fetchPbbFromApi(year);
+    if (apiItems.length > 0) {
+      console.log(`[PBB Fetch] Buffer returned ${apiItems.length} items`);
+      currentList = smartMergeSpptItems(currentList, apiItems);
+    }
+  } catch (err) {
+    console.warn(`[PBB Fetch] Buffer warning for ${year}:`, err);
+  }
+
+  return currentList;
 }
 
 /**
@@ -712,7 +717,7 @@ export function subscribePbbSpptFromFirestore(
     } catch {
       // ignore
     }
-  }, 30000);
+  }, 600000);
 
   return () => {
     firestoreUnsub();

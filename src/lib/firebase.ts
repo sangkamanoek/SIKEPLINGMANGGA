@@ -24,9 +24,23 @@ export enum OperationType {
   GET = 'get',
 }
 
-export const handleFirestoreError = (error: any, _op?: any, _path?: string) => {
-  console.warn('Firestore error handled:', error, _op, _path);
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+}
+
+export const handleFirestoreError = (error: any, operationType: OperationType, path: string | null) => {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    operationType,
+    path,
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
 };
+
 
 export const getAccessToken = async () => 'mock_token';
 
