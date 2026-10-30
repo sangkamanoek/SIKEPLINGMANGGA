@@ -8,6 +8,7 @@ import {
   shouldFilterReport,
 } from './firestoreService';
 import { purgeAllClientCache } from './purgeCache';
+import { safeGetLocalStorage } from './safeStorage';
 
 export const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
 export const LOCAL_STORAGE_KEY_DELETED = 'kepling_deleted_reports_v1';

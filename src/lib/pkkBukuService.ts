@@ -114,7 +114,10 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
       const q = query(collection(db, BUKU1_COL), orderBy('createdAt', 'desc'));
       unsub = onSnapshot(q, (snap) => {
         const items: PkkBuku1Anggota[] = [];
-        snap.forEach((d) => items.push(d.data() as PkkBuku1Anggota));
+        snap.forEach((d) => {
+          const data = d.data() as PkkBuku1Anggota;
+          items.push({ ...data, id: d.id });
+        });
         safeSetLocalStorage(BUKU1_KEY, JSON.stringify(items));
         onUpdate(items);
       });
@@ -183,7 +186,10 @@ export const subscribeBuku4 = (onUpdate: (items: PkkBuku4Notulen[]) => void) => 
       const q = query(collection(db, BUKU4_COL), orderBy('createdAt', 'desc'));
       unsub = onSnapshot(q, (snap) => {
         const items: PkkBuku4Notulen[] = [];
-        snap.forEach((d) => items.push(d.data() as PkkBuku4Notulen));
+        snap.forEach((d) => {
+          const data = d.data() as PkkBuku4Notulen;
+          items.push({ ...data, id: d.id });
+        });
         safeSetLocalStorage(BUKU4_KEY, JSON.stringify(items));
         onUpdate(items);
       });
@@ -252,7 +258,10 @@ export const subscribeBuku5 = (onUpdate: (items: PkkBuku5Inventaris[]) => void) 
       const q = query(collection(db, BUKU5_COL), orderBy('createdAt', 'desc'));
       unsub = onSnapshot(q, (snap) => {
         const items: PkkBuku5Inventaris[] = [];
-        snap.forEach((d) => items.push(d.data() as PkkBuku5Inventaris));
+        snap.forEach((d) => {
+          const data = d.data() as PkkBuku5Inventaris;
+          items.push({ ...data, id: d.id });
+        });
         safeSetLocalStorage(BUKU5_KEY, JSON.stringify(items));
         onUpdate(items);
       });

@@ -87,28 +87,18 @@ export const getLocalAgendaList = (): AgendaKelurahanItem[] => {
   const deletedSet = new Set(getDeletedAgendaIds());
   const local = safeGetLocalStorage<AgendaKelurahanItem[]>(AGENDA_STORAGE_KEY, []);
   
+  // 1. If we have local user-saved data, use it (filtered by deletions)
   if (local && Array.isArray(local) && local.length > 0) {
-    return local.filter(x => !deletedSet.has(x.id));
+    const filteredLocal = local.filter(x => !deletedSet.has(x.id));
+    // If user has saved things but then deleted everything, we should probably respect that.
+    // However, if the deletion was just of a sample, we might still want to see the rest.
+    if (filteredLocal.length > 0 || local.some(x => !SAMPLE_AGENDA_ITEMS.some(s => s.id === x.id))) {
+      return filteredLocal;
+    }
   }
 
-  // If local is empty but NOT due to user deletion, we can seed.
-  // However, to be safe, if deletedSet is NOT empty, it means the user has interacted.
-  if (deletedSet.size > 0) return [];
-
-  // Migration from v1
-  const v1 = safeGetLocalStorage<AgendaKelurahanItem[]>('sikepling_agenda_kelurahan_v1', []);
-  if (v1 && v1.length > 0) {
-    const cleaned = v1.filter(x => !deletedSet.has(x.id));
-    safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(cleaned));
-    return cleaned;
-  }
-
-  // Seed initial sample data if completely fresh
-  const filteredSamples = SAMPLE_AGENDA_ITEMS.filter(x => !deletedSet.has(x.id));
-  if (filteredSamples.length > 0) {
-    safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(filteredSamples));
-  }
-  return filteredSamples;
+  // 2. If no user data, return sample data (filtered by deletions)
+  return SAMPLE_AGENDA_ITEMS.filter(x => !deletedSet.has(x.id));
 };
 
 export const fetchAgendaFromFirestore = async (): Promise<AgendaKelurahanItem[]> => {

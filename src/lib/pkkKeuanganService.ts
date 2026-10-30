@@ -50,7 +50,10 @@ export const subscribePkkKeuangan = (
       const q = query(collection(db, KEUANGAN_COLLECTION), orderBy('tanggal', 'desc'));
       unsub = onSnapshot(q, (snap) => {
         const items: TransaksiKeuanganPkk[] = [];
-        snap.forEach((d) => items.push(d.data() as TransaksiKeuanganPkk));
+        snap.forEach((d) => {
+          const data = d.data() as TransaksiKeuanganPkk;
+          items.push({ ...data, id: d.id });
+        });
         safeSetLocalStorage(KEUANGAN_STORAGE_KEY, JSON.stringify(items));
         onUpdate(items);
       });

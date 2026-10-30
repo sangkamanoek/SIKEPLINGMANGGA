@@ -145,7 +145,7 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
   let unsub: Unsubscribe | null = null;
   try {
     if (db) {
-      const q = query(collection(db, KUNJUNGAN_COLLECTION), orderBy('createdAt', 'desc'));
+      const q = collection(db, KUNJUNGAN_COLLECTION);
       unsub = onSnapshot(
         q,
         (snapshot) => {

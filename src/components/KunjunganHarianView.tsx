@@ -85,6 +85,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  const [selectedRecapLingkungan, setSelectedRecapLingkungan] = useState<number | null>(null);
 
   const isKepling = currentUser?.role === 'kepling';
   const userLingkungan = currentUser?.lingkungan || '';
@@ -114,21 +115,6 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     }
     return 0;
   };
-
-  // 24 Lingkungan Counts calculation
-  const visitsPerLingkungan = useMemo(() => {
-    const counts: { [key: number]: number } = {};
-    for (let i = 1; i <= 24; i++) {
-      counts[i] = 0;
-    }
-    visits.forEach((v) => {
-      const idx = getLingkunganIndex(v.lingkungan);
-      if (idx >= 1 && idx <= 24) {
-        counts[idx] = (counts[idx] || 0) + 1;
-      }
-    });
-    return counts;
-  }, [visits]);
 
   // Date filtering logic
   const filteredVisits = useMemo(() => {
@@ -212,6 +198,21 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     customEndDate,
     searchTerm,
   ]);
+
+  // 24 Lingkungan Counts calculation
+  const visitsPerLingkungan = useMemo(() => {
+    const counts: { [key: number]: number } = {};
+    for (let i = 1; i <= 24; i++) {
+      counts[i] = 0;
+    }
+    (isKepling ? filteredVisits : visits).forEach((v) => {
+      const idx = getLingkunganIndex(v.lingkungan);
+      if (idx >= 1 && idx <= 24) {
+        counts[idx] = (counts[idx] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [visits, filteredVisits, isKepling]);
 
   // Photo count
   const fotoCount = useMemo(() => {
@@ -1028,9 +1029,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
           <div className="flex items-center gap-3 shrink-0">
             <div className="bg-[#1f5f4b] text-white px-5 py-2.5 rounded-xl text-center shadow-xs">
               <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-200">
-                TOTAL SELURUH KUNJUNGAN
+                TOTAL KUNJUNGAN {isKepling ? userLingkungan.toUpperCase() : 'SELURUH'}
               </div>
-              <div className="text-lg font-black tracking-tight">{visits.length} Warga</div>
+              <div className="text-lg font-black tracking-tight">
+                {isKepling ? filteredVisits.length : visits.length} Warga
+              </div>
             </div>
 
             <button
@@ -1050,35 +1053,33 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
             const lingkNum = idx + 1;
             const rom = ROMAN_NUMERALS[idx];
             const count = visitsPerLingkungan[lingkNum] || 0;
-            const isSelected = selectedLingkungan === `Lingkungan ${rom}` || selectedLingkungan === `Lingkungan ${lingkNum}`;
+            
+            // If Kepling, only show their own neighborhood
+            if (isKepling && !userLingkungan.toLowerCase().includes(`lingkungan ${lingkNum}`) && !userLingkungan.toLowerCase().includes(`lk ${lingkNum}`)) {
+              return null;
+            }
 
             return (
               <button
-                type="button"
                 key={lingkNum}
-                onClick={() => {
-                  if (isSelected) {
-                    setSelectedLingkungan('ALL');
-                  } else {
-                    setSelectedLingkungan(`Lingkungan ${rom}`);
-                  }
-                }}
-                className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer ${
-                  isSelected
-                    ? 'border-emerald-500 bg-emerald-100/70 shadow-sm ring-2 ring-emerald-400'
-                    : count > 0
-                    ? 'border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50'
-                    : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 opacity-80'
+                type="button"
+                onClick={() => setSelectedRecapLingkungan(lingkNum)}
+                className={`flex flex-col p-3 rounded-2xl border transition-all text-left group hover:scale-[1.02] cursor-pointer ${
+                  count > 0 ? 'bg-emerald-50 border-emerald-100 hover:border-emerald-300' : 'bg-slate-50 border-slate-100'
                 }`}
               >
-                <div className="text-[11px] font-bold text-slate-700 mb-0.5">
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1 group-hover:text-emerald-600 transition-colors">
                   Lingkungan {rom}
                 </div>
-                <div className="text-xs">
-                  <span className={`font-black text-sm ${count > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-xl font-black ${count > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
                     {count}
                   </span>{' '}
                   <span className="text-[11px] text-slate-500 font-medium">Warga</span>
+                </div>
+                <div className="mt-1 text-[9px] font-bold text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                  <Eye className="w-2.5 h-2.5" />
+                  <span>Lihat Nama</span>
                 </div>
               </button>
             );
@@ -1093,21 +1094,24 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
             </div>
             <div>
               <div className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-100">
-                TOTAL SELURUH KUNJUNGAN
+                TOTAL KUNJUNGAN {isKepling ? userLingkungan.toUpperCase() : 'SELURUH'}
               </div>
               <div className="text-[11px] text-emerald-200 font-semibold">
-                AKUMULASI SAMBANG WARGA 24 LINGKUNGAN (HARI INI ({getTodayLocalIso()}))
+                AKUMULASI SAMBANG WARGA {isKepling ? userLingkungan.toUpperCase() : '24 LINGKUNGAN'} (HARI INI ({getTodayLocalIso()}))
               </div>
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl sm:text-4xl font-black tracking-tight">{visits.length}</span>
+            <span className="text-3xl sm:text-4xl font-black tracking-tight">
+              {isKepling ? filteredVisits.length : visits.length}
+            </span>
             <span className="text-sm sm:text-base font-extrabold uppercase tracking-wider text-emerald-200">
               WARGA
             </span>
           </div>
         </div>
       </div>
+
 
       {/* 5. TREN KUNJUNGAN HARIAN (Chart Section) */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
@@ -1211,6 +1215,75 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                 className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md cursor-pointer"
               >
                 Hapus Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Names List Modal */}
+      {selectedRecapLingkungan !== null && (
+        <div
+          onClick={() => setSelectedRecapLingkungan(null)}
+          className="modal-preview p-4 bg-black/60 backdrop-blur-xs flex items-center justify-center cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl flex flex-col max-h-[80vh]"
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h4 className="font-black text-slate-900 text-lg">
+                  Daftar Warga Sambang
+                </h4>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+                  Lingkungan {ROMAN_NUMERALS[selectedRecapLingkungan - 1]}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedRecapLingkungan(null)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-500 cursor-pointer transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-2">
+              {(isKepling ? filteredVisits : visits)
+                .filter((v) => {
+                  const idx = getLingkunganIndex(v.lingkungan);
+                  return idx === selectedRecapLingkungan;
+                })
+                .sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''))
+                .map((v, i) => (
+                  <div key={v.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/30 transition-all flex items-center justify-between group">
+                    <div>
+                      <div className="font-bold text-slate-900 text-sm">{v.namaWarga}</div>
+                      <div className="text-[10px] text-slate-500 font-medium">{v.alamat}</div>
+                      <div className="text-[10px] text-emerald-600 font-bold mt-0.5">{v.tanggal}</div>
+                    </div>
+                    {v.fotoUrl && (
+                      <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200">
+                        <img src={v.fotoUrl} className="w-full h-full object-cover" alt="Warga" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              {(isKepling ? filteredVisits : visits).filter(v => getLingkunganIndex(v.lingkungan) === selectedRecapLingkungan).length === 0 && (
+                <div className="py-12 text-center text-slate-400">
+                  <Users className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm font-bold">Belum ada data kunjungan tercatat</p>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedRecapLingkungan(null)}
+                className="px-6 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-colors shadow-sm cursor-pointer"
+              >
+                Selesai
               </button>
             </div>
           </div>

@@ -1,127 +1,305 @@
 import { printOfficialDocument } from './printHelper';
 
-export const generatePkkCardPdf = async (item: any, photoUrl?: string | null) => {
-  if (!item) return;
+/**
+ * Standard ID Card Dimensions (CR80 Specification):
+ * Width: 85.60 mm
+ * Height: 53.98 mm
+ */
 
-  const photo = photoUrl || item.pasphotoUrl || '/logo_pkk.jpg';
-  const cardId = `kta-card-print-${Date.now()}`;
+export const generateSinglePkkCardHtml = (item: any): string => {
+  if (!item) return '';
 
-  const cardHtml = `
-    <div id="${cardId}" style="width: 100%; max-width: 180mm; margin: 0 auto; padding: 15px; font-family: 'Times New Roman', serif; background: #ffffff; color: #000000; box-sizing: border-box;">
-      <!-- Header Kop PKK -->
-      <div style="display: flex; items-center; justify-content: space-between; border-bottom: 3px double #134e4a; padding-bottom: 10px; margin-bottom: 15px;">
-        <div style="width: 70px; text-align: center;">
-          <img src="/logo_pkk.jpg" alt="Logo PKK" style="width: 65px; height: 65px; object-fit: contain;" />
+  const photo = item.pasphotoUrl || item.fotoUrl || '/logo_pkk.jpg';
+  const regNo = `12.71.10.2001.${String(item.id || '0045').replace(/[^0-9]/g, '').slice(-4).padStart(4, '0')}`;
+  const namaFormatted = (item.nama || 'NUR AINI, S.Pd.').toUpperCase();
+  const jabatanFormatted = (item.jabatan || 'ANGGOTA TP PKK KELURAHAN').toUpperCase();
+  const ttlFormatted = `${(item.tempatLahir || 'MEDAN').toUpperCase()}, ${item.tanggalLahir || '16-04-1991'}`;
+  const genderFormatted = item.jenisKelamin === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN';
+  const alamatFormatted = (item.alamat || 'JL. BUNGA RINTE NO. 12, LINGKUNGAN IV').toUpperCase();
+  const kelurahanFormatted = 'MANGGA';
+  const kecamatanFormatted = 'MEDAN TUNTUNGAN';
+  const kotaFormatted = 'KOTA MEDAN';
+  const provinsiFormatted = 'SUMATERA UTARA';
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
+    `KTA-PKK|${regNo}|${namaFormatted}|${jabatanFormatted}|KELURAHAN_MANGGA`
+  )}`;
+
+  return `
+    <div style="
+      width: 85.6mm;
+      height: 53.98mm;
+      box-sizing: border-box;
+      border-radius: 3.2mm;
+      overflow: hidden;
+      position: relative;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #0f172a;
+      background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 45%, #bae6fd 100%);
+      border: 1px solid #0284c7;
+      margin: 0 auto;
+      page-break-inside: avoid;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    ">
+      <!-- HEADER BANNER -->
+      <div style="
+        background: linear-gradient(90deg, #0284c7 0%, #0369a1 100%);
+        padding: 2mm 2.8mm;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        gap: 2.5mm;
+        border-bottom: 0.8mm solid #f59e0b;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      ">
+        <!-- Logo PKK - Zoom in 1.70x untuk membuang margin putih gambar JPEG & memperbesar emblem logo -->
+        <div style="
+          width: 12.5mm;
+          height: 12.5mm;
+          border-radius: 50%;
+          background: #ffffff;
+          border: 0.3mm solid #ffffff;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+          overflow: hidden;
+        ">
+          <img src="/logo_pkk.jpg" alt="PKK" style="width: 100%; height: 100%; object-fit: cover; transform: scale(1.70); border-radius: 50%;" />
         </div>
-        <div style="flex: 1; text-align: center; padding: 0 10px;">
-          <div style="font-size: 11pt; font-weight: bold; letter-spacing: 1px; color: #134e4a;">TIM PENGGERAK PKK KELURAHAN MANGGA</div>
-          <div style="font-size: 10pt; font-weight: bold; color: #0f172a;">KECAMATAN MEDAN TUNTUNGAN - KOTA MEDAN</div>
-          <div style="font-size: 8pt; font-style: italic; color: #475569; margin-top: 2px;">Jl. Bunga Rinte No. 12, Kelurahan Mangga, Medan Tuntungan, Kode Pos 20141</div>
-        </div>
-        <div style="width: 70px; text-align: center;">
-          <img src="/logo_pkk.jpg" alt="Logo PKK" style="width: 65px; height: 65px; object-fit: contain; visibility: hidden;" />
-        </div>
-      </div>
-
-      <!-- Title -->
-      <div style="text-align: center; margin-bottom: 18px;">
-        <h2 style="font-size: 13pt; font-weight: bold; text-decoration: underline; margin: 0; text-transform: uppercase; color: #134e4a;">KARTU TANDA ANGGOTA (KTA) PKK</h2>
-        <div style="font-size: 9pt; font-weight: bold; margin-top: 3px; color: #334155;">NOMOR ANGGOTA: KTA-PKK/KM/${(item.id || '001').replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase()}</div>
-      </div>
-
-      <!-- Member Content -->
-      <div style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px;">
-        <!-- Pasphoto Box -->
-        <div style="width: 130px; text-align: center; shrink: 0;">
-          <div style="width: 120px; height: 160px; border: 2px solid #134e4a; border-radius: 6px; overflow: hidden; background: #f8fafc; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
-            <img src="${photo}" alt="Pasphoto" style="width: 100%; height: 100%; object-fit: cover;" />
+        <div style="line-height: 1.12; flex: 1;">
+          <div style="font-size: 8pt; font-weight: 900; letter-spacing: 0.4px; color: #ffffff; text-transform: uppercase;">
+            KARTU TANDA ANGGOTA
           </div>
-          <div style="font-size: 7.5pt; font-weight: bold; color: #475569; margin-top: 6px;">PASPHOTO 3x4</div>
+          <div style="font-size: 5.2pt; font-weight: 800; color: #e0f2fe; text-transform: uppercase;">
+            PEMBERDAYAAN KESEJAHTERAAN KELUARGA (PKK)
+          </div>
+          <div style="font-size: 5.8pt; font-weight: 900; color: #fde047; text-transform: uppercase; margin-top: 0.2mm; letter-spacing: 0.3px;">
+            KELURAHAN MANGGA
+          </div>
+        </div>
+      </div>
+
+      <!-- MAIN CARD BODY -->
+      <div style="padding: 2.2mm 2.8mm; display: flex; gap: 2.5mm; height: calc(53.98mm - 12mm); align-items: flex-start; box-sizing: border-box; position: relative;">
+        <!-- PASPHOTO (Aspect ratio 3x4) -->
+        <div style="width: 17.5mm; flex-shrink: 0; text-align: center;">
+          <div style="
+            width: 17.5mm;
+            height: 23.5mm;
+            border-radius: 1mm;
+            border: 1.2px solid #0284c7;
+            overflow: hidden;
+            background: #e0f2fe;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+          ">
+            <img src="${photo}" alt="Foto" style="width: 100%; height: 100%; object-fit: cover; object-position: top;" />
+          </div>
         </div>
 
-        <!-- Details Table -->
-        <div style="flex: 1;">
-          <table style="width: 100%; border-collapse: collapse; font-size: 9.5pt; line-height: 1.6;">
+        <!-- DETAILS TABLE -->
+        <div style="
+          flex: 1;
+          font-size: 4.4pt;
+          line-height: 1.35;
+          font-weight: 800;
+          color: #0f172a;
+          text-transform: uppercase;
+        ">
+          <table style="width: 100%; border-collapse: collapse; margin: 0; padding: 0;">
             <tbody>
               <tr>
-                <td style="width: 32%; font-weight: bold; padding: 3px 0;">Nama Lengkap</td>
-                <td style="width: 3%; font-weight: bold;">:</td>
-                <td style="width: 65%; font-weight: bold; text-transform: uppercase; color: #0f172a;">${item.nama || '-'}</td>
+                <td style="width: 25mm; color: #334155; padding: 0.2mm 0;">NO. REGISTRASI</td>
+                <td style="width: 1.5mm;">:</td>
+                <td style="font-weight: 900; color: #0369a1;">${regNo}</td>
               </tr>
               <tr>
-                <td style="font-weight: bold; padding: 3px 0;">Jabatan di TP-PKK</td>
-                <td style="font-weight: bold;">:</td>
-                <td style="font-weight: bold; color: #0f766e;">${item.jabatan || 'Anggota PKK'}</td>
+                <td style="color: #334155; padding: 0.2mm 0;">NAMA</td>
+                <td>:</td>
+                <td style="font-weight: 900; color: #0284c7;">${namaFormatted}</td>
               </tr>
               <tr>
-                <td style="font-weight: bold; padding: 3px 0;">Jenis Kelamin</td>
-                <td style="font-weight: bold;">:</td>
-                <td>${item.jenisKelamin === 'P' ? 'Perempuan' : 'Laki-Laki'}</td>
+                <td style="color: #334155; padding: 0.2mm 0;">JABATAN</td>
+                <td>:</td>
+                <td style="font-weight: 800; color: #0f766e;">${jabatanFormatted}</td>
               </tr>
               <tr>
-                <td style="font-weight: bold; padding: 3px 0;">Tempat, Tgl Lahir</td>
-                <td style="font-weight: bold;">:</td>
-                <td>${item.tempatLahir || '-'}, ${item.tanggalLahir || '-'}</td>
+                <td style="color: #334155; padding: 0.2mm 0;">TEMPAT/TGL LAHIR</td>
+                <td>:</td>
+                <td>${ttlFormatted}</td>
               </tr>
               <tr>
-                <td style="font-weight: bold; padding: 3px 0;">Status Pernikahan</td>
-                <td style="font-weight: bold;">:</td>
-                <td>${item.statusPernikahan || '-'}</td>
+                <td style="color: #334155; padding: 0.2mm 0;">JENIS KELAMIN</td>
+                <td>:</td>
+                <td>${genderFormatted}</td>
               </tr>
               <tr>
-                <td style="font-weight: bold; padding: 3px 0;">Pendidikan / Pekerjaan</td>
-                <td style="font-weight: bold;">:</td>
-                <td>${item.pendidikan || '-'} / ${item.pekerjaan || '-'}</td>
+                <td style="color: #334155; padding: 0.2mm 0;">ALAMAT</td>
+                <td>:</td>
+                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 32mm;">${alamatFormatted}</td>
               </tr>
               <tr>
-                <td style="font-weight: bold; padding: 3px 0; vertical-align: top;">Alamat Domisili</td>
-                <td style="font-weight: bold; vertical-align: top;">:</td>
-                <td style="vertical-align: top;">${item.alamat || 'Kelurahan Mangga, Medan Tuntungan'}</td>
+                <td style="color: #334155; padding: 0.2mm 0;">DESA/KELURAHAN</td>
+                <td>:</td>
+                <td style="font-weight: 800;">${kelurahanFormatted}</td>
+              </tr>
+              <tr>
+                <td style="color: #334155; padding: 0.2mm 0;">KECAMATAN</td>
+                <td>:</td>
+                <td style="font-weight: 800;">${kecamatanFormatted}</td>
+              </tr>
+              <tr>
+                <td style="color: #334155; padding: 0.2mm 0;">KABUPATEN/KOTA</td>
+                <td>:</td>
+                <td style="font-weight: 800;">${kotaFormatted}</td>
+              </tr>
+              <tr>
+                <td style="color: #334155; padding: 0.2mm 0;">PROVINSI</td>
+                <td>:</td>
+                <td style="font-weight: 800;">${provinsiFormatted}</td>
               </tr>
             </tbody>
           </table>
         </div>
+
+        <!-- POJOK KIRI BAWAH: BADGE MEDAN UNTUK SEMUA -->
+        <div style="
+          position: absolute;
+          left: 2.8mm;
+          bottom: 2mm;
+          display: inline-flex;
+          align-items: center;
+          border-radius: 0.8mm;
+          overflow: hidden;
+          font-size: 3.8pt;
+          font-weight: 900;
+          line-height: 1;
+          border: 0.3px solid #0f172a;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        ">
+          <span style="background: #991b1b; color: #ffffff; padding: 0.8px 3px; font-weight: 900; letter-spacing: 0.2px;">MEDAN</span>
+          <span style="background: #1e3a8a; color: #ffffff; padding: 0.8px 3.5px; font-weight: 900; letter-spacing: 0.2px;">UNTUK SEMUA</span>
+        </div>
+
+        <!-- BOTTOM RIGHT QR CODE -->
+        <div style="
+          position: absolute;
+          right: 2.2mm;
+          bottom: 1.8mm;
+          text-align: center;
+        ">
+          <div style="
+            width: 10mm;
+            height: 10mm;
+            background: #ffffff;
+            padding: 0.4mm;
+            border-radius: 0.8mm;
+            border: 1px solid #cbd5e1;
+            margin: 0 auto;
+          ">
+            <img src="${qrUrl}" alt="QR" style="width: 100%; height: 100%; object-fit: contain;" />
+          </div>
+          <div style="
+            font-size: 3pt;
+            font-weight: 900;
+            color: #0369a1;
+            margin-top: 0.4mm;
+            line-height: 1;
+            text-align: center;
+          ">
+            SCAN UNTUK DATA KARTU<br/>SCAN TO VIEW
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+export const generateBatchPkkCardHtml = (items: any[]): string => {
+  if (!Array.isArray(items) || items.length === 0) return '';
+
+  const cardsHtml = items
+    .map(
+      (item) => `
+      <div style="
+        display: inline-block;
+        margin: 3mm;
+        padding: 2mm;
+        border: 1px dashed #cbd5e1;
+        border-radius: 4mm;
+        background: #ffffff;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      ">
+        ${generateSinglePkkCardHtml(item)}
+      </div>
+    `
+    )
+    .join('');
+
+  return `
+    <div style="width: 190mm; margin: 0 auto; padding: 6mm 0; font-family: Arial, sans-serif;">
+      <div style="text-align: center; margin-bottom: 5mm; border-bottom: 2px solid #0284c7; padding-bottom: 3mm;">
+        <h2 style="font-size: 13pt; font-weight: 900; color: #0369a1; margin: 0; text-transform: uppercase;">
+          LEMBAR CETAK KARTU TANDA ANGGOTA PKK — KELURAHAN MANGGA
+        </h2>
+        <p style="font-size: 8.5pt; color: #475569; margin-top: 1mm;">
+          Kecamatan Medan Tuntungan • Total ${items.length} Kartu Siap Cetak & Potong (Ukuran Standar ID Card 85.6mm x 53.98mm)
+        </p>
       </div>
 
-      <!-- Signatures Row -->
-      <div style="margin-top: 25px; border-top: 1px solid #cbd5e1; padding-top: 15px;">
-        <table style="width: 100%; border: none; font-size: 9pt;">
-          <tbody>
-            <tr>
-              <td style="width: 50%; text-align: center; vertical-align: top;">
-                <div style="font-weight: bold; color: #334155;">Sekretaris TP-PKK Kelurahan Mangga</div>
-                <div style="height: 50px;"></div>
-                <div style="font-weight: bold; text-decoration: underline;">NUR AISYAH DEWI, A.MD</div>
-                <div style="font-size: 8pt; color: #64748b;">Sekretaris TP PKK</div>
-              </td>
-              <td style="width: 50%; text-align: center; vertical-align: top;">
-                <div>Medan, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                <div style="font-weight: bold; color: #334155;">Ketua TP-PKK Kelurahan Mangga</div>
-                <div style="height: 50px;"></div>
-                <div style="font-weight: bold; text-decoration: underline;">NY. FRANSISKA FERY ARAPENTA TARIGAN</div>
-                <div style="font-size: 8pt; color: #64748b;">Ketua TP PKK</div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div style="display: flex; flex-wrap: wrap; gap: 2mm; justify-content: center;">
+        ${cardsHtml}
       </div>
+    </div>
+  `;
+};
 
-      <!-- Footer Note -->
-      <div style="margin-top: 15px; text-align: center; font-size: 7.5pt; color: #64748b; font-style: italic; border-top: 1px dashed #e2e8f0; padding-top: 6px;">
-        SI-MANGGA • Kartu Tanda Anggota Resmi TP PKK Kelurahan Mangga • Dicetak otomatis pada: ${new Date().toLocaleString('id-ID')}
+export const generatePkkCardPdf = async (item: any, photoUrl?: string | null) => {
+  if (!item) return;
+
+  const cardId = `kta-card-print-${Date.now()}`;
+  const singleCardHtml = generateSinglePkkCardHtml({
+    ...item,
+    pasphotoUrl: photoUrl || item.pasphotoUrl || item.fotoUrl,
+  });
+
+  const pageWrapperHtml = `
+    <div style="width: 190mm; margin: 0 auto; padding: 15mm 0; font-family: Arial, sans-serif; text-align: center;">
+      <div style="margin-bottom: 6mm; border-bottom: 1.5px solid #0284c7; padding-bottom: 3mm; display: inline-block; width: 100%;">
+        <div style="font-size: 11pt; font-weight: 900; color: #0369a1; uppercase;">KARTU TANDA ANGGOTA PKK KELURAHAN MANGGA</div>
+        <div style="font-size: 8pt; color: #64748b;">Siap cetak ke kertas PVC ID Card / Photo Paper (85.60 mm x 53.98 mm)</div>
+      </div>
+      <div style="display: flex; justify-content: center; margin-top: 5mm;">
+        <div style="
+          padding: 3mm;
+          border: 1px dashed #0284c7;
+          border-radius: 4.5mm;
+          background: #ffffff;
+          display: inline-block;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        ">
+          ${singleCardHtml}
+        </div>
       </div>
     </div>
   `;
 
-  // Create temporary container, execute print helper, then remove
   const container = document.createElement('div');
-  container.id = `container-${cardId}`;
-  container.style.display = 'none';
-  container.innerHTML = cardHtml;
+  container.id = cardId;
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.innerHTML = pageWrapperHtml;
   document.body.appendChild(container);
 
   try {
-    printOfficialDocument(cardId, `KTA_PKK_${(item.nama || 'Anggota').replace(/[^a-zA-Z0-9]/g, '_')}`);
+    printOfficialDocument(cardId, `KTA_${(item.nama || 'Anggota').replace(/[^a-zA-Z0-9]/g, '_')}`);
   } finally {
     setTimeout(() => {
       if (document.body.contains(container)) {

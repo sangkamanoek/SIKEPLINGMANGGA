@@ -70,7 +70,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
     if (!file) return;
     setIsProcessingPhoto(true);
     try {
-      const comp = await compressImageFile(file, 1024, 0.82);
+      const comp = await compressImageFile(file, 1280, 0.80);
       if (comp) {
         setFotoUrl(comp);
       } else {

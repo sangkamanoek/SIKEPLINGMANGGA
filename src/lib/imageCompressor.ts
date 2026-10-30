@@ -22,8 +22,8 @@ export interface CompressedPhotoResult {
  */
 export function compressImageFile(
   file: File,
-  maxDim = 720,
-  quality = 0.45
+  maxDim = 1280,
+  quality = 0.78
 ): Promise<string> {
   return new Promise((resolve) => {
     if (!file || !file.type.startsWith('image/')) {
@@ -55,7 +55,7 @@ export function compressImageFile(
 
           if (ctx) {
             ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'medium';
+            ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(bitmap, 0, 0, width, height);
 
             const compressed = canvas.toDataURL('image/jpeg', quality);
@@ -116,7 +116,7 @@ function fallbackFileReader(file: File, maxDim: number, quality: number): Promis
 
           if (ctx) {
             ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'medium';
+            ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, width, height);
 
             const compressed = canvas.toDataURL('image/jpeg', quality);
@@ -160,8 +160,8 @@ function fallbackFileReader(file: File, maxDim: number, quality: number): Promis
  */
 export async function compressMultipleFiles(
   files: FileList | File[],
-  maxDim = 720,
-  quality = 0.45,
+  maxDim = 1280,
+  quality = 0.78,
   kategori?: string,
   onProgress?: (current: number, total: number) => void
 ): Promise<CompressedPhotoResult[]> {

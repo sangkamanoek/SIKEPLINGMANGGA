@@ -24,12 +24,13 @@ export const subscribePosyanduReports = (onUpdate: (items: PosyanduReport[]) => 
 
   if (!db) return () => {};
 
-  const q = query(collection(db, COLLECTION_NAME), orderBy('tanggal', 'desc'));
+  const q = collection(db, COLLECTION_NAME);
   return onSnapshot(q, (snapshot) => {
     const items = snapshot.docs.map(doc => ({
       ...doc.data(),
       id: doc.id
     })) as PosyanduReport[];
+    items.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
     safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(items));
     onUpdate(items);
   });

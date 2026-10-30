@@ -759,7 +759,14 @@ app.post('/api/verify-kunjungan-photo', async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (apiKey) {
       try {
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
         const prompt = `Anda adalah sistem verifikasi AI untuk laporan kunjungan warga door-to-door (tatap muka) oleh Kepala Lingkungan (Kepling) Kelurahan Mangga.
 Tugas Anda: Memeriksa apakah foto yang diunggah adalah FOTO ASLI DOKUMENTASI KUNJUNGAN atau TANGKAPAN LAYAR (SCREENSHOT).
 
@@ -853,7 +860,14 @@ app.post('/api/gemini/improve-pkk', async (req, res) => {
       return res.json({ success: true, improvedText: text });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
     const response = await ai.models.generateContent({
       model: "gemini-3.8-flash",
       contents: `Tolong perbaiki dan buatkan uraian kegiatan PKK berikut menjadi Bahasa Indonesia yang baik, benar, formal, dan informatif. Pertahankan inti informasinya:\n\n"${text}"`,
@@ -1979,7 +1993,14 @@ app.post('/api/gemini/formalize-pkk', async (req, res) => {
       return res.status(500).json({ success: false, message: 'AI Service tidak terkonfigurasi (API Key missing).' });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
     const systemInstruction = `Anda adalah asisten administrasi profesional untuk Tim Penggerak PKK Kelurahan Mangga.
 Tugas Anda: Mengubah catatan kegiatan yang tidak formal, penuh singkatan, dan berantakan menjadi kalimat Bahasa Indonesia yang formal, baku (sesuai PUEBI), profesional, dan mudah dipahami untuk laporan resmi.
 

@@ -102,21 +102,61 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
     cb([]);
     return () => {};
   }
-  try {
-    const q = query(collection(db, 'reports'));
-    return onSnapshot(q, (snapshot) => {
-      const items: any[] = [];
-      snapshot.forEach((docSnap) => {
-        const d = docSnap.data();
-        if (d && docSnap.id) {
-          items.push({ ...d, id: docSnap.id });
+  const collectionsToWatch = ['reports', 'laporan_harian', 'SIKEPLINGMANGGA'];
+  const collectionsData: Record<string, any[]> = {};
+  const unsubs: (() => void)[] = [];
+
+  const emitMerged = () => {
+    const map = new Map<string, any>();
+    for (const colName of collectionsToWatch) {
+      const list = collectionsData[colName] || [];
+      list.forEach((item) => {
+        if (item && item.id) {
+          const existing = map.get(item.id);
+          map.set(item.id, existing ? { ...item, ...existing } : item);
         }
       });
-      cb(items);
-    }, (err) => {
-      console.warn('subscribeReportsFromFirestore error:', err);
-      cb([]);
+    }
+    const merged = Array.from(map.values()).sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.tanggal ? new Date(a.tanggal).getTime() : 0);
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.tanggal ? new Date(b.tanggal).getTime() : 0);
+      return timeB - timeA;
     });
+    cb(merged);
+  };
+
+  try {
+    for (const colName of collectionsToWatch) {
+      try {
+        const q = collection(db, colName);
+        const unsub = onSnapshot(
+          q,
+          (snapshot) => {
+            const items: any[] = [];
+            snapshot.forEach((docSnap) => {
+              const d = docSnap.data();
+              if (d && docSnap.id) {
+                items.push({ ...d, id: docSnap.id });
+              }
+            });
+            collectionsData[colName] = items;
+            emitMerged();
+          },
+          (err) => {
+            console.warn(`subscribeReportsFromFirestore (${colName}) error:`, err);
+            collectionsData[colName] = [];
+            emitMerged();
+          }
+        );
+        unsubs.push(unsub);
+      } catch (e) {
+        console.warn(`Error attaching listener for ${colName}:`, e);
+      }
+    }
+
+    return () => {
+      unsubs.forEach((u) => u());
+    };
   } catch (e) {
     cb([]);
     return () => {};
@@ -125,11 +165,79 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
 
 export const shouldFilterReport = (_r?: any) => false;
 
-export const fetchTargetsFromFirestore = async (): Promise<any> => ({});
-export const saveTargetToFirestore = async () => {};
-export const saveAllTargetsToFirestore = async () => {};
-export const resetTargetsInFirestore = async () => {};
-export const subscribeTargetsFromFirestore = (cb: any) => { cb([]); return () => {}; };
+export const fetchTargetsFromFirestore = async (): Promise<any> => {
+  if (!db) return {};
+  try {
+    const snap = await getDocs(collection(db, 'targets_capaian'));
+    const map: any = {};
+    snap.forEach((d) => {
+      map[d.id] = { ...d.data(), keplingId: d.id };
+    });
+    return map;
+  } catch (err) {
+    console.error('fetchTargetsFromFirestore error:', err);
+    return {};
+  }
+};
+
+export const saveTargetToFirestore = async (item: any) => {
+  if (!db || !item || !item.keplingId) return;
+  try {
+    const cleaned = cleanFirestoreData(item);
+    await setDoc(doc(db, 'targets_capaian', item.keplingId), cleaned, { merge: true });
+  } catch (err) {
+    console.error('saveTargetToFirestore error:', err);
+  }
+};
+
+export const saveAllTargetsToFirestore = async (allTargets: any) => {
+  if (!db || !allTargets) return;
+  try {
+    for (const key of Object.keys(allTargets)) {
+      const item = allTargets[key];
+      if (item && item.keplingId) {
+        await saveTargetToFirestore(item);
+      }
+    }
+  } catch (err) {
+    console.error('saveAllTargetsToFirestore error:', err);
+  }
+};
+
+export const resetTargetsInFirestore = async () => {
+  if (!db) return;
+  try {
+    const snap = await getDocs(collection(db, 'targets_capaian'));
+    for (const d of snap.docs) {
+      await deleteDoc(doc(db, 'targets_capaian', d.id));
+    }
+  } catch (err) {
+    console.error('resetTargetsInFirestore error:', err);
+  }
+};
+
+export const subscribeTargetsFromFirestore = (cb: (data: any) => void) => {
+  if (!db) {
+    cb({});
+    return () => {};
+  }
+  try {
+    const q = query(collection(db, 'targets_capaian'));
+    return onSnapshot(q, (snapshot) => {
+      const map: any = {};
+      snapshot.forEach((docSnap) => {
+        map[docSnap.id] = { ...docSnap.data(), keplingId: docSnap.id };
+      });
+      cb(map);
+    }, (err) => {
+      console.warn('subscribeTargetsFromFirestore error:', err);
+      cb({});
+    });
+  } catch (e) {
+    cb({});
+    return () => {};
+  }
+};
 
 export const saveSyncAuditLog = async (_log: any) => {};
 export const fetchSyncAuditLogs = async (): Promise<SyncAuditLog[]> => [];

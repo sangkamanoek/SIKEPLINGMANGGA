@@ -14,6 +14,8 @@ import {
   Users,
   Sparkles,
   Printer,
+  Eye,
+  FileText,
   Image as ImageIcon,
 } from 'lucide-react';
 import { UserAccount, PosyanduReport, FotoDokumentasi } from '../types';
@@ -25,7 +27,7 @@ import {
 import { KETUA_PKK_LINGKUNGAN_ACCOUNTS } from '../data/keplingList';
 import { KopSuratPkk } from './KopSuratPkk';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
-import { printOfficialDocument } from '../utils/printHelper';
+import { printOfficialDocument, downloadPdfDocument } from '../utils/printHelper';
 import { compressMultipleFiles } from '../lib/imageCompressor';
 
 const formatProperWriting = (text: string): string => {
@@ -55,12 +57,49 @@ const formatProperWriting = (text: string): string => {
   return formatted;
 };
 
-const normalizePetugasNama = (name: string): string => {
-  if (!name) return name;
+const normalizePetugasNama = (name?: string): string => {
+  if (!name) return 'Pelapor PKK Lingkungan';
   if (name.includes('Ny. Sekretaris') || name === 'Ny. Sekretaris PKK Kelurahan Mangga' || name === 'sekretaris_pkk') {
     return 'Nur Aisyah Dewi, A.Md';
   }
   return name;
+};
+
+const getPetugasJabatan = (report: PosyanduReport): string => {
+  const acc = KETUA_PKK_LINGKUNGAN_ACCOUNTS.find(
+    (a) => a.nomorLingkungan === report.nomorLingkungan || a.id === report.pkkLingkunganId
+  );
+  if (acc) {
+    return `Ketua TP-PKK ${acc.lingkungan}`;
+  }
+  if (report.namaPetugas?.includes('Aisyah') || report.namaPetugas?.includes('Sekretaris')) {
+    return 'Sekretaris TP-PKK Kelurahan Mangga';
+  }
+  if (report.namaPetugas?.includes('Fransiska')) {
+    return 'Ketua TP-PKK Kelurahan Mangga';
+  }
+  return `Ketua TP-PKK Lingkungan ${report.nomorLingkungan || ''}`;
+};
+
+const formatTanggalIndo = (dateStr?: string): string => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+};
+
+const getNamaHariIndo = (dateStr?: string): string => {
+  if (!dateStr) return '';
+  try {
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const d = new Date(dateStr);
+    return days[d.getDay()] || 'Senin';
+  } catch {
+    return 'Senin';
+  }
 };
 
 interface PkkPosyanduViewProps {
@@ -80,6 +119,11 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Print & Preview Modal State
+  const [selectedPrintReport, setSelectedPrintReport] = useState<PosyanduReport | null>(null);
+  const [isExportingPDF, setIsExportingPDF] = useState<boolean>(false);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
   // Form State
   const defaultLkNum = currentUser.nomorLingkungan || 1;
@@ -139,7 +183,7 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
     if (!files || files.length === 0) return;
 
     try {
-      const compressedList = await compressMultipleFiles(files, 720, 0.45, 'posyandu');
+      const compressedList = await compressMultipleFiles(files, 1280, 0.78, 'posyandu');
       if (compressedList.length > 0) {
         setFotoList((prev) => [...prev, ...compressedList]);
       }
@@ -255,11 +299,6 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300 max-w-7xl mx-auto">
-      {/* Hidden Kop Surat Template for printing */}
-      <div id="kop-pkk-template" className="hidden">
-        <KopSuratPkk />
-      </div>
-
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-rose-800 via-rose-700 to-pink-800 text-white rounded-3xl p-5 sm:p-7 shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-2 flex-1 min-w-0">
@@ -390,6 +429,37 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                     "{formatProperWriting(report.posyanduKeterangan)}"
                   </p>
                 )}
+
+                {/* GALERI FOTO DOKUMENTASI PADA KARTU LAPORAN POSYANDU */}
+                {Array.isArray(report.dokumentasiFoto) && report.dokumentasiFoto.length > 0 && (
+                  <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                        <Camera className="w-3.5 h-3.5 text-rose-600" />
+                        Dokumentasi Foto ({report.dokumentasiFoto.length}):
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {report.dokumentasiFoto.map((foto, fIdx) => (
+                        <div
+                          key={foto.id || fIdx}
+                          onClick={() => setPreviewPhotoUrl(foto.url)}
+                          className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative group cursor-pointer hover:border-rose-500 transition-all shadow-2xs"
+                          title={foto.name || `Foto ${fIdx + 1}`}
+                        >
+                          <img
+                            src={foto.url}
+                            alt={foto.name || `Foto ${fIdx + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                            <Eye className="w-4 h-4" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
@@ -399,36 +469,12 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => {
-                      const printContainer = document.createElement('div');
-                      printContainer.id = 'temp-print-posyandu';
-                      printContainer.style.display = 'none';
-                      printContainer.innerHTML = `
-                        <div id="lembar-cetak-posyandu-single" class="p-6 bg-white text-slate-900 font-serif">
-                          <div class="mb-4">${document.getElementById('kop-pkk-template')?.innerHTML || ''}</div>
-                          <div class="text-center my-3 pb-2 border-b-2 border-black">
-                            <h2 class="text-base font-black uppercase">LAPORAN PELAYANAN POSYANDU & KESEHATAN</h2>
-                            <p class="text-xs font-bold">${report.posyanduNama} — ${report.lingkungan}</p>
-                            <p class="text-xs">Tanggal: ${report.tanggal}</p>
-                          </div>
-                          <table class="w-full text-xs border-collapse border border-black my-4 uppercase">
-                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Nama Posyandu</td><td class="p-2 border border-black">${(report.posyanduNama || '').toUpperCase()}</td></tr>
-                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Lokasi / Lingkungan</td><td class="p-2 border border-black">${(report.posyanduLokasi || '').toUpperCase()} (${(report.lingkungan || '').toUpperCase()})</td></tr>
-                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Total Warga Dilayani</td><td class="p-2 border border-black font-bold">${report.posyanduJumlahWargaTotal} Orang</td></tr>
-                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Keterangan / Catatan</td><td class="p-2 border border-black">${(report.posyanduKeterangan || '-').toUpperCase()}</td></tr>
-                            <tr><td class="p-2 border border-black font-bold bg-slate-100">Petugas Pelapor</td><td class="p-2 border border-black">${normalizePetugasNama(report.namaPetugas).toUpperCase()}</td></tr>
-                          </table>
-                        </div>
-                      `;
-                      document.body.appendChild(printContainer);
-                      printOfficialDocument('lembar-cetak-posyandu-single', `POSYANDU_${report.posyanduNama.replace(/[^a-zA-Z0-9]/g, '_')}`);
-                      setTimeout(() => document.body.removeChild(printContainer), 1000);
-                    }}
-                    className="px-2.5 py-1 bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold rounded-lg text-[10px] cursor-pointer flex items-center gap-1 shadow-2xs"
-                    title="Cetak Surat Resmi Posyandu"
+                    onClick={() => setSelectedPrintReport(report)}
+                    className="px-2.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-[10px] cursor-pointer flex items-center gap-1 shadow-2xs transition-all active:scale-95"
+                    title="Pratinjau & Cetak Surat Resmi Posyandu A4 (Lengkap Gambar & Isian Laporan)"
                   >
-                    <Printer className="w-3 h-3" />
-                    <span>Cetak</span>
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Cetak PDF A4</span>
                   </button>
                   {(currentUser.role === 'super_admin' || currentUser.role === 'ketua_pkk_kelurahan' || currentUser.role === 'sekretaris_pkk' || currentUser.role === 'sekretaris' || currentUser.role === 'ketua_pokja' || currentUser.role === 'ketua_pkk_lingkungan' || currentUser.id === report.pkkLingkunganId) && (
                     <>
@@ -456,6 +502,265 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
           ))
         )}
       </div>
+
+      {/* MODAL PRATINJAU & CETAK LAPORAN POSYANDU FORMAT A4 RESMI */}
+      {selectedPrintReport && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6 flex flex-col max-h-[92vh]">
+            {/* Modal Top Header Bar */}
+            <div className="bg-slate-900 text-white p-4 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                <h3 className="font-black text-sm sm:text-base text-white">
+                  Pratinjau Lembar Cetak A4 Kedinasan — Laporan Posyandu
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsExportingPDF(true);
+                    const filename = `Laporan_Posyandu_${selectedPrintReport.posyanduNama.replace(/[^a-zA-Z0-9]/g, '_')}_Lk_${selectedPrintReport.nomorLingkungan}_${selectedPrintReport.tanggal}.pdf`;
+                    await downloadPdfDocument('lembar-cetak-posyandu-a4', filename);
+                    setIsExportingPDF(false);
+                  }}
+                  disabled={isExportingPDF}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>{isExportingPDF ? 'Proses PDF...' : 'Unduh PDF A4'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const filename = `Laporan_Posyandu_${selectedPrintReport.posyanduNama.replace(/[^a-zA-Z0-9]/g, '_')}_Lk_${selectedPrintReport.nomorLingkungan}`;
+                    printOfficialDocument('lembar-cetak-posyandu-a4', filename);
+                  }}
+                  className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Cetak / Print</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPrintReport(null)}
+                  className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Preview Body containing Official A4 Layout */}
+            <div className="p-4 sm:p-6 overflow-y-auto bg-slate-200 flex flex-col items-center">
+              <div
+                id="lembar-cetak-posyandu-a4"
+                className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300"
+              >
+                {/* Kop Surat PKK Resmi */}
+                <KopSuratPkk />
+
+                {/* Judul Laporan */}
+                <div className="text-center my-3">
+                  <h1 className="text-[12pt] font-black uppercase tracking-[0.04em] underline font-serif">
+                    LAPORAN PELAYANAN POSYANDU & KESEHATAN KELUARGA
+                  </h1>
+                  <div className="text-[8.5pt] font-serif mt-1 text-slate-900">
+                    <span className="font-bold">Hari:</span> {getNamaHariIndo(selectedPrintReport.tanggal).toUpperCase()} &nbsp;&nbsp;|&nbsp;&nbsp; <span className="font-bold">Tanggal:</span> {formatTanggalIndo(selectedPrintReport.tanggal).toUpperCase()}
+                  </div>
+                </div>
+
+                {/* Identitas Petugas & Posyandu (Kotak Identitas Resmi) */}
+                <div
+                  className="mb-3 text-[8.5pt] font-sans p-2.5 rounded-lg border border-slate-300 max-w-[96%] mx-auto shadow-xs"
+                  style={{ backgroundColor: '#f8fafc' }}
+                >
+                  <table className="w-full text-left border-0">
+                    <tbody>
+                      <tr>
+                        <td className="w-32 font-bold py-0.5 text-slate-800 border-0">Nama Petugas Pelapor</td>
+                        <td className="w-4 font-bold border-0">:</td>
+                        <td className="font-bold uppercase text-slate-900 border-0">{normalizePetugasNama(selectedPrintReport.namaPetugas)}</td>
+                        <td className="w-24 font-bold py-0.5 text-slate-800 border-0">Kelurahan</td>
+                        <td className="w-4 font-bold border-0">:</td>
+                        <td className="text-slate-900 border-0">Kelurahan Mangga</td>
+                      </tr>
+                      <tr>
+                        <td className="font-bold py-0.5 text-slate-800 border-0">Jabatan Pelapor</td>
+                        <td className="font-bold border-0">:</td>
+                        <td className="font-bold text-slate-900 border-0">{getPetugasJabatan(selectedPrintReport)}</td>
+                        <td className="font-bold py-0.5 text-slate-800 border-0">Kecamatan</td>
+                        <td className="font-bold border-0">:</td>
+                        <td className="text-slate-900 border-0">Kecamatan Medan Tuntungan</td>
+                      </tr>
+                      <tr>
+                        <td className="font-bold py-0.5 text-slate-800 border-0">Nama Posyandu</td>
+                        <td className="font-bold border-0">:</td>
+                        <td className="font-bold uppercase text-rose-900 border-0">{selectedPrintReport.posyanduNama}</td>
+                        <td className="font-bold py-0.5 text-slate-800 border-0">Lokasi / Wilayah</td>
+                        <td className="font-bold border-0">:</td>
+                        <td className="font-bold text-slate-900 border-0">{selectedPrintReport.posyanduLokasi || '-'} ({selectedPrintReport.lingkungan})</td>
+                      </tr>
+                      <tr>
+                        <td className="font-bold py-0.5 text-slate-800 border-0">Jumlah Kader/Petugas</td>
+                        <td className="font-bold border-0">:</td>
+                        <td className="font-bold text-slate-900 border-0" colSpan={4}>{selectedPrintReport.posyanduJumlahPetugasKader || '-'}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Tabel Isian Laporan & Kategori Usia Warga Terlayani */}
+                <div className="mb-3">
+                  <div className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1 text-slate-900">
+                    A. REKAPITULASI ISIAN LAPORAN & KATEGORI USIA WARGA TERLAYANI:
+                  </div>
+                  <table className="w-full text-left text-[8pt] font-sans border-[1.5px] border-black border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-900 font-bold border-b border-black">
+                        <th className="w-8 text-center py-1 border border-black">NO</th>
+                        <th className="w-56 py-1 px-2 border border-black">KATEGORI PELAYANAN / KELOMPOK USIA</th>
+                        <th className="w-28 text-center py-1 border border-black">REALISASI</th>
+                        <th className="py-1 px-2 border border-black">KETERANGAN & SASARAN INTERVENSI</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="text-center font-bold border border-black py-1">1</td>
+                        <td className="font-bold border border-black px-2 py-1">👶 Bayi Usia 0 - 2 Tahun (Baduta & Imunisasi)</td>
+                        <td className="text-center font-bold border border-black py-1">{selectedPrintReport.posyanduBayi02Tahun || 0} Jiwa</td>
+                        <td className="border border-black px-2 py-1 text-[7.5pt]">Penimbangan Baduta, PMT, & Imunisasi Dasar Lengkap</td>
+                      </tr>
+                      <tr>
+                        <td className="text-center font-bold border border-black py-1">2</td>
+                        <td className="font-bold border border-black px-2 py-1">🧒 Balita Usia 2 - 5 Tahun (Balita & Stunting)</td>
+                        <td className="text-center font-bold border border-black py-1">{selectedPrintReport.posyanduBalita25Tahun || 0} Jiwa</td>
+                        <td className="border border-black px-2 py-1 text-[7.5pt]">Pengukuran Tinggi/BB, Deteksi Dini Stunting, PMT Balita</td>
+                      </tr>
+                      <tr>
+                        <td className="text-center font-bold border border-black py-1">3</td>
+                        <td className="font-bold border border-black px-2 py-1">👦 Anak Usia 6 - 12 Tahun (Pra-Sekolah & Anak)</td>
+                        <td className="text-center font-bold border border-black py-1">{selectedPrintReport.posyanduAnak612Tahun || 0} Jiwa</td>
+                        <td className="border border-black px-2 py-1 text-[7.5pt]">Pemeriksaan Kesehatan Anak & Pemberian Vitamin</td>
+                      </tr>
+                      <tr>
+                        <td className="text-center font-bold border border-black py-1">4</td>
+                        <td className="font-bold border border-black px-2 py-1">🧑 Remaja Usia 13 - 18 Tahun (Posyandu Remaja)</td>
+                        <td className="text-center font-bold border border-black py-1">{selectedPrintReport.posyanduRemaja1318Tahun || 0} Jiwa</td>
+                        <td className="border border-black px-2 py-1 text-[7.5pt]">Penyuluhan Anemia, Tablet Tambah Darah & PHBS</td>
+                      </tr>
+                      <tr>
+                        <td className="text-center font-bold border border-black py-1">5</td>
+                        <td className="font-bold border border-black px-2 py-1">🤰 Dewasa & Ibu Hamil Usia 19 - 59 Tahun</td>
+                        <td className="text-center font-bold border border-black py-1">{selectedPrintReport.posyanduDewasaIbuHamil1959Tahun || 0} Jiwa</td>
+                        <td className="border border-black px-2 py-1 text-[7.5pt]">Pemeriksaan Bumil (ANC), PMT Bumil KEK & Skrining Kesehatan</td>
+                      </tr>
+                      <tr>
+                        <td className="text-center font-bold border border-black py-1">6</td>
+                        <td className="font-bold border border-black px-2 py-1">👵 Lansia Usia 60+ Tahun (Lanjut Usia & PTM)</td>
+                        <td className="text-center font-bold border border-black py-1">{selectedPrintReport.posyanduLansia60TahunKeatas || 0} Jiwa</td>
+                        <td className="border border-black px-2 py-1 text-[7.5pt]">Skrining PTM (Tensi / Gula Darah) & Edukasi Kesehatan Lansia</td>
+                      </tr>
+                      <tr className="bg-slate-100 font-black">
+                        <td className="text-center border border-black py-1 font-black" colSpan={2}>TOTAL KUMULATIF WARGA TERLAYANI POSYANDU</td>
+                        <td className="text-center border border-black py-1 text-rose-900 text-[9pt] font-black">{selectedPrintReport.posyanduJumlahWargaTotal || 0} JIWA</td>
+                        <td className="border border-black px-2 py-1 text-[7.5pt] font-bold">Akumulasi Seluruh Sasaran Usia Layanan Posyandu</td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  {/* Rincian Jenis Layanan & Catatan Hasil Posyandu */}
+                  <div className="mt-2 space-y-1 text-[8pt] font-sans border border-black p-2 rounded bg-slate-50">
+                    {Array.isArray(selectedPrintReport.posyanduJenisLayanan) && selectedPrintReport.posyanduJenisLayanan.length > 0 && (
+                      <div>
+                        <strong>Jenis Layanan Kesehatan Diberikan:</strong> {selectedPrintReport.posyanduJenisLayanan.join(', ')}
+                      </div>
+                    )}
+                    {selectedPrintReport.posyanduKeterangan && (
+                      <div className="mt-1">
+                        <strong>Catatan & Uraian Hasil Pelaksanaan:</strong> "{formatProperWriting(selectedPrintReport.posyanduKeterangan)}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dokumentasi Laporan Foto Lapangan Terlampir */}
+                {selectedPrintReport.dokumentasiFoto && selectedPrintReport.dokumentasiFoto.length > 0 && (
+                  <div className="mb-3 avoid-break">
+                    <div className="text-[8.5pt] font-bold font-sans uppercase tracking-wider mb-1.5 text-slate-900">
+                      B. DOKUMENTASI LAPORAN FOTO LAPANGAN TERLAMPIR ({selectedPrintReport.dokumentasiFoto.length} FOTO):
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      {selectedPrintReport.dokumentasiFoto.map((foto, idx) => (
+                        <div key={foto.id || idx} className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center">
+                          <div className="w-full h-[125px] rounded overflow-hidden bg-slate-50 flex items-center justify-center border border-slate-200">
+                            <img
+                              src={foto.url}
+                              alt={foto.name || `Dokumentasi ${idx + 1}`}
+                              crossOrigin="anonymous"
+                              className="w-full h-full object-contain object-center"
+                            />
+                          </div>
+                          <div className="text-[7.5pt] font-bold text-slate-800 mt-1 truncate w-full text-center font-sans">
+                            {foto.name || `Foto ${idx + 1}: Pelayanan ${selectedPrintReport.posyanduNama}`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pengesahan Tanda Tangan (Nama & Jabatan Pelapor) */}
+                <div className="mt-4 pt-2 text-[8.5pt] font-sans avoid-break">
+                  <div className="flex justify-end pr-4">
+                    <div className="text-center flex flex-col items-center min-w-[220px]">
+                      <div>Medan, {formatTanggalIndo(selectedPrintReport.tanggal).toUpperCase()}</div>
+                      <div className="mt-0.5">Yang Melaporkan,</div>
+                      <div className="font-bold uppercase whitespace-nowrap text-slate-900 mt-0.5">
+                        {getPetugasJabatan(selectedPrintReport).toUpperCase()}
+                      </div>
+                      <div className="h-12" />
+                      <div className="font-bold underline uppercase whitespace-nowrap text-slate-900">
+                        ( {normalizePetugasNama(selectedPrintReport.namaPetugas)} )
+                      </div>
+                      <div className="text-[7.5pt] text-slate-700 mt-0.5">Pelapor Kegiatan Posyandu</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Lembar A4 */}
+                <div className="mt-4 pt-1.5 border-t border-slate-300 flex items-center justify-between text-[6.5pt] text-slate-500 italic font-sans">
+                  <span>SI-MANGGA • Sistem Informasi & Administrasi Kelurahan Mangga</span>
+                  <span>Dokumen Resmi Pelayanan Posyandu • Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LIGHTBOX PREVIEW FOTO FULLSCREEN */}
+      {previewPhotoUrl && (
+        <div
+          onClick={() => setPreviewPhotoUrl(null)}
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center">
+            <button
+              type="button"
+              onClick={() => setPreviewPhotoUrl(null)}
+              className="absolute -top-12 right-0 p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors cursor-pointer"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={previewPhotoUrl}
+              alt="Foto Dokumentasi Fullscreen"
+              className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/20"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Modal Input Laporan Posyandu */}
       {isModalOpen && (

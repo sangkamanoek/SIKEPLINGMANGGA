@@ -122,6 +122,9 @@ export default function App() {
         safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(fetched));
       }
     }).catch(() => {});
+    
+    // Trigger silent background sync
+    import('./lib/syncManager').then(m => m.runSilentBackgroundSync()).catch(console.error);
   }, []);
 
   // Toast
