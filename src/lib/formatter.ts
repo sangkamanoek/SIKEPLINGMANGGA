@@ -1,3 +1,6 @@
+import { KunjunganWargaData } from './kunjunganService';
+import { LaporanHarianItem, UserAccount } from '../types';
+
 export const formatRupiah = (val: number): string => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val || 0);
 };
@@ -20,7 +23,13 @@ export const getTodayLocalIso = (date?: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const isReportMatchingKepling = (..._args: any[]) => true;
+export const isReportMatchingKepling = (report: LaporanHarianItem, kepling: UserAccount): boolean => {
+  if (report.keplingId === kepling.id) return true;
+  if (report.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase()) return true;
+  if (String(report.lingkungan).trim().toLowerCase() === kepling.lingkungan.trim().toLowerCase()) return true;
+  return false;
+};
+
 export const generateReportPdfFileName = (..._args: any[]) => 'laporan.pdf';
 export const formatReportToText = (..._args: any[]) => '';
 export const extractNomorLingkungan = (..._args: any[]) => 1;
@@ -44,7 +53,12 @@ export const getReportIsoDate = (d: any): string => {
   return getTodayLocalIso();
 };
 
-export const isKunjunganMatchingKepling = (..._args: any[]) => true;
+export const isKunjunganMatchingKepling = (kj: KunjunganWargaData, kepling: UserAccount): boolean => {
+  if (kj.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase()) return true;
+  if (kj.lingkungan?.trim().toLowerCase() === kepling.lingkungan.trim().toLowerCase()) return true;
+  return false;
+};
+
 export const getNamaHariIndonesia = (..._args: any[]) => 'Senin';
 export const isReportMatchingDate = (..._args: any[]) => true;
 export const isKunjunganOnDate = (..._args: any[]) => true;
@@ -54,3 +68,4 @@ export const NAMA_BULAN = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
 ];
+

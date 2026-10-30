@@ -651,12 +651,15 @@ export function subscribePbbSpptFromFirestore(
 
       // If the server is genuinely empty (database wiped / fresh start) and we are not loading from offline cache
       if (snapshot.empty && !isFromCache) {
-        console.log(`[PBB Sync] Firestore collection is empty on the server for ${year}.`);
-        activeList = [];
-        onData([]);
+        console.warn(`[PBB Sync] Firestore collection appears empty for ${year}. Retaining existing data to prevent flicker.`);
+        // Do NOT set activeList to [] immediately, wait for actual data or explicit wipe command
       } else if (firestoreItems.length > 0) {
         activeList = smartMergeSpptItems(activeList, firestoreItems);
         onData(activeList);
+      } else if (!snapshot.empty && firestoreItems.length === 0 && !isFromCache) {
+        // This case handles a true empty collection if we know it should be empty
+        activeList = [];
+        onData([]);
       }
     },
     (err: any) => {
