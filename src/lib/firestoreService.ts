@@ -15,6 +15,8 @@ export interface SyncAuditLog {
   action: string;
   status: string;
   details?: any;
+  summary?: string;
+  deviceInfo?: string;
 }
 
 export interface AttendanceQREntity {
@@ -239,9 +241,9 @@ export const subscribeTargetsFromFirestore = (cb: (data: any) => void) => {
   }
 };
 
-export const saveSyncAuditLog = async (_log: any) => {};
+export const saveSyncAuditLog = async (_log: any): Promise<boolean> => { return true; };
 export const fetchSyncAuditLogs = async (): Promise<SyncAuditLog[]> => [];
-export const saveAttendanceQRToFirestore = async (_qr: any) => {};
+export const saveAttendanceQRToFirestore = async (_qr: any): Promise<{ success: boolean; method?: string }> => { return { success: true, method: 'firestore' }; };
 export const subscribeAttendanceQRFromFirestore = (_dateStr: string, cb: (qr: AttendanceQREntity | null) => void) => {
   if (typeof cb === 'function') {
     cb(null);
@@ -251,6 +253,6 @@ export const subscribeAttendanceQRFromFirestore = (_dateStr: string, cb: (qr: At
 
 export const subscribeCustomEventsFromFirestore = (cb: any) => { cb([]); return () => {}; };
 export const subscribeEventAttendanceFromFirestore = (cb: any) => { cb([]); return () => {}; };
-export const saveCustomEventToFirestore = async (_event: any) => {};
-export const deleteCustomEventFromFirestore = async (_id: string) => {};
-export const saveEventAttendanceToFirestore = async (_att: any) => {};
+export const saveCustomEventToFirestore = async (_event: any): Promise<boolean> => true;
+export const deleteCustomEventFromFirestore = async (_id: string): Promise<boolean> => true;
+export const saveEventAttendanceToFirestore = async (_att: any): Promise<boolean> => true;

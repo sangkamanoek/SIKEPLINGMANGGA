@@ -45,6 +45,7 @@ import { compressImageFile } from '../lib/imageCompressor';
 
 interface LaporanKeuanganPkkViewProps {
   currentUser: UserAccount;
+  onShowToast?: (msg: string, type?: 'error' | 'info' | 'success') => void;
 }
 
 export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ currentUser }) => {

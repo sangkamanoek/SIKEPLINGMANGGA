@@ -11,10 +11,28 @@ export interface VersionRelease {
   }[];
 }
 
-export const CURRENT_APP_VERSION = 'v2.5.0';
-export const CURRENT_RELEASE_DATE = '4 Oktober 2026';
+export const CURRENT_APP_VERSION = 'v2.5.1';
+export const CURRENT_RELEASE_DATE = '31 Oktober 2026';
 
 export const APP_VERSION_HISTORY: VersionRelease[] = [
+  {
+    version: 'v2.5.1',
+    releaseDate: '31 Oktober 2026',
+    title: 'Pembaruan Lambang Resmi TP-PKK: Lis Emas Murni & Transparansi Sempurna Tanpa Latar Gelap',
+    badge: 'TERBARU',
+    isImportant: true,
+    highlights: [
+      'Pembaruan Lambang Resmi TP-PKK dengan Latar Belakang Transparan Penuh',
+      'Pembersihan Total Seluruh Sisa Border Gelap & Penataan Ulang Badge KTA',
+      'Peningkatan Ketajaman dan Kontras Warna Lambang PKK pada KTA, Kop Surat, dan Banner'
+    ],
+    changes: [
+      {
+        category: 'PENINGKATAN',
+        description: 'Penghapusan tuntas sudut hitam pada lambang PKK dan integrasi langsung aset beresolusi tinggi dengan transparansi alpha channel penuh.'
+      }
+    ]
+  },
   {
     version: 'v2.5.0',
     releaseDate: '4 Oktober 2026',

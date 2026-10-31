@@ -37,6 +37,7 @@ import { compressMultipleFiles } from '../lib/imageCompressor';
 
 interface PkkKegiatanViewProps {
   currentUser: UserAccount;
+  onShowToast?: (msg: string, type?: 'error' | 'info' | 'success') => void;
 }
 
 const getIndonesianDayName = (dateStr: string): string => {

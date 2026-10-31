@@ -175,10 +175,9 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       }
     }
 
-    loadAllAttendance().then((list) => {
-      const m = findMatch(list);
-      setAbsenApelData(m || null);
-    });
+    const list = loadAllAttendance();
+    const m = findMatch(list);
+    setAbsenApelData(m || null);
   }, [item, attendanceList]);
 
   const displayTanggal = React.useMemo(() => {
@@ -323,7 +322,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
         if (!alreadyHas) {
           list.push({
             id: `kunj_foto_${kunj.id || kIdx}`,
-            url: kunj.fotoDokumentasi,
+            url: typeof kunj.fotoDokumentasi === 'string' ? kunj.fotoDokumentasi : String((kunj.fotoDokumentasi as any)?.[0] || ''),
             name: `[KUNJUNGAN] ${kunj.namaWarga} - ${kunj.alamat}`,
             timestamp: kunj.createdAt || new Date().toISOString(),
             kategori: 'perlinsos',

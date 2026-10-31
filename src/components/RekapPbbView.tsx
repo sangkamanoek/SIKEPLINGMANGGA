@@ -73,6 +73,11 @@ import {
   stripNonDigits,
   computePbbOverview,
   formatRekapPbbWaText,
+  subscribePbbSummary,
+  getCachedPbbOverview,
+  fetchPbbSpptForLingkungan,
+  subscribePbbSpptForLingkungan,
+  KelurahanPbbOverview,
 } from '../lib/pbbService';
 import { RekapCapaianPbb24Lingkungan } from './RekapCapaianPbb24Lingkungan';
 
@@ -138,13 +143,24 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => {
     return getLocalSpptForYear(selectedYear);
   });
+  const [summaryOverview, setSummaryOverview] = useState<KelurahanPbbOverview>(() => getCachedPbbOverview(selectedYear));
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [copiedPbbWa, setCopiedPbbWa] = useState<boolean>(false);
 
+  useEffect(() => {
+    const unsubSummary = subscribePbbSummary(selectedYear, (ov) => {
+      if (ov && ov.totalWp > 0) setSummaryOverview(ov);
+    });
+    return () => unsubSummary();
+  }, [selectedYear]);
+
   // Compute live 24-Lingkungan PBB overview for official WA reporting
   const livePbbOverview = useMemo(() => {
-    return computePbbOverview(spptList, selectedYear);
-  }, [spptList, selectedYear]);
+    if (spptList.length > 0 && !isKepling) {
+      return computePbbOverview(spptList, selectedYear);
+    }
+    return summaryOverview;
+  }, [spptList, selectedYear, summaryOverview, isKepling]);
 
   // Handler Salin Rekap PBB WA
   const handleCopyPbbWa = () => {
@@ -196,39 +212,65 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
   // Subscribe to Firebase Firestore & Server Buffer real-time updates for active year
   useEffect(() => {
-    // 1. Initial fetch from Firestore & Server Buffer
-    fetchPbbSpptFromFirestore(selectedYear).then((items) => {
-      if (Array.isArray(items) && items.length > 0) {
-        lastFirestoreItemsRef.current = items;
-        setSpptList(prev => {
-          if (!prev || prev.length === 0) return items;
-          // Protect local recent modifications (e.g. moved lingkungan) from being reverted
-          return smartMergeSpptItems(items, prev, false);
-        });
-        const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        setLastSyncTime(nowStr);
-        try {
-          localStorage.setItem(`sikepling_pbb_last_sync_time_${selectedYear}`, nowStr);
-        } catch {}
-      }
-    }).catch(() => {});
+    let unsubscribe: () => void = () => {};
 
-    // 2. Real-time subscription
-    const unsubscribe = subscribePbbSpptFromFirestore(selectedYear, (items) => {
-      if (Array.isArray(items)) {
-        lastFirestoreItemsRef.current = items;
-        setSpptList(prev => {
-          if (!prev || prev.length === 0) return items;
-          // Protect local recent modifications from being reverted
-          return smartMergeSpptItems(items, prev, false);
-        });
-        const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        setLastSyncTime(nowStr);
-        try {
-          localStorage.setItem(`sikepling_pbb_last_sync_time_${selectedYear}`, nowStr);
-        } catch {}
-      }
-    });
+    if (isKepling && keplingLingkunganNum) {
+      // Kepling on mobile: load only their own lingkungan (~800 items instead of 22,585 items)
+      fetchPbbSpptForLingkungan(selectedYear, keplingLingkunganNum).then((items) => {
+        if (Array.isArray(items) && items.length > 0) {
+          lastFirestoreItemsRef.current = items;
+          setSpptList(prev => {
+            if (!prev || prev.length === 0) return items;
+            return smartMergeSpptItems(items, prev, false);
+          });
+          const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          setLastSyncTime(nowStr);
+        }
+      }).catch(() => {});
+
+      unsubscribe = subscribePbbSpptForLingkungan(selectedYear, keplingLingkunganNum, (items) => {
+        if (Array.isArray(items)) {
+          lastFirestoreItemsRef.current = items;
+          setSpptList(prev => {
+            if (!prev || prev.length === 0) return items;
+            return smartMergeSpptItems(items, prev, false);
+          });
+          const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          setLastSyncTime(nowStr);
+        }
+      });
+    } else {
+      // Super Admin or Kasi Pem: full list
+      fetchPbbSpptFromFirestore(selectedYear).then((items) => {
+        if (Array.isArray(items) && items.length > 0) {
+          lastFirestoreItemsRef.current = items;
+          setSpptList(prev => {
+            if (!prev || prev.length === 0) return items;
+            return smartMergeSpptItems(items, prev, false);
+          });
+          const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          setLastSyncTime(nowStr);
+          try {
+            localStorage.setItem(`sikepling_pbb_last_sync_time_${selectedYear}`, nowStr);
+          } catch {}
+        }
+      }).catch(() => {});
+
+      unsubscribe = subscribePbbSpptFromFirestore(selectedYear, (items) => {
+        if (Array.isArray(items)) {
+          lastFirestoreItemsRef.current = items;
+          setSpptList(prev => {
+            if (!prev || prev.length === 0) return items;
+            return smartMergeSpptItems(items, prev, false);
+          });
+          const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          setLastSyncTime(nowStr);
+          try {
+            localStorage.setItem(`sikepling_pbb_last_sync_time_${selectedYear}`, nowStr);
+          } catch {}
+        }
+      });
+    }
 
     const handleWipedEvent = () => {
       setSpptList([]);
@@ -240,7 +282,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       unsubscribe();
       window.removeEventListener('pbb-wiped-all', handleWipedEvent);
     };
-  }, [selectedYear]);
+  }, [selectedYear, isKepling, keplingLingkunganNum]);
 
   // Sync state changes to localStorage for active year
   useEffect(() => {
@@ -610,7 +652,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     setFormPbbTerutang(String(item.pbbTerutang));
     setFormJumlahBayar(item.jumlahBayar !== undefined && item.jumlahBayar !== null ? String(item.jumlahBayar) : String(item.pbbTerutang));
     setFormLingkungan(item.lingkungan);
-    setFormStatus(item.status);
+    setFormStatus(item.status === 'Sudah Bayar' ? 'Sudah Bayar' : 'Belum Bayar');
     setFormTglBayar(item.tglBayar || (item.status === 'Sudah Bayar' ? (item.updatedAt ? item.updatedAt.split('T')[0] : new Date().toISOString().split('T')[0]) : ''));
     setFormKeterangan(item.keterangan || '');
     setFormError(null);

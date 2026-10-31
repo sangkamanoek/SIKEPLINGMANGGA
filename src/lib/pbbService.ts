@@ -1,11 +1,14 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   setDoc,
   deleteDoc,
   writeBatch,
   onSnapshot,
+  query,
+  where,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
@@ -13,6 +16,8 @@ import { SpptPbbItem, INITIAL_PBB_SUMMARY, SAMPLE_SPPT_ITEMS } from '../data/pbb
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import { cleanFirestoreData } from './firestoreService';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
+import { savePbbToIndexedDB, getPbbFromIndexedDB } from './indexedDbStorage';
+import { PRECOMPUTED_PBB_SUMMARY_2026 } from '../data/pbbSummaryData';
 
 export interface LingkunganPbbSummary {
   lingkungan: number;
@@ -42,48 +47,191 @@ export const AVAILABLE_PBB_YEARS = [2024, 2025, 2026, 2027, 2028];
 export const DEFAULT_PBB_YEAR = 2026;
 
 const STORAGE_KEY_PREFIX = 'sikepling_sppt_pbb_records_';
+export const PBB_SUMMARY_STORAGE_KEY_PREFIX = 'sikepling_pbb_summary_';
 
 export const getPbbStorageKey = (year: number): string => {
   return `${STORAGE_KEY_PREFIX}${year}_v3`;
 };
 
 /**
- * Load SPPT items from localStorage or fallback to defaults
+ * Get synchronously cached PBB overview. Eliminates 0 (NOL) flickering on mobile devices.
+ */
+export function getCachedPbbOverview(year: number = DEFAULT_PBB_YEAR): KelurahanPbbOverview {
+  const key = `${PBB_SUMMARY_STORAGE_KEY_PREFIX}${year}`;
+  const cached = safeGetLocalStorage<KelurahanPbbOverview | null>(key, null);
+  if (cached && cached.totalWp > 0) {
+    return cached;
+  }
+  if (year === 2026 && PRECOMPUTED_PBB_SUMMARY_2026) {
+    return PRECOMPUTED_PBB_SUMMARY_2026 as KelurahanPbbOverview;
+  }
+  return {
+    year,
+    totalTargetNominal: 0,
+    totalRealisasiNominal: 0,
+    totalSisaNominal: 0,
+    totalWp: 0,
+    totalWpLunas: 0,
+    totalWpBelumLunas: 0,
+    persentaseRealisasiNominal: 0,
+    persentaseWpLunas: 0,
+    lingkunganSummaries: [],
+  };
+}
+
+/**
+ * Fetch PBB overview summary from Firestore document or server API buffer.
+ * Only downloads 1 lightweight JSON document (~5KB) instead of 22,585 records (~18MB).
+ */
+export async function fetchPbbSummaryFromFirestore(year: number = DEFAULT_PBB_YEAR): Promise<KelurahanPbbOverview> {
+  const key = `${PBB_SUMMARY_STORAGE_KEY_PREFIX}${year}`;
+
+  // 1. Try Firestore doc `pbb_summary/{year}`
+  try {
+    const docRef = doc(db, 'pbb_summary', String(year));
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data() as KelurahanPbbOverview;
+      if (data && data.totalWp > 0) {
+        safeSetLocalStorage(key, JSON.stringify(data));
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn(`[PBB Summary] Firestore notice for ${year}:`, err);
+  }
+
+  // 2. Try Server buffer route `/api/pbb/summary`
+  try {
+    const res = await fetch(`/api/pbb/summary?year=${year}&_t=${Date.now()}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.data && json.data.totalWp > 0) {
+        safeSetLocalStorage(key, JSON.stringify(json.data));
+        return json.data as KelurahanPbbOverview;
+      }
+    }
+  } catch (err) {
+    console.warn(`[PBB Summary] Server buffer notice for ${year}:`, err);
+  }
+
+  return getCachedPbbOverview(year);
+}
+
+/**
+ * Real-time listener for PBB overview summary.
+ * Instantly supplies cached numbers to mobile UI, then silently syncs updates.
+ */
+export function subscribePbbSummary(
+  year: number = DEFAULT_PBB_YEAR,
+  onData: (overview: KelurahanPbbOverview) => void
+): Unsubscribe {
+  const key = `${PBB_SUMMARY_STORAGE_KEY_PREFIX}${year}`;
+  // 1. Immediately provide cached overview (0ms latency, never NOL)
+  const initial = getCachedPbbOverview(year);
+  onData(initial);
+
+  // 2. Background refresh
+  fetchPbbSummaryFromFirestore(year).then((latest) => {
+    if (latest && latest.totalWp > 0) {
+      onData(latest);
+    }
+  }).catch(() => {});
+
+  // 3. Realtime Firestore listener on `pbb_summary/{year}`
+  try {
+    const docRef = doc(db, 'pbb_summary', String(year));
+    return onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as KelurahanPbbOverview;
+          if (data && data.totalWp > 0) {
+            safeSetLocalStorage(key, JSON.stringify(data));
+            onData(data);
+          }
+        }
+      },
+      (err) => {
+        console.warn(`[PBB Summary] Listener notice for ${year}:`, err);
+      }
+    );
+  } catch (e) {
+    console.warn('Error setting up pbb_summary subscription:', e);
+    return () => {};
+  }
+}
+
+/**
+ * Save updated overview summary to Firestore and LocalStorage
+ */
+export async function savePbbSummaryToFirestore(overview: KelurahanPbbOverview, year: number = DEFAULT_PBB_YEAR): Promise<void> {
+  const key = `${PBB_SUMMARY_STORAGE_KEY_PREFIX}${year}`;
+  safeSetLocalStorage(key, JSON.stringify(overview));
+  try {
+    const docRef = doc(db, 'pbb_summary', String(year));
+    await setDoc(docRef, { ...overview, updatedAt: new Date().toISOString() }, { merge: true });
+  } catch (e) {
+    console.warn(`[PBB Summary] Error saving summary to Firestore:`, e);
+  }
+}
+
+/**
+ * Load SPPT items from localStorage or IndexedDB fallback
  */
 export function getLocalSpptForYear(year: number): SpptPbbItem[] {
   const key = getPbbStorageKey(year);
-  const defaultItems = year === 2026 ? SAMPLE_SPPT_ITEMS : [];
   const res = safeGetLocalStorage<SpptPbbItem[]>(key, []);
   if (Array.isArray(res) && res.length > 0) return res;
 
   // Check fallback storage keys (e.g. legacy master data key)
   const legacyMaster = safeGetLocalStorage<SpptPbbItem[]>(`sikepling_pbb_master_data_${year}`, []);
   if (Array.isArray(legacyMaster) && legacyMaster.length > 0) {
-    // Migrate to standard key
     safeSetLocalStorage(key, JSON.stringify(legacyMaster));
     return legacyMaster;
   }
 
-  return defaultItems;
+  return year === 2026 ? SAMPLE_SPPT_ITEMS : [];
 }
 
 /**
- * Save SPPT items to localStorage and notify all components
+ * Asynchronously read full PBB SPPT records from IndexedDB (supports 100MB+ without 5MB quota limit)
+ */
+export async function getPbbSpptFromIndexedDb(year: number = DEFAULT_PBB_YEAR): Promise<SpptPbbItem[]> {
+  try {
+    const idbData = await getPbbFromIndexedDB();
+    if (Array.isArray(idbData) && idbData.length > 0) {
+      return idbData;
+    }
+  } catch (err) {
+    console.warn('[PBB IDB] Error loading from IndexedDB:', err);
+  }
+  return getLocalSpptForYear(year);
+}
+
+/**
+ * Save SPPT items to localStorage AND IndexedDB and notify all components
  */
 export function saveLocalSpptForYear(items: SpptPbbItem[], year: number): void {
   const key = getPbbStorageKey(year);
   safeSetLocalStorage(key, JSON.stringify(items));
-  // Keep backup master data key in sync
   safeSetLocalStorage(`sikepling_pbb_master_data_${year}`, JSON.stringify(items));
+  // Safely persist complete dataset to IndexedDB (prevents mobile quota drop)
+  savePbbToIndexedDB(items).catch(() => {});
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('pbb-data-updated', { detail: { year, count: items.length } }));
   }
 }
 
 /**
- * Calculate comprehensive PBB statistics per Lingkungan and for entire Kelurahan
+ * Calculate comprehensive PBB statistics per Lingkungan and for entire Kelurahan.
+ * If spptList is not yet loaded, automatically returns cached/precomputed overview so HP never displays 0!
  */
 export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAULT_PBB_YEAR): KelurahanPbbOverview {
+  if (!spptList || spptList.length === 0) {
+    return getCachedPbbOverview(year);
+  }
+
   const lingkunganSummaries: LingkunganPbbSummary[] = [];
   let totalTargetNominal = 0;
   let totalRealisasiNominal = 0;
@@ -179,6 +327,55 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
 }
 
 /**
+ * Fetch only the SPPT items belonging to a single lingkungan (e.g. for Kepling on mobile).
+ * Reduces payload from 22,585 items to ~800 items.
+ */
+export async function fetchPbbSpptForLingkungan(year: number = DEFAULT_PBB_YEAR, lingkungan: number): Promise<SpptPbbItem[]> {
+  const colName = `${PBB_COLLECTION_PREFIX}${year}`;
+  try {
+    const q = query(collection(db, colName), where('lingkungan', '==', lingkungan));
+    const snap = await getDocs(q);
+    const items: SpptPbbItem[] = [];
+    snap.forEach((docSnap) => {
+      const data = docSnap.data() as SpptPbbItem;
+      if (data && data.id) items.push({ ...data, id: docSnap.id || data.id });
+    });
+    return items;
+  } catch (err) {
+    console.warn(`[PBB Fetch] Notice fetching Lingkungan ${lingkungan}:`, err);
+    return [];
+  }
+}
+
+/**
+ * Subscribe to SPPT items for a single lingkungan in real-time
+ */
+export function subscribePbbSpptForLingkungan(
+  year: number = DEFAULT_PBB_YEAR,
+  lingkungan: number,
+  onData: (items: SpptPbbItem[]) => void
+): Unsubscribe {
+  const colName = `${PBB_COLLECTION_PREFIX}${year}`;
+  const q = query(collection(db, colName), where('lingkungan', '==', lingkungan));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const items: SpptPbbItem[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as SpptPbbItem;
+        if (data && data.id) items.push({ ...data, id: docSnap.id || data.id });
+      });
+      if (items.length > 0) {
+        onData(items);
+      }
+    },
+    (err) => {
+      console.warn(`[PBB Subscribe] Notice for Lingkungan ${lingkungan}:`, err);
+    }
+  );
+}
+
+/**
  * Format teks resmi WhatsApp untuk Rekapitulasi Capaian PBB 24 Lingkungan (Persentase Kepatuhan WP).
  * Diurutkan dari Lingkungan 1 sampai dengan 24.
  */
@@ -243,7 +440,7 @@ export function formatRekapPbbWaText(overview: KelurahanPbbOverview, year: numbe
 // SMART MERGE & DUAL-TIER SYNC (SERVER BUFFER + FIRESTORE)
 // ====================================================
 
-const PBB_COLLECTION_PREFIX = 'pbb_sppt_';
+export const PBB_COLLECTION_PREFIX = 'pbb_sppt_';
 
 /**
  * Format raw NOP digits (up to 18 digits) into XX.XX.XXX.XXX.XXX-XXXX.X dynamically as-you-type
@@ -476,12 +673,19 @@ export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR)
 
     if (firestoreItems.length > 0) {
       currentList = smartMergeSpptItems(currentList, firestoreItems);
+      // Asynchronously cache into local IndexedDB
+      savePbbToIndexedDB(currentList).catch(() => {});
     } else if (snapshot.size === 0) {
       console.warn(`[PBB Fetch] Firestore collection ${colName} is empty.`);
     }
   } catch (err) {
-    console.error(`[PBB Fetch] Firestore error for ${colName}:`, err);
-    handleFirestoreError(err, OperationType.LIST, colName);
+    console.warn(`[PBB Fetch] Firestore notice for ${colName}, attempting local offline fallback:`, err);
+    try {
+      const idbItems = await getPbbFromIndexedDB();
+      if (idbItems && idbItems.length > 0) {
+        currentList = smartMergeSpptItems(currentList, idbItems);
+      }
+    } catch {}
   }
 
   // 2. Fetch from Express Server Buffer (/api/pbb) (Fallback/Merge)
@@ -629,7 +833,18 @@ export function subscribePbbSpptFromFirestore(
   const colName = `${PBB_COLLECTION_PREFIX}${year}`;
   const colRef = collection(db, colName);
 
-  let activeList: SpptPbbItem[] = [];
+  let activeList: SpptPbbItem[] = getLocalSpptForYear(year);
+  if (activeList.length > 0) {
+    onData(activeList);
+  }
+
+  // Hydrate immediately from IndexedDB for zero-lag mobile restoration
+  getPbbFromIndexedDB().then((idb) => {
+    if (idb && idb.length > 0 && idb.length > activeList.length) {
+      activeList = smartMergeSpptItems(activeList, idb);
+      onData(activeList);
+    }
+  }).catch(() => {});
 
   // Initial fetch from Server API buffer
   fetchPbbFromApi(year).then((apiItems) => {
@@ -660,6 +875,7 @@ export function subscribePbbSpptFromFirestore(
         // Do NOT set activeList to [] immediately, wait for actual data or explicit wipe command
       } else if (firestoreItems.length > 0) {
         activeList = smartMergeSpptItems(activeList, firestoreItems);
+        savePbbToIndexedDB(activeList).catch(() => {});
         onData(activeList);
       } else if (!snapshot.empty && firestoreItems.length === 0 && !isFromCache) {
         // This case handles a true empty collection if we know it should be empty

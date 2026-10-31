@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserAccount } from '../types';
 import { KunjunganWargaData, saveKunjunganWargaToFirestore } from '../lib/kunjunganService';
+export type { KunjunganWargaData };
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { Users, CheckCircle2, X, Camera, Upload } from 'lucide-react';
 import { getTodayLocalIso } from '../lib/formatter';
@@ -9,6 +10,7 @@ import { compressImageFile } from '../lib/imageCompressor';
 interface FormKunjunganWargaProps {
   isOpen?: boolean;
   onClose?: () => void;
+  onCancel?: () => void;
   currentUser?: UserAccount;
   editItem?: KunjunganWargaData | null;
   tanggalLaporan?: string;
@@ -19,6 +21,7 @@ interface FormKunjunganWargaProps {
 export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   isOpen = true,
   onClose,
+  onCancel,
   currentUser,
   editItem,
   tanggalLaporan,

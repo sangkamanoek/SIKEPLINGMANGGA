@@ -522,7 +522,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
           }
         : (() => {
             const timeStat = checkApelTimeStatus();
-            if (timeStat.isLate || !timeStat.isWorkDay) {
+            if (timeStat.isLate) {
               return {
                 status: 'Tidak Mengikuti Apel' as const,
                 jam: '-',
@@ -687,7 +687,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
               if (day === 0 || day === 6) return null;
 
               const timeStat = checkApelTimeStatus();
-              const isPastWindow = timeStat.isLate || !timeStat.isWorkDay;
+              const isPastWindow = timeStat.isLate;
               const isAbsent = !todayApel && isPastWindow;
 
               return (
@@ -743,9 +743,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                             const absentStat = calculateAbsentDays(
                               attendanceList,
                               selectedAccountId,
-                              rawDate,
-                              eventList,
-                              eventAttendanceList
+                              rawDate
                             );
                             return (
                               <span className="inline-block px-2.5 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10px] tracking-wide shadow-2xs">

@@ -39,6 +39,11 @@ import {
   fetchPbbSpptFromFirestore,
   subscribePbbSpptFromFirestore,
   computePbbOverview,
+  subscribePbbSummary,
+  getCachedPbbOverview,
+  fetchPbbSpptForLingkungan,
+  subscribePbbSpptForLingkungan,
+  KelurahanPbbOverview,
 } from '../lib/pbbService';
 
 interface SmartHubDashboardProps {
@@ -123,6 +128,8 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
     }
   };
 
+  const [summaryOverview, setSummaryOverview] = useState<KelurahanPbbOverview>(() => getCachedPbbOverview(pbbYear));
+
   // Reactive live SPPT list state
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => {
     const list = getLocalSpptForYear(pbbYear);
@@ -139,30 +146,40 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
 
   // Subscribe to real-time PBB updates (Firestore, API buffer, LocalStorage, BroadcastChannel)
   useEffect(() => {
-    // 1. Initial reload from local storage
-    const currentLocal = getLocalSpptForYear(pbbYear);
-    if (currentLocal.length > 0) {
-      setSpptList(currentLocal);
-    }
-
-    // 2. Fetch latest online
-    fetchPbbSpptFromFirestore(pbbYear).then((items) => {
-      if (Array.isArray(items) && items.length > 0) {
-        setSpptList(items);
-      }
-    }).catch(() => {});
-
-    // 3. Real-time subscription
-    const unsub = subscribePbbSpptFromFirestore(pbbYear, (items) => {
-      if (Array.isArray(items) && items.length > 0) {
-        setSpptList(items);
-      }
+    // 1. Subscribe to summary overview (instant 0ms loading)
+    const unsubSummary = subscribePbbSummary(pbbYear, (ov) => {
+      if (ov && ov.totalWp > 0) setSummaryOverview(ov);
     });
 
-    // 4. Local storage & cross-tab sync listeners
+    let unsubSppt: () => void = () => {};
+
+    if (isKepling && activeAccount.nomorLingkungan) {
+      const lk = activeAccount.nomorLingkungan;
+      fetchPbbSpptForLingkungan(pbbYear, lk).then((items) => {
+        if (Array.isArray(items) && items.length > 0) setSpptList(items);
+      }).catch(() => {});
+      unsubSppt = subscribePbbSpptForLingkungan(pbbYear, lk, (items) => {
+        if (Array.isArray(items) && items.length > 0) setSpptList(items);
+      });
+    } else {
+      // Super Admin or Kasi Pem
+      const currentLocal = getLocalSpptForYear(pbbYear);
+      if (currentLocal.length > 0) {
+        setSpptList(currentLocal);
+      }
+      fetchPbbSpptFromFirestore(pbbYear).then((items) => {
+        if (Array.isArray(items) && items.length > 0) setSpptList(items);
+      }).catch(() => {});
+      unsubSppt = subscribePbbSpptFromFirestore(pbbYear, (items) => {
+        if (Array.isArray(items) && items.length > 0) setSpptList(items);
+      });
+    }
+
     const handleSync = () => {
-      const updated = getLocalSpptForYear(pbbYear);
-      setSpptList(updated);
+      if (!isKepling) {
+        const updated = getLocalSpptForYear(pbbYear);
+        setSpptList(updated);
+      }
     };
 
     window.addEventListener('pbb-data-updated', handleSync);
@@ -182,13 +199,14 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
     window.addEventListener('storage', handleStorage);
 
     return () => {
-      unsub();
+      unsubSummary();
+      unsubSppt();
       window.removeEventListener('pbb-data-updated', handleSync);
       window.removeEventListener('pbb-item-synced', handleSync);
       window.removeEventListener('pbb-wiped-all', handleWiped);
       window.removeEventListener('storage', handleStorage);
     };
-  }, [pbbYear]);
+  }, [pbbYear, isKepling, activeAccount?.nomorLingkungan]);
 
   // Live PBB database summary computed directly from synced SPPT data (same as RekapPbbView)
   const pbbSummary = useMemo(() => {
@@ -223,9 +241,9 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       };
     }
 
-    // Check computePbbOverview baseline if available
-    const overview = computePbbOverview(spptList, pbbYear);
-    if (overview.totalWp > 0) {
+    // Check summaryOverview baseline
+    const overview = summaryOverview;
+    if (overview && overview.totalWp > 0) {
       const lkTarget = isKepling && activeAccount.nomorLingkungan
         ? overview.lingkunganSummaries.find(lk => lk.lingkungan === activeAccount.nomorLingkungan)
         : null;

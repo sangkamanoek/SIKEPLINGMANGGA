@@ -24,7 +24,9 @@ export interface KunjunganWargaData {
   nik?: string;
   alamat: string;
   lingkungan: string;
+  lingkunganNomor?: number;
   namaKepling: string;
+  keplingId?: string;
   perlinsos?: string;
   ikd?: string;
   pbb?: string;
@@ -33,6 +35,7 @@ export interface KunjunganWargaData {
   keterangan?: string;
   telepon?: string;
   fotoUrl?: string;
+  fotoDokumentasi?: any;
   createdAt?: string;
   updatedAt?: string;
 }

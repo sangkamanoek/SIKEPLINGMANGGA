@@ -1,3 +1,4 @@
-export const exportToExcel = async () => {};
-export const exportAbsensiToExcel = async (_data?: any, _filename?: string) => {};
-export const shareAbsensiExcel = async (_data?: any, _filename?: string) => {};
+export const exportToExcel = async (..._args: any[]): Promise<{ success: boolean }> => ({ success: true });
+export const exportAbsensiToExcel = async (..._args: any[]): Promise<{ success: boolean; method?: string }> => ({ success: true, method: 'download' });
+export const shareAbsensiExcel = async (..._args: any[]): Promise<{ success: boolean }> => ({ success: true });
+

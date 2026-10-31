@@ -50,6 +50,9 @@ import { fetchAllReports, saveReportToServer, subscribeReportsFromFirestore } fr
 import { subscribeKunjungan, KunjunganWargaData } from './lib/kunjunganService';
 import { getTodayLocalIso } from './lib/formatter';
 import { safeGetLocalStorage, safeSetLocalStorage } from './lib/safeStorage';
+import { subscribeAttendance, loadAllAttendance } from './lib/attendanceApi';
+import { getReportsFromIndexedDB, getVisitsFromIndexedDB } from './lib/indexedDbStorage';
+import { subscribeTargetsFromFirestore } from './lib/firestoreService';
 
 const ACTIVE_ACCOUNT_STORAGE_KEY = 'sikepling_active_account_id';
 const ACTIVE_TAB_STORAGE_KEY = 'sikepling_active_tab_v2';
@@ -92,8 +95,8 @@ export default function App() {
     return safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_LOCAL_KEY, []);
   });
   const [kunjunganList, setKunjunganList] = useState<KunjunganWargaData[]>([]);
-  const [attendanceList, setAttendanceList] = useState<AbsenApelItem[]>([]);
-  const [targetsMap] = useState(getDefaultTargetsCapaianMap);
+  const [attendanceList, setAttendanceList] = useState<AbsenApelItem[]>(() => loadAllAttendance());
+  const [targetsMap, setTargetsMap] = useState(getDefaultTargetsCapaianMap);
   const [selectedRiwayatKepling, setSelectedRiwayatKepling] = useState<string>('');
 
   // Modals
@@ -118,6 +121,20 @@ export default function App() {
       setActiveAccount((prev) => (prev ? getEffectiveProfile(prev) : prev));
     }).catch(() => {});
 
+    // Hydrate reports from IndexedDB if memory or localStorage was evicted on mobile
+    getReportsFromIndexedDB().then((idbReports) => {
+      if (idbReports && idbReports.length > 0) {
+        setReports((prev) => (prev.length === 0 ? idbReports : prev));
+      }
+    }).catch(() => {});
+
+    // Hydrate visits from IndexedDB
+    getVisitsFromIndexedDB().then((idbVisits) => {
+      if (idbVisits && idbVisits.length > 0) {
+        setKunjunganList((prev) => (prev.length === 0 ? idbVisits : prev));
+      }
+    }).catch(() => {});
+
     // Use real-time subscription for reports
     const unsub = subscribeReportsFromFirestore((fetched) => {
       if (Array.isArray(fetched)) {
@@ -128,8 +145,21 @@ export default function App() {
 
     // Use real-time subscription for kunjungan
     const unsubKunjungan = subscribeKunjungan((fetched) => {
-      // Logic to update kunjunganList state
       setKunjunganList(fetched);
+    });
+
+    // Use real-time subscription for attendance
+    const unsubAttendance = subscribeAttendance((fetched) => {
+      if (Array.isArray(fetched)) {
+        setAttendanceList(fetched);
+      }
+    });
+
+    // Use real-time subscription for targets
+    const unsubTargets = subscribeTargetsFromFirestore((map) => {
+      if (map && Object.keys(map).length > 0) {
+        setTargetsMap(map);
+      }
     });
     
     // Trigger silent background sync for other data
@@ -143,6 +173,8 @@ export default function App() {
     return () => {
       unsub();
       unsubKunjungan();
+      unsubAttendance();
+      unsubTargets();
       clearInterval(syncInterval);
     };
   }, []);

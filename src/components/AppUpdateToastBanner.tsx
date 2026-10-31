@@ -9,7 +9,8 @@ import {
 } from '../lib/appVersionService';
 
 interface AppUpdateToastBannerProps {
-  onOpenDetails: () => void;
+  onOpenDetails?: () => void;
+  onOpenUpdateModal?: () => void;
 }
 
 export const AppUpdateToastBanner: React.FC<AppUpdateToastBannerProps> = ({ onOpenDetails }) => {

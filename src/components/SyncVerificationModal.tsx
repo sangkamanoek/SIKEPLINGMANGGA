@@ -335,7 +335,7 @@ const ReportDiffCard: React.FC<ReportDiffCardProps> = ({ item, status, onSync, s
       if (status === 'localOnly') {
         const ok = await saveReportToServer(item);
         if (ok) {
-          showToast(`Laporan ${item.nomorLaporan || item.id} berhasil dikirim ke server!`, 'success');
+          showToast(`Laporan ${(item as any).nomorLaporan || item.id} berhasil dikirim ke server!`, 'success');
           onSync();
         } else {
           showToast('Gagal mengirim laporan ke server.', 'error');
@@ -367,7 +367,7 @@ const ReportDiffCard: React.FC<ReportDiffCardProps> = ({ item, status, onSync, s
           <span className="font-mono text-[11px] text-slate-400">ID: {item.id}</span>
         </div>
         <p className="text-xs text-slate-700 line-clamp-1 bg-white p-2 rounded-lg border border-slate-200 mt-1">
-          {item.kegiatanLainnya || item.kinerja?.kegiatanLainnya || 'Laporan Harian Kepling'}
+          {(item as any).kegiatanLainnya || item.kinerja?.kegiatanLainnya || 'Laporan Harian Kepling'}
         </p>
       </div>
 
@@ -428,7 +428,7 @@ const ReportConflictCard: React.FC<ReportConflictCardProps> = ({ conflict, onSyn
         <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
           <span className="text-[10px] font-bold text-amber-700 uppercase">Versi Di Perangkat Lokal</span>
           <p className="text-xs font-bold text-slate-900">{conflict.local.namaKepling} ({conflict.local.tanggal})</p>
-          <p className="text-[11px] text-slate-600 line-clamp-2">{conflict.local.kegiatanLainnya || 'Catatan lokal'}</p>
+          <p className="text-[11px] text-slate-600 line-clamp-2">{(conflict.local as any).kegiatanLainnya || conflict.local.kinerja?.kegiatanLainnya || 'Catatan lokal'}</p>
           <button
             type="button"
             onClick={() => handleResolve(true)}
@@ -442,7 +442,7 @@ const ReportConflictCard: React.FC<ReportConflictCardProps> = ({ conflict, onSyn
         <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
           <span className="text-[10px] font-bold text-blue-700 uppercase">Versi Di Server Cloud</span>
           <p className="text-xs font-bold text-slate-900">{conflict.server.namaKepling} ({conflict.server.tanggal})</p>
-          <p className="text-[11px] text-slate-600 line-clamp-2">{conflict.server.kegiatanLainnya || 'Catatan server'}</p>
+          <p className="text-[11px] text-slate-600 line-clamp-2">{(conflict.server as any).kegiatanLainnya || conflict.server.kinerja?.kegiatanLainnya || 'Catatan server'}</p>
           <button
             type="button"
             onClick={() => handleResolve(false)}

@@ -30,7 +30,7 @@ export function useKeplingMorningNotification(currentUser: UserAccount | null) {
             'Pengingat Laporan Harian Kepling ⏰',
             {
               body: `Halo ${currentUser.nama}, selamat pagi! Jangan lupa untuk mengisi laporan kinerja harian dan absen apel pagi hari ini pukul 07.30 WIB.`,
-              icon: '/logo_pkk.jpg',
+              icon: '/logo_pemko_medan.png',
             }
           );
         }

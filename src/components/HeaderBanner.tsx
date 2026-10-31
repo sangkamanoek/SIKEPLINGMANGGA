@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { GoogleUser, SheetMetadata, UserAccount, isPkkRole } from '../types';
 import { CURRENT_APP_VERSION, hasUnseenAppUpdate } from '../lib/appVersionService';
+import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
 
 interface HeaderBannerProps {
   user: GoogleUser | null;
@@ -53,6 +54,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   onOpenPPTModal,
   onOpenAbsenApel,
   onOpenUpdateModal,
+  onOpenSyncVerification,
   portalMode,
 }) => {
   const isPkk = activeAccount ? isPkkRole(activeAccount.role) || portalMode === 'pkk' : portalMode === 'pkk';
@@ -225,11 +227,11 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
               />
             </div>
             {isPkk && (
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1.5 shadow-xs shrink-0 border border-white/20 overflow-hidden">
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center p-1 shadow-xs shrink-0 border border-white/30 overflow-hidden">
                 <img
-                  src="/logo_pkk.jpg"
-                  alt="Logo PKK"
-                  className="w-full h-full object-cover"
+                  src={PKK_LOGO_BASE64}
+                  alt="Logo PKK Resmi"
+                  className="w-full h-full object-contain"
                 />
               </div>
             )}

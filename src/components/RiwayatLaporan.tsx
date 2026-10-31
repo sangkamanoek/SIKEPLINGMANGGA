@@ -275,7 +275,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
     let base = items;
     if (isKepling) {
       base = base.filter((item) => {
-        const matchLingkungan = keplingLingkungan && item.lingkungan && item.lingkungan.toLowerCase().includes(keplingLingkungan.toLowerCase());
+        const matchLingkungan = keplingLingkungan && item.lingkungan && String(item.lingkungan).toLowerCase().includes(keplingLingkungan.toLowerCase());
         const matchNama = keplingNama && item.namaKepling && item.namaKepling.toLowerCase().includes(keplingNama.toLowerCase());
         return Boolean(matchLingkungan || matchNama);
       });

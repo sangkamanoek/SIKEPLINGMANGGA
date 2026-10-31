@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Printer, Download, CreditCard, Layers, CheckCircle2 } from 'lucide-react';
 import { printOfficialDocument } from '../utils/printHelper';
 import { generateSinglePkkCardHtml, generateBatchPkkCardHtml } from '../utils/pkkCardGenerator';
+import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
 
 interface PkkCardModalProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
 
   if (!isOpen || !member) return null;
 
-  const photoUrl = member.pasphotoUrl || '/logo_pkk.jpg';
+  const photoUrl = member.pasphotoUrl || PKK_LOGO_BASE64;
 
   const regNo = `12.71.10.2001.${String(member.id || '0045').replace(/[^0-9]/g, '').slice(-4).padStart(4, '0')}`;
   const namaFormatted = (member.nama || 'NUR AINI, S.Pd.').toUpperCase();
@@ -164,12 +165,12 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
                 background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
               }}
             >
-              {/* Logo PKK - Zoom in 1.70x untuk membuang margin putih gambar JPEG & memperbesar emblem logo */}
-              <div className="w-[36px] h-[36px] sm:w-[48px] sm:h-[48px] rounded-full bg-white shrink-0 flex items-center justify-center shadow-md overflow-hidden border border-white">
+              {/* Logo PKK Resmi - Lingkaran putih bersih dengan lis emas dan transparansi murni */}
+              <div className="w-[40px] h-[40px] sm:w-[48px] sm:h-[48px] rounded-full bg-white shrink-0 flex items-center justify-center p-0.5 shadow-md overflow-hidden border border-white">
                 <img
-                  src="/logo_pkk.jpg"
-                  alt="Logo PKK"
-                  className="w-full h-full object-cover scale-[1.70] rounded-full"
+                  src={PKK_LOGO_BASE64}
+                  alt="Logo PKK Resmi"
+                  className="w-full h-full object-contain"
                 />
               </div>
               <div className="leading-[1.12] flex-1">
@@ -195,7 +196,7 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
                     alt={namaFormatted}
                     className="w-full h-full object-cover object-top"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/logo_pkk.jpg';
+                      (e.target as HTMLImageElement).src = PKK_LOGO_BASE64;
                     }}
                   />
                 </div>

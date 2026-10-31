@@ -1,4 +1,5 @@
 import React from 'react';
+import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
 
 export const KopSuratPkk: React.FC<{ className?: string }> = ({ className = '' }) => (
   <div
@@ -15,10 +16,10 @@ export const KopSuratPkk: React.FC<{ className?: string }> = ({ className = '' }
     }}
   >
     {/* Left Logo */}
-    <div style={{ width: '100px', minWidth: '100px', textAlign: 'center', shrink: 0 }}>
+    <div style={{ width: '100px', minWidth: '100px', textAlign: 'center', flexShrink: 0 }}>
       <img
-        src="/logo_pkk.jpg"
-        alt="Logo PKK"
+        src={PKK_LOGO_BASE64}
+        alt="Logo PKK Resmi"
         style={{
           width: '90px',
           height: '90px',
@@ -92,9 +93,9 @@ export const KopSuratPkk: React.FC<{ className?: string }> = ({ className = '' }
     </div>
 
     {/* Right Balance Spacer */}
-    <div style={{ width: '100px', minWidth: '100px', shrink: 0, visibility: 'hidden' }}>
+    <div style={{ width: '100px', minWidth: '100px', flexShrink: 0, visibility: 'hidden' }}>
       <img
-        src="/logo_pkk.jpg"
+        src={PKK_LOGO_BASE64}
         alt="Spacer"
         style={{ width: '90px', height: '90px', objectFit: 'contain' }}
       />

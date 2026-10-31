@@ -302,13 +302,15 @@ export async function saveSuperAdminDeviceDataToFirestore(createdByName: string 
 
     // Save simple sync audit log
     const dId = getOrInitDeviceId();
-    await saveSyncAuditLog(
-      dId,
-      dataSnapshot.deviceInfo,
-      'success',
-      dataSnapshot.summary,
-      createdByName
-    );
+    await saveSyncAuditLog({
+      timestamp: new Date().toISOString(),
+      actor: createdByName,
+      action: 'BACKUP_SAVE',
+      status: 'success',
+      details: dataSnapshot.summary,
+      summary: JSON.stringify(dataSnapshot.summary),
+      deviceInfo: JSON.stringify(dataSnapshot.deviceInfo),
+    });
 
     return {
       success: true,
@@ -320,18 +322,18 @@ export async function saveSuperAdminDeviceDataToFirestore(createdByName: string 
     console.error('Error saving device backup to Firestore:', error);
     try {
       const dId = getOrInitDeviceId();
-      await saveSyncAuditLog(
-        dId,
-        {
+      await saveSyncAuditLog({
+        timestamp: new Date().toISOString(),
+        actor: createdByName,
+        action: 'BACKUP_SAVE_FAILED',
+        status: 'failed',
+        deviceInfo: JSON.stringify({
           userAgent: navigator.userAgent,
           platform: (navigator as any).platform || 'Unknown',
           screenResolution: `${window.screen.width}x${window.screen.height}`,
           language: navigator.language,
-        },
-        'failed',
-        { reportsCount: 0, familyCount: 0, pbbCount: 0, visitsCount: 0 },
-        createdByName
-      );
+        }),
+      });
     } catch (e) {
       console.error('Failed to log failure audit:', e);
     }
@@ -580,13 +582,15 @@ export async function syncSuperAdminDeviceDataToLiveFirestore(
 
     // Save simple sync audit log on success
     const dId = getOrInitDeviceId();
-    await saveSyncAuditLog(
-      dId,
-      snapshot.deviceInfo,
-      'success',
-      snapshot.summary,
-      'Super Admin'
-    );
+    await saveSyncAuditLog({
+      timestamp: new Date().toISOString(),
+      actor: 'Super Admin',
+      action: 'LIVE_DEVICE_SYNC',
+      status: 'success',
+      details: snapshot.summary,
+      summary: JSON.stringify(snapshot.summary),
+      deviceInfo: JSON.stringify(snapshot.deviceInfo),
+    });
 
     return {
       success: true,
@@ -597,18 +601,18 @@ export async function syncSuperAdminDeviceDataToLiveFirestore(
     console.error('Error during live device sync to Firestore:', error);
     try {
       const dId = getOrInitDeviceId();
-      await saveSyncAuditLog(
-        dId,
-        {
+      await saveSyncAuditLog({
+        timestamp: new Date().toISOString(),
+        actor: 'Super Admin',
+        action: 'LIVE_DEVICE_SYNC_FAILED',
+        status: 'failed',
+        deviceInfo: JSON.stringify({
           userAgent: navigator.userAgent,
           platform: (navigator as any).platform || 'Unknown',
           screenResolution: `${window.screen.width}x${window.screen.height}`,
           language: navigator.language,
-        },
-        'failed',
-        { reportsCount: 0, familyCount: 0, pbbCount: 0, visitsCount: 0 },
-        'Super Admin'
-      );
+        }),
+      });
     } catch (e) {
       console.error('Failed to log failure audit:', e);
     }

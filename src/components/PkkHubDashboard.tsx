@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
 import {
   Wallet,
   FileText,
@@ -166,9 +167,9 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-tosca-100 text-xs font-bold tracking-wide shadow-xs">
               <div className="w-6 h-6 rounded-full bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
                 <img
-                  src="/logo_pkk.jpg"
-                  alt="Logo PKK"
-                  className="w-full h-full object-cover scale-[0.94] transform"
+                  src={PKK_LOGO_BASE64}
+                  alt="Logo PKK Resmi"
+                  className="w-full h-full object-contain"
                 />
               </div>
               <span>TIM PENGGERAK PKK KELURAHAN MANGGA</span>

@@ -155,9 +155,16 @@ export const saveBuku1Item = async (item: PkkBuku1Anggota) => {
   } catch (e) {}
   try {
     if (db) {
-      await setDoc(doc(db, BUKU1_COL, item.id), cleanFirestoreData(payload));
+      // Non-blocking Firestore save with 3.5s timeout guard so UI never hangs on slow cellular connections
+      const savePromise = setDoc(doc(db, BUKU1_COL, item.id), cleanFirestoreData(payload));
+      await Promise.race([
+        savePromise,
+        new Promise((resolve) => setTimeout(resolve, 3500)),
+      ]);
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[pkkBukuService] Firestore save error:', e);
+  }
 };
 
 export const deleteBuku1Item = async (id: string) => {

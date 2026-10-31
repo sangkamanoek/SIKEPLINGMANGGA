@@ -113,6 +113,6 @@ export const fetchPkkKegiatanFromServer = async (): Promise<any[]> => [];
 export const clearPkkKeuanganData = async (): Promise<void> => {
   safeSetLocalStorage(KEUANGAN_STORAGE_KEY, JSON.stringify([]));
 };
-export const exportPkkKeuanganToExcel = async (_items?: any[]): Promise<void> => {};
+export const exportPkkKeuanganToExcel = async (..._args: any[]): Promise<void> => {};
 
 

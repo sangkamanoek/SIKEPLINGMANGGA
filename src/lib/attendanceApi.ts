@@ -38,19 +38,24 @@ export const getCurrentTimeString = () => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-export const submitAbsenApel = async (_data: any) => {
-  // Logic usually handled in the component calling saveAbsen
+export const submitAbsenApel = async (..._args: any[]): Promise<boolean> => {
+  return true;
 };
 
 export const computeAttendanceSummary24 = (attendanceList: AbsenApelItem[] = [], date?: string) => {
   const targetDate = date || getTodayDateString();
   const todayRecords = attendanceList.filter(a => a.tanggal === targetDate || a.createdAt?.startsWith(targetDate));
   
-  const totalHadir = todayRecords.filter(a => a.status === 'HADIR').length;
-  const totalIzin = todayRecords.filter(a => a.status === 'IZIN').length;
-  const totalSakit = todayRecords.filter(a => a.status === 'SAKIT').length;
-  const totalDinasLuar = todayRecords.filter(a => a.status === 'DINAS_LUAR').length;
-  const totalAlpa = todayRecords.filter(a => a.status === 'ALPA' || a.status === 'TIDAK_HADIR').length;
+  const isStatus = (a: AbsenApelItem, ...matches: string[]) => {
+    const st = String(a.status || '').toUpperCase();
+    return matches.some(m => st.includes(m.toUpperCase()));
+  };
+
+  const totalHadir = todayRecords.filter(a => isStatus(a, 'Hadir')).length;
+  const totalIzin = todayRecords.filter(a => isStatus(a, 'Izin')).length;
+  const totalSakit = todayRecords.filter(a => isStatus(a, 'Sakit')).length;
+  const totalDinasLuar = todayRecords.filter(a => isStatus(a, 'Dinas')).length;
+  const totalAlpa = todayRecords.filter(a => isStatus(a, 'Tidak', 'Alpa')).length;
   
   const totalParticipating = 24;
   const percentageHadir = (totalHadir / totalParticipating) * 100;
@@ -77,24 +82,33 @@ export const getTodayAbsenForKepling = (
   const targetDate = date || getTodayDateString();
   return (
     attendanceList?.find(
-      (a) => a.keplingId === keplingId && (a.tanggal === targetDate || a.createdAt?.startsWith(targetDate))
+      (a) => (a.keplingId === keplingId || a.accountId === keplingId) && (a.tanggal === targetDate || a.createdAt?.startsWith(targetDate))
     ) || null
   );
 };
 
 export const checkApelTimeStatus = () => {
   const d = new Date();
+  const day = d.getDay();
+  const isWorkDay = day >= 1 && day <= 5;
   const hour = d.getHours();
   const minute = d.getMinutes();
+  const formattedTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} WIB`;
   
-  // Example rule: late after 08:00
+  // Rule: apel window 07.00 - 08.00 Waktu Indonesia Barat
   const isLate = hour > 8 || (hour === 8 && minute > 0);
-  
+  const isWithinWindow = hour >= 7 && (hour < 8 || (hour === 8 && minute === 0));
+  const statusLabel = isLate ? 'Terlambat' : 'Tepat Waktu';
+
   if (isLate) {
     return {
       status: 'TERLAMBAT' as const,
       label: 'Terlambat',
+      statusLabel: 'Terlambat',
       isLate: true,
+      isWorkDay,
+      isWithinWindow,
+      formattedTime,
       colorClass: 'text-rose-700 bg-rose-50 border-rose-200',
     };
   }
@@ -102,7 +116,11 @@ export const checkApelTimeStatus = () => {
   return {
     status: 'TEPAT_WAKTU' as const,
     label: 'Tepat Waktu',
+    statusLabel: 'Tepat Waktu',
     isLate: false,
+    isWorkDay,
+    isWithinWindow,
+    formattedTime,
     colorClass: 'text-emerald-700 bg-emerald-50 border-emerald-200',
   };
 };
@@ -117,10 +135,14 @@ export const calculateAbsentDays = (
   
   const monthRecords = attendanceList.filter(a => {
     const d = a.tanggal || a.createdAt || '';
-    return d.startsWith(`${year}-${String(month).padStart(2, '0')}`) && a.keplingId === keplingId;
+    const accId = a.keplingId || a.accountId;
+    return d.startsWith(`${year}-${String(month).padStart(2, '0')}`) && accId === keplingId;
   });
 
-  const totalAbsent = monthRecords.filter(a => a.status === 'ALPA' || a.status === 'TIDAK_HADIR').length;
+  const totalAbsent = monthRecords.filter(a => {
+    const st = String(a.status || '').toUpperCase();
+    return st.includes('TIDAK') || st.includes('ALPA');
+  }).length;
 
   return {
     consecutiveDays: 0, // Placeholder for more complex logic
@@ -132,8 +154,17 @@ export const loadAllAttendance = (): AbsenApelItem[] => {
   return safeGetLocalStorage<AbsenApelItem[]>(ATTENDANCE_STORAGE_KEY, []);
 };
 
-export const isAttendanceMatchingKepling = (record: any, keplingId: string) => {
-  return record?.keplingId === keplingId;
+export const isAttendanceMatchingKepling = (record: any, keplingInput: any) => {
+  if (!record) return false;
+  if (typeof keplingInput === 'string') {
+    return record.keplingId === keplingInput || record.accountId === keplingInput;
+  }
+  if (keplingInput && typeof keplingInput === 'object') {
+    const targetId = keplingInput.id || keplingInput.username;
+    const targetLk = keplingInput.nomorLingkungan;
+    return record.keplingId === targetId || record.accountId === targetId || (targetLk && (record.lingkungan === targetLk || record.nomorLingkungan === targetLk));
+  }
+  return false;
 };
 
 export const isAttendanceMatchingDate = (record: any, dateStr: string) => {
@@ -157,7 +188,7 @@ export const computeWeeklyAttendance24 = (attendanceList: AbsenApelItem[] = [], 
   }
 
   const rows: KeplingWeeklyRow[] = KEPLING_ACCOUNTS.map((acc) => {
-    const accRecords = attendanceList.filter(a => a.keplingId === acc.id);
+    const accRecords = attendanceList.filter(a => (a.keplingId || a.accountId) === acc.id);
     const dailyStatus: Record<string, string> = {};
     let hadir = 0;
     let tidakApel = 0;
@@ -167,8 +198,9 @@ export const computeWeeklyAttendance24 = (attendanceList: AbsenApelItem[] = [], 
       const rec = accRecords.find(r => r.tanggal === wd.dateStr || r.createdAt?.startsWith(wd.dateStr));
       if (rec) {
         dailyStatus[wd.dateStr] = rec.status;
-        if (rec.status === 'HADIR') hadir++;
-        else if (rec.status === 'IZIN' || rec.status === 'SAKIT') izinSakit++;
+        const st = String(rec.status || '').toUpperCase();
+        if (st.includes('HADIR')) hadir++;
+        else if (st.includes('IZIN') || st.includes('SAKIT')) izinSakit++;
         else tidakApel++;
       } else {
         dailyStatus[wd.dateStr] = '-';
@@ -212,12 +244,19 @@ export const computeMonthlyAttendance24 = (
   const rows: KeplingMonthlyRow[] = KEPLING_ACCOUNTS.map((acc) => {
     const monthRecords = attendanceList.filter(a => {
       const d = a.tanggal || a.createdAt || '';
-      return d.startsWith(`${year}-${String(month).padStart(2, '0')}`) && a.keplingId === acc.id;
+      const accId = a.keplingId || a.accountId;
+      return d.startsWith(`${year}-${String(month).padStart(2, '0')}`) && accId === acc.id;
     });
 
-    const hadir = monthRecords.filter(r => r.status === 'HADIR').length;
-    const izinSakit = monthRecords.filter(r => r.status === 'IZIN' || r.status === 'SAKIT').length;
-    const tidakApel = monthRecords.filter(r => r.status === 'ALPA' || r.status === 'TIDAK_HADIR').length;
+    const hadir = monthRecords.filter(r => String(r.status || '').toUpperCase().includes('HADIR')).length;
+    const izinSakit = monthRecords.filter(r => {
+      const st = String(r.status || '').toUpperCase();
+      return st.includes('IZIN') || st.includes('SAKIT');
+    }).length;
+    const tidakApel = monthRecords.filter(r => {
+      const st = String(r.status || '').toUpperCase();
+      return st.includes('TIDAK') || st.includes('ALPA');
+    }).length;
 
     return {
       accountId: acc.id,

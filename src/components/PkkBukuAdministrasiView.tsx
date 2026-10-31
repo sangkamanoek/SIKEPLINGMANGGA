@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
 import {
   BookOpen,
   Plus,
@@ -46,6 +47,7 @@ import { subscribeSurat, saveSuratItem, deleteSuratItem } from '../lib/suratServ
 import { subscribePkkKeuangan, saveTransaksiPkk, deleteTransaksiPkk } from '../lib/pkkKeuanganService';
 import { subscribePkkKegiatan, savePkkKegiatan, deletePkkKegiatan } from '../lib/pkkKegiatanService';
 import { formatTanggalIndonesia, getTodayLocalIso } from '../lib/formatter';
+import { compressImageFile } from '../lib/imageCompressor';
 
 interface PkkBukuAdministrasiViewProps {
   currentUser: UserAccount;
@@ -83,6 +85,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
 
   // General Loading/Saving States
   const [isSaving, setIsSaving] = useState(false);
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
 
   // Subscriptions
   useEffect(() => {
@@ -275,11 +278,15 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           pekerjaan: b1Pekerjaan,
           keterangan: b1Keterangan,
           pasphotoUrl: b1PasphotoUrl,
+          createdAt: editingItem?.createdAt || new Date().toISOString(),
         };
         await saveBuku1Item(item);
-        const { generatePkkCardPdf } = await import('../utils/pkkCardGenerator');
-        await generatePkkCardPdf(item, b1PasphotoUrl || null);
-        onShowToast?.('Anggota PKK berhasil disimpan & Kartu KTA otomatis terunduh!', 'success');
+        onShowToast?.(`Anggota PKK "${item.nama}" berhasil disimpan!`, 'success');
+        setIsFormOpen(false);
+        resetForm();
+        // Langsung tampilkan modal pratinjau KTA di layar agar pengguna dapat melihat kartu secara nyaman
+        setSelectedCardMember(item);
+        return;
       } else if (activeBook === 2) {
         // Agenda Surat Masuk/Keluar
         const isMasuk = b2Jenis === 'SURAT_MASUK';
@@ -326,6 +333,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           hasilKeputusan: b4Keputusan,
           catatanRapat: b4Catatan,
           keterangan: b4Keterangan,
+          createdAt: editingItem?.createdAt || new Date().toISOString(),
         };
         await saveBuku4Item(item);
       } else if (activeBook === 5) {
@@ -338,6 +346,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           jumlah: Number(b5Jumlah),
           kondisi: b5Kondisi,
           keterangan: b5Keterangan,
+          createdAt: editingItem?.createdAt || new Date().toISOString(),
         };
         await saveBuku5Item(item);
       } else if (activeBook === 6) {
@@ -467,7 +476,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           <div className="space-y-2 flex-1 min-w-0">
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-tosca-100 text-xs font-bold tracking-wide shadow-xs">
               <div className="w-6 h-6 rounded-full bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
-                <img src="/logo_pkk.jpg" alt="Logo PKK" className="w-full h-full object-cover scale-[0.94] transform" />
+                <img src={PKK_LOGO_BASE64} alt="Logo PKK Resmi" className="w-full h-full object-contain" />
               </div>
               <span>TIM PENGGERAK PKK KELURAHAN MANGGA</span>
             </div>
@@ -947,19 +956,49 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                     <input type="text" value={b1Keterangan} onChange={(e) => setB1Keterangan(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="cth. Aktif sejak 2024" />
                   </div>
                   <div className="space-y-1">
-                    <label className="font-extrabold text-slate-700">Pasfoto</label>
+                    <div className="flex items-center justify-between">
+                      <label className="font-extrabold text-slate-700">Pasfoto</label>
+                      {isCompressingPhoto && (
+                        <span className="text-[10px] font-bold text-sky-600 flex items-center gap-1">
+                          <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Mengompres foto...
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="file"
                       accept="image/*"
+                      disabled={isCompressingPhoto || isSaving}
                       onChange={async (e) => {
                         if (e.target.files && e.target.files[0]) {
-                          const base64 = await fileToBase64(e.target.files[0]);
-                          setB1PasphotoUrl(base64);
+                          const file = e.target.files[0];
+                          try {
+                            setIsCompressingPhoto(true);
+                            // Compress phone/camera photos down to crisp lightweight ~30KB JPEG
+                            const compressed = await compressImageFile(file, 480, 0.75);
+                            setB1PasphotoUrl(compressed);
+                          } catch (err) {
+                            console.error('Photo compression error:', err);
+                            const fallback = await fileToBase64(file);
+                            setB1PasphotoUrl(fallback);
+                          } finally {
+                            setIsCompressingPhoto(false);
+                          }
                         }
                       }}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl"
                     />
-                    {b1PasphotoUrl && <img src={b1PasphotoUrl} className="w-16 h-20 object-cover rounded mt-2" alt="Preview" />}
+                    {b1PasphotoUrl && (
+                      <div className="flex items-center gap-3 mt-2">
+                        <img src={b1PasphotoUrl} className="w-16 h-20 object-cover rounded-lg border border-slate-300 shadow-xs" alt="Preview" />
+                        <button
+                          type="button"
+                          onClick={() => setB1PasphotoUrl('')}
+                          className="text-xs text-rose-600 hover:text-rose-700 font-bold underline cursor-pointer"
+                        >
+                          Hapus Foto
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1084,13 +1123,19 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                       accept="image/*"
                       onChange={async (e) => {
                         if (e.target.files && e.target.files[0]) {
-                          const base64 = await fileToBase64(e.target.files[0]);
-                          setB3Bukti(base64);
+                          const file = e.target.files[0];
+                          try {
+                            const compressed = await compressImageFile(file, 720, 0.70);
+                            setB3Bukti(compressed);
+                          } catch (err) {
+                            const fallback = await fileToBase64(file);
+                            setB3Bukti(fallback);
+                          }
                         }
                       }}
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl"
                     />
-                    {b3Bukti && <img src={b3Bukti} className="w-16 h-16 object-cover rounded mt-2" alt="Preview" />}
+                    {b3Bukti && <img src={b3Bukti} className="w-16 h-16 object-cover rounded mt-2 border border-slate-300" alt="Preview" />}
                   </div>
                 </div>
               )}

@@ -38,6 +38,9 @@ import {
   formatRekapPbbWaText,
   subscribePbbSpptFromFirestore,
   fetchPbbSpptFromFirestore,
+  subscribePbbSummary,
+  getCachedPbbOverview,
+  KelurahanPbbOverview,
 } from '../lib/pbbService';
 import { SpptPbbItem } from '../data/pbbSampleData';
 import { RekapCapaianPbb24Lingkungan } from './RekapCapaianPbb24Lingkungan';
@@ -84,24 +87,31 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
 
   // Real-time SPPT & Realisasi Data
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => getLocalSpptForYear(pbbYear));
+  const [summaryOverview, setSummaryOverview] = useState<KelurahanPbbOverview>(() => getCachedPbbOverview(pbbYear));
   const [isSyncingPbb, setIsSyncingPbb] = useState(false);
 
   useEffect(() => {
+    const unsubSummary = subscribePbbSummary(pbbYear, (ov) => {
+      if (ov && ov.totalWp > 0) setSummaryOverview(ov);
+    });
     setSpptList(getLocalSpptForYear(pbbYear));
     fetchPbbSpptFromFirestore(pbbYear).then((items) => {
-      if (Array.isArray(items)) setSpptList(items);
+      if (Array.isArray(items) && items.length > 0) setSpptList(items);
     }).catch(() => {});
     const unsub = subscribePbbSpptFromFirestore(pbbYear, (items) => {
-      if (Array.isArray(items)) setSpptList(items);
+      if (Array.isArray(items) && items.length > 0) setSpptList(items);
     });
-    return () => unsub();
+    return () => {
+      unsubSummary();
+      unsub();
+    };
   }, [pbbYear]);
 
   const handleManualSyncPbb = async () => {
     setIsSyncingPbb(true);
     try {
       const items = await fetchPbbSpptFromFirestore(pbbYear);
-      if (Array.isArray(items)) {
+      if (Array.isArray(items) && items.length > 0) {
         setSpptList(items);
       }
     } catch {} finally {
@@ -110,8 +120,11 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   };
 
   const pbbOverview = useMemo(() => {
-    return computePbbOverview(spptList, pbbYear);
-  }, [spptList, pbbYear]);
+    if (spptList.length > 0) {
+      return computePbbOverview(spptList, pbbYear);
+    }
+    return summaryOverview;
+  }, [spptList, pbbYear, summaryOverview]);
 
   const [copiedWaHeader, setCopiedWaHeader] = useState(false);
   const handleCopyPbbWa = () => {

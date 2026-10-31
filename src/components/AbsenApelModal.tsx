@@ -48,8 +48,9 @@ interface AbsenApelModalProps {
   isOpen: boolean;
   onClose: () => void;
   activeAccount: UserAccount;
-  attendanceList: AbsenApelItem[];
-  onRefreshAttendance: () => Promise<void>;
+  attendanceList?: AbsenApelItem[];
+  onRefreshAttendance?: () => Promise<void> | void;
+  onAbsenSuccess?: () => void;
   showToast?: (text: string, type: 'success' | 'error' | 'info') => void;
 }
 

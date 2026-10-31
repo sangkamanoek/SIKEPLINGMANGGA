@@ -1139,6 +1139,24 @@ app.delete('/api/surat/:id', (req, res) => {
   }
 });
 
+// GET PBB summary overview for given year (fast instant loading for mobile)
+app.get('/api/pbb/summary', (req, res) => {
+  const year = String(req.query.year || '2026');
+  const summaryFile = path.join(DATA_DIR, 'pbb_summary.json');
+  try {
+    if (fs.existsSync(summaryFile)) {
+      const allSummaries = JSON.parse(fs.readFileSync(summaryFile, 'utf-8'));
+      if (allSummaries[year]) {
+        res.setHeader('Cache-Control', 'public, max-age=60');
+        return res.json({ success: true, data: allSummaries[year] });
+      }
+    }
+  } catch (e) {
+    console.error('Error reading pbb_summary.json:', e);
+  }
+  return res.json({ success: false, message: 'Summary not found' });
+});
+
 // GET PBB SPPT records for given year (e.g. ?year=2026)
 app.get('/api/pbb', (req, res) => {
   const year = String(req.query.year || '2026');

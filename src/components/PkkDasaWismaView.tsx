@@ -56,6 +56,7 @@ const formatProperWriting = (text: string): string => {
 
 interface PkkDasaWismaViewProps {
   currentUser: UserAccount;
+  onShowToast?: (msg: string, type?: 'error' | 'info' | 'success') => void;
 }
 
 export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser }) => {

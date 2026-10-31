@@ -89,6 +89,11 @@ import {
   computePbbOverview,
   subscribePbbSpptFromFirestore,
   fetchPbbSpptFromFirestore,
+  subscribePbbSummary,
+  getCachedPbbOverview,
+  fetchPbbSpptForLingkungan,
+  subscribePbbSpptForLingkungan,
+  KelurahanPbbOverview,
 } from '../lib/pbbService';
 import { SpptPbbItem } from '../data/pbbSampleData';
 
@@ -403,16 +408,41 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     perLingkunganMap: {},
   }), []);
 
+  const [summaryOverview, setSummaryOverview] = useState<KelurahanPbbOverview>(() => getCachedPbbOverview(pbbYear));
+
   useEffect(() => {
-    setSpptList(getLocalSpptForYear(pbbYear));
-    fetchPbbSpptFromFirestore(pbbYear).then((items) => {
-      if (Array.isArray(items)) setSpptList(items);
-    }).catch(() => {});
-    const unsub = subscribePbbSpptFromFirestore(pbbYear, (items) => {
-      if (Array.isArray(items)) setSpptList(items);
+    // 1. Subscribe to summary overview (instant 0ms loading of 24 Lingkungan rankings)
+    const unsubSummary = subscribePbbSummary(pbbYear, (ov) => {
+      if (ov && ov.totalWp > 0) setSummaryOverview(ov);
     });
-    return () => unsub();
-  }, [pbbYear]);
+
+    // 2. Kepling role: subscribe only to own Lingkungan records to prevent mobile memory/network drops
+    const isKeplingRole = activeAccount?.role === 'kepling' && activeAccount?.nomorLingkungan;
+    let unsubSppt: () => void = () => {};
+
+    if (isKeplingRole) {
+      const lk = activeAccount.nomorLingkungan!;
+      fetchPbbSpptForLingkungan(pbbYear, lk).then((items) => {
+        if (Array.isArray(items) && items.length > 0) setSpptList(items);
+      }).catch(() => {});
+      unsubSppt = subscribePbbSpptForLingkungan(pbbYear, lk, (items) => {
+        if (Array.isArray(items)) setSpptList(items);
+      });
+    } else {
+      setSpptList(getLocalSpptForYear(pbbYear));
+      fetchPbbSpptFromFirestore(pbbYear).then((items) => {
+        if (Array.isArray(items) && items.length > 0) setSpptList(items);
+      }).catch(() => {});
+      unsubSppt = subscribePbbSpptFromFirestore(pbbYear, (items) => {
+        if (Array.isArray(items)) setSpptList(items);
+      });
+    }
+
+    return () => {
+      unsubSummary();
+      unsubSppt();
+    };
+  }, [pbbYear, activeAccount?.role, activeAccount?.nomorLingkungan]);
 
   const handleManualSyncPbb = async () => {
     setIsSyncingPbb(true);
@@ -434,8 +464,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
   // Total Kumulatif All-Time (untuk overview pagu / akhir tahun 31 Desember)
   const pbbOverview = useMemo(() => {
-    return computePbbOverview(spptList, pbbYear);
-  }, [spptList, pbbYear]);
+    if (spptList.length > 0 && activeAccount?.role !== 'kepling') {
+      return computePbbOverview(spptList, pbbYear);
+    }
+    return summaryOverview;
+  }, [spptList, pbbYear, summaryOverview, activeAccount?.role]);
 
   // Realisasi PBB berbasis Periode Terpilih (Opsi A: Murni Transaksi Bulan Ini jika memilih Bulan Ini)
   const isCumulativePeriod = period === 'ALL' || period === 'THIS_YEAR' || period.startsWith('YEAR_');

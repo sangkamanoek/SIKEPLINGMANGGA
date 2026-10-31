@@ -1,4 +1,5 @@
 import { printOfficialDocument } from './printHelper';
+import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
 
 /**
  * Standard ID Card Dimensions (CR80 Specification):
@@ -9,7 +10,7 @@ import { printOfficialDocument } from './printHelper';
 export const generateSinglePkkCardHtml = (item: any): string => {
   if (!item) return '';
 
-  const photo = item.pasphotoUrl || item.fotoUrl || '/logo_pkk.jpg';
+  const photo = item.pasphotoUrl || item.fotoUrl || PKK_LOGO_BASE64;
   const regNo = `12.71.10.2001.${String(item.id || '0045').replace(/[^0-9]/g, '').slice(-4).padStart(4, '0')}`;
   const namaFormatted = (item.nama || 'NUR AINI, S.Pd.').toUpperCase();
   const jabatanFormatted = (item.jabatan || 'ANGGOTA TP PKK KELURAHAN').toUpperCase();
@@ -55,7 +56,7 @@ export const generateSinglePkkCardHtml = (item: any): string => {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       ">
-        <!-- Logo PKK - Zoom in 1.70x untuk membuang margin putih gambar JPEG & memperbesar emblem logo -->
+        <!-- Logo PKK Resmi - Utuh, beresolusi tinggi dengan teks melingkar dan lis emas tampak sempurna -->
         <div style="
           width: 12.5mm;
           height: 12.5mm;
@@ -68,8 +69,10 @@ export const generateSinglePkkCardHtml = (item: any): string => {
           justify-content: center;
           box-shadow: 0 1px 3px rgba(0,0,0,0.25);
           overflow: hidden;
+          padding: 0.3mm;
+          box-sizing: border-box;
         ">
-          <img src="/logo_pkk.jpg" alt="PKK" style="width: 100%; height: 100%; object-fit: cover; transform: scale(1.70); border-radius: 50%;" />
+          <img src="${PKK_LOGO_BASE64}" alt="PKK" style="width: 100%; height: 100%; object-fit: contain;" />
         </div>
         <div style="line-height: 1.12; flex: 1;">
           <div style="font-size: 8pt; font-weight: 900; letter-spacing: 0.4px; color: #ffffff; text-transform: uppercase;">

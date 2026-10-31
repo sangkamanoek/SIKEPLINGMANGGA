@@ -329,6 +329,7 @@ export interface EventAttendance {
 export interface AbsenApelItem {
   id: string; // e.g. "absen_kepling_1_2026-09-13" or timestamp
   accountId: string; // e.g. "kepling_1" or "super_admin"
+  keplingId?: string;
   namaKepling: string;
   lingkungan: string;
   nomorLingkungan?: number;

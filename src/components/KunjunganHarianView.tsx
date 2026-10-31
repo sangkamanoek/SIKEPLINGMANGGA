@@ -46,6 +46,7 @@ import { getTodayLocalIso, formatTanggalIndonesia } from '../lib/formatter';
 
 interface KunjunganHarianViewProps {
   currentUser?: UserAccount;
+  kunjunganList?: any[];
   onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 

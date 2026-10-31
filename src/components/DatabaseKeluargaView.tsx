@@ -197,15 +197,10 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
   // Real-time Firestore subscription
   useEffect(() => {
     setIsLoading(true);
-    const unsubKeluarga = subscribeDataKeluarga(
-      (list) => {
-        setDataList(list);
-        setIsLoading(false);
-      },
-      () => {
-        setIsLoading(false);
-      }
-    );
+    const unsubKeluarga = subscribeDataKeluarga((list) => {
+      setDataList(list);
+      setIsLoading(false);
+    });
 
     const unsubPbb = subscribePbbSpptFromFirestore(DEFAULT_PBB_YEAR, (list) => {
       setSpptList(list);
@@ -2291,9 +2286,9 @@ export const DatabaseKeluargaView: React.FC<DatabaseKeluargaViewProps> = ({
                     <span>Catatan Peringatan Pada Berkas:</span>
                   </div>
                   <ul className="text-[11px] text-amber-800 space-y-1 list-disc pl-5">
-                    {parseResult.errors.map((err, idx) => (
+                    {(parseResult.errors || []).map((err: any, idx) => (
                       <li key={idx}>
-                        Baris {err.row}: {err.nomorKk ? `[KK: ${err.nomorKk}] ` : ''}{err.message}
+                        Baris {err?.row || idx + 1}: {err?.nomorKk ? `[KK: ${err.nomorKk}] ` : ''}{typeof err === 'string' ? err : (err?.message || 'Error')}
                       </li>
                     ))}
                   </ul>

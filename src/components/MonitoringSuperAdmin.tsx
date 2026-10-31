@@ -105,6 +105,9 @@ import {
   formatRekapPbbWaText,
   subscribePbbSpptFromFirestore,
   fetchPbbSpptFromFirestore,
+  subscribePbbSummary,
+  getCachedPbbOverview,
+  KelurahanPbbOverview,
 } from '../lib/pbbService';
 import { SpptPbbItem } from '../data/pbbSampleData';
 import { RekapCapaianPbb24Lingkungan } from './RekapCapaianPbb24Lingkungan';
@@ -244,10 +247,14 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
     return DEFAULT_PBB_YEAR;
   });
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => getLocalSpptForYear(pbbYear));
+  const [summaryOverview, setSummaryOverview] = useState<KelurahanPbbOverview>(() => getCachedPbbOverview(pbbYear));
   const [isSyncingPbb, setIsSyncingPbb] = useState(false);
   const [pbbSearch, setPbbSearch] = useState<string>('');
 
   useEffect(() => {
+    const unsubSummary = subscribePbbSummary(pbbYear, (ov) => {
+      if (ov && ov.totalWp > 0) setSummaryOverview(ov);
+    });
     setSpptList(getLocalSpptForYear(pbbYear));
     fetchPbbSpptFromFirestore(pbbYear).then((items) => {
       if (items && items.length > 0) setSpptList(items);
@@ -255,7 +262,10 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
     const unsub = subscribePbbSpptFromFirestore(pbbYear, (items) => {
       if (items && items.length > 0) setSpptList(items);
     });
-    return () => unsub();
+    return () => {
+      unsubSummary();
+      unsub();
+    };
   }, [pbbYear]);
 
   const handleManualSyncPbb = async () => {
@@ -271,8 +281,11 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
   };
 
   const pbbOverview = useMemo(() => {
-    return computePbbOverview(spptList, pbbYear);
-  }, [spptList, pbbYear]);
+    if (spptList.length > 0) {
+      return computePbbOverview(spptList, pbbYear);
+    }
+    return summaryOverview;
+  }, [spptList, pbbYear, summaryOverview]);
 
   const [copiedPbbWaSuperAdmin, setCopiedPbbWaSuperAdmin] = useState(false);
   const handleCopyPbbWaSuperAdmin = () => {
@@ -378,6 +391,9 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
       const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       const qrData: AttendanceQREntity = {
         id: `qr_${selectedDate}`,
+        code: token,
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        active: true,
         token,
         tanggal: selectedDate,
         createdAt: new Date().toISOString(),
@@ -2121,7 +2137,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
           </div>
 
           {/* SECTION 3: Akun Bawaan yang Dinonaktifkan (Untuk Pemulihan) */}
-          {ALL_ACCOUNTS.filter(a => getDeletedAccountIds().has(a.id)).length > 0 && (
+          {ALL_ACCOUNTS.filter(a => getDeletedAccountIds().includes(a.id)).length > 0 && (
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
@@ -2133,7 +2149,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {ALL_ACCOUNTS
-                  .filter(a => getDeletedAccountIds().has(a.id))
+                  .filter(a => getDeletedAccountIds().includes(a.id))
                   .map((acc) => (
                     <div key={acc.id} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs">
                       <div>
@@ -2333,11 +2349,11 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                     Riwayat Sinkronisasi Perangkat Terakhir (Audit Log):
                   </h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {syncAuditLogs.map((log) => (
-                      <div key={log.deviceId} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                    {syncAuditLogs.map((log: any, idx) => (
+                      <div key={log.id || log.deviceId || idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="font-black text-slate-700 text-xs truncate max-w-[200px]" title={log.deviceId}>
-                            📱 ID: {log.deviceId} {log.deviceId === localStorage.getItem('sikepling_device_id') && <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[8px] font-bold ml-1">Perangkat Ini</span>}
+                          <span className="font-black text-slate-700 text-xs truncate max-w-[200px]" title={log.deviceId || log.id}>
+                            📱 ID: {log.deviceId || log.id || `Log-${idx}`} {log.deviceId === localStorage.getItem('sikepling_device_id') && <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[8px] font-bold ml-1">Perangkat Ini</span>}
                           </span>
                           <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
                             log.status === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
@@ -2347,18 +2363,20 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 font-medium">
                           <div>
-                            Terakhir Sinkron: <span className="font-bold text-slate-700">{formatTanggalIndonesia(new Date(log.lastSyncAt.split('T')[0]))} {log.lastSyncAt.split('T')[1]?.substring(0, 5) || ''} WIB</span>
+                            Terakhir Sinkron: <span className="font-bold text-slate-700">{log.lastSyncAt || log.timestamp || '-'}</span>
                           </div>
                           <div>
-                            Operator: <span className="font-bold text-indigo-700">{log.operatorName || 'Super Admin'}</span>
+                            Operator: <span className="font-bold text-indigo-700">{log.operatorName || log.actor || 'Super Admin'}</span>
                           </div>
                         </div>
                         <div className="text-[10px] text-slate-500">
-                          Data Terunggah: <span className="font-extrabold text-indigo-800">{(log.summary?.totalCount ?? 0)} item</span> ({log.summary?.reportsCount || 0} Laporan, {log.summary?.familyCount || 0} Keluarga, {log.summary?.pbbCount || 0} PBB, {log.summary?.visitsCount || 0} Kunjungan)
+                          Data Terunggah: <span className="font-extrabold text-indigo-800">{log.action || 'Audit'}</span> {log.summary ? `(${typeof log.summary === 'string' ? log.summary : JSON.stringify(log.summary)})` : ''}
                         </div>
-                        <div className="text-[9px] text-slate-400 italic truncate" title={log.deviceInfo?.userAgent}>
-                          Platform: {log.deviceInfo?.platform} ({log.deviceInfo?.screenResolution})
-                        </div>
+                        {log.deviceInfo && (
+                          <div className="text-[9px] text-slate-400 italic truncate" title={typeof log.deviceInfo === 'string' ? log.deviceInfo : JSON.stringify(log.deviceInfo)}>
+                            Device: {typeof log.deviceInfo === 'string' ? log.deviceInfo : JSON.stringify(log.deviceInfo)}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

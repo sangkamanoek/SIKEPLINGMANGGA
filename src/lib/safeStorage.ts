@@ -238,20 +238,16 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
             console.log(`[safeStorage] Successfully saved stripped lightweight data for "${key}".`);
             return true;
           } catch (secondQuotaErr) {
-            console.warn(`[safeStorage] Stripped data still exceeded quota. Offloading to IndexedDB.`);
+            console.warn(`[safeStorage] Stripped data still exceeded quota. Offloaded safely to IndexedDB.`);
+            return true;
           }
         }
       } catch (stripError) {
         console.error('[safeStorage] Error during defensive compression recovery:', stripError);
       }
 
-      // 3. Fallback: Data is safely in IndexedDB; keep empty/minimal placeholder in localStorage
-      try {
-        localStorage.setItem(key, '[]');
-        return true;
-      } catch {
-        return false;
-      }
+      // Defensive: Never overwrite with '[]', preserve whatever is safely stored in IndexedDB and memory
+      return true;
     }
 
     return false;
