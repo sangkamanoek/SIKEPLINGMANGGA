@@ -196,7 +196,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
   // Clear Form Fields
   const resetForm = () => {
     setEditingItem(null);
-    setB1Nama(''); setB1Jabatan(''); setB1Gender('P'); setB1TempatLahir(''); setB1TglLahir(''); setB1Status('Kawin'); setB1Alamat(''); setB1Pendidikan(''); setB1Pekerjaan(''); setB1Keterangan('');
+    setB1Nama(''); setB1Jabatan(''); setB1Gender('P'); setB1TempatLahir(''); setB1TglLahir(''); setB1Status('Kawin'); setB1Alamat(''); setB1Pendidikan(''); setB1Pekerjaan(''); setB1Keterangan(''); setB1PasphotoUrl('');
     setB2Nomor(''); setB2Tanggal(getTodayLocalIso()); setB2Jenis('SURAT_MASUK'); setB2Perihal(''); setB2AsalTujuan(''); setB2Keterangan(''); setB2FileUrl(''); setB2FileName('');
     setB3Tanggal(getTodayLocalIso()); setB3Jenis('PENERIMAAN'); setB3Jumlah(0); setB3Kategori('Kas Umum'); setB3Keterangan(''); setB3NomorBukti('');
     setB4Tanggal(getTodayLocalIso()); setB4Agenda(''); setB4Pimpinan(''); setB4Peserta(0); setB4Keputusan(''); setB4Catatan(''); setB4Keterangan('');
@@ -219,6 +219,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       setB1Pendidikan(item.pendidikan || '');
       setB1Pekerjaan(item.pekerjaan || '');
       setB1Keterangan(item.keterangan || '');
+      setB1PasphotoUrl(item.pasphotoUrl || '');
     } else if (activeBook === 2) {
       setB2Nomor(item.nomorSurat || '');
       setB2Tanggal(item.tanggal || item.tanggalSurat || getTodayLocalIso());
@@ -277,7 +278,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           pendidikan: b1Pendidikan,
           pekerjaan: b1Pekerjaan,
           keterangan: b1Keterangan,
-          pasphotoUrl: b1PasphotoUrl,
+          pasphotoUrl: b1PasphotoUrl || editingItem?.pasphotoUrl || '',
           createdAt: editingItem?.createdAt || new Date().toISOString(),
         };
         await saveBuku1Item(item);

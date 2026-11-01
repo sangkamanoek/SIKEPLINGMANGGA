@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { UserAccount } from '../types';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
+import { AgendaKelurahanBanner } from './AgendaKelurahanBanner';
 import {
   subscribePkkKeuangan,
   formatRupiah,
@@ -249,6 +250,8 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
       </div>
 
       <RealtimeSyncStatusPanel />
+
+      <AgendaKelurahanBanner activeAccount={currentUser} />
 
       {/* 3 Main Action Modules (Segregated specifically for PKK) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

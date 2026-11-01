@@ -32,6 +32,7 @@ import { UserAccount, LaporanHarianItem, AbsenApelItem } from '../types';
 import { DeadlineNotifAlert } from './DeadlineNotifAlert';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { SpptPbbItem } from '../data/pbbSampleData';
+import { AgendaKelurahanBanner } from './AgendaKelurahanBanner';
 import {
   DEFAULT_PBB_YEAR,
   AVAILABLE_PBB_YEARS,
@@ -542,17 +543,21 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         badgeColor: 'bg-teal-100 text-teal-800',
         action: () => onNavigate('kegiatan_khusus'),
       },
-      {
-        id: 'agenda',
-        title: 'Agenda & Jadwal Kegiatan Kelurahan',
-        desc: 'Jadwal rapat, gotong royong, posyandu, dan agenda resmi kelurahan lengkap dengan status selesai, lokasi, peserta, & ekspor Excel.',
-        category: 'laporan',
-        icon: Calendar,
-        iconBg: 'bg-emerald-50 text-emerald-700',
-        badge: 'AGENDA RESMI',
-        badgeColor: 'bg-emerald-100 text-emerald-900',
-        action: () => onNavigate('agenda'),
-      },
+      ...(!isKepling
+        ? [
+            {
+              id: 'agenda',
+              title: 'Agenda & Jadwal Kegiatan Kelurahan',
+              desc: 'Jadwal rapat, gotong royong, posyandu, dan agenda resmi kelurahan lengkap dengan status selesai, lokasi, peserta, & ekspor Excel.',
+              category: 'laporan',
+              icon: Calendar,
+              iconBg: 'bg-emerald-50 text-emerald-700',
+              badge: 'AGENDA RESMI',
+              badgeColor: 'bg-emerald-100 text-emerald-900',
+              action: () => onNavigate('agenda'),
+            },
+          ]
+        : []),
       {
         id: 'daftar_tugas_khusus',
         title: 'Daftar Tugas Khusus & Dokumentasi',
@@ -764,6 +769,9 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
 
       {/* Visual Alert & Deadline 23:30 Push Notif Component */}
       <DeadlineNotifAlert activeAccount={activeAccount} reports={reports} onNavigate={onNavigate} />
+
+      {/* Agenda Kelurahan Banner for Kepling */}
+      <AgendaKelurahanBanner activeAccount={activeAccount} />
 
       {/* 3 Pilar Utama SI-MANGGA Banner Quick Navigation */}
       <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-2xs">

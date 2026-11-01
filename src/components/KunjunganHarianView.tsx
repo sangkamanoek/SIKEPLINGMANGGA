@@ -70,9 +70,12 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   currentUser,
   onShowToast,
 }) => {
+  const isKepling = currentUser?.role === 'kepling';
+  const userLingkungan = currentUser?.lingkungan || '';
+
   const [visits, setVisits] = useState<KunjunganWargaData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedLingkungan, setSelectedLingkungan] = useState<string>('ALL');
+  const [selectedLingkungan, setSelectedLingkungan] = useState<string>(isKepling && userLingkungan ? userLingkungan : 'ALL');
   const [selectedKategori, setSelectedKategori] = useState<string>('ALL');
   const [activePeriod, setActivePeriod] = useState<PeriodFilterType>('HARI_INI');
   const [selectedDate, setSelectedDate] = useState<string>(getTodayLocalIso());
@@ -88,8 +91,6 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
   const [selectedRecapLingkungan, setSelectedRecapLingkungan] = useState<number | null>(null);
 
-  const isKepling = currentUser?.role === 'kepling';
-  const userLingkungan = currentUser?.lingkungan || '';
   const printAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -123,9 +124,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     const today = new Date();
 
     return visits.filter((item) => {
-      // 1. Role restriction
-      if (isKepling && userLingkungan) {
-        if (!item.lingkungan || !item.lingkungan.toLowerCase().includes(userLingkungan.toLowerCase())) {
+      // 1. Role restriction (Strictly locked to Kepling's own inputs/lingkungan)
+      if (isKepling) {
+        const matchesLingkungan = userLingkungan && item.lingkungan && item.lingkungan.toLowerCase().includes(userLingkungan.toLowerCase());
+        const matchesName = currentUser?.nama && item.namaKepling && item.namaKepling.toLowerCase() === currentUser.nama.toLowerCase();
+        if (!matchesLingkungan && !matchesName) {
           return false;
         }
       }
@@ -540,10 +543,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
             <select
               value={selectedLingkungan}
               onChange={(e) => setSelectedLingkungan(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 font-bold outline-none cursor-pointer"
+              disabled={isKepling}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 font-bold outline-none cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
             >
-              <option value="ALL">Semua 24 Lingkungan</option>
-              {KEPLING_ACCOUNTS.map((k) => (
+              {!isKepling && <option value="ALL">Semua 24 Lingkungan</option>}
+              {KEPLING_ACCOUNTS.filter(k => !isKepling || k.lingkungan === userLingkungan).map((k) => (
                 <option key={k.id} value={k.lingkungan}>
                   {k.lingkungan} - {k.nama}
                 </option>

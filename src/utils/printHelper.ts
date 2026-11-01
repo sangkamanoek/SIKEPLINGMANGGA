@@ -55,21 +55,35 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
             display: block;
             image-rendering: auto;
           }
-          table {
+          table:not(.no-print-border) {
             width: 100%;
             border-collapse: collapse;
           }
-          th, td {
+          table:not(.no-print-border) th,
+          table:not(.no-print-border) td {
             border: 1px solid #000000;
             padding: 6px 8px;
             text-align: left;
             font-size: 10px;
             vertical-align: top;
           }
-          th {
+          table:not(.no-print-border) th {
             background-color: #f1f5f9;
             font-weight: 700;
             color: #000000;
+          }
+          /* KTA Card styling isolation so no black borders or giant table padding ever leak into ID cards */
+          .kta-card-root, .kta-card-root * {
+            box-sizing: border-box;
+          }
+          .kta-card-root table,
+          .kta-card-root th,
+          .kta-card-root td,
+          .kta-card-root tr {
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
           }
           .avoid-break {
             page-break-inside: avoid !important;

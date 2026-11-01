@@ -17,6 +17,7 @@ import {
   Eye,
   FileText,
   Image as ImageIcon,
+  Loader2,
 } from 'lucide-react';
 import { UserAccount, PosyanduReport, FotoDokumentasi } from '../types';
 import {
@@ -143,6 +144,7 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
   const [formJenisLayanan, setFormJenisLayanan] = useState<string[]>([]);
   const [formKeterangan, setFormKeterangan] = useState<string>('');
   const [fotoList, setFotoList] = useState<FotoDokumentasi[]>([]);
+  const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
 
   useEffect(() => {
     const unsub = subscribePosyanduReports((items) => {
@@ -182,15 +184,21 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    setIsProcessingPhotos(true);
     try {
-      const compressedList = await compressMultipleFiles(files, 1280, 0.78, 'posyandu');
+      // Use lightweight 720px, 0.45 quality (~35KB-50KB per photo)
+      const compressedList = await compressMultipleFiles(files, 720, 0.45, 'posyandu');
       if (compressedList.length > 0) {
         setFotoList((prev) => [...prev, ...compressedList]);
+        onShowToast?.(`Berhasil memproses ${compressedList.length} foto dokumentasi!`, 'success');
       }
     } catch (err) {
       console.warn('Gagal memproses foto posyandu:', err);
+      onShowToast?.('Gagal memproses foto dokumentasi.', 'error');
+    } finally {
+      setIsProcessingPhotos(false);
+      e.target.value = '';
     }
-    e.target.value = '';
   };
 
   const handleOpenAdd = () => {
@@ -443,18 +451,36 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                       {report.dokumentasiFoto.map((foto, fIdx) => (
                         <div
                           key={foto.id || fIdx}
-                          onClick={() => setPreviewPhotoUrl(foto.url)}
-                          className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative group cursor-pointer hover:border-rose-500 transition-all shadow-2xs"
+                          onClick={() => {
+                            if (foto.url && foto.url.length > 20) {
+                              setPreviewPhotoUrl(foto.url);
+                            }
+                          }}
+                          className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative group cursor-pointer hover:border-rose-500 transition-all shadow-2xs flex items-center justify-center"
                           title={foto.name || `Foto ${fIdx + 1}`}
                         >
-                          <img
-                            src={foto.url}
-                            alt={foto.name || `Foto ${fIdx + 1}`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          />
-                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                            <Eye className="w-4 h-4" />
-                          </div>
+                          {foto.url && foto.url.length > 20 ? (
+                            <>
+                              <img
+                                src={foto.url}
+                                alt={foto.name || `Foto ${fIdx + 1}`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                <Eye className="w-4 h-4" />
+                              </div>
+                            </>
+                          ) : (
+                            <div className="p-1.5 text-center flex flex-col items-center justify-center text-slate-400 w-full h-full">
+                              <ImageIcon className="w-4 h-4 mb-0.5 text-slate-300" />
+                              <span className="text-[8px] text-slate-600 font-semibold truncate max-w-[70px]">
+                                {foto.name || `Foto ${fIdx + 1}`}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -693,16 +719,38 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                       {selectedPrintReport.dokumentasiFoto.map((foto, idx) => (
                         <div key={foto.id || idx} className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center">
-                          <div className="w-full h-[125px] rounded overflow-hidden bg-slate-50 flex items-center justify-center border border-slate-200">
-                            <img
-                              src={foto.url}
-                              alt={foto.name || `Dokumentasi ${idx + 1}`}
-                              crossOrigin="anonymous"
-                              className="w-full h-full object-contain object-center"
-                            />
+                          <div className="w-full h-[135px] rounded overflow-hidden bg-slate-50 flex items-center justify-center border border-slate-200">
+                            {foto.url && foto.url.length > 20 ? (
+                              <img
+                                src={foto.url}
+                                alt={foto.name || `Dokumentasi ${idx + 1}`}
+                                className="w-full h-full object-contain object-center"
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  target.style.display = 'none';
+                                  const parent = target.parentElement;
+                                  if (parent && !parent.querySelector('.posyandu-photo-fallback')) {
+                                    const fb = document.createElement('div');
+                                    fb.className = 'posyandu-photo-fallback flex flex-col items-center justify-center p-2 text-center text-slate-400 text-[8pt] h-full w-full';
+                                    fb.innerHTML = '<span class="font-bold text-slate-700 text-[7.5pt]">' + (foto.name || ('Dokumentasi ' + (idx + 1))) + '</span><span class="text-[6.5pt] text-slate-400 italic mt-0.5">(Dokumentasi Kegiatan)</span>';
+                                    parent.appendChild(fb);
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center p-2 text-center text-slate-400 text-[8pt] h-full w-full">
+                                <Camera className="w-6 h-6 text-slate-300 mb-1" />
+                                <span className="font-bold text-slate-700 text-[7.5pt] truncate max-w-[150px]">
+                                  {foto.name || `Dokumentasi ${idx + 1}`}
+                                </span>
+                                <span className="text-[6.5pt] text-slate-400 italic mt-0.5">
+                                  (Lampiran Foto Kegiatan)
+                                </span>
+                              </div>
+                            )}
                           </div>
                           <div className="text-[7.5pt] font-bold text-slate-800 mt-1 truncate w-full text-center font-sans">
-                            {foto.name || `Foto ${idx + 1}: Pelayanan ${selectedPrintReport.posyanduNama}`}
+                            {foto.name ? `Foto ${idx + 1}: ${foto.name}` : `Foto ${idx + 1}: Pelayanan ${selectedPrintReport.posyanduNama}`}
                           </div>
                         </div>
                       ))}
@@ -933,25 +981,70 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
               {/* Dokumentasi Foto */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-slate-700">Foto Dokumentasi:</label>
-                  <label className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-2xs">
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>+ Unggah Foto</span>
-                    <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" />
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700">Foto Dokumentasi Kegiatan:</label>
+                    <span className="text-[10px] text-slate-500">Maks. 4 foto dokumentasi lapangan (otomatis dikompres)</span>
+                  </div>
+                  <label className={`px-3 py-1.5 ${isProcessingPhotos ? 'bg-slate-400 cursor-not-allowed' : 'bg-rose-700 hover:bg-rose-800 cursor-pointer'} text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-2xs transition-all`}>
+                    {isProcessingPhotos ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Memproses...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>+ Unggah Foto</span>
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          disabled={isProcessingPhotos}
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </>
+                    )}
                   </label>
                 </div>
                 {fotoList.length > 0 && (
-                  <div className="grid grid-cols-4 gap-2 pt-1">
-                    {fotoList.map((foto) => (
-                      <div key={foto.id} className="relative group rounded-xl overflow-hidden border aspect-square bg-slate-100">
-                        <img src={foto.url} alt={foto.name} className="w-full h-full object-cover" />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                    {fotoList.map((foto, idx) => (
+                      <div
+                        key={foto.id || idx}
+                        className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50 flex items-center justify-center shadow-2xs"
+                      >
+                        {foto.url && foto.url.length > 20 ? (
+                          <img
+                            src={foto.url}
+                            alt={foto.name || `Foto ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="p-2 text-center flex flex-col items-center justify-center text-slate-500 bg-amber-50/80 w-full h-full border border-dashed border-amber-300">
+                            <ImageIcon className="w-5 h-5 text-amber-600 mb-1" />
+                            <span className="text-[8.5pt] font-bold text-slate-700 truncate max-w-[80px]">
+                              {foto.name || `Foto ${idx + 1}`}
+                            </span>
+                            <span className="text-[7pt] text-rose-600 font-bold mt-0.5">
+                              Foto belum ada
+                            </span>
+                          </div>
+                        )}
                         <button
                           type="button"
-                          onClick={() => setFotoList((prev) => prev.filter((f) => f.id !== foto.id))}
-                          className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => setFotoList((prev) => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-1.5 right-1.5 p-1 bg-rose-600/90 hover:bg-rose-700 text-white rounded-lg shadow-sm cursor-pointer transition-transform active:scale-90"
+                          title="Hapus foto ini"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
+                        <div className="absolute bottom-0 inset-x-0 bg-slate-900/75 text-[8pt] text-white px-1.5 py-0.5 truncate text-center font-sans">
+                          {foto.name || `Foto ${idx + 1}`}
+                        </div>
                       </div>
                     ))}
                   </div>

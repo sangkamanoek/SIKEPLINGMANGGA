@@ -111,13 +111,18 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
   let unsub: Unsubscribe | undefined;
   try {
     if (db) {
-      const q = query(collection(db, BUKU1_COL), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, BUKU1_COL));
       unsub = onSnapshot(q, (snap) => {
         const items: PkkBuku1Anggota[] = [];
         snap.forEach((d) => {
           const data = d.data() as PkkBuku1Anggota;
-          items.push({ ...data, id: d.id });
+          items.push({
+            ...data,
+            id: d.id,
+            createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+          });
         });
+        items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         safeSetLocalStorage(BUKU1_KEY, JSON.stringify(items));
         onUpdate(items);
       });
@@ -142,7 +147,7 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
 
 export const saveBuku1Item = async (item: PkkBuku1Anggota) => {
   const current = safeGetLocalStorage<PkkBuku1Anggota[]>(BUKU1_KEY, []);
-  const payload = { ...item, updatedAt: new Date().toISOString() };
+  const payload = { ...item, createdAt: item.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
   const idx = current.findIndex((x) => x.id === item.id);
   const updated = idx >= 0 ? current.map((x) => (x.id === item.id ? payload : x)) : [payload, ...current];
   safeSetLocalStorage(BUKU1_KEY, JSON.stringify(updated));
@@ -190,13 +195,18 @@ export const subscribeBuku4 = (onUpdate: (items: PkkBuku4Notulen[]) => void) => 
   let unsub: Unsubscribe | undefined;
   try {
     if (db) {
-      const q = query(collection(db, BUKU4_COL), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, BUKU4_COL));
       unsub = onSnapshot(q, (snap) => {
         const items: PkkBuku4Notulen[] = [];
         snap.forEach((d) => {
           const data = d.data() as PkkBuku4Notulen;
-          items.push({ ...data, id: d.id });
+          items.push({
+            ...data,
+            id: d.id,
+            createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+          });
         });
+        items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         safeSetLocalStorage(BUKU4_KEY, JSON.stringify(items));
         onUpdate(items);
       });
@@ -221,7 +231,7 @@ export const subscribeBuku4 = (onUpdate: (items: PkkBuku4Notulen[]) => void) => 
 
 export const saveBuku4Item = async (item: PkkBuku4Notulen) => {
   const current = safeGetLocalStorage<PkkBuku4Notulen[]>(BUKU4_KEY, []);
-  const payload = { ...item, updatedAt: new Date().toISOString() };
+  const payload = { ...item, createdAt: item.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
   const idx = current.findIndex((x) => x.id === item.id);
   const updated = idx >= 0 ? current.map((x) => (x.id === item.id ? payload : x)) : [payload, ...current];
   safeSetLocalStorage(BUKU4_KEY, JSON.stringify(updated));
@@ -262,13 +272,18 @@ export const subscribeBuku5 = (onUpdate: (items: PkkBuku5Inventaris[]) => void) 
   let unsub: Unsubscribe | undefined;
   try {
     if (db) {
-      const q = query(collection(db, BUKU5_COL), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, BUKU5_COL));
       unsub = onSnapshot(q, (snap) => {
         const items: PkkBuku5Inventaris[] = [];
         snap.forEach((d) => {
           const data = d.data() as PkkBuku5Inventaris;
-          items.push({ ...data, id: d.id });
+          items.push({
+            ...data,
+            id: d.id,
+            createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+          });
         });
+        items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         safeSetLocalStorage(BUKU5_KEY, JSON.stringify(items));
         onUpdate(items);
       });

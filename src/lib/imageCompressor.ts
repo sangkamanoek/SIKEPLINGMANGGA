@@ -22,11 +22,20 @@ export interface CompressedPhotoResult {
  */
 export function compressImageFile(
   file: File,
-  maxDim = 1280,
-  quality = 0.78
+  maxDim = 720,
+  quality = 0.48
 ): Promise<string> {
   return new Promise((resolve) => {
-    if (!file || !file.type.startsWith('image/')) {
+    if (!file) {
+      resolve('');
+      return;
+    }
+
+    const isImage =
+      (file.type && file.type.startsWith('image/')) ||
+      /\.(jpe?g|png|webp|bmp|gif|heic)$/i.test(file.name || '');
+
+    if (!isImage) {
       resolve('');
       return;
     }
@@ -160,8 +169,8 @@ function fallbackFileReader(file: File, maxDim: number, quality: number): Promis
  */
 export async function compressMultipleFiles(
   files: FileList | File[],
-  maxDim = 1280,
-  quality = 0.78,
+  maxDim = 720,
+  quality = 0.48,
   kategori?: string,
   onProgress?: (current: number, total: number) => void
 ): Promise<CompressedPhotoResult[]> {

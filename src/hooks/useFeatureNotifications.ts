@@ -285,6 +285,7 @@ export function useFeatureNotifications({
   // Calculate unread/new counts
   const unreadCounts = useMemo<Record<string, number>>(() => {
     const counts: Record<string, number> = {};
+    console.log('DEBUG: Calculating unreadCounts', { featureItemsMap, seenMap, activeTab });
 
     Object.keys(featureItemsMap).forEach((feature) => {
       // If user is currently on this tab, count is 0
@@ -308,6 +309,7 @@ export function useFeatureNotifications({
       counts[feature] = unread;
     });
 
+    console.log('DEBUG: Final unreadCounts', counts);
     return counts;
   }, [featureItemsMap, seenMap, activeTab]);
 

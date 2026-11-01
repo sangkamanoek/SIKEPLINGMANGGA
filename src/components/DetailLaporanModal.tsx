@@ -1482,12 +1482,12 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                     key={foto.id || idx}
                                     className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center shadow-xs"
                                   >
-                                    <div className="w-full h-[115px] rounded-md overflow-hidden bg-slate-50 flex items-center justify-center p-0.5 border border-slate-200">
+                                    <div className="w-full h-[120px] rounded-md overflow-hidden bg-slate-50 flex items-center justify-center p-0.5 border border-slate-200">
                                       <img
                                         src={foto.url}
                                         alt={getProperFotoLabel(foto, idx)}
                                         crossOrigin="anonymous"
-                                        className="w-full h-full object-contain object-center"
+                                        className="w-full h-full object-cover object-center"
                                       />
                                     </div>
                                     <div
@@ -1569,7 +1569,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                     src={foto.url}
                                     alt={getProperFotoLabel(foto, idx)}
                                     crossOrigin="anonymous"
-                                    className="w-full h-full object-contain object-center"
+                                    className="w-full h-full object-cover object-center"
                                   />
                                 </div>
                                 <div

@@ -11,6 +11,7 @@ import {
   saveVisitsToIndexedDB,
   saveHistoryToIndexedDB,
   saveSuratToIndexedDB,
+  savePosyanduToIndexedDB,
 } from './indexedDbStorage';
 
 // Bounded memory cache (max 2MB total) to avoid memory leaks on 1GB/2GB RAM mobile devices
@@ -23,6 +24,7 @@ let idPbbSaveTimeout: any = null;
 let idbVisitsTimeout: any = null;
 let idbHistoryTimeout: any = null;
 let idbSuratTimeout: any = null;
+let idbPosyanduTimeout: any = null;
 
 /**
  * Clean & sanitize text input to prevent malicious injections (XSS / SQLi / Corrupt characters)
@@ -182,6 +184,18 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
       }, 500);
     }
 
+    if (key.includes('posyandu')) {
+      if (idbPosyanduTimeout) clearTimeout(idbPosyanduTimeout);
+      idbPosyanduTimeout = setTimeout(() => {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            savePosyanduToIndexedDB(parsed).catch(() => {});
+          }
+        } catch {}
+      }, 500);
+    }
+
     localStorage.setItem(key, value);
     return true;
   } catch (error: any) {
@@ -228,6 +242,8 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
             saveHistoryToIndexedDB(parsed).catch(() => {});
           } else if (key.includes('surat')) {
             saveSuratToIndexedDB(parsed).catch(() => {});
+          } else if (key.includes('posyandu')) {
+            savePosyanduToIndexedDB(parsed).catch(() => {});
           }
 
           const lightweight = parsed.map(stripHeavyMediaFromItem);

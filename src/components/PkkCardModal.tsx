@@ -19,36 +19,77 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'single' | 'batch'>('single');
   const [isPrinting, setIsPrinting] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const [customKelurahan, setCustomKelurahan] = useState(member?.kelurahan || 'MANGGA');
+  const [customKecamatan, setCustomKecamatan] = useState(member?.kecamatan || 'MEDAN TUNTUNGAN');
+  const [customKota, setCustomKota] = useState(member?.kota || 'KOTA MEDAN');
+  const [customProvinsi, setCustomProvinsi] = useState(member?.provinsi || 'SUMATERA UTARA');
+  const [customRegNo, setCustomRegNo] = useState(`12.71.10.2001.${String(member?.id || '0045').replace(/[^0-9]/g, '').slice(-4).padStart(4, '0')}`);
 
   if (!isOpen || !member) return null;
 
   const photoUrl = member.pasphotoUrl || PKK_LOGO_BASE64;
 
-  const regNo = `12.71.10.2001.${String(member.id || '0045').replace(/[^0-9]/g, '').slice(-4).padStart(4, '0')}`;
+  const regNo = customRegNo;
   const namaFormatted = (member.nama || 'NUR AINI, S.Pd.').toUpperCase();
   const jabatanFormatted = (member.jabatan || 'ANGGOTA TP PKK KELURAHAN').toUpperCase();
   const ttlFormatted = `${(member.tempatLahir || 'MEDAN').toUpperCase()}, ${member.tanggalLahir || '16-04-1991'}`;
   const genderFormatted = member.jenisKelamin === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN';
   const alamatFormatted = (member.alamat || 'JL. BUNGA RINTE NO. 12, LINGKUNGAN IV').toUpperCase();
-  const kelurahanFormatted = 'MANGGA';
-  const kecamatanFormatted = 'MEDAN TUNTUNGAN';
-  const kotaFormatted = 'KOTA MEDAN';
-  const provinsiFormatted = 'SUMATERA UTARA';
+  const kelurahanFormatted = customKelurahan.toUpperCase();
+  const kecamatanFormatted = customKecamatan.toUpperCase();
+  const kotaFormatted = customKota.toUpperCase();
+  const provinsiFormatted = customProvinsi.toUpperCase();
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-    `KTA-PKK|${regNo}|${namaFormatted}|${jabatanFormatted}|KELURAHAN_MANGGA`
+    `KTA-PKK|${regNo}|${namaFormatted}|${jabatanFormatted}|KELURAHAN_${kelurahanFormatted}`
   )}`;
 
   const handlePrintSingle = () => {
     setIsPrinting(true);
-    const cardHtml = generateSinglePkkCardHtml(member);
+    const cardHtml = generateSinglePkkCardHtml(member, {
+      regNo,
+      kelurahan: customKelurahan,
+      kecamatan: customKecamatan,
+      kota: customKota,
+      provinsi: customProvinsi,
+    });
     
+    const singleCardPrintWrapper = `
+      <div style="
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20mm 0 10mm 0;
+        box-sizing: border-box;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      ">
+        <div style="
+          padding: 3.8mm;
+          border: 2px dashed #0284c7;
+          border-radius: 5.5mm;
+          background: #ffffff;
+          display: inline-block;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+          page-break-inside: avoid;
+          break-inside: avoid;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        ">
+          ${cardHtml}
+        </div>
+      </div>
+    `;
+
     const container = document.createElement('div');
     const elementId = `kta-single-print-${Date.now()}`;
     container.id = elementId;
     container.style.position = 'fixed';
     container.style.left = '-9999px';
-    container.innerHTML = cardHtml;
+    container.innerHTML = singleCardPrintWrapper;
     document.body.appendChild(container);
 
     setTimeout(() => {
@@ -65,7 +106,12 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
   const handlePrintBatch = () => {
     setIsPrinting(true);
     const listToPrint = allMembers.length > 0 ? allMembers : [member];
-    const batchHtml = generateBatchPkkCardHtml(listToPrint);
+    const batchHtml = generateBatchPkkCardHtml(listToPrint, {
+      kelurahan: customKelurahan,
+      kecamatan: customKecamatan,
+      kota: customKota,
+      provinsi: customProvinsi,
+    });
 
     const container = document.createElement('div');
     const elementId = `kta-batch-print-${Date.now()}`;
@@ -139,152 +185,218 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Body - Card Graphic Preview */}
-        <div className="p-6 bg-slate-200 flex flex-col items-center justify-center overflow-x-auto min-h-[320px]">
-          {/* THE EXACT STANDARDIZED PKK CARD COMPONENT */}
-          <div
-            className="relative w-[342px] h-[216px] sm:w-[428px] sm:h-[270px] rounded-2xl overflow-hidden shadow-2xl border-2 border-sky-600 font-sans text-slate-900 shrink-0 select-none transition-transform hover:scale-[1.02]"
-            style={{
-              background: 'linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 45%, #bae6fd 100%)',
-              boxShadow: '0 20px 30px -10px rgba(2, 132, 199, 0.3)',
-            }}
+        {/* Region Customization Bar */}
+        <div className="bg-sky-50 px-4 py-2 border-b border-sky-100 flex items-center justify-between text-xs">
+          <span className="font-bold text-sky-900 flex items-center gap-1.5">
+            <span>Kelurahan Aktif:</span>
+            <span className="bg-sky-600 text-white px-2 py-0.5 rounded font-black uppercase">{customKelurahan}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowSettings(!showSettings)}
+            className="text-sky-700 hover:text-sky-900 font-bold underline cursor-pointer"
           >
-            {/* Subtle Batik Watermark Overlay */}
-            <div
-              className="absolute inset-0 opacity-[0.07] pointer-events-none bg-repeat"
-              style={{
-                backgroundImage: 'radial-gradient(#0369a1 1px, transparent 1px)',
-                backgroundSize: '8px 8px',
-              }}
-            />
+            {showSettings ? 'Tutup Pengaturan Wilayah' : 'Ubah / Atur Wilayah KTA'}
+          </button>
+        </div>
 
-            {/* TOP HEADER BANNER (Vibrant Gradient Cyan/Blue) */}
-            <div
-              className="relative px-2.5 py-1.5 sm:px-3 sm:py-2 text-white flex items-center gap-2 sm:gap-2.5 border-b-2 border-amber-400"
-              style={{
-                background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
-              }}
-            >
-              {/* Logo PKK Resmi - Lingkaran putih bersih dengan lis emas dan transparansi murni */}
-              <div className="w-[40px] h-[40px] sm:w-[48px] sm:h-[48px] rounded-full bg-white shrink-0 flex items-center justify-center p-0.5 shadow-md overflow-hidden border border-white">
-                <img
-                  src={PKK_LOGO_BASE64}
-                  alt="Logo PKK Resmi"
-                  className="w-full h-full object-contain"
+        {showSettings && (
+          <div className="bg-sky-900 text-white p-4 space-y-3 text-xs border-b border-sky-800 animate-in fade-in duration-200">
+            <p className="font-extrabold text-sky-200">Sesuaikan Atribut Wilayah pada Kartu Anggota (KTA):</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-sky-300 mb-1 uppercase">Kelurahan / Desa</label>
+                <input
+                  type="text"
+                  value={customKelurahan}
+                  onChange={(e) => setCustomKelurahan(e.target.value)}
+                  className="w-full bg-sky-950 border border-sky-700 rounded-xl px-3 py-1.5 text-white font-bold uppercase focus:outline-none focus:ring-2 focus:ring-sky-400"
                 />
               </div>
-              <div className="leading-[1.12] flex-1">
-                <h1 className="text-[10.5px] sm:text-[14px] font-black tracking-wide text-white drop-shadow-xs uppercase">
-                  KARTU TANDA ANGGOTA
-                </h1>
-                <p className="text-[7px] sm:text-[9.5px] font-bold text-sky-100 tracking-tight uppercase">
-                  PEMBERDAYAAN KESEJAHTERAAN KELUARGA (PKK)
-                </p>
-                <p className="text-[7.5px] sm:text-[10px] font-black text-amber-300 tracking-wider uppercase mt-[0.5px]">
-                  KELURAHAN MANGGA
-                </p>
+              <div>
+                <label className="block text-[10px] font-bold text-sky-300 mb-1 uppercase">Kecamatan</label>
+                <input
+                  type="text"
+                  value={customKecamatan}
+                  onChange={(e) => setCustomKecamatan(e.target.value)}
+                  className="w-full bg-sky-950 border border-sky-700 rounded-xl px-3 py-1.5 text-white font-bold uppercase focus:outline-none focus:ring-2 focus:ring-sky-400"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-sky-300 mb-1 uppercase">Kabupaten / Kota</label>
+                <input
+                  type="text"
+                  value={customKota}
+                  onChange={(e) => setCustomKota(e.target.value)}
+                  className="w-full bg-sky-950 border border-sky-700 rounded-xl px-3 py-1.5 text-white font-bold uppercase focus:outline-none focus:ring-2 focus:ring-sky-400"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-sky-300 mb-1 uppercase">Provinsi</label>
+                <input
+                  type="text"
+                  value={customProvinsi}
+                  onChange={(e) => setCustomProvinsi(e.target.value)}
+                  className="w-full bg-sky-950 border border-sky-700 rounded-xl px-3 py-1.5 text-white font-bold uppercase focus:outline-none focus:ring-2 focus:ring-sky-400"
+                />
               </div>
             </div>
+          </div>
+        )}
 
-            {/* CARD MAIN BODY */}
-            <div className="p-2 sm:p-3 flex gap-2 sm:gap-3 items-start h-[calc(100%-42px)]">
-              {/* Left Photo Frame (Pasphoto 3x4 style) */}
-              <div className="w-[72px] sm:w-[96px] shrink-0 flex flex-col items-center">
-                <div className="w-[70px] h-[92px] sm:w-[92px] sm:h-[122px] rounded-lg border-2 border-sky-600 overflow-hidden bg-sky-100 shadow-md">
+        {/* Modal Body - Card Graphic Preview (Matching image_5ea1aef7) */}
+        <div className="p-4 sm:p-7 bg-slate-100 flex flex-col items-center justify-center overflow-x-auto min-h-[340px]">
+          {/* Outer Dashed Cutting Guide Frame */}
+          <div className="p-3 sm:p-4 border-2 border-dashed border-sky-600 rounded-[22px] sm:rounded-[26px] bg-white shadow-xl inline-block transition-transform hover:scale-[1.01]">
+            <div
+              className="relative w-[342px] h-[216px] sm:w-[430px] sm:h-[272px] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-sky-600 font-sans text-slate-900 shrink-0 select-none flex flex-col"
+              style={{
+                background: 'linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 45%, #bae6fd 100%)',
+              }}
+            >
+              {/* Subtle Batik Watermark Overlay */}
+              <div
+                className="absolute inset-0 opacity-[0.06] pointer-events-none bg-repeat"
+                style={{
+                  backgroundImage: 'radial-gradient(#0369a1 1px, transparent 1px)',
+                  backgroundSize: '8px 8px',
+                }}
+              />
+
+              {/* TOP HEADER BANNER (Vibrant Gradient Cyan/Blue) */}
+              <div
+                className="relative px-2.5 py-1.5 sm:px-3 sm:py-2 text-white flex items-center border-b-2 border-amber-400 shrink-0"
+                style={{
+                  background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
+                }}
+              >
+                {/* Logo PKK Resmi */}
+                <div className="w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white shrink-0 flex items-center justify-center p-0.5 shadow-md overflow-hidden border border-white">
                   <img
-                    src={photoUrl}
-                    alt={namaFormatted}
-                    className="w-full h-full object-cover object-top"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = PKK_LOGO_BASE64;
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Middle & Right Details List */}
-              <div className="flex-1 min-w-0 font-extrabold text-[7px] sm:text-[9.2px] leading-[1.3] text-slate-900 space-y-[1.5px] uppercase">
-                <div className="grid grid-cols-[82px_6px_1fr] sm:grid-cols-[105px_8px_1fr] items-baseline">
-                  <span className="text-slate-700">NO. REGISTRASI</span>
-                  <span>:</span>
-                  <span className="font-black text-sky-900 tracking-tight">{regNo}</span>
-                </div>
-
-                <div className="grid grid-cols-[82px_6px_1fr] sm:grid-cols-[105px_8px_1fr] items-baseline">
-                  <span className="text-slate-700">NAMA</span>
-                  <span>:</span>
-                  <span className="font-black text-slate-950 truncate">{namaFormatted}</span>
-                </div>
-
-                <div className="grid grid-cols-[82px_6px_1fr] sm:grid-cols-[105px_8px_1fr] items-baseline">
-                  <span className="text-slate-700">JABATAN</span>
-                  <span>:</span>
-                  <span className="font-extrabold text-sky-800 truncate">{jabatanFormatted}</span>
-                </div>
-
-                <div className="grid grid-cols-[82px_6px_1fr] sm:grid-cols-[105px_8px_1fr] items-baseline">
-                  <span className="text-slate-700">TEMPAT/TGL LAHIR</span>
-                  <span>:</span>
-                  <span className="truncate">{ttlFormatted}</span>
-                </div>
-
-                <div className="grid grid-cols-[82px_6px_1fr] sm:grid-cols-[105px_8px_1fr] items-baseline">
-                  <span className="text-slate-700">JENIS KELAMIN</span>
-                  <span>:</span>
-                  <span>{genderFormatted}</span>
-                </div>
-
-                <div className="grid grid-cols-[82px_6px_1fr] sm:grid-cols-[105px_8px_1fr] items-baseline">
-                  <span className="text-slate-700">ALAMAT</span>
-                  <span>:</span>
-                  <span className="truncate">{alamatFormatted}</span>
-                </div>
-
-                <div className="grid grid-cols-[82px_6px_1fr] sm:grid-cols-[105px_8px_1fr] items-baseline">
-                  <span className="text-slate-700">DESA/KELURAHAN</span>
-                  <span>:</span>
-                  <span className="font-bold">{kelurahanFormatted}</span>
-                </div>
-
-                <div className="grid grid-cols-[82px_6px_1fr] sm:grid-cols-[105px_8px_1fr] items-baseline">
-                  <span className="text-slate-700">KECAMATAN</span>
-                  <span>:</span>
-                  <span className="font-bold">{kecamatanFormatted}</span>
-                </div>
-
-                <div className="grid grid-cols-[82px_6px_1fr] sm:grid-cols-[105px_8px_1fr] items-baseline">
-                  <span className="text-slate-700">KABUPATEN/KOTA</span>
-                  <span>:</span>
-                  <span className="font-bold">{kotaFormatted}</span>
-                </div>
-
-                <div className="grid grid-cols-[82px_6px_1fr] sm:grid-cols-[105px_8px_1fr] items-baseline">
-                  <span className="text-slate-700">PROVINSI</span>
-                  <span>:</span>
-                  <span className="font-bold">{provinsiFormatted}</span>
-                </div>
-              </div>
-
-              {/* POJOK KIRI BAWAH: BADGE MEDAN UNTUK SEMUA */}
-              <div className="absolute left-2.5 bottom-2 sm:left-3.5 sm:bottom-2.5 inline-flex items-center rounded overflow-hidden text-[5.5px] sm:text-[7.5px] font-black border border-slate-900 shadow-2xs select-none">
-                <span className="bg-red-800 text-white px-1 sm:px-1.5 py-[1px] font-black tracking-tight">MEDAN</span>
-                <span className="bg-blue-900 text-white px-1 sm:px-1.5 py-[1px] font-black tracking-tight">UNTUK SEMUA</span>
-              </div>
-
-              {/* Bottom Right QR Code */}
-              <div className="absolute right-2 bottom-2 sm:right-3 sm:bottom-3 flex flex-col items-center">
-                <div className="w-[38px] h-[38px] sm:w-[50px] sm:h-[50px] p-0.5 bg-white rounded border border-slate-300 shadow-xs">
-                  <img
-                    src={qrUrl}
-                    alt="QR Verification"
+                    src={PKK_LOGO_BASE64}
+                    alt="Logo PKK Resmi"
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <span className="text-[4px] sm:text-[5.5px] font-black text-sky-950 mt-0.5 text-center leading-none tracking-tighter">
-                  SCAN UNTUK DATA KARTU
-                  <br />
-                  SCAN TO VIEW
-                </span>
+                {/* Centered Titles with logo compensation */}
+                <div className="leading-[1.15] flex-1 text-center mr-[38px] sm:mr-[46px]">
+                  <h1 className="text-[10px] sm:text-[13px] font-black tracking-wide text-white drop-shadow-xs uppercase">
+                    KARTU TANDA ANGGOTA
+                  </h1>
+                  <p className="text-[6.5px] sm:text-[8.5px] font-bold text-sky-100 tracking-tight uppercase">
+                    PEMBERDAYAAN KESEJAHTERAAN KELUARGA (PKK)
+                  </p>
+                  <p className="text-[7.5px] sm:text-[9.5px] font-black text-amber-300 tracking-wider uppercase mt-[1px]">
+                    KELURAHAN {kelurahanFormatted}
+                  </p>
+                </div>
+              </div>
+
+              {/* CARD MAIN BODY */}
+              <div className="p-2 sm:p-2.5 flex gap-2 sm:gap-2.5 items-start flex-1 min-h-0 relative">
+                {/* Left Photo Frame (Pasphoto 3x4 style) & Bottom Badge */}
+                <div className="w-[68px] sm:w-[86px] shrink-0 flex flex-col items-center justify-between h-full">
+                  <div className="w-[66px] h-[88px] sm:w-[84px] sm:h-[112px] rounded-lg border-2 border-sky-600 overflow-hidden bg-white shadow-xs flex items-center justify-center">
+                    <img
+                      src={photoUrl}
+                      alt={namaFormatted}
+                      className={`w-full h-full ${photoUrl === PKK_LOGO_BASE64 ? 'object-contain p-2' : 'object-cover object-top'}`}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = PKK_LOGO_BASE64;
+                      }}
+                    />
+                  </div>
+
+                  {/* POJOK KIRI BAWAH: BADGE MEDAN UNTUK SEMUA (Stacked UNTUK/SEMUA) */}
+                  <div className="inline-flex items-stretch rounded overflow-hidden border border-slate-900 shadow-xs select-none mt-auto">
+                    <div className="bg-red-800 text-white px-1 sm:px-1.5 py-0.5 text-[6px] sm:text-[7.5px] font-black tracking-tight flex items-center justify-center">
+                      MEDAN
+                    </div>
+                    <div className="bg-blue-900 text-white px-1 sm:px-1.2 py-0.5 text-[4px] sm:text-[5.5px] font-black tracking-tight flex flex-col justify-center leading-[1.05] text-center">
+                      <span>UNTUK</span>
+                      <span>SEMUA</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Center Details List (Right-aligned labels hugging colons) */}
+                <div className="flex-1 min-w-0 pr-[54px] sm:pr-[68px] font-extrabold text-[6.5px] sm:text-[8.5px] leading-[1.25] text-slate-900 uppercase">
+                  <div className="flex items-baseline mb-[1px]">
+                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">NO. REGISTRASI</div>
+                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
+                    <div className="flex-1 min-w-0 font-black text-sky-800 pl-1.5 break-all">{regNo}</div>
+                  </div>
+
+                  <div className="flex items-baseline mb-[1px]">
+                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">NAMA</div>
+                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
+                    <div className="flex-1 min-w-0 font-black text-sky-700 pl-1.5 break-words">{namaFormatted}</div>
+                  </div>
+
+                  <div className="flex items-baseline mb-[1px]">
+                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">JABATAN</div>
+                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
+                    <div className="flex-1 min-w-0 font-extrabold text-teal-800 pl-1.5 break-words">{jabatanFormatted}</div>
+                  </div>
+
+                  <div className="flex items-baseline mb-[1px]">
+                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">TEMPAT/TGL LAHIR</div>
+                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
+                    <div className="flex-1 min-w-0 pl-1.5 break-words">{ttlFormatted}</div>
+                  </div>
+
+                  <div className="flex items-baseline mb-[1px]">
+                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">JENIS KELAMIN</div>
+                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
+                    <div className="flex-1 min-w-0 pl-1.5">{genderFormatted}</div>
+                  </div>
+
+                  {/* ALAMAT with distinct gap */}
+                  <div className="flex items-baseline mb-[4px] sm:mb-[6px]">
+                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">ALAMAT</div>
+                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
+                    <div className="flex-1 min-w-0 pl-1.5 break-words">{alamatFormatted}</div>
+                  </div>
+
+                  {/* Region Block */}
+                  <div className="flex items-baseline mb-[1px]">
+                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">DESA/KELURAHAN</div>
+                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
+                    <div className="flex-1 min-w-0 pl-1.5 font-bold">{kelurahanFormatted}</div>
+                  </div>
+
+                  <div className="flex items-baseline mb-[1px]">
+                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">KECAMATAN</div>
+                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
+                    <div className="flex-1 min-w-0 pl-1.5 font-bold">{kecamatanFormatted}</div>
+                  </div>
+
+                  <div className="flex items-baseline mb-[1px]">
+                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">KABUPATEN/KOTA</div>
+                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
+                    <div className="flex-1 min-w-0 pl-1.5 font-bold">{kotaFormatted}</div>
+                  </div>
+
+                  <div className="flex items-baseline">
+                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">PROVINSI</div>
+                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
+                    <div className="flex-1 min-w-0 pl-1.5 font-bold">{provinsiFormatted}</div>
+                  </div>
+                </div>
+
+                {/* Bottom Right QR Code & Label */}
+                <div className="absolute right-2 bottom-1.5 sm:right-2.5 sm:bottom-2 flex flex-col items-center">
+                  <div className="w-[42px] h-[42px] sm:w-[54px] sm:h-[54px] p-0.5 bg-white rounded border border-slate-300 shadow-xs">
+                    <img
+                      src={qrUrl}
+                      alt="QR Verification"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <span className="text-[4.5px] sm:text-[6px] font-black text-sky-700 mt-0.5 text-center leading-none tracking-tight">
+                    SCAN VERIFIKASI
+                  </span>
+                </div>
               </div>
             </div>
           </div>

@@ -1,14 +1,15 @@
-import { LaporanHarianItem, DataKeluarga, SuratKedinasanItem } from '../types';
+import { LaporanHarianItem, DataKeluarga, SuratKedinasanItem, PosyanduReport } from '../types';
 import { SpptPbbItem } from '../data/pbbSampleData';
 
 const DB_NAME = 'sikepling_offline_db';
-const DB_VERSION = 5; // Incremented version to add surat_store
+const DB_VERSION = 6; // Incremented version to add posyandu_store
 const STORE_REPORTS = 'reports_store';
 const STORE_KELUARGA = 'family_store';
 const STORE_PBB = 'pbb_store';
 const STORE_VISITS = 'visits_store';
 const STORE_HISTORY = 'history_store';
 const STORE_SURAT = 'surat_store';
+const STORE_POSYANDU = 'posyandu_store';
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -37,6 +38,9 @@ function openDatabase(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_SURAT)) {
         db.createObjectStore(STORE_SURAT, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_POSYANDU)) {
+        db.createObjectStore(STORE_POSYANDU, { keyPath: 'id' });
       }
     };
 
@@ -471,6 +475,106 @@ export async function deleteSuratFromIndexedDB(id: string): Promise<boolean> {
     });
   } catch (err) {
     console.warn('[IndexedDB] Error deleting surat item from IndexedDB:', err);
+    return false;
+  }
+}
+
+/**
+ * Save all Posyandu reports to IndexedDB (No 5MB quota limitation)
+ */
+export async function savePosyanduToIndexedDB(data: PosyanduReport[]): Promise<boolean> {
+  if (!Array.isArray(data)) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_POSYANDU, 'readwrite');
+      const store = tx.objectStore(STORE_POSYANDU);
+
+      store.clear();
+      if (data.length > 0) {
+        data.forEach((item) => {
+          if (item && item.id) {
+            store.put(item);
+          }
+        });
+      }
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error saving posyandu data:', err);
+    return false;
+  }
+}
+
+/**
+ * Read all Posyandu reports from IndexedDB
+ */
+export async function getPosyanduFromIndexedDB(): Promise<PosyanduReport[] | null> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_POSYANDU, 'readonly');
+      const store = tx.objectStore(STORE_POSYANDU);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const result = request.result;
+        if (Array.isArray(result) && result.length > 0) {
+          resolve(result as PosyanduReport[]);
+        } else {
+          resolve(null);
+        }
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error getting posyandu data:', err);
+    return null;
+  }
+}
+
+/**
+ * Save single Posyandu report to IndexedDB
+ */
+export async function saveSinglePosyanduToIndexedDB(item: PosyanduReport): Promise<boolean> {
+  if (!item || !item.id) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_POSYANDU, 'readwrite');
+      const store = tx.objectStore(STORE_POSYANDU);
+      store.put(item);
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error saving single posyandu item:', err);
+    return false;
+  }
+}
+
+/**
+ * Delete single Posyandu report from IndexedDB
+ */
+export async function deletePosyanduFromIndexedDB(id: string): Promise<boolean> {
+  if (!id) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_POSYANDU, 'readwrite');
+      const store = tx.objectStore(STORE_POSYANDU);
+      store.delete(id);
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error deleting posyandu item from IndexedDB:', err);
     return false;
   }
 }
