@@ -34,25 +34,16 @@ export const KopSuratPkk: React.FC<{ className?: string }> = ({ className = '' }
     <div style={{ flex: 1, textAlign: 'center', padding: '0 8px' }}>
       <div
         style={{
-          fontSize: '11pt',
+          fontSize: '12pt',
           fontWeight: 'bold',
           fontFamily: "'Times New Roman', Times, serif, sans-serif",
           color: '#000000',
           lineHeight: '1.2',
+          letterSpacing: '0.02em',
+          marginBottom: '2px',
         }}
       >
         PEMBERDAYAAN DAN KESEJAHTERAAN KELUARGA
-      </div>
-      <div
-        style={{
-          fontSize: '10pt',
-          fontWeight: 'bold',
-          fontFamily: "'Times New Roman', Times, serif, sans-serif",
-          color: '#000000',
-          lineHeight: '1.2',
-        }}
-      >
-        (PKK)
       </div>
       <div
         style={{
@@ -60,9 +51,10 @@ export const KopSuratPkk: React.FC<{ className?: string }> = ({ className = '' }
           fontWeight: '900',
           fontFamily: "'Times New Roman', Times, serif, sans-serif",
           color: '#000000',
-          lineHeight: '1.1',
-          margin: '3px 0',
+          lineHeight: '1.15',
+          margin: '2px 0',
           textTransform: 'uppercase',
+          letterSpacing: '0.01em',
         }}
       >
         TIM PENGGERAK KELURAHAN MANGGA
