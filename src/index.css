@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --color-tosca-50: #f0fdf9;
+  --color-tosca-50: #f0fdfa;
   --color-tosca-100: #ccfbf1;
   --color-tosca-200: #99f6e4;
   --color-tosca-300: #5eead4;
@@ -12,6 +12,11 @@
   --color-tosca-800: #115e59;
   --color-tosca-900: #134e4a;
   --color-tosca-950: #042f2e;
+  
+  /* Official PKK Brand Colors from user image */
+  --color-pkk-teal: #357266;
+  --color-pkk-dark: #2d5a50;
+  --color-pkk-light: #e6efed;
 }
 
 @layer base {

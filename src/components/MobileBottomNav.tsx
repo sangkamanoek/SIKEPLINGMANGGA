@@ -82,76 +82,76 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   }
 
   // Khusus Akun Tim Penggerak PKK (Pemisahan Hak Akses Mandiri)
-  if (isPkk) {
-    return (
-      <aside
-        aria-label="Menu Navigasi Cepat PKK"
-        className="md:hidden print:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-teal-200 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-2 pt-1.5 pb-safe"
-      >
-        <nav className="flex items-center justify-around max-w-lg mx-auto">
-          {/* Tab 1: Beranda / Hub PKK */}
-          <button
-            type="button"
-            onClick={() => onSelectTab('hub')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              activeTab === 'hub' ? 'text-teal-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Home className={`w-5 h-5 ${activeTab === 'hub' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-            <span className="text-[10px] mt-0.5 tracking-tight">Beranda</span>
-          </button>
-
-          {/* Tab 2: Kegiatan PKK */}
-          <button
-            type="button"
-            onClick={() => onSelectTab('kegiatan_pkk')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              activeTab === 'kegiatan_pkk' ? 'text-emerald-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <div className="relative">
-              <FileText className={`w-5 h-5 ${activeTab === 'kegiatan_pkk' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-              {renderBadge('kegiatan_pkk')}
-            </div>
-            <span className="text-[10px] mt-0.5 tracking-tight">Kegiatan</span>
-          </button>
-
-          {/* Center Action Button: Keuangan PKK (BKU) */}
-          <div className="flex-1 flex justify-center -mt-4">
+    if (isPkk) {
+      return (
+        <aside
+          aria-label="Menu Navigasi Cepat PKK"
+          className="md:hidden print:hidden fixed bottom-0 inset-x-0 z-40 bg-pkk-teal border-t border-pkk-dark shadow-[0_-4px_16px_rgba(0,0,0,0.1)] px-2 pt-1.5 pb-safe"
+        >
+          <nav className="flex items-center justify-around max-w-lg mx-auto">
+            {/* Tab 1: Beranda / Hub PKK */}
             <button
               type="button"
-              onClick={() => onSelectTab('keuangan_pkk')}
-              className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer border-2 border-white relative ${
-                activeTab === 'keuangan_pkk'
-                  ? 'bg-gradient-to-tr from-teal-800 to-emerald-700 text-white ring-2 ring-teal-500 ring-offset-2'
-                  : 'bg-gradient-to-tr from-teal-700 to-emerald-600 text-white hover:brightness-105'
+              onClick={() => onSelectTab('hub')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+                activeTab === 'hub' ? 'text-white font-black' : 'text-white/60 hover:text-white'
               }`}
-              title="Buku Kas Umum PKK"
             >
-              <Wallet className="w-5 h-5 stroke-[2.5]" />
-              {renderBadge('keuangan_pkk')}
-              <span className="sr-only">Kas PKK</span>
+              <Home className={`w-5 h-5 ${activeTab === 'hub' ? 'stroke-[3]' : 'stroke-[1.8]'}`} />
+              <span className="text-[10px] mt-0.5 tracking-tight font-bold">Beranda</span>
             </button>
-          </div>
-
-          {/* Tab 4: Dasa Wisma */}
-          <button
-            type="button"
-            onClick={() => onSelectTab('dasa_wisma')}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              activeTab === 'dasa_wisma' ? 'text-blue-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <div className="relative">
-              <Users className={`w-5 h-5 ${activeTab === 'dasa_wisma' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-              {renderBadge('dasa_wisma')}
+  
+            {/* Tab 2: Kegiatan PKK */}
+            <button
+              type="button"
+              onClick={() => onSelectTab('kegiatan_pkk')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+                activeTab === 'kegiatan_pkk' ? 'text-white font-black' : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <div className="relative">
+                <FileText className={`w-5 h-5 ${activeTab === 'kegiatan_pkk' ? 'stroke-[3]' : 'stroke-[1.8]'}`} />
+                {renderBadge('kegiatan_pkk')}
+              </div>
+              <span className="text-[10px] mt-0.5 tracking-tight font-bold">Kegiatan</span>
+            </button>
+  
+            {/* Center Action Button: Keuangan PKK (BKU) */}
+            <div className="flex-1 flex justify-center -mt-6">
+              <button
+                type="button"
+                onClick={() => onSelectTab('keuangan_pkk')}
+                className={`w-14 h-14 rounded-full flex flex-col items-center justify-center shadow-xl transition-transform active:scale-95 cursor-pointer border-4 border-pkk-teal relative ${
+                  activeTab === 'keuangan_pkk'
+                    ? 'bg-white text-pkk-teal ring-4 ring-white/20'
+                    : 'bg-amber-400 text-slate-900 hover:brightness-105'
+                }`}
+                title="Buku Kas Umum PKK"
+              >
+                <Wallet className="w-6 h-6 stroke-[3]" />
+                {renderBadge('keuangan_pkk')}
+                <span className="sr-only">Kas PKK</span>
+              </button>
             </div>
-            <span className="text-[10px] mt-0.5 tracking-tight">Dasa Wisma</span>
-          </button>
-        </nav>
-      </aside>
-    );
-  }
+  
+            {/* Tab 4: Dasa Wisma */}
+            <button
+              type="button"
+              onClick={() => onSelectTab('dasa_wisma')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+                activeTab === 'dasa_wisma' ? 'text-white font-black' : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <div className="relative">
+                <Users className={`w-5 h-5 ${activeTab === 'dasa_wisma' ? 'stroke-[3]' : 'stroke-[1.8]'}`} />
+                {renderBadge('dasa_wisma')}
+              </div>
+              <span className="text-[10px] mt-0.5 tracking-tight font-bold">Dasa Wisma</span>
+            </button>
+          </nav>
+        </aside>
+      );
+    }
 
   return (
     <aside

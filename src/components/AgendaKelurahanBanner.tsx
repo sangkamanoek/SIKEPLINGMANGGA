@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, Users, Bell, X, CheckCircle2, Info, ChevronRight, Check } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Bell, X, CheckCircle2, Info, ChevronRight, Check, Volume2 } from 'lucide-react';
 import { UserAccount, AgendaKelurahanItem } from '../types';
 import { getLocalAgendaList, subscribeAgendaFromFirestore } from '../lib/agendaService';
 
@@ -118,6 +118,16 @@ export const AgendaKelurahanBanner: React.FC<AgendaKelurahanBannerProps> = ({ ac
             >
               <span>Baca Detail Agenda</span>
               <ChevronRight className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('open-notif-sound-modal'))}
+              title="Pengaturan Bunyi & Getar HP"
+              className="px-3 py-2 bg-teal-950/80 hover:bg-teal-900 border border-teal-500/40 text-teal-200 rounded-xl text-xs font-black shadow-md transition-all cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <Volume2 className="w-4 h-4 text-teal-300" />
+              <span className="hidden sm:inline">Bunyi &amp; Getar HP</span>
             </button>
 
             <button

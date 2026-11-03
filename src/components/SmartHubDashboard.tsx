@@ -787,6 +787,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Pilar 1 */}
           <div 
             onClick={() => onNavigate(isKepling ? 'form' : 'dashboard_kasi')}
             className="p-3.5 bg-slate-50/80 hover:bg-emerald-50/60 border border-slate-200/90 hover:border-emerald-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
@@ -801,6 +802,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             </div>
           </div>
 
+          {/* Pilar 2 */}
           <div 
             onClick={() => {
               window.dispatchEvent(new CustomEvent('switch-to-pkk-role'));
@@ -817,14 +819,13 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             </div>
           </div>
 
+          {/* Pilar 3 */}
           <div 
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'surat_kedinasan' }));
-            }}
+            onClick={() => onNavigate('surat_kedinasan')}
             className="p-3.5 bg-slate-50/80 hover:bg-blue-50/60 border border-slate-200/90 hover:border-blue-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
           >
             <div className="w-10 h-10 rounded-lg bg-blue-700 text-white flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-102">
-              <FileText className="w-5 h-5" />
+              <Database className="w-5 h-5" />
             </div>
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-blue-800 uppercase block tracking-wider">Pilar 3</span>

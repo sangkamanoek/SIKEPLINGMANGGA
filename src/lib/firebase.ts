@@ -14,26 +14,18 @@ try {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   const dbId = (firebaseConfig as any).firestoreDatabaseId;
   
-  if (typeof window !== 'undefined') {
-    try {
-      db = initializeFirestore(
-        app,
-        {
-          localCache: persistentLocalCache({
-            tabManager: persistentMultipleTabManager(),
-          }),
-        },
-        dbId || '(default)'
-      );
-    } catch (cacheErr) {
-      console.warn('Persistent cache fallback to getFirestore:', cacheErr);
-      db = dbId ? getFirestore(app, dbId) : getFirestore(app);
-    }
-  } else {
-    db = dbId ? getFirestore(app, dbId) : getFirestore(app);
-  }
+  // Enhanced initialization with Multi-Tab Persistent Cache for maximum speed
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    }),
+  }, dbId || '(default)');
+  
+  console.log('Firebase initialized with Persistent Cache on DB:', dbId || '(default)');
 } catch (e) {
-  console.warn('Firebase init notice:', e);
+  console.error('Firebase initialization error:', e);
+  // Fallback to basic if persistence fails
+  db = getFirestore(app);
 }
 
 export enum OperationType {

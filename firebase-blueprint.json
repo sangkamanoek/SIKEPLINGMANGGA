@@ -199,9 +199,130 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "taskId", "fotoUrl"]
+    },
+    "PkkKeuangan": {
+      "title": "Keuangan PKK (BKU)",
+      "description": "Pencatatan kas masuk dan kas keluar BKU TP PKK Kelurahan Mangga.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "uraian": { "type": "string" },
+        "jenis": { "type": "string", "enum": ["Penerimaan", "Pengeluaran"] },
+        "nominal": { "type": "number" },
+        "nomorBukti": { "type": "string" },
+        "sumberAtauPenerima": { "type": "string" },
+        "kategori": { "type": "string" },
+        "keterangan": { "type": "string" }
+      },
+      "required": ["id", "tanggal", "uraian", "jenis", "nominal"]
+    },
+    "PkkKegiatan": {
+      "title": "Laporan Kegiatan Pokja PKK",
+      "description": "Laporan dan foto dokumentasi kegiatan 4 Pokja dan PKK Lingkungan.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pokjaCategory": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "namaKegiatan": { "type": "string" },
+        "lokasi": { "type": "string" },
+        "deskripsi": { "type": "string" },
+        "dokumentasiFoto": { "type": "array" }
+      },
+      "required": ["id", "pokjaCategory", "tanggal", "namaKegiatan"]
+    },
+    "PkkDasaWisma": {
+      "title": "Data Dasa Wisma PKK",
+      "description": "Rekapitulasi data anggota dan statistik kelompok Dasa Wisma per lingkungan.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "lingkunganNomor": { "type": "number" },
+        "namaKelompok": { "type": "string" },
+        "namaKetuaDawis": { "type": "string" },
+        "jumlahKk": { "type": "number" },
+        "jumlahJiwa": { "type": "number" }
+      },
+      "required": ["id", "lingkunganNomor", "namaKelompok"]
+    },
+    "PkkPosyandu": {
+      "title": "Laporan Posyandu Pokja IV",
+      "description": "Dokumentasi dan rekap pelayanan Posyandu Balita & Lansia.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "namaPosyandu": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "jumlahBalitaHadir": { "type": "number" }
+      },
+      "required": ["id", "namaPosyandu", "tanggal"]
+    },
+    "PkkBuku1": {
+      "title": "Buku 1 Administrasi PKK (Data Anggota)",
+      "description": "Data susunan kepengurusan dan anggota TP PKK.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nama": { "type": "string" },
+        "jabatan": { "type": "string" },
+        "jenisKelamin": { "type": "string" }
+      },
+      "required": ["id", "nama", "jabatan"]
+    },
+    "PkkBuku4": {
+      "title": "Buku 4 Administrasi PKK (Notulen Rapat)",
+      "description": "Catatan notulen dan keputusan rapat PKK.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pimpinanRapat": { "type": "string" },
+        "jumlahPeserta": { "type": "number" }
+      },
+      "required": ["id", "pimpinanRapat"]
+    },
+    "PkkBuku5": {
+      "title": "Buku 5 Administrasi PKK (Inventaris)",
+      "description": "Inventarisasi aset dan barang milik TP PKK.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "namaBarang": { "type": "string" },
+        "asalBarang": { "type": "string" },
+        "jumlah": { "type": "number" }
+      },
+      "required": ["id", "namaBarang"]
     }
   },
   "firestore": {
+    "pkk_keuangan/{docId}": {
+      "schema": "PkkKeuangan",
+      "description": "Koleksi transaksi kas BKU PKK."
+    },
+    "pkk_kegiatan/{docId}": {
+      "schema": "PkkKegiatan",
+      "description": "Koleksi kegiatan dan dokumentasi 4 Pokja PKK."
+    },
+    "pkk_dasa_wisma/{docId}": {
+      "schema": "PkkDasaWisma",
+      "description": "Koleksi data kelompok Dasa Wisma PKK."
+    },
+    "pkk_posyandu_reports/{docId}": {
+      "schema": "PkkPosyandu",
+      "description": "Koleksi laporan kegiatan Posyandu PKK."
+    },
+    "pkk_buku_1_anggota/{docId}": {
+      "schema": "PkkBuku1",
+      "description": "Koleksi Buku 1 Administrasi PKK (Data Anggota TP PKK)."
+    },
+    "pkk_buku_4_notulen/{docId}": {
+      "schema": "PkkBuku4",
+      "description": "Koleksi Buku 4 Administrasi PKK (Notulen Rapat PKK)."
+    },
+    "pkk_buku_5_inventaris/{docId}": {
+      "schema": "PkkBuku5",
+      "description": "Koleksi Buku 5 Administrasi PKK (Inventaris Aset PKK)."
+    },
     "tugas_khusus/{docId}": {
       "schema": "TugasKhusus",
       "description": "Koleksi tugas khusus lurah tersinkronisasi real-time ke seluruh HP."

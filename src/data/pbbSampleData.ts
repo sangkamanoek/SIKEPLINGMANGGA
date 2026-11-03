@@ -18,6 +18,8 @@ export interface SpptPbbItem {
   isDiskon?: boolean;
   diskonPembayaran?: number;
   persenDiskon?: number;
+  isBermasalah?: boolean;
+  masalahNote?: string;
 }
 
 export const INITIAL_PBB_SUMMARY = { totalKetetapan: 0, totalTerbayar: 0, persentase: 0 };

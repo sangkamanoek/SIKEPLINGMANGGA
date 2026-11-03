@@ -4,98 +4,157 @@ import {
   Search,
   Plus,
   Download,
-  MapPin,
-  CheckCircle2,
   Trash2,
   Edit2,
   X,
   Check,
-  Building,
-  Baby,
-  Heart,
-  Home,
-  Sparkles,
   Phone,
   Printer,
-  Image as ImageIcon,
+  Sparkles,
+  Bot,
+  Copy,
+  AlertTriangle,
+  FileSpreadsheet,
+  CheckCircle2,
+  ShieldAlert,
+  Droplets,
+  Heart,
+  Baby,
+  Activity,
+  Home,
+  CheckSquare,
+  Database,
+  UserPlus,
+  ListChecks,
+  UserCheck,
+  ChevronDown,
+  ChevronUp,
+  Calculator,
 } from 'lucide-react';
-import { UserAccount, KelompokDasaWisma } from '../types';
+import { UserAccount, KelompokDasaWisma, KkAnggotaDasaWisma, DataKeluarga } from '../types';
 import {
   subscribeDasaWisma,
   saveDasaWisma,
   deleteDasaWisma,
   exportDasaWismaToExcel,
-  clearSampleDasaWismaData,
 } from '../lib/pkkDasaWismaService';
+import { subscribeDataKeluarga } from '../lib/dataKeluargaService';
 import { KopSuratPkk } from './KopSuratPkk';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument } from '../utils/printHelper';
-
-const formatProperWriting = (text: string): string => {
-  if (!text) return '';
-  let formatted = text.replace(/(^\s*|[.!?]\s+)([a-z])/g, (m) => m.toUpperCase());
-  const keywords = [
-    { pattern: /\bpkk\b/gi, replacement: 'PKK' },
-    { pattern: /\btp-pkk\b/gi, replacement: 'TP-PKK' },
-    { pattern: /\blurah\b/gi, replacement: 'Lurah' },
-    { pattern: /\bkelurahan\b/gi, replacement: 'Kelurahan' },
-    { pattern: /\bmangga\b/gi, replacement: 'Mangga' },
-    { pattern: /\bkepling\b/gi, replacement: 'Kepling' },
-    { pattern: /\bkepala lingkungan\b/gi, replacement: 'Kepala Lingkungan' },
-    { pattern: /\btaman pkk\b/gi, replacement: 'Taman PKK' },
-    { pattern: /\btoga\b/gi, replacement: 'TOGA' },
-    { pattern: /\bdawis\b/gi, replacement: 'Dawis' },
-    { pattern: /\bdasa wisma\b/gi, replacement: 'Dasa Wisma' },
-    { pattern: /\bposyandu\b/gi, replacement: 'Posyandu' },
-  ];
-  keywords.forEach((kw) => {
-    formatted = formatted.replace(kw.pattern, kw.replacement);
-  });
-  return formatted;
-};
+import {
+  parseRawTextToDasaWisma,
+  validateDasaWismaData,
+  generateDasaWismaSheetsCsv,
+} from '../lib/dasaWismaAiParser';
 
 interface PkkDasaWismaViewProps {
   currentUser: UserAccount;
   onShowToast?: (msg: string, type?: 'error' | 'info' | 'success') => void;
 }
 
-export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser }) => {
+export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser, onShowToast }) => {
   const [dawisList, setDawisList] = useState<KelompokDasaWisma[]>([]);
+  const [allKeluargaList, setAllKeluargaList] = useState<DataKeluarga[]>([]);
   const [filterLingkungan, setFilterLingkungan] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'daftar' | 'asisten_ai'>('daftar');
+
+  // Asisten Digital AI State
+  const [rawAiText, setRawAiText] = useState<string>('');
+  const [extractedResult, setExtractedResult] = useState<Partial<KelompokDasaWisma> | null>(null);
+  const [aiWarnings, setAiWarnings] = useState<string[]>([]);
+  const [isParsingAi, setIsParsingAi] = useState<boolean>(false);
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<KelompokDasaWisma | null>(null);
 
-  // Form State - initialized empty for manual user entry
+  // Anggota Kepala Keluarga (KK) State
+  const [formDaftarKk, setFormDaftarKk] = useState<KkAnggotaDasaWisma[]>([]);
+  const [isKkPickerOpen, setIsKkPickerOpen] = useState<boolean>(false);
+  const [kkPickerSearch, setKkPickerSearch] = useState<string>('');
+  const [selectedKkIds, setSelectedKkIds] = useState<Set<string>>(new Set());
+  const [isManualKkOpen, setIsManualKkOpen] = useState<boolean>(false);
+  const [manualKkNama, setManualKkNama] = useState<string>('');
+  const [manualKkNomor, setManualKkNomor] = useState<string>('');
+  const [manualKkAlamat, setManualKkAlamat] = useState<string>('');
+  const [manualKkJiwa, setManualKkJiwa] = useState<string>('');
+  const [manualKkLaki, setManualKkLaki] = useState<string>('0');
+  const [manualKkPerempuan, setManualKkPerempuan] = useState<string>('0');
+  const [expandedDawisKk, setExpandedDawisKk] = useState<Record<string, boolean>>({});
+
+  // Form State - Full Dasa Wisma Variables
   const [formNama, setFormNama] = useState<string>('');
   const [formLingkunganNomor, setFormLingkunganNomor] = useState<number>(
     currentUser.nomorLingkungan || 1
   );
   const [formNamaKetua, setFormNamaKetua] = useState<string>('');
+  const [formNamaKrt, setFormNamaKrt] = useState<string>('');
   const [formTelepon, setFormTelepon] = useState<string>('');
+  const [formRtRw, setFormRtRw] = useState<string>('00/00');
+
+  // Demografi
   const [formJumlahKk, setFormJumlahKk] = useState<string>('');
   const [formJumlahJiwa, setFormJumlahJiwa] = useState<string>('');
+  const [formLakiLaki, setFormLakiLaki] = useState<string>('0');
+  const [formPerempuan, setFormPerempuan] = useState<string>('0');
+
+  // Kategori Khusus
   const [formJumlahBalita, setFormJumlahBalita] = useState<string>('0');
-  const [formJumlahIbuHamil, setFormJumlahIbuHamil] = useState<string>('0');
   const [formJumlahLansia, setFormJumlahLansia] = useState<string>('0');
+  const [formJumlahPus, setFormJumlahPus] = useState<string>('0');
+  const [formJumlahWus, setFormJumlahWus] = useState<string>('0');
+  const [formJumlahAkseptorKb, setFormJumlahAkseptorKb] = useState<string>('0');
+  const [formJumlahIbuHamil, setFormJumlahIbuHamil] = useState<string>('0');
+  const [formJumlahIbuMenyusui, setFormJumlahIbuMenyusui] = useState<string>('0');
+  const [formJumlahIbuNifas, setFormJumlahIbuNifas] = useState<string>('0');
+  const [formButaAksara, setFormButaAksara] = useState<string>('0');
+
+  // Sanitasi & Rumah
   const [formJambanSehat, setFormJambanSehat] = useState<string>('0');
   const [formSpal, setFormSpal] = useState<string>('0');
   const [formToga, setFormToga] = useState<string>('0');
+  const [formSumberAirMinum, setFormSumberAirMinum] = useState<string>('Air Galon / Kemasan');
+  const [formSumberAir, setFormSumberAir] = useState<string>('PDAM / Air Perpipaan');
+  const [formMakananPokok, setFormMakananPokok] = useState<string>('Beras');
+  const [formKriteriaRumah, setFormKriteriaRumah] = useState<string>('Layak Huni');
+  const [formStikerP4k, setFormStikerP4k] = useState<string>('Menempel');
+
+  // PTP & Industri Rumah Tangga
+  const [formPtpPeternakan, setFormPtpPeternakan] = useState<boolean>(false);
+  const [formPtpPerikanan, setFormPtpPerikanan] = useState<boolean>(false);
+  const [formPtpWarungHidup, setFormPtpWarungHidup] = useState<boolean>(false);
+  const [formPtpToga, setFormPtpToga] = useState<boolean>(true);
+  const [formIndustriPangan, setFormIndustriPangan] = useState<boolean>(false);
+  const [formIndustriSandang, setFormIndustriSandang] = useState<boolean>(false);
+  const [formKegiatanPosyandu, setFormKegiatanPosyandu] = useState<boolean>(true);
+  const [formKegiatanUp2k, setFormKegiatanUp2k] = useState<boolean>(false);
+
   const [formKegiatan, setFormKegiatan] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [alertMsg, setAlertMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [alertMsg, setAlertMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // AI Output strings
+  const [aiNarrative, setAiNarrative] = useState<string>('');
+  const [aiMarkdownTable, setAiMarkdownTable] = useState<string>('');
 
   useEffect(() => {
-    const unsub = subscribeDasaWisma((items) => {
+    const unsubDawis = subscribeDasaWisma((items) => {
       setDawisList(items);
     });
-    return () => unsub();
+    const unsubKeluarga = subscribeDataKeluarga((items) => {
+      setAllKeluargaList(items);
+    });
+    return () => {
+      unsubDawis();
+      unsubKeluarga();
+    };
   }, []);
 
-  const showAlert = (text: string, type: 'success' | 'error' = 'success') => {
+  const showAlert = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
     setAlertMsg({ text, type });
+    if (onShowToast) onShowToast(text, type);
     setTimeout(() => setAlertMsg(null), 3500);
   };
 
@@ -105,8 +164,10 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
     let totalJiwa = 0;
     let totalBalita = 0;
     let totalBumil = 0;
+    let totalBusui = 0;
     let totalLansia = 0;
-    let totalJamban = 0;
+    let totalPus = 0;
+    let totalWus = 0;
     let totalToga = 0;
 
     dawisList.forEach((d) => {
@@ -114,8 +175,10 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
       totalJiwa += d.jumlahJiwa || 0;
       totalBalita += d.jumlahBalita || 0;
       totalBumil += d.jumlahIbuHamil || 0;
+      totalBusui += d.jumlahIbuMenyusui || 0;
       totalLansia += d.jumlahLansia || 0;
-      totalJamban += d.punyaJambanSehat || 0;
+      totalPus += d.jumlahPus || 0;
+      totalWus += d.jumlahWus || 0;
       totalToga += d.punyaToga || 0;
     });
 
@@ -125,8 +188,10 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
       totalJiwa,
       totalBalita,
       totalBumil,
+      totalBusui,
       totalLansia,
-      totalJamban,
+      totalPus,
+      totalWus,
       totalToga,
     };
   }, [dawisList]);
@@ -149,20 +214,279 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
     });
   }, [dawisList, filterLingkungan, searchQuery]);
 
+  const availableFamiliesInLingkungan = useMemo(() => {
+    return allKeluargaList.filter((k) => k.lingkunganNomor === formLingkunganNomor);
+  }, [allKeluargaList, formLingkunganNomor]);
+
+  const filteredFamiliesInPicker = useMemo(() => {
+    if (!kkPickerSearch.trim()) return availableFamiliesInLingkungan;
+    const q = kkPickerSearch.toLowerCase();
+    return availableFamiliesInLingkungan.filter((k) => {
+      const matchNama = (k.namaKepalaKeluarga || '').toLowerCase().includes(q);
+      const matchKk = (k.nomorKk || '').includes(q);
+      const matchNik = (k.nikKepalaKeluarga || '').includes(q);
+      const matchJalan = (k.namaJalan || '').toLowerCase().includes(q);
+      const matchAlamat = (k.alamatLengkap || '').toLowerCase().includes(q);
+      return matchNama || matchKk || matchNik || matchJalan || matchAlamat;
+    });
+  }, [availableFamiliesInLingkungan, kkPickerSearch]);
+
+  const updateDaftarKk = (newList: KkAnggotaDasaWisma[]) => {
+    setFormDaftarKk(newList);
+    setFormJumlahKk(String(newList.length));
+  };
+
+  const handleOpenKkPicker = () => {
+    const existingIds = new Set(formDaftarKk.map((k) => k.id));
+    setSelectedKkIds(existingIds);
+    setKkPickerSearch('');
+    setIsKkPickerOpen(true);
+  };
+
+  const handleToggleKkInPicker = (kkId: string) => {
+    setSelectedKkIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(kkId)) next.delete(kkId);
+      else next.add(kkId);
+      return next;
+    });
+  };
+
+  const handleSelectAllKkInPicker = (families: DataKeluarga[]) => {
+    const allSelected = families.every((f) => selectedKkIds.has(f.id));
+    setSelectedKkIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        families.forEach((f) => next.delete(f.id));
+      } else {
+        families.forEach((f) => next.add(f.id));
+      }
+      return next;
+    });
+  };
+
+  const handleApplyKkPicker = () => {
+    const availableKeluarga = allKeluargaList.filter(
+      (k) => k.lingkunganNomor === formLingkunganNomor
+    );
+
+    // Keep existing manual entries
+    const manualEntries = formDaftarKk.filter(
+      (k) => k.sumberData === 'MANUAL' && !selectedKkIds.has(k.id)
+    );
+
+    const newFromDb: KkAnggotaDasaWisma[] = availableKeluarga
+      .filter((k) => selectedKkIds.has(k.id))
+      .map((k) => ({
+        id: k.id,
+        namaKepalaKeluarga: k.namaKepalaKeluarga,
+        nomorKk: k.nomorKk,
+        nik: k.nikKepalaKeluarga,
+        alamat: k.namaJalan ? `${k.namaJalan} ${k.nomorRumah || ''}`.trim() : k.alamatLengkap,
+        jumlahJiwa: k.jumlahAnggotaKeluarga,
+        jumlahLakiLaki: k.jumlahLakiLaki,
+        jumlahPerempuan: k.jumlahPerempuan,
+        jumlahBalita: k.jumlahBalita,
+        jumlahLansia: k.jumlahLansia,
+        sumberData: 'DATABASE_KELUARGA',
+      }));
+
+    const merged = [...manualEntries, ...newFromDb];
+    updateDaftarKk(merged);
+    setIsKkPickerOpen(false);
+
+    // Auto calculate demography from selected families
+    if (merged.length > 0) {
+      let tJiwa = 0;
+      let tL = 0;
+      let tP = 0;
+      let tBalita = 0;
+      let tLansia = 0;
+      let tJamban = 0;
+
+      merged.forEach((kk) => {
+        const dbEntry = availableKeluarga.find((k) => k.id === kk.id);
+        if (dbEntry) {
+          tJiwa += Number(dbEntry.jumlahAnggotaKeluarga) || 0;
+          tL += Number(dbEntry.jumlahLakiLaki) || 0;
+          tP += Number(dbEntry.jumlahPerempuan) || 0;
+          tBalita += Number(dbEntry.jumlahBalita) || 0;
+          tLansia += Number(dbEntry.jumlahLansia) || 0;
+          if (dbEntry.jambanKeluarga && !dbEntry.jambanKeluarga.includes('Tidak Memiliki')) {
+            tJamban++;
+          }
+        } else {
+          tJiwa += Number(kk.jumlahJiwa) || 0;
+          tL += Number(kk.jumlahLakiLaki) || 0;
+          tP += Number(kk.jumlahPerempuan) || 0;
+          tBalita += Number(kk.jumlahBalita) || 0;
+          tLansia += Number(kk.jumlahLansia) || 0;
+        }
+      });
+
+      if (tJiwa > 0) {
+        setFormJumlahJiwa(String(tJiwa));
+        setFormLakiLaki(String(tL));
+        setFormPerempuan(String(tP));
+        setFormJumlahBalita(String(tBalita));
+        setFormJumlahLansia(String(tLansia));
+        if (tJamban > 0) setFormJambanSehat(String(tJamban));
+      }
+    }
+
+    showAlert(
+      `✓ ${merged.length} Kepala Keluarga diterapkan! Jumlah KK (${merged.length}) & demografi terisi otomatis.`,
+      'success'
+    );
+  };
+
+  const handleAddManualKk = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!manualKkNama.trim()) {
+      showAlert('Nama Kepala Keluarga wajib diisi!', 'error');
+      return;
+    }
+
+    const newKk: KkAnggotaDasaWisma = {
+      id: 'kk_man_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      namaKepalaKeluarga: manualKkNama.trim(),
+      nomorKk: manualKkNomor.trim() || undefined,
+      alamat: manualKkAlamat.trim() || undefined,
+      jumlahJiwa: parseInt(manualKkJiwa, 10) || 0,
+      jumlahLakiLaki: parseInt(manualKkLaki, 10) || 0,
+      jumlahPerempuan: parseInt(manualKkPerempuan, 10) || 0,
+      sumberData: 'MANUAL',
+    };
+
+    const updated = [...formDaftarKk, newKk];
+    updateDaftarKk(updated);
+
+    if (newKk.jumlahJiwa && newKk.jumlahJiwa > 0) {
+      const curJiwa = parseInt(formJumlahJiwa, 10) || 0;
+      setFormJumlahJiwa(String(curJiwa + newKk.jumlahJiwa));
+      if (newKk.jumlahLakiLaki) {
+        setFormLakiLaki(String((parseInt(formLakiLaki, 10) || 0) + newKk.jumlahLakiLaki));
+      }
+      if (newKk.jumlahPerempuan) {
+        setFormPerempuan(String((parseInt(formPerempuan, 10) || 0) + newKk.jumlahPerempuan));
+      }
+    }
+
+    setManualKkNama('');
+    setManualKkNomor('');
+    setManualKkAlamat('');
+    setManualKkJiwa('');
+    setManualKkLaki('0');
+    setManualKkPerempuan('0');
+    setIsManualKkOpen(false);
+    showAlert(`Kepala Keluarga "${newKk.namaKepalaKeluarga}" ditambahkan! Jumlah KK menjadi ${updated.length}.`, 'success');
+  };
+
+  const handleRemoveKk = (id: string) => {
+    const updated = formDaftarKk.filter((k) => k.id !== id);
+    updateDaftarKk(updated);
+  };
+
+  const handleAutoCalculateDemografi = () => {
+    if (formDaftarKk.length === 0) {
+      showAlert('Daftar Kepala Keluarga masih kosong!', 'error');
+      return;
+    }
+
+    const availableKeluarga = allKeluargaList.filter(
+      (k) => k.lingkunganNomor === formLingkunganNomor
+    );
+
+    let totalJiwa = 0;
+    let totalL = 0;
+    let totalP = 0;
+    let totalBalita = 0;
+    let totalLansia = 0;
+    let jambanCount = 0;
+    let countFromDb = 0;
+
+    formDaftarKk.forEach((kk) => {
+      const dbEntry = availableKeluarga.find(
+        (k) =>
+          k.id === kk.id ||
+          (kk.nomorKk && k.nomorKk === kk.nomorKk) ||
+          k.namaKepalaKeluarga.toLowerCase() === kk.namaKepalaKeluarga.toLowerCase()
+      );
+
+      if (dbEntry) {
+        countFromDb++;
+        totalJiwa += Number(dbEntry.jumlahAnggotaKeluarga) || 0;
+        totalL += Number(dbEntry.jumlahLakiLaki) || 0;
+        totalP += Number(dbEntry.jumlahPerempuan) || 0;
+        totalBalita += Number(dbEntry.jumlahBalita) || 0;
+        totalLansia += Number(dbEntry.jumlahLansia) || 0;
+        if (dbEntry.jambanKeluarga && !dbEntry.jambanKeluarga.includes('Tidak Memiliki')) {
+          jambanCount++;
+        }
+      } else {
+        totalJiwa += Number(kk.jumlahJiwa) || 0;
+        totalL += Number(kk.jumlahLakiLaki) || 0;
+        totalP += Number(kk.jumlahPerempuan) || 0;
+        totalBalita += Number(kk.jumlahBalita) || 0;
+        totalLansia += Number(kk.jumlahLansia) || 0;
+      }
+    });
+
+    setFormJumlahJiwa(String(totalJiwa));
+    setFormLakiLaki(String(totalL));
+    setFormPerempuan(String(totalP));
+    setFormJumlahBalita(String(totalBalita));
+    setFormJumlahLansia(String(totalLansia));
+    if (jambanCount > 0) setFormJambanSehat(String(jambanCount));
+
+    showAlert(
+      `✨ Demografi berhasil dihitung otomatis dari ${formDaftarKk.length} KK (${countFromDb} terhubung ke Database Keluarga)!`,
+      'success'
+    );
+  };
+
+  const toggleExpandKk = (id: string) => {
+    setExpandedDawisKk((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const handleOpenAdd = () => {
     setEditingItem(null);
     setFormNama('');
     setFormLingkunganNomor(currentUser.nomorLingkungan || 1);
     setFormNamaKetua('');
+    setFormNamaKrt('');
     setFormTelepon('');
+    setFormRtRw('00/00');
+    setFormDaftarKk([]);
     setFormJumlahKk('');
     setFormJumlahJiwa('');
+    setFormLakiLaki('0');
+    setFormPerempuan('0');
     setFormJumlahBalita('0');
-    setFormJumlahIbuHamil('0');
     setFormJumlahLansia('0');
+    setFormJumlahPus('0');
+    setFormJumlahWus('0');
+    setFormJumlahAkseptorKb('0');
+    setFormJumlahIbuHamil('0');
+    setFormJumlahIbuMenyusui('0');
+    setFormJumlahIbuNifas('0');
+    setFormButaAksara('0');
     setFormJambanSehat('0');
     setFormSpal('0');
     setFormToga('0');
+    setFormSumberAirMinum('Air Galon / Kemasan');
+    setFormSumberAir('PDAM / Air Perpipaan');
+    setFormMakananPokok('Beras');
+    setFormKriteriaRumah('Layak Huni');
+    setFormStikerP4k('Menempel');
+    setFormPtpPeternakan(false);
+    setFormPtpPerikanan(false);
+    setFormPtpWarungHidup(false);
+    setFormPtpToga(true);
+    setFormIndustriPangan(false);
+    setFormIndustriSandang(false);
+    setFormKegiatanPosyandu(true);
+    setFormKegiatanUp2k(false);
     setFormKegiatan('');
     setIsModalOpen(true);
   };
@@ -172,15 +496,39 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
     setFormNama(item.namaKelompok);
     setFormLingkunganNomor(item.lingkunganNomor);
     setFormNamaKetua(item.namaKetuaDawis);
+    setFormNamaKrt(item.namaKrt || '');
     setFormTelepon(item.teleponKetua || '');
-    setFormJumlahKk(String(item.jumlahKk || 0));
+    setFormRtRw(item.rtRw || '01/02');
+    setFormDaftarKk(item.daftarKkAnggota || []);
+    setFormJumlahKk(String(item.jumlahKk || (item.daftarKkAnggota ? item.daftarKkAnggota.length : 0)));
     setFormJumlahJiwa(String(item.jumlahJiwa || 0));
+    setFormLakiLaki(String(item.jumlahLakiLaki || 0));
+    setFormPerempuan(String(item.jumlahPerempuan || 0));
     setFormJumlahBalita(String(item.jumlahBalita || 0));
-    setFormJumlahIbuHamil(String(item.jumlahIbuHamil || 0));
     setFormJumlahLansia(String(item.jumlahLansia || 0));
+    setFormJumlahPus(String(item.jumlahPus || 0));
+    setFormJumlahWus(String(item.jumlahWus || 0));
+    setFormJumlahAkseptorKb(String(item.jumlahAkseptorKb || 0));
+    setFormJumlahIbuHamil(String(item.jumlahIbuHamil || 0));
+    setFormJumlahIbuMenyusui(String(item.jumlahIbuMenyusui || 0));
+    setFormJumlahIbuNifas(String(item.jumlahIbuNifas || 0));
+    setFormButaAksara(String(item.jumlahButaAksara || 0));
     setFormJambanSehat(String(item.punyaJambanSehat || 0));
     setFormSpal(String(item.punyaSpal || 0));
     setFormToga(String(item.punyaToga || 0));
+    setFormSumberAirMinum(item.sumberAirMinum || 'Air Galon / Kemasan');
+    setFormSumberAir(item.sumberAirBersih || 'PDAM / Air Perpipaan');
+    setFormMakananPokok(item.makananPokok || 'Beras');
+    setFormKriteriaRumah(item.kriteriaRumah || 'Layak Huni');
+    setFormStikerP4k(item.stikerP4k || 'Menempel');
+    setFormPtpPeternakan(!!item.ptpPeternakan);
+    setFormPtpPerikanan(!!item.ptpPerikanan);
+    setFormPtpWarungHidup(!!item.ptpWarungHidup);
+    setFormPtpToga(!!item.ptpToga || item.punyaToga > 0);
+    setFormIndustriPangan(!!item.industriPangan);
+    setFormIndustriSandang(!!item.industriSandang);
+    setFormKegiatanPosyandu(item.kegiatanPosyandu !== false);
+    setFormKegiatanUp2k(!!item.kegiatanUp2kKoperasi);
     setFormKegiatan(item.kegiatanUtama || '');
     setIsModalOpen(true);
   };
@@ -198,26 +546,60 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
 
     setIsSubmitting(true);
     try {
-      const item: KelompokDasaWisma = {
-        id: editingItem ? editingItem.id : 'dawis_' + Date.now(),
+      const computedJumlahKk = formDaftarKk.length > 0 ? formDaftarKk.length : (parseInt(formJumlahKk, 10) || 0);
+
+      const rawObj: Partial<KelompokDasaWisma> = {
         namaKelompok: formNama.trim(),
         lingkunganNomor: formLingkunganNomor,
         lingkunganNama: `Lingkungan ${formLingkunganNomor}`,
         namaKetuaDawis: formNamaKetua.trim(),
+        namaKrt: formNamaKrt.trim(),
         teleponKetua: formTelepon.trim(),
-        jumlahKk: parseInt(formJumlahKk, 10) || 0,
+        rtRw: formRtRw.trim(),
+        daftarKkAnggota: formDaftarKk,
+        jumlahKk: computedJumlahKk,
         jumlahJiwa: parseInt(formJumlahJiwa, 10) || 0,
+        jumlahLakiLaki: parseInt(formLakiLaki, 10) || 0,
+        jumlahPerempuan: parseInt(formPerempuan, 10) || 0,
         jumlahBalita: parseInt(formJumlahBalita, 10) || 0,
-        jumlahIbuHamil: parseInt(formJumlahIbuHamil, 10) || 0,
         jumlahLansia: parseInt(formJumlahLansia, 10) || 0,
+        jumlahPus: parseInt(formJumlahPus, 10) || 0,
+        jumlahWus: parseInt(formJumlahWus, 10) || 0,
+        jumlahAkseptorKb: parseInt(formJumlahAkseptorKb, 10) || 0,
+        jumlahIbuHamil: parseInt(formJumlahIbuHamil, 10) || 0,
+        jumlahIbuMenyusui: parseInt(formJumlahIbuMenyusui, 10) || 0,
+        jumlahIbuNifas: parseInt(formJumlahIbuNifas, 10) || 0,
+        jumlahButaAksara: parseInt(formButaAksara, 10) || 0,
         punyaJambanSehat: parseInt(formJambanSehat, 10) || 0,
         punyaSpal: parseInt(formSpal, 10) || 0,
         punyaToga: parseInt(formToga, 10) || 0,
+        sumberAirMinum: formSumberAirMinum,
+        sumberAirBersih: formSumberAir,
+        makananPokok: formMakananPokok,
+        kriteriaRumah: formKriteriaRumah,
+        stikerP4k: formStikerP4k,
+        ptpPeternakan: formPtpPeternakan,
+        ptpPerikanan: formPtpPerikanan,
+        ptpWarungHidup: formPtpWarungHidup,
+        ptpToga: formPtpToga,
+        industriPangan: formIndustriPangan,
+        industriSandang: formIndustriSandang,
+        kegiatanPosyandu: formKegiatanPosyandu,
+        kegiatanUp2kKoperasi: formKegiatanUp2k,
         kegiatanUtama: formKegiatan.trim(),
+      };
+
+      const { warnings, sanitizedData } = validateDasaWismaData(rawObj);
+
+      const itemToSave: KelompokDasaWisma = {
+        ...(sanitizedData as KelompokDasaWisma),
+        id: editingItem ? editingItem.id : 'dawis_' + Date.now(),
+        validationWarnings: warnings,
+        createdByName: currentUser.nama || 'Kader PKK',
         updatedAt: new Date().toISOString(),
       };
 
-      await saveDasaWisma(item);
+      await saveDasaWisma(itemToSave);
       showAlert(
         editingItem
           ? 'Data Dasa Wisma berhasil diperbarui!'
@@ -231,6 +613,100 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleRunAiParser = () => {
+    if (!rawAiText.trim()) {
+      showAlert('Masukkan catatan / teks mentah pendataan Dasa Wisma!', 'error');
+      return;
+    }
+
+    setIsParsingAi(true);
+    setTimeout(async () => {
+      const { parsedData, validation } = parseRawTextToDasaWisma(
+        rawAiText,
+        currentUser.nomorLingkungan || 1
+      );
+      setExtractedResult(parsedData);
+      setAiWarnings(validation.warnings);
+
+      const module = await import('../lib/dasaWismaAiParser');
+      setAiNarrative(module.generateDasaWismaNarrative(parsedData));
+      setAiMarkdownTable(module.generateDasaWismaMarkdownTable([parsedData as KelompokDasaWisma]));
+
+      setIsParsingAi(false);
+      showAlert('Teks mentah berhasil diekstrak dan divalidasi oleh AI!', 'info');
+    }, 800);
+  };
+
+  const handleSaveAiExtracted = async () => {
+    if (!extractedResult || !extractedResult.namaKelompok) {
+      showAlert('Data hasil ekstraksi AI tidak valid.', 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const itemToSave: KelompokDasaWisma = {
+        id: 'dawis_ai_' + Date.now(),
+        namaKelompok: extractedResult.namaKelompok || 'Dasa Wisma Baru',
+        lingkunganNomor: extractedResult.lingkunganNomor || currentUser.nomorLingkungan || 1,
+        lingkunganNama: `Lingkungan ${extractedResult.lingkunganNomor || currentUser.nomorLingkungan || 1}`,
+        namaKetuaDawis: extractedResult.namaKetuaDawis || 'Kader Dasa Wisma',
+        namaKrt: extractedResult.namaKrt || '',
+        teleponKetua: extractedResult.teleponKetua || '',
+        jumlahKk: extractedResult.jumlahKk || 0,
+        jumlahJiwa: extractedResult.jumlahJiwa || 0,
+        jumlahLakiLaki: extractedResult.jumlahLakiLaki || 0,
+        jumlahPerempuan: extractedResult.jumlahPerempuan || 0,
+        jumlahBalita: extractedResult.jumlahBalita || 0,
+        jumlahLansia: extractedResult.jumlahLansia || 0,
+        jumlahPus: extractedResult.jumlahPus || 0,
+        jumlahWus: extractedResult.jumlahWus || 0,
+        jumlahAkseptorKb: extractedResult.jumlahAkseptorKb || 0,
+        jumlahIbuHamil: extractedResult.jumlahIbuHamil || 0,
+        jumlahIbuMenyusui: extractedResult.jumlahIbuMenyusui || 0,
+        jumlahIbuNifas: extractedResult.jumlahIbuNifas || 0,
+        jumlahButaAksara: extractedResult.jumlahButaAksara || 0,
+        punyaJambanSehat: extractedResult.punyaJambanSehat || 0,
+        punyaSpal: extractedResult.punyaSpal || 0,
+        punyaToga: extractedResult.punyaToga || 0,
+        sumberAirMinum: extractedResult.sumberAirMinum || 'Air Galon / Kemasan',
+        sumberAirBersih: extractedResult.sumberAirBersih || 'PDAM / Air Perpipaan',
+        makananPokok: extractedResult.makananPokok || 'Beras',
+        kriteriaRumah: extractedResult.kriteriaRumah || 'Layak Huni',
+        stikerP4k: extractedResult.stikerP4k || 'Menempel',
+        kegiatanUtama: extractedResult.kegiatanUtama || 'Pendataan Dasa Wisma Lapangan',
+        validationWarnings: aiWarnings,
+        createdByName: currentUser.nama || 'Kader PKK (AI Digitizer)',
+        updatedAt: new Date().toISOString(),
+      };
+
+      await saveDasaWisma(itemToSave);
+      showAlert('Hasil ekstraksi AI berhasil disimpan ke database Firestore!', 'success');
+      setExtractedResult(null);
+      setRawAiText('');
+      setAiNarrative('');
+      setAiMarkdownTable('');
+      setActiveTab('daftar');
+    } catch (err) {
+      console.error(err);
+      showAlert('Gagal menyimpan hasil ekstraksi AI.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCopyForSheets = () => {
+    const csvContent = generateDasaWismaSheetsCsv(filteredList);
+    navigator.clipboard.writeText(csvContent).then(
+      () => {
+        showAlert('Tabel data Dasa Wisma disalin! Siap dipaste ke Google Sheets atau Excel.', 'success');
+      },
+      () => {
+        showAlert('Gagal menyalin ke clipboard.', 'error');
+      }
+    );
   };
 
   const handleDelete = async (id: string, nama: string) => {
@@ -251,6 +727,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
           className={`p-4 rounded-2xl flex items-center justify-between text-xs font-bold animate-in fade-in ${
             alertMsg.type === 'success'
               ? 'bg-tosca-50 text-tosca-900 border border-tosca-200'
+              : alertMsg.type === 'info'
+              ? 'bg-blue-50 text-blue-900 border border-blue-200'
               : 'bg-rose-50 text-rose-900 border border-rose-200'
           }`}
         >
@@ -261,433 +739,1329 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser 
           <button
             type="button"
             onClick={() => setAlertMsg(null)}
-            className="p-1 hover:bg-black/5 rounded"
+            className="p-1 hover:bg-black/5 rounded cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Header Banner */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-tosca-800 text-xs font-black tracking-wide mb-2">
-            <Users className="w-3.5 h-3.5 text-tosca-600" />
-            <span>KELOMPOK DASA WISMA 24 LINGKUNGAN</span>
+      {/* Header Banner - Updated to PKK Teal with White Text */}
+      <div className="relative overflow-hidden bg-pkk-teal text-white rounded-3xl border border-pkk-dark p-6 sm:p-8 shadow-xl">
+        <div className="absolute right-0 top-0 translate-x-10 -translate-y-8 w-64 h-64 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          <div className="space-y-4 max-w-3xl">
+            <div className="inline-flex items-center gap-2 text-[10px] font-black tracking-[0.2em] text-tosca-200 uppercase px-2.5 py-1 rounded-lg bg-white/10 border border-white/10">
+              <Users className="w-3.5 h-3.5" />
+              <span>Kelompok Dasa Wisma 24 Lingkungan</span>
+            </div>
+            
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-[1.1] [text-wrap:balance]">
+              Asisten Digital & Pendataan Dasa Wisma PKK
+            </h1>
+            
+            <p className="text-sm text-tosca-100 leading-relaxed max-w-2xl font-medium">
+              Modul lengkap pendataan variabel Dasa Wisma (PUS, WUS, Ibu Hamil, Balita, Sanitasi & Pekarangan TOGA) dilengkapi dengan sistem AI Digitizer untuk konversi otomatis catatan lapangan.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-4 pt-2">
+              <button
+                type="button"
+                onClick={handleCopyForSheets}
+                className="group flex items-center gap-2 text-xs font-bold text-white hover:text-amber-300 transition-colors"
+              >
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors border border-white/10">
+                  <Copy className="w-4 h-4" />
+                </div>
+                <span>Copy for Sheets</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => printOfficialDocument('lembar-cetak-dasa-wisma', `REKAP_DASA_WISMA_PKK_${new Date().toISOString().split('T')[0]}`)}
+                className="group flex items-center gap-2 text-xs font-bold text-white hover:text-amber-300 transition-colors"
+              >
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors border border-white/10">
+                  <Printer className="w-4 h-4" />
+                </div>
+                <span>Cetak Rekap</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => exportDasaWismaToExcel(filteredList)}
+                className="group flex items-center gap-2 text-xs font-bold text-white hover:text-amber-300 transition-colors"
+              >
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors border border-white/10">
+                  <Download className="w-4 h-4" />
+                </div>
+                <span>Excel Export</span>
+              </button>
+            </div>
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Data Binaan Dasa Wisma TP-PKK Kelurahan Mangga
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
-            Sistem pendataan kelompok 10–20 kepala keluarga (Dasa Wisma) binaan PKK. Mencakup data ibu hamil, balita stunting, lansia, sanitasi jamban, serta pemanfaatan pekarangan toga.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => printOfficialDocument('lembar-cetak-dasa-wisma', `REKAP_DASA_WISMA_PKK_${new Date().toISOString().split('T')[0]}`)}
-            className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-            title="Cetak Rekap Dasa Wisma dengan Kop Surat Resmi"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Cetak Rekap</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => exportDasaWismaToExcel(filteredList)}
-            className="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-2xs"
-          >
-            <Download className="w-4 h-4 text-tosca-700" />
-            <span>Export Excel</span>
-          </button>
 
           <button
             type="button"
             onClick={handleOpenAdd}
-            className="px-4 py-2.5 rounded-xl bg-tosca-700 hover:bg-tosca-800 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-tosca-700/20"
+            className="px-6 py-4 rounded-2xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-sm flex items-center justify-center gap-3 transition-all cursor-pointer shadow-lg active:scale-[0.98] shrink-0 border-b-4 border-amber-600"
           >
-            <Plus className="w-4 h-4" />
-            <span>+ Tambah Dasa Wisma</span>
+            <Plus className="w-5 h-5" />
+            <span>Tambah Dasa Wisma</span>
           </button>
         </div>
       </div>
+
 
       <RealtimeSyncStatusPanel />
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3.5">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold text-slate-400 block uppercase">Total Dasa Wisma</span>
-          <span className="text-xl font-black text-tosca-900 mt-0.5 block">{stats.totalKelompok}</span>
-          <span className="text-[10px] text-slate-500">Kelompok di 24 Lk</span>
-        </div>
+      {/* Main Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
+        <button
+          type="button"
+          onClick={() => setActiveTab('daftar')}
+          className={`px-4 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'daftar'
+              ? 'bg-pkk-teal text-white shadow-md'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Daftar & Rekapitulasi Dasa Wisma ({filteredList.length})</span>
+        </button>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold text-slate-400 block uppercase">Kepala Keluarga</span>
-          <span className="text-xl font-black text-slate-900 mt-0.5 block">{stats.totalKk}</span>
-          <span className="text-[10px] text-slate-500">{stats.totalJiwa} Jiwa Warga</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold text-slate-400 block uppercase">Balita Binaan</span>
-          <span className="text-xl font-black text-tosca-700 mt-0.5 block">{stats.totalBalita}</span>
-          <span className="text-[10px] text-tosca-600">Terpantau Posyandu</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold text-slate-400 block uppercase">Ibu Hamil</span>
-          <span className="text-xl font-black text-amber-700 mt-0.5 block">{stats.totalBumil}</span>
-          <span className="text-[10px] text-amber-600">Pendampingan KEK</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold text-slate-400 block uppercase">Lanjut Usia</span>
-          <span className="text-xl font-black text-purple-700 mt-0.5 block">{stats.totalLansia}</span>
-          <span className="text-[10px] text-purple-600">Skrining Posyandu</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <span className="text-[10px] font-bold text-slate-400 block uppercase">Pekarangan Toga</span>
-          <span className="text-xl font-black text-tosca-700 mt-0.5 block">{stats.totalToga}</span>
-          <span className="text-[10px] text-tosca-600">HATINYA PKK</span>
-        </div>
+        <button
+          type="button"
+          onClick={() => setActiveTab('asisten_ai')}
+          className={`px-4 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+            activeTab === 'asisten_ai'
+              ? 'bg-amber-400 text-slate-900 shadow-md'
+              : 'bg-white text-amber-700 hover:bg-amber-50 border border-amber-200'
+          }`}
+        >
+          <Bot className="w-4 h-4" />
+          <span>AI Digitizer (Konversi Catatan)</span>
+        </button>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
-          <select
-            value={filterLingkungan}
-            onChange={(e) => setFilterLingkungan(e.target.value)}
-            className="px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-white text-slate-800 focus:outline-tosca-600 cursor-pointer"
-          >
-            <option value="ALL">Semua Lingkungan (1 s/d 24)</option>
-            {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                Lingkungan {n}
-              </option>
-            ))}
-          </select>
-
-          <div className="relative flex-1 min-w-[200px]">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari kelompok, ketua Dasa Wisma, lingkungan..."
-              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:outline-tosca-600"
-            />
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      {activeTab === 'asisten_ai' && (
+        <div className="bg-gradient-to-br from-purple-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl border border-purple-500/30">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] tracking-wider uppercase inline-flex items-center gap-1.5 mb-2">
+                <Sparkles className="w-3.5 h-3.5 text-slate-900" />
+                <span>AI Parser Catatan Lapangan</span>
+              </span>
+              <h2 className="text-lg sm:text-xl font-black">
+                Konversi Teks Mentah / Chat WA Menjadi Data Dasa Wisma Terstruktur
+              </h2>
+              <p className="text-xs text-purple-200 mt-1 max-w-2xl leading-relaxed">
+                Tempelkan catatan kasar kader, isi pesan WhatsApp, atau hasil ketikan OCR. AI akan mengekstrak otomatis variabel Dasa Wisma (Jiwa, PUS/WUS, Bumil, Balita, Sanitasi, TOGA) serta melakukan validasi logika matematika otomatis.
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="text-xs font-bold text-slate-500">
-          Total: <strong className="text-slate-900">{filteredList.length}</strong> kelompok
-        </div>
-      </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-purple-300 uppercase tracking-widest">
+                Input Catatan Mentah
+              </label>
+              <textarea
+                rows={8}
+                value={rawAiText}
+                onChange={(e) => setRawAiText(e.target.value)}
+                placeholder="Contoh: Dasa Wisma Melati 03 Lingkungan 4. Ketua Ibu Ani (08123456789). Jumlah 15 KK, 60 jiwa (28 L, 32 P). Ada 3 balita, 2 lansia, 1 bumil, 4 busui..."
+                className="w-full p-5 text-sm bg-slate-950/50 border border-purple-500/30 rounded-2xl text-purple-50 placeholder-purple-400/30 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition-all font-mono leading-relaxed"
+              />
 
-      {/* Dasa Wisma Cards List or Clean Empty State */}
-      <div id="lembar-cetak-dasa-wisma" className="uppercase">
-        <div className="hidden print:block mb-4">
-          <KopSuratPkk />
-          <div className="text-center my-2">
-            <h2 className="text-sm font-black uppercase text-slate-900 underline">
-              REKAPITULASI KELOMPOK BINAAN DASA WISMA TP-PKK KELURAHAN MANGGA
-            </h2>
-            <p className="text-[10px] text-slate-600 font-medium">Kecamatan Medan Tuntungan • Kota Medan</p>
-          </div>
-        </div>
-
-      {filteredList.length === 0 ? (
-        <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-10 sm:p-14 text-center max-w-xl mx-auto shadow-2xs">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-tosca-50 border border-tosca-200 flex items-center justify-center text-tosca-600 shadow-2xs">
-            <Users className="w-8 h-8" />
-          </div>
-          <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-1">
-            Data Dasa Wisma Masih Kosong
-          </h3>
-          <p className="text-xs text-slate-500 mb-6 leading-relaxed max-w-md mx-auto">
-            Data contoh Dasa Wisma telah berhasil dikosongkan. Silakan tambahkan data kelompok Dasa Wisma binaan PKK secara manual per lingkungan.
-          </p>
-          <button
-            type="button"
-            onClick={handleOpenAdd}
-            className="px-5 py-2.5 rounded-xl bg-tosca-700 hover:bg-tosca-800 text-white font-bold text-xs inline-flex items-center gap-2 shadow-md shadow-tosca-700/20 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tambah Kelompok Dasa Wisma Baru</span>
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredList.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-2xl border border-slate-200 hover:border-blue-400 shadow-xs hover:shadow-md transition-all p-5 flex flex-col justify-between"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-tosca-800 text-[11px] font-black">
-                    {item.lingkunganNama}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {item.id}
-                  </span>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 leading-snug">
-                    {item.namaKelompok}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
-                    <span className="font-semibold text-slate-800">
-                      Ketua: {item.namaKetuaDawis}
-                    </span>
-                    {item.teleponKetua && (
-                      <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                        <Phone className="w-3 h-3" />
-                        <span>{item.teleponKetua}</span>
-                      </span>
-                    )}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3 text-[11px] text-purple-300 font-medium">
+                  <div className="flex -space-x-1">
+                    <div className="w-5 h-5 rounded-full border border-purple-800 bg-purple-900 flex items-center justify-center">
+                      <Check className="w-2.5 h-2.5" />
+                    </div>
+                    <div className="w-5 h-5 rounded-full border border-purple-800 bg-purple-900 flex items-center justify-center">
+                      <Check className="w-2.5 h-2.5" />
+                    </div>
                   </div>
+                  <span>Automated validation: L+P math & Bumil status.</span>
                 </div>
-
-                {/* Data Grid per Kelompok */}
-                <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">KK Binaan</span>
-                    <span className="font-bold text-slate-800">{item.jumlahKk} KK</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">Balita</span>
-                    <span className="font-bold text-tosca-700">{item.jumlahBalita} Anak</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">Ibu Hamil</span>
-                    <span className="font-bold text-amber-700">{item.jumlahIbuHamil} Bumil</span>
-                  </div>
-                </div>
-
-                {/* Sanitasi & HATINYA PKK */}
-                <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1">
-                  <span>Jamban Sehat: <strong>{item.punyaJambanSehat} KK</strong></span>
-                  <span>Pekarangan Toga: <strong>{item.punyaToga} KK</strong></span>
-                </div>
-
-                {item.kegiatanUtama && (
-                  <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">
-                    {formatProperWriting(item.kegiatanUtama)}
-                  </p>
-                )}
-              </div>
-
-              {/* Card Footer Actions */}
-              <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => handleOpenEdit(item)}
-                  className="text-xs font-bold text-tosca-700 hover:text-tosca-900 flex items-center gap-1 cursor-pointer"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                  <span>Ubah Data</span>
-                </button>
 
                 <button
                   type="button"
-                  onClick={() => handleDelete(item.id, item.namaKelompok)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                  title="Hapus Dasa Wisma"
+                  onClick={handleRunAiParser}
+                  disabled={isParsingAi}
+                  className="w-full sm:w-auto px-8 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Bot className="w-4 h-4" />
+                  <span>{isParsingAi ? 'Memproses...' : 'Ekstrak & Validasi AI'}</span>
                 </button>
               </div>
             </div>
-          ))}
+
+              <div className="p-6 rounded-2xl bg-white/10 border border-white/20 space-y-4">
+                <h4 className="text-[10px] font-black text-amber-400 uppercase tracking-widest flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>Sistem Kerja & Biaya</span>
+                </h4>
+                <div className="space-y-4 text-[11px] text-white leading-relaxed">
+                  <p>Aplikasi ini menggunakan teknologi <strong>Heuristic Neural Parsing</strong> yang dirancang khusus untuk PKK:</p>
+                  <ul className="space-y-2.5">
+                    <li className="flex gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1 shrink-0" />
+                      <span><strong>Analisis Otomatis:</strong> Mengekstrak 30+ variabel data dari teks acak (WhatsApp/Catatan) secara instan tanpa perlu input manual satu per satu.</span>
+                    </li>
+                    <li className="flex gap-2 p-2 bg-amber-400/20 border border-amber-400/30 rounded-lg">
+                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1 shrink-0" />
+                      <span><strong>Biaya Rp 0 (Gratis Selamanya):</strong> Seluruh pemrosesan dilakukan secara LOKAL di browser Anda. Tidak ada biaya server atau biaya API yang dibebankan kepada kader.</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1 shrink-0" />
+                      <span><strong>Keamanan Data:</strong> Data Anda tetap berada di perangkat hingga Anda menekan tombol "Simpan" untuk mengirimnya ke Database Kelurahan.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+          </div>
+
+          {/* Result Card from AI Extraction */}
+          {extractedResult && (
+            <div className="bg-white text-slate-900 rounded-2xl p-6 space-y-4 animate-in fade-in border border-amber-300 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-tosca-600" />
+                  <h3 className="font-extrabold text-sm text-slate-900">
+                    Hasil Ekstraksi &amp; Validasi Data
+                  </h3>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full bg-tosca-100 text-tosca-800 text-[10px] font-black uppercase">
+                  {extractedResult.namaKelompok}
+                </span>
+              </div>
+
+              {aiWarnings.length > 0 && (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <span>Catatan Validasi Logika AI:</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                    {aiWarnings.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <Bot className="w-3.5 h-3.5" />
+                    <span>A. Ringkasan Laporan AI</span>
+                  </h4>
+                  <div className="p-4 rounded-xl bg-purple-50 border border-purple-100 text-xs text-purple-900 leading-relaxed font-medium italic whitespace-pre-wrap">
+                    {aiNarrative}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <span>B. Tabel Rekapitulasi (Siap Salin)</span>
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(aiMarkdownTable);
+                        showAlert('Tabel Markdown disalin!', 'success');
+                      }}
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                      title="Salin Tabel Markdown"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-900 text-slate-300 text-[10px] font-mono leading-tight overflow-x-auto whitespace-pre border border-slate-700">
+                    {aiMarkdownTable}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase font-bold">Nama KRT</span>
+                  <span className="font-bold text-slate-900">{extractedResult.namaKrt || extractedResult.namaKetuaDawis || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase font-bold">Wilayah</span>
+                  <span className="font-bold text-slate-900">{extractedResult.lingkunganNama || 'Lingkungan 1'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase font-bold">Jumlah KK &amp; Jiwa</span>
+                  <span className="font-bold text-slate-900">{extractedResult.jumlahKk} KK / {extractedResult.jumlahJiwa} Jiwa</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase font-bold">Demografi L / P</span>
+                  <span className="font-bold text-slate-900">{extractedResult.jumlahLakiLaki || 0} L / {extractedResult.jumlahPerempuan || 0} P</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase font-bold">PUS &amp; WUS</span>
+                  <span className="font-bold text-purple-900">{extractedResult.jumlahPus || 0} PUS / {extractedResult.jumlahWus || 0} WUS</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase font-bold">Balita / Bumil</span>
+                  <span className="font-bold text-tosca-700">{extractedResult.jumlahBalita || 0} Balita / {extractedResult.jumlahIbuHamil || 0} Bumil</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase font-black tracking-widest">Air Minum</span>
+                  <span className="font-bold text-slate-900">{extractedResult.sumberAirMinum || 'Air Galon'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase font-black tracking-widest">Air Bersih</span>
+                  <span className="font-bold text-slate-900">{extractedResult.sumberAirBersih || 'PDAM'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase font-black tracking-widest">Stiker P4K</span>
+                  <span className="font-bold text-amber-700">{extractedResult.stikerP4k || 'Tidak'}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExtractedResult(null);
+                    setAiNarrative('');
+                    setAiMarkdownTable('');
+                  }}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveAiExtracted}
+                  disabled={isSubmitting}
+                  className="px-5 py-2 rounded-xl bg-tosca-700 hover:bg-tosca-800 text-white text-xs font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isSubmitting ? 'Simpan...' : 'Simpan ke Firestore'}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
-      </div>
+
+      {activeTab === 'daftar' && (
+        <>
+          {/* Stat Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">Kelompok</span>
+              <span className="text-2xl font-black text-slate-900 mt-1 block tabular-nums">{stats.totalKelompok}</span>
+              <span className="text-[10px] text-slate-500 font-medium mt-1 block">Dasa Wisma</span>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">Penduduk</span>
+              <span className="text-2xl font-black text-slate-900 mt-1 block tabular-nums">{stats.totalJiwa}</span>
+              <span className="text-[10px] text-slate-500 font-medium mt-1 block">{stats.totalKk} Kepala Keluarga</span>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">PUS / WUS</span>
+              <span className="text-2xl font-black text-purple-700 mt-1 block tabular-nums">{stats.totalPus} / {stats.totalWus}</span>
+              <span className="text-[10px] text-purple-600 font-medium mt-1 block">Pasangan Usia Subur</span>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">Balita</span>
+              <span className="text-2xl font-black text-tosca-700 mt-1 block tabular-nums">{stats.totalBalita}</span>
+              <span className="text-[10px] text-tosca-600 font-medium mt-1 block">{stats.totalBumil} Ibu Hamil</span>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">Busui / Nifas</span>
+              <span className="text-2xl font-black text-amber-700 mt-1 block tabular-nums">{stats.totalBusui}</span>
+              <span className="text-[10px] text-amber-600 font-medium mt-1 block">Ibu Menyusui</span>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm border-b-4 border-b-emerald-500">
+              <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">Hatinya PKK</span>
+              <span className="text-2xl font-black text-emerald-700 mt-1 block tabular-nums">{stats.totalToga}</span>
+              <span className="text-[10px] text-emerald-600 font-medium mt-1 block">Pekarangan TOGA</span>
+            </div>
+          </div>
+
+          {/* Filter & Search Bar */}
+          <div className="flex flex-col md:flex-row items-center gap-4 bg-slate-100 p-1.5 rounded-2xl">
+            <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm shrink-0">
+              <button
+                type="button"
+                onClick={() => setFilterLingkungan('ALL')}
+                className={`px-4 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                  filterLingkungan === 'ALL' ? 'bg-pkk-teal text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                Semua
+              </button>
+              <select
+                value={filterLingkungan === 'ALL' ? '' : filterLingkungan}
+                onChange={(e) => setFilterLingkungan(e.target.value || 'ALL')}
+                className="px-3 py-2 text-[10px] font-black uppercase tracking-wider bg-transparent text-slate-700 focus:outline-none border-l border-slate-100 cursor-pointer"
+              >
+                <option value="">Lingkungan</option>
+                {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={n}>
+                    Lk {n}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="relative flex-1 w-full">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari nama kelompok, ketua, atau KRT..."
+                className="w-full pl-11 pr-4 py-3 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all shadow-sm font-medium"
+              />
+              <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+            </div>
+
+            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] hidden lg:block tabular-nums">
+              {filteredList.length} <span className="opacity-60">Kelompok</span>
+            </div>
+          </div>
+
+          {/* Dasa Wisma Cards List */}
+          <div id="lembar-cetak-dasa-wisma">
+            <div className="hidden print:block mb-4">
+              <KopSuratPkk />
+              <div className="text-center my-2">
+                <h2 className="text-sm font-black uppercase text-slate-900 underline">
+                  REKAPITULASI KELOMPOK BINAAN DASA WISMA TP-PKK KELURAHAN MANGGA
+                </h2>
+                <p className="text-[10px] text-slate-600 font-medium">Kecamatan Medan Tuntungan • Kota Medan</p>
+              </div>
+            </div>
+
+            {filteredList.length === 0 ? (
+              <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-10 sm:p-14 text-center max-w-xl mx-auto shadow-2xs">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-tosca-50 border border-tosca-200 flex items-center justify-center text-tosca-600 shadow-2xs">
+                  <Users className="w-8 h-8" />
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-1">
+                  Data Dasa Wisma Masih Kosong
+                </h3>
+                <p className="text-xs text-slate-500 mb-6 leading-relaxed max-w-md mx-auto">
+                  Silakan tambahkan kelompok Dasa Wisma binaan PKK secara manual atau gunakan Asisten AI Digitizer untuk konversi cepat dari catatan WA/OCR.
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('asisten_ai')}
+                    className="px-4 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs inline-flex items-center gap-2 shadow-md transition-all cursor-pointer"
+                  >
+                    <Bot className="w-4 h-4 text-amber-300" />
+                    <span>Gunakan Asisten AI</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenAdd}
+                    className="px-4 py-2.5 rounded-xl bg-tosca-700 hover:bg-tosca-800 text-white font-bold text-xs inline-flex items-center gap-2 shadow-md transition-all cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Input Manual</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredList.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-white rounded-2xl border border-slate-200 hover:border-blue-400 shadow-xs hover:shadow-md transition-all p-5 flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2.5 py-0.5 rounded-full bg-pkk-light border border-pkk-teal/20 text-pkk-teal text-[11px] font-black">
+                          {item.lingkunganNama}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {item.id}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="text-sm font-black text-slate-900 leading-tight">
+                            {item.namaKelompok}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-medium">
+                            <span>{item.lingkunganNama}</span>
+                            <span aria-hidden="true" className="opacity-30">/</span>
+                            <span>Ketua: {item.namaKetuaDawis}</span>
+                          </div>
+                        </div>
+                        {item.teleponKetua && (
+                          <a
+                            href={`tel:${item.teleponKetua}`}
+                            className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-tosca-50 hover:text-tosca-600 transition-colors"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                      </div>
+
+                      {/* Warnings if logic error */}
+                      {item.validationWarnings && item.validationWarnings.length > 0 && (
+                        <div className="flex items-center gap-1.5 text-[10px] text-amber-600 font-bold bg-amber-50 px-2.5 py-1 rounded-lg">
+                          <AlertTriangle className="w-3 h-3" />
+                          <span>{item.validationWarnings[0]}</span>
+                        </div>
+                      )}
+
+                      {/* Data Grid Summary */}
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Kependudukan</span>
+                          <div className="text-[11px] font-bold text-slate-800 tabular-nums">
+                            {item.jumlahKk} KK · {item.jumlahJiwa} Jiwa
+                          </div>
+                        </div>
+
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">PUS / WUS</span>
+                          <div className="text-[11px] font-bold text-purple-700 tabular-nums">
+                            {item.jumlahPus || 0} PUS / {item.jumlahWus || 0} WUS
+                          </div>
+                        </div>
+
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Posyandu</span>
+                          <div className="text-[11px] font-bold text-pkk-teal tabular-nums">
+                            {item.jumlahBalita || 0} Balita / {item.jumlahIbuHamil || 0} Bumil
+                          </div>
+                        </div>
+
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Sanitasi & Toga</span>
+                          <div className="text-[11px] font-bold text-slate-800 tabular-nums">
+                            {item.punyaJambanSehat || 0} WC / {item.punyaToga || 0} Toga
+                          </div>
+                        </div>
+                      </div>
+
+                      {item.kegiatanUtama && (
+                        <div className="bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+                          <p className="text-[10px] text-slate-500 leading-relaxed italic">
+                            &ldquo;{item.kegiatanUtama}&rdquo;
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Daftar Kepala Keluarga Anggota */}
+                      {item.daftarKkAnggota && item.daftarKkAnggota.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpandKk(item.id)}
+                            className="w-full flex items-center justify-between text-[11px] font-bold text-slate-700 hover:text-pkk-teal transition-colors py-1 cursor-pointer"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <Users className="w-3.5 h-3.5 text-pkk-teal" />
+                              <span>{item.daftarKkAnggota.length} Kepala Keluarga Terdaftar</span>
+                            </span>
+                            {expandedDawisKk[item.id] ? (
+                              <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                            )}
+                          </button>
+
+                          {expandedDawisKk[item.id] && (
+                            <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                              {item.daftarKkAnggota.map((kk, idx) => (
+                                <div
+                                  key={kk.id || idx}
+                                  className="text-[10px] p-2 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between gap-2"
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-bold text-slate-800 truncate">
+                                      {idx + 1}. {kk.namaKepalaKeluarga}
+                                    </div>
+                                    <div className="text-[9px] text-slate-400 truncate">
+                                      {kk.nomorKk ? `No. KK: ${kk.nomorKk}` : ''}
+                                      {kk.nomorKk && kk.alamat ? ' · ' : ''}
+                                      {kk.alamat || ''}
+                                    </div>
+                                  </div>
+                                  {kk.jumlahJiwa ? (
+                                    <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-white text-slate-600 border border-slate-200">
+                                      {kk.jumlahJiwa} Jiwa
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-3 mt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <span className="text-[10px] text-slate-400">
+                        Input: {item.createdByName || 'Kader'}
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(item)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-pkk-teal hover:bg-pkk-light transition-colors cursor-pointer"
+                          title="Edit Dasa Wisma"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item.id, item.namaKelompok)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Hapus Dasa Wisma"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Modal Add / Edit Dasa Wisma */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-xl w-full max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150">
-            <div className="bg-tosca-800 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Users className="w-5 h-5 text-amber-300" />
-                <h3 className="font-bold text-sm sm:text-base">
-                  {editingItem ? 'Ubah Data Dasa Wisma' : 'Tambah Kelompok Dasa Wisma Baru'}
-                </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-pkk-light flex items-center justify-center text-pkk-teal">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 leading-tight">
+                    {editingItem ? 'Ubah Data Dasa Wisma' : 'Tambah Kelompok Baru'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                    Pendataan Variabel Lengkap PKK
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 text-blue-200 hover:text-white rounded-lg hover:bg-tosca-700 cursor-pointer"
+                className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Nama Kelompok Dasa Wisma</label>
-                  <input
-                    type="text"
-                    value={formNama}
-                    onChange={(e) => setFormNama(e.target.value)}
-                    placeholder="Contoh: Dasa Wisma Mawar I"
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-tosca-600 font-semibold"
-                    required
-                  />
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
+              {/* Section 1: Identitas & Wilayah */}
+              <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-black text-[10px]">01</div>
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Identitas & Wilayah</h4>
+                  <div className="flex-1 h-px bg-slate-100" />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Wilayah Lingkungan</label>
-                  <select
-                    value={formLingkunganNomor}
-                    onChange={(e) => setFormLingkunganNomor(parseInt(e.target.value, 10))}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-tosca-600 font-bold"
-                  >
-                    {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
-                      <option key={n} value={n}>
-                        Lingkungan {n}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Nama Kelompok</label>
+                    <input
+                      type="text"
+                      value={formNama}
+                      onChange={(e) => setFormNama(e.target.value)}
+                      placeholder="Contoh: Dasa Wisma Mawar I"
+                      className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all font-semibold"
+                      required
+                    />
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Nama Ketua Dasa Wisma</label>
-                  <input
-                    type="text"
-                    value={formNamaKetua}
-                    onChange={(e) => setFormNamaKetua(e.target.value)}
-                    placeholder="Nama lengkap kader"
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-tosca-600 font-medium"
-                    required
-                  />
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Wilayah Lingkungan</label>
+                    <select
+                      value={formLingkunganNomor}
+                      onChange={(e) => setFormLingkunganNomor(parseInt(e.target.value, 10))}
+                      className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all font-bold"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                        <option key={n} value={n}>
+                          Lingkungan {n}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Nomor Telepon / WhatsApp</label>
-                  <input
-                    type="tel"
-                    value={formTelepon}
-                    onChange={(e) => setFormTelepon(e.target.value)}
-                    placeholder="0812xxxxxxxx"
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-tosca-600"
-                  />
-                </div>
-              </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Kepala Rumah Tangga (KRT)</label>
+                    <input
+                      type="text"
+                      value={formNamaKrt}
+                      onChange={(e) => setFormNamaKrt(e.target.value)}
+                      placeholder="Nama Kepala Keluarga"
+                      className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all font-semibold"
+                    />
+                  </div>
 
-              {/* Anggota & Sasaran Kesehatan */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                <h4 className="text-xs font-bold text-slate-800">
-                  Data Warga Binaan Kelompok:
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-slate-600">Jumlah KK</label>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Ketua Dasa Wisma</label>
+                    <input
+                      type="text"
+                      value={formNamaKetua}
+                      onChange={(e) => setFormNamaKetua(e.target.value)}
+                      placeholder="Nama Kader"
+                      className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all font-semibold"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Kontak Ketua</label>
+                    <input
+                      type="tel"
+                      value={formTelepon}
+                      onChange={(e) => setFormTelepon(e.target.value)}
+                      placeholder="0812xxxxxxxx"
+                      className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">RT / RW</label>
+                    <input
+                      type="text"
+                      value={formRtRw}
+                      onChange={(e) => setFormRtRw(e.target.value)}
+                      placeholder="01 / 02"
+                      className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Section 2: Demografi & Anggota Kepala Keluarga */}
+              <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-black text-[10px]">02</div>
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Kependudukan & Kelompok Khusus</h4>
+                  <div className="flex-1 h-px bg-slate-100" />
+                </div>
+
+                {/* Sub-Panel: Daftar Anggota Kepala Keluarga */}
+                <div className="bg-slate-50/80 rounded-2xl p-4 sm:p-5 border border-slate-200/80 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-pkk-teal" />
+                        <h5 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                          Daftar Kepala Keluarga Anggota Kelompok
+                        </h5>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            formDaftarKk.length >= 10 && formDaftarKk.length <= 20
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : formDaftarKk.length > 0
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {formDaftarKk.length} KK Terdaftar
+                          {formDaftarKk.length >= 10 && formDaftarKk.length <= 20 ? ' (Ideal 10-20 KK)' : ''}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Setiap Dasa Wisma beranggotakan 10-20 KK. Angka Jumlah KK di bawah akan terhitung otomatis sesuai daftar ini.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleOpenKkPicker}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pkk-teal text-white hover:bg-tosca-700 text-xs font-bold shadow-sm transition-all cursor-pointer"
+                      >
+                        <Database className="w-3.5 h-3.5" />
+                        <span>Pilih dari Database Lk. {formLingkunganNomor}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsManualKkOpen(!isManualKkOpen)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all cursor-pointer"
+                      >
+                        <UserPlus className="w-3.5 h-3.5 text-slate-500" />
+                        <span>{isManualKkOpen ? 'Tutup Input' : '+ Tambah Manual'}</span>
+                      </button>
+
+                      {formDaftarKk.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleAutoCalculateDemografi}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 text-white hover:bg-purple-700 text-xs font-bold shadow-sm transition-all cursor-pointer"
+                          title="Hitung otomatis data kependudukan & sanitasi dari KK yang dipilih"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Hitung Demografi</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Manual KK Input Drawer */}
+                  {isManualKkOpen && (
+                    <div className="bg-white rounded-xl p-4 border border-tosca-200 shadow-sm space-y-3 animate-in fade-in duration-150">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <UserPlus className="w-3.5 h-3.5 text-pkk-teal" />
+                          Tambah Kepala Keluarga Secara Manual
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsManualKkOpen(false)}
+                          className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Nama Kepala Keluarga *</label>
+                          <input
+                            type="text"
+                            value={manualKkNama}
+                            onChange={(e) => setManualKkNama(e.target.value)}
+                            placeholder="Contoh: Budi Santoso"
+                            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-tosca-500/20"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Nomor Kartu Keluarga (Opsional)</label>
+                          <input
+                            type="text"
+                            value={manualKkNomor}
+                            onChange={(e) => setManualKkNomor(e.target.value)}
+                            placeholder="16 Digit No. KK"
+                            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-tosca-500/20"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Alamat / Jalan / Gang</label>
+                          <input
+                            type="text"
+                            value={manualKkAlamat}
+                            onChange={(e) => setManualKkAlamat(e.target.value)}
+                            placeholder="Contoh: Jl. Bunga Raya No. 12"
+                            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-tosca-500/20"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Total Jiwa</label>
+                          <input
+                            type="number"
+                            value={manualKkJiwa}
+                            onChange={(e) => setManualKkJiwa(e.target.value)}
+                            placeholder="0"
+                            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Laki-Laki</label>
+                          <input
+                            type="number"
+                            value={manualKkLaki}
+                            onChange={(e) => setManualKkLaki(e.target.value)}
+                            placeholder="0"
+                            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Perempuan</label>
+                          <input
+                            type="number"
+                            value={manualKkPerempuan}
+                            onChange={(e) => setManualKkPerempuan(e.target.value)}
+                            placeholder="0"
+                            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsManualKkOpen(false)}
+                          className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 cursor-pointer"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAddManualKk()}
+                          className="px-4 py-1.5 text-xs font-bold rounded-lg bg-pkk-teal text-white hover:bg-tosca-700 cursor-pointer"
+                        >
+                          Masukkan ke Daftar KK
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* List of Registered KK */}
+                  {formDaftarKk.length === 0 ? (
+                    <div className="p-5 border-2 border-dashed border-slate-200 rounded-xl text-center space-y-1.5">
+                      <p className="text-xs text-slate-600 font-bold">
+                        Belum ada Kepala Keluarga yang dimasukkan ke kelompok ini.
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        Klik tombol <span className="font-bold text-pkk-teal">&ldquo;Pilih dari Database Lk. {formLingkunganNomor}&rdquo;</span> atau <span className="font-bold text-slate-700">&ldquo;+ Tambah Manual&rdquo;</span> di atas untuk mendaftarkan anggota Dasa Wisma.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {formDaftarKk.map((kk, idx) => (
+                        <div
+                          key={kk.id || idx}
+                          className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center justify-between gap-3 shadow-xs hover:border-slate-300 transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <span className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0">
+                              {idx + 1}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-black text-slate-900 truncate">
+                                  {kk.namaKepalaKeluarga}
+                                </span>
+                                <span
+                                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                                    kk.sumberData === 'DATABASE_KELUARGA'
+                                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                      : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                  }`}
+                                >
+                                  {kk.sumberData === 'DATABASE_KELUARGA' ? 'Database' : 'Manual'}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                {kk.nomorKk ? `No. KK: ${kk.nomorKk}` : ''}
+                                {kk.nomorKk && kk.alamat ? ' · ' : ''}
+                                {kk.alamat || 'Alamat belum diisi'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            {kk.jumlahJiwa ? (
+                              <span className="text-[10px] font-bold text-slate-600 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+                                {kk.jumlahJiwa} Jiwa
+                              </span>
+                            ) : null}
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveKk(kk.id)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Hapus dari kelompok"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Grid Demografi & Kategori Khusus */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Jml KK</label>
+                      {formDaftarKk.length > 0 && (
+                        <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded">
+                          Otomatis ({formDaftarKk.length})
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="number"
                       value={formJumlahKk}
                       onChange={(e) => setFormJumlahKk(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+                      className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg tabular-nums font-bold text-slate-900 focus:bg-white"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-slate-600">Jumlah Jiwa</label>
-                    <input
-                      type="number"
-                      value={formJumlahJiwa}
-                      onChange={(e) => setFormJumlahJiwa(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
-                    />
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Jiwa</label>
+                    <input type="number" value={formJumlahJiwa} onChange={(e) => setFormJumlahJiwa(e.target.value)} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg tabular-nums" />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-slate-600">Balita</label>
-                    <input
-                      type="number"
-                      value={formJumlahBalita}
-                      onChange={(e) => setFormJumlahBalita(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
-                    />
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Laki-Laki</label>
+                    <input type="number" value={formLakiLaki} onChange={(e) => setFormLakiLaki(e.target.value)} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg tabular-nums" />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-slate-600">Ibu Hamil</label>
-                    <input
-                      type="number"
-                      value={formJumlahIbuHamil}
-                      onChange={(e) => setFormJumlahIbuHamil(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
-                    />
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Perempuan</label>
+                    <input type="number" value={formPerempuan} onChange={(e) => setFormPerempuan(e.target.value)} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg tabular-nums" />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2.5 pt-1">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-slate-600">Lansia</label>
-                    <input
-                      type="number"
-                      value={formJumlahLansia}
-                      onChange={(e) => setFormJumlahLansia(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
-                    />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-purple-400 uppercase tracking-wider">PUS</label>
+                    <input type="number" value={formJumlahPus} onChange={(e) => setFormJumlahPus(e.target.value)} className="w-full px-3 py-2 text-sm bg-purple-50/50 border border-purple-100 rounded-lg tabular-nums text-purple-700 font-bold" />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-slate-600">Jamban Sehat</label>
-                    <input
-                      type="number"
-                      value={formJambanSehat}
-                      onChange={(e) => setFormJambanSehat(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
-                    />
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-purple-400 uppercase tracking-wider">WUS</label>
+                    <input type="number" value={formJumlahWus} onChange={(e) => setFormJumlahWus(e.target.value)} className="w-full px-3 py-2 text-sm bg-purple-50/50 border border-purple-100 rounded-lg tabular-nums text-purple-700 font-bold" />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-slate-600">Pekarangan Toga</label>
-                    <input
-                      type="number"
-                      value={formToga}
-                      onChange={(e) => setFormToga(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
-                    />
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-purple-400 uppercase tracking-wider">Akseptor KB</label>
+                    <input type="number" value={formJumlahAkseptorKb} onChange={(e) => setFormJumlahAkseptorKb(e.target.value)} className="w-full px-3 py-2 text-sm bg-purple-50/50 border border-purple-100 rounded-lg tabular-nums text-purple-700 font-bold" />
                   </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-tosca-400 uppercase tracking-wider">Ibu Hamil</label>
+                    <input type="number" value={formJumlahIbuHamil} onChange={(e) => setFormJumlahIbuHamil(e.target.value)} className="w-full px-3 py-2 text-sm bg-tosca-50/50 border border-tosca-100 rounded-lg tabular-nums text-tosca-700 font-bold" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-wider">Ibu Menyusui</label>
+                    <input type="number" value={formJumlahIbuMenyusui} onChange={(e) => setFormJumlahIbuMenyusui(e.target.value)} className="w-full px-3 py-2 text-sm bg-amber-50/50 border border-amber-100 rounded-lg tabular-nums text-amber-700 font-bold" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-wider">Ibu Nifas</label>
+                    <input type="number" value={formJumlahIbuNifas} onChange={(e) => setFormJumlahIbuNifas(e.target.value)} className="w-full px-3 py-2 text-sm bg-amber-50/50 border border-amber-100 rounded-lg tabular-nums text-amber-700 font-bold" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Balita</label>
+                    <input type="number" value={formJumlahBalita} onChange={(e) => setFormJumlahBalita(e.target.value)} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg tabular-nums" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Lansia</label>
+                    <input type="number" value={formJumlahLansia} onChange={(e) => setFormJumlahLansia(e.target.value)} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg tabular-nums" />
+                  </div>
+                </div>
+              </section>
+
+              {/* Section 3: Sanitasi */}
+              <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-black text-[10px]">03</div>
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Sanitasi & Pekarangan</h4>
+                  <div className="flex-1 h-px bg-slate-100" />
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Jamban (KK)</label>
+                    <input type="number" value={formJambanSehat} onChange={(e) => setFormJambanSehat(e.target.value)} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg tabular-nums" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">SPAL (KK)</label>
+                    <input type="number" value={formSpal} onChange={(e) => setFormSpal(e.target.value)} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg tabular-nums" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Toga (KK)</label>
+                    <input type="number" value={formToga} onChange={(e) => setFormToga(e.target.value)} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg tabular-nums" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Sumber Air Minum</label>
+                      <span className="text-[9px] text-pkk-teal font-bold uppercase">(Untuk Dikonsumsi)</span>
+                    </div>
+                    <select value={formSumberAirMinum} onChange={(e) => setFormSumberAirMinum(e.target.value)} className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-pkk-teal/20 focus:border-pkk-teal outline-none transition-all">
+                      <option value="Air Galon / Kemasan">Air Galon / Kemasan</option>
+                      <option value="Depot Isi Ulang">Depot Isi Ulang</option>
+                      <option value="PDAM / Air Perpipaan">PDAM / Air Perpipaan</option>
+                      <option value="Sumur Bor / Terlindungi">Sumur Bor / Terlindungi</option>
+                      <option value="Mata Air">Mata Air</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Sumber Air Bersih</label>
+                      <span className="text-[9px] text-blue-600 font-bold uppercase">(Mandi/Cuci/Kakus)</span>
+                    </div>
+                    <select value={formSumberAir} onChange={(e) => setFormSumberAir(e.target.value)} className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-pkk-teal/20 focus:border-pkk-teal outline-none transition-all">
+                      <option value="PDAM / Air Perpipaan">PDAM / Air Perpipaan</option>
+                      <option value="Sumur Bor / Terlindungi">Sumur Bor / Terlindungi</option>
+                      <option value="Air Galon / Kemasan">Air Galon / Kemasan</option>
+                      <option value="Mata Air / Sungai">Mata Air / Sungai</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              {/* Section 4: Kriteria Rumah */}
+              <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-black text-[10px]">04</div>
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Kriteria & Aktivitas</h4>
+                  <div className="flex-1 h-px bg-slate-100" />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Kelayakan Rumah</label>
+                    <select value={formKriteriaRumah} onChange={(e) => setFormKriteriaRumah(e.target.value)} className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl">
+                      <option value="Layak Huni">Layak Huni</option>
+                      <option value="Tidak Layak Huni">Tidak Layak Huni</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Stiker P4K</label>
+                    <select value={formStikerP4k} onChange={(e) => setFormStikerP4k(e.target.value)} className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl">
+                      <option value="Menempel">Menempel</option>
+                      <option value="Tidak Menempel">Tidak Menempel</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Makanan Pokok</label>
+                    <select value={formMakananPokok} onChange={(e) => setFormMakananPokok(e.target.value)} className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl">
+                      <option value="Beras">Beras</option>
+                      <option value="Non-Beras">Non-Beras</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Catatan Kegiatan Pokok</label>
+                  <textarea
+                    rows={3}
+                    value={formKegiatan}
+                    onChange={(e) => setFormKegiatan(e.target.value)}
+                    placeholder="Contoh: Arisan rutin, pemanfaatan toga, senam sehat..."
+                    className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all font-medium italic"
+                  />
+                </div>
+              </section>
+            </form>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-6 py-3 rounded-xl text-slate-500 font-bold text-xs hover:bg-slate-200 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={(e: any) => handleSubmit(e)}
+                disabled={isSubmitting}
+                className="px-10 py-3 rounded-xl bg-pkk-teal hover:bg-pkk-dark text-white font-black text-xs shadow-lg shadow-pkk-teal/20 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Menyimpan...' : 'Simpan Data'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Pemilih KK dari Database Keluarga */}
+      {isKkPickerOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-pkk-light flex items-center justify-center text-pkk-teal">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 leading-tight">
+                    Pilih Kepala Keluarga dari Database
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    Lingkungan {formLingkunganNomor} · {availableFamiliesInLingkungan.length} Kepala Keluarga Terdaftar di Database
+                  </p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsKkPickerOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Catatan Kegiatan Pokok Dasa Wisma</label>
+            {/* Search & Bulk Select Toolbar */}
+            <div className="p-4 border-b border-slate-100 space-y-3 bg-white shrink-0">
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  value={formKegiatan}
-                  onChange={(e) => setFormKegiatan(e.target.value)}
-                  placeholder="Contoh: Arisan rutin setiap tanggal 10, senam sehat lansia & pemanfaatan toga"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-tosca-600"
+                  value={kkPickerSearch}
+                  onChange={(e) => setKkPickerSearch(e.target.value)}
+                  placeholder="Cari nama Kepala Keluarga, NIK, No. KK, atau jalan/gang..."
+                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 font-medium"
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-700 text-xs">
+                    {filteredFamiliesInPicker.length} KK ditemukan
+                  </span>
+                  <span className="text-slate-300">·</span>
+                  <span className="text-[11px] font-bold text-pkk-teal bg-pkk-light px-2 py-0.5 rounded-full">
+                    {selectedKkIds.size} Dipilih
+                  </span>
+                </div>
+
+                {filteredFamiliesInPicker.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectAllKkInPicker(filteredFamiliesInPicker)}
+                    className="text-xs font-bold text-pkk-teal hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <ListChecks className="w-3.5 h-3.5" />
+                    <span>
+                      {filteredFamiliesInPicker.every((f) => selectedKkIds.has(f.id))
+                        ? 'Batal Pilih Semua'
+                        : 'Pilih Semua Hasil'}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* List of Families */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+              {availableFamiliesInLingkungan.length === 0 ? (
+                <div className="p-8 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                    <Database className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">
+                    Belum Ada Data Keluarga di Lingkungan {formLingkunganNomor}
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    Database Data Keluarga untuk Lingkungan {formLingkunganNomor} masih kosong. Anda dapat menambahkan data keluarga terlebih dahulu pada menu Database Data Keluarga atau gunakan opsi <strong>&ldquo;+ Tambah Manual&rdquo;</strong>.
+                  </p>
+                </div>
+              ) : filteredFamiliesInPicker.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs font-medium">
+                  Tidak ditemukan Kepala Keluarga dengan kata kunci &ldquo;{kkPickerSearch}&rdquo;.
+                </div>
+              ) : (
+                filteredFamiliesInPicker.map((fam) => {
+                  const isChecked = selectedKkIds.has(fam.id);
+                  return (
+                    <div
+                      key={fam.id}
+                      onClick={() => handleToggleKkInPicker(fam.id)}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
+                        isChecked
+                          ? 'bg-tosca-50/60 border-tosca-300 ring-1 ring-tosca-400/30'
+                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {}} // handled by parent div onClick
+                        className="mt-0.5 rounded border-slate-300 text-pkk-teal focus:ring-pkk-teal cursor-pointer"
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="text-xs font-black text-slate-900 truncate">
+                            {fam.namaKepalaKeluarga}
+                          </h4>
+                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md shrink-0">
+                            {fam.jumlahAnggotaKeluarga || 0} Jiwa
+                          </span>
+                        </div>
+
+                        <div className="text-[10px] text-slate-500 space-y-0.5 mt-0.5">
+                          <p className="truncate">
+                            No. KK: {fam.nomorKk || '-'} · NIK: {fam.nikKepalaKeluarga || '-'}
+                          </p>
+                          <p className="text-slate-400 truncate">
+                            {fam.namaJalan ? `${fam.namaJalan} ${fam.nomorRumah || ''}`.trim() : fam.alamatLengkap}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[9px] font-semibold text-slate-500">
+                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                            L: {fam.jumlahLakiLaki || 0} · P: {fam.jumlahPerempuan || 0}
+                          </span>
+                          {fam.jumlahBalita > 0 && (
+                            <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                              {fam.jumlahBalita} Balita
+                            </span>
+                          )}
+                          {fam.jumlahLansia > 0 && (
+                            <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">
+                              {fam.jumlahLansia} Lansia
+                            </span>
+                          )}
+                          {fam.jambanKeluarga && (
+                            <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded truncate max-w-[200px]">
+                              {fam.jambanKeluarga}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
+              <span className="text-xs text-slate-500">
+                <strong className="text-slate-800 font-bold">{selectedKkIds.size}</strong> KK dipilih
+              </span>
+
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 cursor-pointer"
+                  onClick={() => setIsKkPickerOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-5 py-2.5 rounded-xl bg-tosca-700 hover:bg-tosca-800 text-white font-bold text-xs shadow-md cursor-pointer flex items-center gap-1.5"
+                  type="button"
+                  onClick={handleApplyKkPicker}
+                  className="px-5 py-2 text-xs font-bold text-white bg-pkk-teal hover:bg-tosca-700 rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <Check className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Data Dasa Wisma'}</span>
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Terapkan ({selectedKkIds.size} KK)</span>
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

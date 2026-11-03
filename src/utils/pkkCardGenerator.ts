@@ -1,5 +1,6 @@
 import { printOfficialDocument } from './printHelper';
 import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
+import { formatDateToIndonesianFull } from './dateFormatter';
 
 /**
  * Standard ID Card Dimensions (CR80 Specification):
@@ -7,14 +8,21 @@ import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
  * Height: 53.98 mm
  */
 
-export const generateSinglePkkCardHtml = (item: any, options?: { regNo?: string; kelurahan?: string; kecamatan?: string; kota?: string; provinsi?: string }): string => {
+export const generateSinglePkkCardHtml = (item: any, options?: { regNo?: string; kelurahan?: string; kecamatan?: string; kota?: string; provinsi?: string; side?: 'front' | 'back' }): string => {
   if (!item) return '';
 
+  const side = options?.side || 'front';
+
+  if (side === 'back') {
+    return generateBackSidePkkCardHtml(options);
+  }
+
   const photo = item.pasphotoUrl || item.fotoUrl || PKK_LOGO_BASE64;
-  const regNo = options?.regNo || `12.71.10.2001.${String(item.id || '0045').replace(/[^0-9]/g, '').slice(-4).padStart(4, '0')}`;
+  const regNo = options?.regNo || item.noRegistrasi || '-';
   const namaFormatted = (item.nama || 'NUR AINI, S.Pd.').toUpperCase();
   const jabatanFormatted = (item.jabatan || 'ANGGOTA TP PKK KELURAHAN').toUpperCase();
-  const ttlFormatted = `${(item.tempatLahir || 'MEDAN').toUpperCase()}, ${item.tanggalLahir || '16-04-1991'}`;
+
+  const ttlFormatted = `${(item.tempatLahir || 'MEDAN').toUpperCase()}, ${formatDateToIndonesianFull(item.tanggalLahir || '16-04-1991').toUpperCase()}`;
   const genderFormatted = item.jenisKelamin === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN';
   const alamatFormatted = (item.alamat || 'JL. BUNGA RINTE NO. 12, LINGKUNGAN IV').toUpperCase();
   const kelurahanFormatted = (options?.kelurahan || item.kelurahan || 'MANGGA').toUpperCase();
@@ -35,8 +43,12 @@ export const generateSinglePkkCardHtml = (item: any, options?: { regNo?: string;
       overflow: hidden;
       position: relative;
       font-family: Arial, Helvetica, sans-serif;
-      color: #0f172a;
+      color: #000000;
       background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 45%, #bae6fd 100%);
+      background-image: 
+        radial-gradient(circle at 2px 2px, rgba(3, 105, 161, 0.08) 1px, transparent 0),
+        linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 45%, #bae6fd 100%);
+      background-size: 4mm 4mm, 100% 100%;
       border: 1.5px solid #0284c7;
       margin: 0 auto;
       page-break-inside: avoid;
@@ -78,7 +90,7 @@ export const generateSinglePkkCardHtml = (item: any, options?: { regNo?: string;
         ">
           <img src="${PKK_LOGO_BASE64}" alt="PKK" style="width: 100%; height: 100%; object-fit: contain; display: block;" />
         </div>
-        <!-- Centered Header Titles (Identik dengan image) -->
+        <!-- Centered Header Titles -->
         <div style="line-height: 1.15; flex: 1; text-align: center; margin-right: 9.2mm;">
           <div style="font-size: 7.2pt; font-weight: 900; letter-spacing: 0.4px; color: #ffffff; text-transform: uppercase;">
             KARTU TANDA ANGGOTA
@@ -115,7 +127,7 @@ export const generateSinglePkkCardHtml = (item: any, options?: { regNo?: string;
           height: 100%;
           box-sizing: border-box;
         ">
-          <!-- PASPHOTO (3x4 aspect ratio) -->
+          <!-- PASPHOTO -->
           <div style="
             width: 16.5mm;
             height: 22mm;
@@ -132,29 +144,30 @@ export const generateSinglePkkCardHtml = (item: any, options?: { regNo?: string;
             <img src="${photo}" alt="Foto" style="width: 100%; height: 100%; object-fit: ${photo === PKK_LOGO_BASE64 ? 'contain; padding: 1.2mm' : 'cover'}; object-position: top; display: block;" />
           </div>
 
-          <!-- POJOK KIRI BAWAH: BADGE MEDAN UNTUK SEMUA (Exact match to image: MEDAN + stacked UNTUK/SEMUA) -->
+          <!-- POJOK KIRI BAWAH: BADGE MEDAN UNTUK SEMUA -->
           <div style="
             display: inline-flex;
             align-items: stretch;
-            border: 0.4px solid #0f172a;
-            border-radius: 0.7mm;
+            border: 0.5px solid #0f172a;
+            border-radius: 1.4mm;
             overflow: hidden;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+            box-shadow: 0 1.2px 3.5px rgba(0,0,0,0.4);
             margin-top: auto;
-            margin-bottom: 0.2mm;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+            margin-bottom: 2mm;
+            margin-left: 2mm;
+            align-self: flex-start;
           ">
             <div style="
               background: #991b1b;
               color: #ffffff;
               font-weight: 900;
               font-size: 3.4pt;
-              padding: 0.6mm 1.3mm;
+              padding: 0.7mm 1.5mm;
               display: flex;
               align-items: center;
               justify-content: center;
-              letter-spacing: 0.2px;
+              letter-spacing: 0.3px;
+              border-right: 0.2mm solid #0f172a;
             ">
               MEDAN
             </div>
@@ -162,93 +175,91 @@ export const generateSinglePkkCardHtml = (item: any, options?: { regNo?: string;
               background: #1e3a8a;
               color: #ffffff;
               font-weight: 900;
-              font-size: 2.5pt;
-              padding: 0.4mm 1.1mm;
+              font-size: 3.2pt;
+              padding: 0.6mm 1.5mm;
               display: flex;
-              flex-direction: column;
+              align-items: center;
               justify-content: center;
-              line-height: 1.05;
+              line-height: 1;
               text-align: center;
               letter-spacing: 0.1px;
+              white-space: nowrap;
             ">
-              <span>UNTUK</span>
-              <span>SEMUA</span>
+              UNTUK SEMUA
             </div>
           </div>
         </div>
 
-        <!-- DETAILS LIST (Right-aligned labels matching image_5ea1aef7) -->
+        <!-- DETAILS LIST - ALL BLACK TEXT -->
         <div style="
           flex: 1;
           min-width: 0;
           padding-right: 12.5mm;
           font-size: 3.8pt;
           line-height: 1.22;
-          font-weight: 800;
-          color: #0f172a;
+          font-weight: 900;
+          color: #000000;
           text-transform: uppercase;
           box-sizing: border-box;
         ">
           <div style="display: flex; align-items: baseline; margin-bottom: 0.25mm;">
-            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #1e293b; font-weight: 800; padding-right: 1.2mm;">NO. REGISTRASI</div>
-            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #475569; font-weight: 900;">:</div>
-            <div style="flex: 1; min-width: 0; font-weight: 900; color: #0369a1; padding-left: 1.2mm; word-break: break-all;">${regNo}</div>
+            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">NIK</div>
+            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>
+            <div style="flex: 1; min-width: 0; font-weight: 900; color: #000000; padding-left: 1.2mm; word-break: break-all;">${regNo}</div>
           </div>
 
           <div style="display: flex; align-items: baseline; margin-bottom: 0.25mm;">
-            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #1e293b; font-weight: 800; padding-right: 1.2mm;">NAMA</div>
-            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #475569; font-weight: 900;">:</div>
-            <div style="flex: 1; min-width: 0; font-weight: 900; color: #0284c7; padding-left: 1.2mm; word-break: break-word;">${namaFormatted}</div>
+            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">NAMA</div>
+            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>
+            <div style="flex: 1; min-width: 0; font-weight: 900; color: #000000; padding-left: 1.2mm; word-break: break-word;">${namaFormatted}</div>
           </div>
 
           <div style="display: flex; align-items: baseline; margin-bottom: 0.25mm;">
-            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #1e293b; font-weight: 800; padding-right: 1.2mm;">JABATAN</div>
-            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #475569; font-weight: 900;">:</div>
-            <div style="flex: 1; min-width: 0; font-weight: 800; color: #0f766e; padding-left: 1.2mm; word-break: break-word;">${jabatanFormatted}</div>
+            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">JABATAN</div>
+            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>
+            <div style="flex: 1; min-width: 0; font-weight: 900; color: #000000; padding-left: 1.2mm; word-break: break-word;">${jabatanFormatted}</div>
           </div>
 
           <div style="display: flex; align-items: baseline; margin-bottom: 0.25mm;">
-            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #1e293b; font-weight: 800; padding-right: 1.2mm;">TEMPAT/TGL LAHIR</div>
-            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #475569; font-weight: 900;">:</div>
-            <div style="flex: 1; min-width: 0; padding-left: 1.2mm; word-break: break-word;">${ttlFormatted}</div>
+            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">TEMPAT/TGL LAHIR</div>
+            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>
+            <div style="flex: 1; min-width: 0; font-weight: 900; color: #000000; padding-left: 1.2mm; word-break: break-word;">${ttlFormatted}</div>
           </div>
 
           <div style="display: flex; align-items: baseline; margin-bottom: 0.25mm;">
-            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #1e293b; font-weight: 800; padding-right: 1.2mm;">JENIS KELAMIN</div>
-            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #475569; font-weight: 900;">:</div>
-            <div style="flex: 1; min-width: 0; padding-left: 1.2mm;">${genderFormatted}</div>
+            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">JENIS KELAMIN</div>
+            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>
+            <div style="flex: 1; min-width: 0; font-weight: 900; color: #000000; padding-left: 1.2mm;">${genderFormatted}</div>
           </div>
 
-          <!-- ALAMAT with distinct vertical gap matching image_5ea1aef7 -->
           <div style="display: flex; align-items: baseline; margin-bottom: 1.1mm;">
-            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #1e293b; font-weight: 800; padding-right: 1.2mm;">ALAMAT</div>
-            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #475569; font-weight: 900;">:</div>
-            <div style="flex: 1; min-width: 0; padding-left: 1.2mm; word-break: break-word;">${alamatFormatted}</div>
-          </div>
-
-          <!-- REGION DATA BLOCK -->
-          <div style="display: flex; align-items: baseline; margin-bottom: 0.25mm;">
-            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #1e293b; font-weight: 800; padding-right: 1.2mm;">DESA/KELURAHAN</div>
-            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #475569; font-weight: 900;">:</div>
-            <div style="flex: 1; min-width: 0; font-weight: 800; padding-left: 1.2mm;">${kelurahanFormatted}</div>
+            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">ALAMAT</div>
+            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>
+            <div style="flex: 1; min-width: 0; font-weight: 900; color: #000000; padding-left: 1.2mm; word-break: break-word;">${alamatFormatted}</div>
           </div>
 
           <div style="display: flex; align-items: baseline; margin-bottom: 0.25mm;">
-            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #1e293b; font-weight: 800; padding-right: 1.2mm;">KECAMATAN</div>
-            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #475569; font-weight: 900;">:</div>
-            <div style="flex: 1; min-width: 0; font-weight: 800; padding-left: 1.2mm;">${kecamatanFormatted}</div>
+            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">DESA/KELURAHAN</div>
+            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>
+            <div style="flex: 1; min-width: 0; font-weight: 900; color: #000000; padding-left: 1.2mm;">${kelurahanFormatted}</div>
           </div>
 
           <div style="display: flex; align-items: baseline; margin-bottom: 0.25mm;">
-            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #1e293b; font-weight: 800; padding-right: 1.2mm;">KABUPATEN/KOTA</div>
-            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #475569; font-weight: 900;">:</div>
-            <div style="flex: 1; min-width: 0; font-weight: 800; padding-left: 1.2mm;">${kotaFormatted}</div>
+            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">KECAMATAN</div>
+            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>
+            <div style="flex: 1; min-width: 0; font-weight: 900; color: #000000; padding-left: 1.2mm;">${kecamatanFormatted}</div>
+          </div>
+
+          <div style="display: flex; align-items: baseline; margin-bottom: 0.25mm;">
+            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">KABUPATEN/KOTA</div>
+            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>
+            <div style="flex: 1; min-width: 0; font-weight: 900; color: #000000; padding-left: 1.2mm;">${kotaFormatted}</div>
           </div>
 
           <div style="display: flex; align-items: baseline;">
-            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #1e293b; font-weight: 800; padding-right: 1.2mm;">PROVINSI</div>
-            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #475569; font-weight: 900;">:</div>
-            <div style="flex: 1; min-width: 0; font-weight: 800; padding-left: 1.2mm;">${provinsiFormatted}</div>
+            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">PROVINSI</div>
+            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>
+            <div style="flex: 1; min-width: 0; font-weight: 900; color: #000000; padding-left: 1.2mm;">${provinsiFormatted}</div>
           </div>
         </div>
 
@@ -277,7 +288,8 @@ export const generateSinglePkkCardHtml = (item: any, options?: { regNo?: string;
           <div style="
             font-size: 2.5pt;
             font-weight: 900;
-            color: #0284c7;
+            color: #000000;
+            opacity: 0.8;
             margin-top: 0.25mm;
             line-height: 1;
             text-align: center;
@@ -290,6 +302,91 @@ export const generateSinglePkkCardHtml = (item: any, options?: { regNo?: string;
     </div>
   `;
 };
+
+export const generateBackSidePkkCardHtml = (options?: { kelurahan?: string }): string => {
+  const kel = (options?.kelurahan || 'MANGGA').toUpperCase();
+  const programs = [
+    'Penghayatan dan Pengamalan Pancasila',
+    'Gotong Royong',
+    'Pangan',
+    'Sandang',
+    'Perumahan dan Tata Laksana Rumah Tangga',
+    'Pendidikan dan Keterampilan',
+    'Kesehatan',
+    'Pengembangan Kehidupan Berkoperasi',
+    'Kelestarian Lingkungan Hidup',
+    'Perencanaan Sehat'
+  ];
+
+  const programsHtml = programs.map((p, i) => `
+    <div style="display: flex; gap: 1mm; margin-bottom: 0.6mm; align-items: start;">
+      <div style="font-size: 3.5pt; font-weight: 900; color: #0369a1; width: 3mm; flex-shrink: 0;">${i + 1}.</div>
+      <div style="font-size: 3.4pt; font-weight: 900; color: #000000; line-height: 1.15; text-transform: uppercase;">${p}</div>
+    </div>
+  `).join('');
+
+  const today = new Date();
+  const dateStr = `Medan, ${formatDateToIndonesianFull(today.toISOString())}`;
+
+  return `
+    <div class="kta-card-root" style="
+      width: 85.6mm;
+      height: 53.98mm;
+      box-sizing: border-box;
+      border-radius: 3.5mm;
+      overflow: hidden;
+      position: relative;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      background-image: 
+        radial-gradient(circle at 2px 2px, rgba(3, 105, 161, 0.05) 1px, transparent 0),
+        linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      background-size: 6mm 6mm, 100% 100%;
+      border: 1.5px solid #0284c7;
+      margin: 0 auto;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      display: flex;
+      flex-direction: column;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    ">
+      <div style="background: #0369a1; padding: 1.2mm; text-align: center; border-bottom: 0.5mm solid #0284c7;">
+        <div style="font-size: 6.5pt; font-weight: 900; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">10 Program Pokok PKK</div>
+      </div>
+      
+      <div style="padding: 2mm 3mm; flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; align-content: start;">
+        <div style="display: flex; flex-direction: column;">
+          ${programs.slice(0, 5).map((p, i) => `
+            <div style="display: flex; gap: 1mm; margin-bottom: 0.5mm; align-items: start;">
+              <div style="font-size: 3.5pt; font-weight: 900; color: #0369a1; width: 3mm; flex-shrink: 0;">${i + 1}.</div>
+              <div style="font-size: 3.4pt; font-weight: 900; color: #000000; line-height: 1.1; text-transform: uppercase;">${p}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="display: flex; flex-direction: column;">
+          ${programs.slice(5, 10).map((p, i) => `
+            <div style="display: flex; gap: 1mm; margin-bottom: 0.5mm; align-items: start;">
+              <div style="font-size: 3.5pt; font-weight: 900; color: #0369a1; width: 3mm; flex-shrink: 0;">${i + 6}.</div>
+              <div style="font-size: 3.4pt; font-weight: 900; color: #000000; line-height: 1.1; text-transform: uppercase;">${p}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Signature Section -->
+      <div style="padding: 0 4mm 2.5mm 4mm; display: flex; justify-content: flex-end;">
+        <div style="text-align: center; width: 38mm;">
+           <div style="font-size: 3pt; font-weight: 800; color: #000000; text-transform: uppercase;">${dateStr}</div>
+           <div style="font-size: 3.2pt; font-weight: 900; color: #000000; text-transform: uppercase; margin-top: 0.3mm;">Ketua TP PKK Kelurahan ${kel}</div>
+           <div style="height: 6mm; margin: 0.5mm 0; border: 0.2mm dashed transparent;"></div>
+           <div style="font-size: 3.8pt; font-weight: 900; color: #000000; text-transform: uppercase; border-top: 0.2mm solid #000000; padding-top: 0.3mm;">Ny. Fransiska F.A. Tarigan</div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
 
 export const generateBatchPkkCardHtml = (
   items: any[],
@@ -307,7 +404,7 @@ export const generateBatchPkkCardHtml = (
         display: inline-block;
         margin: 2.5mm;
         padding: 2.5mm;
-        border: 1.5px dashed #0284c7;
+        border: 1px solid #e2e8f0;
         border-radius: 4.5mm;
         background: #ffffff;
         page-break-inside: avoid;
@@ -348,18 +445,16 @@ export const generatePkkCardPdf = async (item: any, photoUrl?: string | null) =>
   });
 
   const pageWrapperHtml = `
-    <div style="width: 100%; display: flex; justify-content: center; align-items: center; padding: 20mm 0 10mm 0; box-sizing: border-box; page-break-inside: avoid; break-inside: avoid;">
+    <div style="width: 100%; display: flex; justify-content: center; align-items: center; padding: 15mm 0; box-sizing: border-box; page-break-inside: avoid; break-inside: avoid;">
       <div style="
-        padding: 3.8mm;
-        border: 2px dashed #0284c7;
-        border-radius: 5.5mm;
-        background: #ffffff;
         display: inline-block;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
         page-break-inside: avoid;
         break-inside: avoid;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+        border-radius: 3.5mm;
+        overflow: hidden;
       ">
         ${singleCardHtml}
       </div>

@@ -203,20 +203,21 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     searchTerm,
   ]);
 
-  // 24 Lingkungan Counts calculation
-  const visitsPerLingkungan = useMemo(() => {
+  // Cumulative counts (all time for each environment)
+  const cumulativeCounts = useMemo(() => {
     const counts: { [key: number]: number } = {};
     for (let i = 1; i <= 24; i++) {
       counts[i] = 0;
     }
-    (isKepling ? filteredVisits : visits).forEach((v) => {
+    // Always use the full visits list for cumulative totals
+    visits.forEach((v) => {
       const idx = getLingkunganIndex(v.lingkungan);
       if (idx >= 1 && idx <= 24) {
         counts[idx] = (counts[idx] || 0) + 1;
       }
     });
     return counts;
-  }, [visits, filteredVisits, isKepling]);
+  }, [visits]);
 
   // Photo count
   const fotoCount = useMemo(() => {
@@ -303,20 +304,52 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   };
 
   const handleCopyWa = () => {
-    let text = `*REKAPITULASI KUNJUNGAN PER LINGKUNGAN (SAMPAI DENGAN HARI INI)*\n`;
-    text += `*KELURAHAN MANGGA - KECAMATAN MEDAN TUNTUNGAN*\n`;
-    text += `Tanggal: ${formatTanggalIndonesia(new Date())}\n`;
-    text += `Total Seluruh Kunjungan: ${visits.length} Warga\n\n`;
-    text += `*RINCIAN 24 LINGKUNGAN:*\n`;
+    const todayIso = getTodayLocalIso();
+    const dateLabel = activePeriod === 'HARI_INI' ? `Hari Ini (${selectedDate || todayIso})` : (selectedDate || todayIso);
+    
+    let text = `*REKAP KUNJUNGAN HARIAN DOOR-TO-DOOR*\n`;
+    text += `*KELURAHAN MANGGA, KEC. MEDAN TUNTUNGAN*\n`;
+    text += `Periode / Tanggal: ${dateLabel}\n`;
+    text += `Total Kunjungan: ${filteredVisits.length} Rumah\n\n`;
+    text += `----------------------------------------\n`;
+
+    // Group filtered visits by Environment for daily details
+    const groups: { [key: string]: KunjunganWargaData[] } = {};
+    filteredVisits.forEach((v) => {
+      const env = v.lingkungan || 'Tanpa Lingkungan';
+      if (!groups[env]) groups[env] = [];
+      groups[env].push(v);
+    });
+
+    // Sort environment keys
+    const sortedEnvs = Object.keys(groups).sort((a, b) => {
+      const numA = parseInt(a.replace(/[^0-9]/g, ''), 10) || 0;
+      const numB = parseInt(b.replace(/[^0-9]/g, ''), 10) || 0;
+      return numA - numB;
+    });
+
+    sortedEnvs.forEach((env) => {
+      const list = groups[env];
+      text += `*${env}*\n`;
+      text += `Total Kunjungan : ${list.length} Warga\n`;
+      text += `Rincian :\n`;
+      list.forEach((w) => {
+        text += `- ${w.namaWarga.toUpperCase()} (${(w.alamat || '-').toUpperCase()})\n`;
+      });
+      text += `\n`;
+    });
+
+    // Cumulative stats
+    text += `*TOTAL KUNJUNGAN PER LINGKUNGAN SAMPAI DENGAN HARI INI:*\n`;
     for (let i = 1; i <= 24; i++) {
       const rom = ROMAN_NUMERALS[i - 1];
-      const count = visitsPerLingkungan[i] || 0;
-      text += `Lingkungan ${rom}: ${count} Warga\n`;
+      const count = cumulativeCounts[i] || 0;
+      text += `- Lingkungan ${rom}: ${count} Warga\n`;
     }
-    text += `\n#MedanUntukSemua\n#SemuaUntukMedan`;
+    text += `\n*TOTAL SELURUH KUNJUNGAN: ${visits.length} Warga*`;
 
     navigator.clipboard.writeText(text);
-    if (onShowToast) onShowToast('Rekapitulasi Kunjungan disalin untuk WhatsApp!', 'success');
+    if (onShowToast) onShowToast('Rekap Kunjungan WA berhasil disalin!', 'success');
   };
 
   const handleExportExcel = () => {
@@ -1057,7 +1090,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
           {Array.from({ length: 24 }).map((_, idx) => {
             const lingkNum = idx + 1;
             const rom = ROMAN_NUMERALS[idx];
-            const count = visitsPerLingkungan[lingkNum] || 0;
+            const count = cumulativeCounts[lingkNum] || 0;
             
             // If Kepling, only show their own neighborhood
             if (isKepling && !userLingkungan.toLowerCase().includes(`lingkungan ${lingkNum}`) && !userLingkungan.toLowerCase().includes(`lk ${lingkNum}`)) {

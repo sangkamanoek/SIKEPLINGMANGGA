@@ -28,6 +28,7 @@ export interface LingkunganPbbSummary {
   persentaseRealisasi: number;
   persentaseWpLunas: number;
   sisaNominal: number;
+  totalBermasalah: number;
 }
 
 export interface KelurahanPbbOverview {
@@ -38,6 +39,7 @@ export interface KelurahanPbbOverview {
   totalWp: number;
   totalWpLunas: number;
   totalWpBelumLunas: number;
+  totalBermasalah: number;
   persentaseRealisasiNominal: number;
   persentaseWpLunas: number;
   lingkunganSummaries: LingkunganPbbSummary[];
@@ -73,6 +75,7 @@ export function getCachedPbbOverview(year: number = DEFAULT_PBB_YEAR): Kelurahan
     totalWp: 0,
     totalWpLunas: 0,
     totalWpBelumLunas: 0,
+    totalBermasalah: 0,
     persentaseRealisasiNominal: 0,
     persentaseWpLunas: 0,
     lingkunganSummaries: [],
@@ -237,6 +240,7 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
   let totalRealisasiNominal = 0;
   let totalWp = 0;
   let totalWpLunas = 0;
+  let totalBermasalah = 0;
 
   // Single-pass bucket aggregation for 24 Lingkungan
   interface LkBucket {
@@ -244,6 +248,7 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
     lunasCount: number;
     nominalTotal: number;
     nominalLunas: number;
+    bermasalahCount: number;
   }
 
   const buckets: LkBucket[] = Array.from({ length: 25 }, () => ({
@@ -251,6 +256,7 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
     lunasCount: 0,
     nominalTotal: 0,
     nominalLunas: 0,
+    bermasalahCount: 0,
   }));
 
   for (let i = 0; i < spptList.length; i++) {
@@ -269,6 +275,9 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
             : terutang;
         b.nominalLunas += paid;
       }
+      if (s.isBermasalah) {
+        b.bermasalahCount++;
+      }
     }
   }
 
@@ -285,6 +294,7 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
     const lkTargetNominal = b.nominalTotal > 0 ? b.nominalTotal : base.targetNominal;
     const lkWpLunas = b.count > 0 ? b.lunasCount : base.wpLunas;
     const lkRealisasiNominal = b.nominalTotal > 0 ? b.nominalLunas : base.realisasiNominal;
+    const lkBermasalah = b.bermasalahCount;
     const lkSisaNominal = Math.max(0, lkTargetNominal - lkRealisasiNominal);
 
     const persentaseRealisasi = lkTargetNominal > 0 ? (lkRealisasiNominal / lkTargetNominal) * 100 : 0;
@@ -299,12 +309,14 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
       persentaseRealisasi,
       persentaseWpLunas,
       sisaNominal: lkSisaNominal,
+      totalBermasalah: lkBermasalah,
     });
 
     totalTargetNominal += lkTargetNominal;
     totalRealisasiNominal += lkRealisasiNominal;
     totalWp += lkTotalWp;
     totalWpLunas += lkWpLunas;
+    totalBermasalah += lkBermasalah;
   }
 
   const totalSisaNominal = Math.max(0, totalTargetNominal - totalRealisasiNominal);
@@ -320,6 +332,7 @@ export function computePbbOverview(spptList: SpptPbbItem[], year: number = DEFAU
     totalWp,
     totalWpLunas,
     totalWpBelumLunas,
+    totalBermasalah,
     persentaseRealisasiNominal,
     persentaseWpLunas,
     lingkunganSummaries,
@@ -735,6 +748,8 @@ export function cleanPbbItemForFirestore(item: SpptPbbItem): Record<string, any>
       : (!isNaN(Number(item.lingkungan)) ? Number(item.lingkungan) : 0),
     jumlahBayar: jBayar, // Guaranteed to be number or null, NEVER undefined!
     keterangan: item.keterangan ? String(item.keterangan).trim() : '',
+    isBermasalah: Boolean(item.isBermasalah),
+    masalahNote: item.masalahNote ? String(item.masalahNote).trim() : '',
     tglBayar: item.tglBayar ? String(item.tglBayar).trim() : (isLunas ? (item.updatedAt ? item.updatedAt.split('T')[0] : new Date().toISOString().split('T')[0]) : null),
     updatedAt: item.updatedAt || new Date().toISOString(),
   };

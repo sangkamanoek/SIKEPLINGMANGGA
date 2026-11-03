@@ -42,6 +42,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const [pbb, setPbb] = useState(editItem?.pbb || 'Belum');
   const [kategoriBansos, setKategoriBansos] = useState(editItem?.kategoriBansos || 'PKH / BPNT (DTKS)');
   const [statusBansos, setStatusBansos] = useState<'Sudah' | 'Belum' | 'Menolak' | 'Layak' | 'Tidak Layak'>(editItem?.statusBansos || 'Sudah');
+  const [bpjsTk, setBpjsTk] = useState(editItem?.bpjsTk || 'Belum Terdaftar');
   const [keterangan, setKeterangan] = useState(editItem?.keterangan || '');
   const [fotoUrl, setFotoUrl] = useState(
     editItem?.fotoUrl || (editItem as any)?.foto || (editItem as any)?.fotoDokumentasi || ''
@@ -62,6 +63,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       setPbb(editItem.pbb || 'Belum');
       setKategoriBansos(editItem.kategoriBansos || 'PKH / BPNT (DTKS)');
       setStatusBansos(editItem.statusBansos || 'Sudah');
+      setBpjsTk(editItem.bpjsTk || 'Belum Terdaftar');
       setKeterangan(editItem.keterangan || '');
       setFotoUrl(
         editItem.fotoUrl || (editItem as any)?.foto || (editItem as any)?.fotoDokumentasi || ''
@@ -121,6 +123,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
         perlinsos,
         ikd,
         pbb,
+        bpjsTk,
         kategoriBansos,
         statusBansos,
         keterangan: keterangan.trim(),
@@ -136,6 +139,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
         setNamaWarga('');
         setAlamat('');
         setKeterangan('');
+        setBpjsTk('Belum Terdaftar');
         setFotoUrl('');
         if (onSuccess) onSuccess();
         if (onClose) onClose();
@@ -273,6 +277,24 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
             <option value="Lunas">Lunas</option>
           </select>
         </div>
+      </div>
+
+      <div>
+        <label className="block text-slate-800 font-bold mb-1">Status Kepesertaan BPJS Ketenagakerjaan (Mandiri/Pekerja):</label>
+        <select
+          value={bpjsTk}
+          onChange={(e) => setBpjsTk(e.target.value)}
+          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
+        >
+          <option value="Aktif">Aktif (Sudah Terlindungi)</option>
+          <option value="Non-Aktif">Non-Aktif</option>
+          <option value="Belum Terdaftar">Belum Terdaftar</option>
+          <option value="Sudah Daftar (Agen Perisai)">Sudah Daftar (Agen Perisai)</option>
+          <option value="Menolak">Menolak Menjadi Peserta</option>
+        </select>
+        <p className="text-[10px] text-slate-500 mt-1 font-medium italic">
+          * Verifikasi kepesertaan jaminan kecelakaan kerja dan kematian bagi pekerja mandiri di lingkungan.
+        </p>
       </div>
 
 

@@ -44,6 +44,9 @@ import { AppUpdateToastBanner } from './components/AppUpdateToastBanner';
 import { LoginPage } from './components/LoginPage';
 import { TopNavigationBar } from './components/TopNavigationBar';
 import { SyncVerificationModal } from './components/SyncVerificationModal';
+import { KeplingAlertBanner } from './components/KeplingAlertBanner';
+import { NotifikasiSoundSettingsModal } from './components/NotifikasiSoundSettingsModal';
+import { useAgendaTugasRealtimeAlert } from './hooks/useAgendaTugasRealtimeAlert';
 
 import { getDefaultTargetsCapaianMap } from './data/targetsData';
 import { fetchAllReports, saveReportToServer, subscribeReportsFromFirestore } from './lib/reportsApi';
@@ -108,11 +111,20 @@ export default function App() {
   const [isAppUpdateOpen, setIsAppUpdateOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isSyncVerificationOpen, setIsSyncVerificationOpen] = useState(false);
+  const [isNotifSoundModalOpen, setIsNotifSoundModalOpen] = useState(false);
+
+  // Real-time audio chime & mobile vibration alert for Agenda Kelurahan & Tugas Khusus Lurah
+  const { activeAlert, dismissAlert, replayAlertSound } = useAgendaTugasRealtimeAlert(activeAccount);
 
   useEffect(() => {
     const handleOpenFullSelector = () => setIsAccountModalOpen(true);
+    const handleOpenNotifSound = () => setIsNotifSoundModalOpen(true);
     window.addEventListener('open-account-selector-full', handleOpenFullSelector);
-    return () => window.removeEventListener('open-account-selector-full', handleOpenFullSelector);
+    window.addEventListener('open-notif-sound-modal', handleOpenNotifSound);
+    return () => {
+      window.removeEventListener('open-account-selector-full', handleOpenFullSelector);
+      window.removeEventListener('open-notif-sound-modal', handleOpenNotifSound);
+    };
   }, []);
 
   // Sync custom profiles from server / Firestore on start
@@ -277,6 +289,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans pb-20 md:pb-8">
+      {/* Real-time Alert Banner with Sound and Mobile Vibration indicator */}
+      <KeplingAlertBanner
+        alert={activeAlert}
+        onDismiss={dismissAlert}
+        onNavigateTab={handleTabChange}
+        onReplayAlertSound={replayAlertSound}
+      />
+
       {/* Official Header Banner */}
       <HeaderBanner
         user={null}
@@ -293,6 +313,7 @@ export default function App() {
         onOpenSyncVerification={() => setIsSyncVerificationOpen(true)}
         onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
         onOpenUpdateModal={() => setIsAppUpdateOpen(true)}
+        onOpenNotifSoundSettings={() => setIsNotifSoundModalOpen(true)}
         onLogout={handleLogout}
         portalMode={isPkk ? 'pkk' : 'kelurahan'}
       />
@@ -578,6 +599,12 @@ export default function App() {
           safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(updated));
         }}
         showToast={showToast}
+      />
+
+      <NotifikasiSoundSettingsModal
+        isOpen={isNotifSoundModalOpen}
+        onClose={() => setIsNotifSoundModalOpen(false)}
+        currentUser={activeAccount}
       />
 
       {/* Floating Toast Notification */}

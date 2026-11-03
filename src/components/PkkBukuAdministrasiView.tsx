@@ -112,6 +112,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
   // Form Fields - Unified / Dynamic depending on the active book
   // Book 1 (Anggota)
   const [b1Nama, setB1Nama] = useState('');
+  const [b1RegNo, setB1RegNo] = useState('');
   const [b1Jabatan, setB1Jabatan] = useState('');
   const [b1Gender, setB1Gender] = useState<'L' | 'P'>('P');
   const [b1TempatLahir, setB1TempatLahir] = useState('');
@@ -196,7 +197,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
   // Clear Form Fields
   const resetForm = () => {
     setEditingItem(null);
-    setB1Nama(''); setB1Jabatan(''); setB1Gender('P'); setB1TempatLahir(''); setB1TglLahir(''); setB1Status('Kawin'); setB1Alamat(''); setB1Pendidikan(''); setB1Pekerjaan(''); setB1Keterangan(''); setB1PasphotoUrl('');
+    setB1Nama(''); setB1RegNo(''); setB1Jabatan(''); setB1Gender('P'); setB1TempatLahir(''); setB1TglLahir(''); setB1Status('Kawin'); setB1Alamat(''); setB1Pendidikan(''); setB1Pekerjaan(''); setB1Keterangan(''); setB1PasphotoUrl('');
     setB2Nomor(''); setB2Tanggal(getTodayLocalIso()); setB2Jenis('SURAT_MASUK'); setB2Perihal(''); setB2AsalTujuan(''); setB2Keterangan(''); setB2FileUrl(''); setB2FileName('');
     setB3Tanggal(getTodayLocalIso()); setB3Jenis('PENERIMAAN'); setB3Jumlah(0); setB3Kategori('Kas Umum'); setB3Keterangan(''); setB3NomorBukti('');
     setB4Tanggal(getTodayLocalIso()); setB4Agenda(''); setB4Pimpinan(''); setB4Peserta(0); setB4Keputusan(''); setB4Catatan(''); setB4Keterangan('');
@@ -210,6 +211,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
     setIsFormOpen(true);
     if (activeBook === 1) {
       setB1Nama(item.nama || '');
+      setB1RegNo(item.nik || '');
       setB1Jabatan(item.jabatan || '');
       setB1Gender(item.jenisKelamin || 'P');
       setB1TempatLahir(item.tempatLahir || '');
@@ -268,6 +270,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       if (activeBook === 1) {
         const item: PkkBuku1Anggota = {
           id: editingItem?.id || 'b1_' + Date.now(),
+          nik: b1RegNo,
           nama: b1Nama,
           jabatan: b1Jabatan,
           jenisKelamin: b1Gender,
@@ -901,6 +904,17 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
               {activeBook === 1 && (
                 <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="font-extrabold text-slate-700">Nomor Induk Kependudukan (NIK)</label>
+                    <input 
+                      type="text" 
+                      value={b1RegNo} 
+                      onChange={(e) => setB1RegNo(e.target.value)} 
+                      required
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold" 
+                      placeholder="Masukkan 16 digit NIK" 
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="font-extrabold text-slate-700">Nama Lengkap</label>

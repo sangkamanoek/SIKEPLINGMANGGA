@@ -32,6 +32,7 @@ export interface KunjunganWargaData {
   pbb?: string;
   kategoriBansos?: string;
   statusBansos?: 'Sudah' | 'Belum' | 'Menolak' | 'Layak' | 'Tidak Layak';
+  bpjsTk?: 'Aktif' | 'Non-Aktif' | 'Belum Terdaftar' | 'Sudah Daftar (Agen Perisai)' | 'Menolak' | string;
   keterangan?: string;
   telepon?: string;
   fotoUrl?: string;

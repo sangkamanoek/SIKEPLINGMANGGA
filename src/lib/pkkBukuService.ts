@@ -14,6 +14,7 @@ import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 
 export interface PkkBuku1Anggota {
   id: string;
+  nik: string;
   nama: string;
   jabatan: string;
   jenisKelamin: 'L' | 'P';
@@ -73,6 +74,7 @@ const BUKU1_CHAN = 'sikepling_buku_1_chan';
 const DEFAULT_BUKU1_ITEMS: PkkBuku1Anggota[] = [
   {
     id: 'anggota_pkk_ketua',
+    nik: '12711020010001',
     nama: 'Ny. Fransiska Fery Arapenta Tarigan',
     jabatan: 'Ketua Tim Penggerak PKK',
     jenisKelamin: 'P',
@@ -88,6 +90,7 @@ const DEFAULT_BUKU1_ITEMS: PkkBuku1Anggota[] = [
   },
   {
     id: 'anggota_pkk_sekretaris',
+    nik: '12711020010002',
     nama: 'Nur Aisyah Dewi, A.Md',
     jabatan: 'Sekretaris Tim Penggerak PKK',
     jenisKelamin: 'P',

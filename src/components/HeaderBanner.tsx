@@ -15,6 +15,7 @@ import {
   Loader2,
   Sparkles,
   RefreshCw,
+  Volume2,
 } from 'lucide-react';
 import { GoogleUser, SheetMetadata, UserAccount, isPkkRole } from '../types';
 import { CURRENT_APP_VERSION, hasUnseenAppUpdate } from '../lib/appVersionService';
@@ -36,6 +37,7 @@ interface HeaderBannerProps {
   onOpenAbsenApel?: () => void;
   onOpenUpdateModal?: () => void;
   onOpenSyncVerification?: () => void;
+  onOpenNotifSoundSettings?: () => void;
   portalMode?: 'kelurahan' | 'pkk';
 }
 
@@ -55,6 +57,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
   onOpenAbsenApel,
   onOpenUpdateModal,
   onOpenSyncVerification,
+  onOpenNotifSoundSettings,
   portalMode,
 }) => {
   const isPkk = activeAccount ? isPkkRole(activeAccount.role) || portalMode === 'pkk' : portalMode === 'pkk';
@@ -162,7 +165,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isMobileMenuOpen, isHelperMenuOpen]);
   return (
-    <header className={`${isPkk ? 'bg-tosca-700' : 'bg-emerald-800'} text-white shadow-lg print:hidden transition-colors duration-500`}>
+    <header className={`${isPkk ? 'bg-pkk-teal' : 'bg-emerald-800'} text-white shadow-lg print:hidden transition-colors duration-500`}>
       {activeAccount.role === 'super_admin' && isIframe && !user && (
         <div className="bg-amber-500 text-slate-950 px-4 py-2.5 text-center text-xs font-black flex flex-col sm:flex-row items-center justify-center gap-2 border-b border-amber-600/50 animate-pulse">
           <span className="flex items-center gap-1">⚠️ <span className="font-extrabold uppercase">Penting:</span> Browser memblokir popup Google di panel preview. Buka di tab baru untuk menghubungkan Google.</span>
@@ -177,7 +180,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
         </div>
       )}
       {/* Top Banner with Medan Logo Replica and Tagline */}
-      <div className={`max-w-6xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b ${isPkk ? 'border-tosca-600/60' : 'border-emerald-700/60'} text-xs`}>
+      <div className={`max-w-6xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b ${isPkk ? 'border-pkk-dark/40' : 'border-emerald-700/60'} text-xs`}>
         {/* Official Slogan Badge */}
         <div className="flex items-center gap-2.5">
           <div className="inline-flex items-center rounded-md overflow-hidden shadow-xs text-[11px] font-black tracking-wider uppercase">
@@ -545,6 +548,20 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                 </button>
               )}
 
+              {onOpenNotifSoundSettings && (
+                <button
+                  id="btn-open-sound-settings"
+                  type="button"
+                  onClick={onOpenNotifSoundSettings}
+                  className="p-1.5 rounded-lg bg-emerald-900/80 hover:bg-emerald-700 border border-emerald-600/50 text-teal-200 hover:text-white transition-all cursor-pointer relative"
+                  title="Pengaturan Bunyi & Getar Notifikasi HP (Agenda & Tugas Lurah)"
+                  aria-label="Bunyi & Getar Notifikasi"
+                >
+                  <Volume2 className="w-4 h-4 text-teal-300" />
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400" />
+                </button>
+              )}
+
               {onLogout && (
                 <button
                   id="btn-logout-app"
@@ -700,6 +717,20 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                     >
                       <KeyRound className="w-4 h-4 text-amber-400 shrink-0" />
                       <span>Ubah Kata Sandi</span>
+                    </button>
+                  )}
+
+                  {onOpenNotifSoundSettings && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        onOpenNotifSoundSettings();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-teal-300 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-left"
+                    >
+                      <Volume2 className="w-4 h-4 text-teal-400 shrink-0" />
+                      <span>Notifikasi Bunyi &amp; Getar HP</span>
                     </button>
                   )}
 

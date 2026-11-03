@@ -3,6 +3,7 @@ import { X, Printer, Download, CreditCard, Layers, CheckCircle2 } from 'lucide-r
 import { printOfficialDocument } from '../utils/printHelper';
 import { generateSinglePkkCardHtml, generateBatchPkkCardHtml } from '../utils/pkkCardGenerator';
 import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
+import { formatDateToIndonesianFull } from '../utils/dateFormatter';
 
 interface PkkCardModalProps {
   isOpen: boolean;
@@ -25,16 +26,18 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
   const [customKecamatan, setCustomKecamatan] = useState(member?.kecamatan || 'MEDAN TUNTUNGAN');
   const [customKota, setCustomKota] = useState(member?.kota || 'KOTA MEDAN');
   const [customProvinsi, setCustomProvinsi] = useState(member?.provinsi || 'SUMATERA UTARA');
-  const [customRegNo, setCustomRegNo] = useState(`12.71.10.2001.${String(member?.id || '0045').replace(/[^0-9]/g, '').slice(-4).padStart(4, '0')}`);
+  const [customRegNo, setCustomRegNo] = useState(member?.nik || '');
+
+  const [showBack, setShowBack] = useState(false);
 
   if (!isOpen || !member) return null;
 
   const photoUrl = member.pasphotoUrl || PKK_LOGO_BASE64;
 
-  const regNo = customRegNo;
+  const regNo = customRegNo || member?.noRegistrasi || '-';
   const namaFormatted = (member.nama || 'NUR AINI, S.Pd.').toUpperCase();
   const jabatanFormatted = (member.jabatan || 'ANGGOTA TP PKK KELURAHAN').toUpperCase();
-  const ttlFormatted = `${(member.tempatLahir || 'MEDAN').toUpperCase()}, ${member.tanggalLahir || '16-04-1991'}`;
+  const ttlFormatted = `${(member.tempatLahir || 'MEDAN').toUpperCase()}, ${formatDateToIndonesianFull(member.tanggalLahir || '16-04-1991').toUpperCase()}`;
   const genderFormatted = member.jenisKelamin === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN';
   const alamatFormatted = (member.alamat || 'JL. BUNGA RINTE NO. 12, LINGKUNGAN IV').toUpperCase();
   const kelurahanFormatted = customKelurahan.toUpperCase();
@@ -60,26 +63,45 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
       <div style="
         width: 100%;
         display: flex;
-        justify-content: center;
+        flex-direction: column;
         align-items: center;
-        padding: 20mm 0 10mm 0;
+        padding: 20mm 0;
+        gap: 10mm;
         box-sizing: border-box;
-        page-break-inside: avoid;
-        break-inside: avoid;
       ">
+        <!-- FRONT SIDE -->
         <div style="
           padding: 3.8mm;
-          border: 2px dashed #0284c7;
+          border: 1px solid #e2e8f0;
           border-radius: 5.5mm;
           background: #ffffff;
           display: inline-block;
           box-shadow: 0 4px 16px rgba(0,0,0,0.06);
           page-break-inside: avoid;
           break-inside: avoid;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
         ">
           ${cardHtml}
+        </div>
+
+        <!-- BACK SIDE -->
+        <div style="
+          padding: 3.8mm;
+          border: 1px solid #e2e8f0;
+          border-radius: 5.5mm;
+          background: #ffffff;
+          display: inline-block;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+          page-break-inside: avoid;
+          break-inside: avoid;
+        ">
+          ${generateSinglePkkCardHtml(member, {
+            regNo,
+            kelurahan: customKelurahan,
+            kecamatan: customKecamatan,
+            kota: customKota,
+            provinsi: customProvinsi,
+            side: 'back'
+          })}
         </div>
       </div>
     `;
@@ -202,8 +224,18 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
 
         {showSettings && (
           <div className="bg-sky-900 text-white p-4 space-y-3 text-xs border-b border-sky-800 animate-in fade-in duration-200">
-            <p className="font-extrabold text-sky-200">Sesuaikan Atribut Wilayah pada Kartu Anggota (KTA):</p>
+            <p className="font-extrabold text-sky-200">Sesuaikan Atribut Wilayah & Registrasi pada Kartu (KTA):</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] font-bold text-sky-300 mb-1 uppercase">NIK Anggota</label>
+                <input
+                  type="text"
+                  value={customRegNo}
+                  onChange={(e) => setCustomRegNo(e.target.value)}
+                  className="w-full bg-sky-950 border border-sky-700 rounded-xl px-3 py-1.5 text-white font-bold focus:outline-none focus:ring-2 focus:ring-sky-400"
+                  placeholder="Masukkan 16 Digit NIK"
+                />
+              </div>
               <div>
                 <label className="block text-[10px] font-bold text-sky-300 mb-1 uppercase">Kelurahan / Desa</label>
                 <input
@@ -244,161 +276,243 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
           </div>
         )}
 
-        {/* Modal Body - Card Graphic Preview (Matching image_5ea1aef7) */}
-        <div className="p-4 sm:p-7 bg-slate-100 flex flex-col items-center justify-center overflow-x-auto min-h-[340px]">
-          {/* Outer Dashed Cutting Guide Frame */}
-          <div className="p-3 sm:p-4 border-2 border-dashed border-sky-600 rounded-[22px] sm:rounded-[26px] bg-white shadow-xl inline-block transition-transform hover:scale-[1.01]">
-            <div
-              className="relative w-[342px] h-[216px] sm:w-[430px] sm:h-[272px] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-sky-600 font-sans text-slate-900 shrink-0 select-none flex flex-col"
-              style={{
-                background: 'linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 45%, #bae6fd 100%)',
-              }}
+        {/* Modal Body - Card Graphic Preview */}
+        <div className="p-4 sm:p-10 bg-slate-100 flex flex-col items-center justify-center overflow-x-auto min-h-[400px]">
+          {/* Card View Switcher (Front/Back) */}
+          <div className="flex items-center gap-1 mb-4 bg-white p-1 rounded-full border border-slate-300 shadow-sm">
+            <button
+              onClick={() => setShowBack(false)}
+              className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all ${!showBack ? 'bg-sky-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
             >
-              {/* Subtle Batik Watermark Overlay */}
-              <div
-                className="absolute inset-0 opacity-[0.06] pointer-events-none bg-repeat"
-                style={{
-                  backgroundImage: 'radial-gradient(#0369a1 1px, transparent 1px)',
-                  backgroundSize: '8px 8px',
-                }}
-              />
+              TAMPAK DEPAN
+            </button>
+            <button
+              onClick={() => setShowBack(true)}
+              className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all ${showBack ? 'bg-sky-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              TAMPAK BELAKANG
+            </button>
+          </div>
 
-              {/* TOP HEADER BANNER (Vibrant Gradient Cyan/Blue) */}
+          {/* Card Container */}
+          <div className="shadow-[0_20px_50px_rgba(0,0,0,0.15)] rounded-xl sm:rounded-2xl overflow-hidden transition-all duration-500 hover:scale-[1.01]">
+            {!showBack ? (
+              /* FRONT SIDE */
               <div
-                className="relative px-2.5 py-1.5 sm:px-3 sm:py-2 text-white flex items-center border-b-2 border-amber-400 shrink-0"
+                className="relative w-[342px] h-[216px] sm:w-[430px] sm:h-[272px] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-sky-600 font-sans text-black shrink-0 select-none flex flex-col animate-in slide-in-from-right-4 duration-300"
                 style={{
-                  background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
+                  background: 'linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 45%, #bae6fd 100%)',
+                  backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(3, 105, 161, 0.12) 1px, transparent 0), linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 45%, #bae6fd 100%)',
+                  backgroundSize: '12px 12px, 100% 100%',
                 }}
               >
-                {/* Logo PKK Resmi */}
-                <div className="w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white shrink-0 flex items-center justify-center p-0.5 shadow-md overflow-hidden border border-white">
-                  <img
-                    src={PKK_LOGO_BASE64}
-                    alt="Logo PKK Resmi"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                {/* Centered Titles with logo compensation */}
-                <div className="leading-[1.15] flex-1 text-center mr-[38px] sm:mr-[46px]">
-                  <h1 className="text-[10px] sm:text-[13px] font-black tracking-wide text-white drop-shadow-xs uppercase">
-                    KARTU TANDA ANGGOTA
-                  </h1>
-                  <p className="text-[6.5px] sm:text-[8.5px] font-bold text-sky-100 tracking-tight uppercase">
-                    PEMBERDAYAAN KESEJAHTERAAN KELUARGA (PKK)
-                  </p>
-                  <p className="text-[7.5px] sm:text-[9.5px] font-black text-amber-300 tracking-wider uppercase mt-[1px]">
-                    KELURAHAN {kelurahanFormatted}
-                  </p>
-                </div>
-              </div>
+                {/* Subtle Batik Watermark Overlay */}
+                <div
+                  className="absolute inset-0 opacity-[0.06] pointer-events-none bg-repeat"
+                  style={{
+                    backgroundImage: 'radial-gradient(#0369a1 1px, transparent 1px)',
+                    backgroundSize: '8px 8px',
+                  }}
+                />
 
-              {/* CARD MAIN BODY */}
-              <div className="p-2 sm:p-2.5 flex gap-2 sm:gap-2.5 items-start flex-1 min-h-0 relative">
-                {/* Left Photo Frame (Pasphoto 3x4 style) & Bottom Badge */}
-                <div className="w-[68px] sm:w-[86px] shrink-0 flex flex-col items-center justify-between h-full">
-                  <div className="w-[66px] h-[88px] sm:w-[84px] sm:h-[112px] rounded-lg border-2 border-sky-600 overflow-hidden bg-white shadow-xs flex items-center justify-center">
+                {/* TOP HEADER BANNER */}
+                <div
+                  className="relative px-2.5 py-1.5 sm:px-3 sm:py-2 text-white flex items-center border-b-2 border-amber-400 shrink-0"
+                  style={{
+                    background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
+                  }}
+                >
+                  {/* Logo PKK Resmi */}
+                  <div className="w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white shrink-0 flex items-center justify-center p-0.5 shadow-md overflow-hidden border border-white">
                     <img
-                      src={photoUrl}
-                      alt={namaFormatted}
-                      className={`w-full h-full ${photoUrl === PKK_LOGO_BASE64 ? 'object-contain p-2' : 'object-cover object-top'}`}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = PKK_LOGO_BASE64;
-                      }}
-                    />
-                  </div>
-
-                  {/* POJOK KIRI BAWAH: BADGE MEDAN UNTUK SEMUA (Stacked UNTUK/SEMUA) */}
-                  <div className="inline-flex items-stretch rounded overflow-hidden border border-slate-900 shadow-xs select-none mt-auto">
-                    <div className="bg-red-800 text-white px-1 sm:px-1.5 py-0.5 text-[6px] sm:text-[7.5px] font-black tracking-tight flex items-center justify-center">
-                      MEDAN
-                    </div>
-                    <div className="bg-blue-900 text-white px-1 sm:px-1.2 py-0.5 text-[4px] sm:text-[5.5px] font-black tracking-tight flex flex-col justify-center leading-[1.05] text-center">
-                      <span>UNTUK</span>
-                      <span>SEMUA</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Center Details List (Right-aligned labels hugging colons) */}
-                <div className="flex-1 min-w-0 pr-[54px] sm:pr-[68px] font-extrabold text-[6.5px] sm:text-[8.5px] leading-[1.25] text-slate-900 uppercase">
-                  <div className="flex items-baseline mb-[1px]">
-                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">NO. REGISTRASI</div>
-                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
-                    <div className="flex-1 min-w-0 font-black text-sky-800 pl-1.5 break-all">{regNo}</div>
-                  </div>
-
-                  <div className="flex items-baseline mb-[1px]">
-                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">NAMA</div>
-                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
-                    <div className="flex-1 min-w-0 font-black text-sky-700 pl-1.5 break-words">{namaFormatted}</div>
-                  </div>
-
-                  <div className="flex items-baseline mb-[1px]">
-                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">JABATAN</div>
-                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
-                    <div className="flex-1 min-w-0 font-extrabold text-teal-800 pl-1.5 break-words">{jabatanFormatted}</div>
-                  </div>
-
-                  <div className="flex items-baseline mb-[1px]">
-                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">TEMPAT/TGL LAHIR</div>
-                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
-                    <div className="flex-1 min-w-0 pl-1.5 break-words">{ttlFormatted}</div>
-                  </div>
-
-                  <div className="flex items-baseline mb-[1px]">
-                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">JENIS KELAMIN</div>
-                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
-                    <div className="flex-1 min-w-0 pl-1.5">{genderFormatted}</div>
-                  </div>
-
-                  {/* ALAMAT with distinct gap */}
-                  <div className="flex items-baseline mb-[4px] sm:mb-[6px]">
-                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">ALAMAT</div>
-                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
-                    <div className="flex-1 min-w-0 pl-1.5 break-words">{alamatFormatted}</div>
-                  </div>
-
-                  {/* Region Block */}
-                  <div className="flex items-baseline mb-[1px]">
-                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">DESA/KELURAHAN</div>
-                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
-                    <div className="flex-1 min-w-0 pl-1.5 font-bold">{kelurahanFormatted}</div>
-                  </div>
-
-                  <div className="flex items-baseline mb-[1px]">
-                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">KECAMATAN</div>
-                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
-                    <div className="flex-1 min-w-0 pl-1.5 font-bold">{kecamatanFormatted}</div>
-                  </div>
-
-                  <div className="flex items-baseline mb-[1px]">
-                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">KABUPATEN/KOTA</div>
-                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
-                    <div className="flex-1 min-w-0 pl-1.5 font-bold">{kotaFormatted}</div>
-                  </div>
-
-                  <div className="flex items-baseline">
-                    <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-slate-700 pr-1.5">PROVINSI</div>
-                    <div className="w-[6px] shrink-0 text-center font-black text-slate-500">:</div>
-                    <div className="flex-1 min-w-0 pl-1.5 font-bold">{provinsiFormatted}</div>
-                  </div>
-                </div>
-
-                {/* Bottom Right QR Code & Label */}
-                <div className="absolute right-2 bottom-1.5 sm:right-2.5 sm:bottom-2 flex flex-col items-center">
-                  <div className="w-[42px] h-[42px] sm:w-[54px] sm:h-[54px] p-0.5 bg-white rounded border border-slate-300 shadow-xs">
-                    <img
-                      src={qrUrl}
-                      alt="QR Verification"
+                      src={PKK_LOGO_BASE64}
+                      alt="Logo PKK Resmi"
                       className="w-full h-full object-contain"
                     />
                   </div>
-                  <span className="text-[4.5px] sm:text-[6px] font-black text-sky-700 mt-0.5 text-center leading-none tracking-tight">
-                    SCAN VERIFIKASI
-                  </span>
+                  {/* Centered Titles */}
+                  <div className="leading-[1.15] flex-1 text-center mr-[38px] sm:mr-[46px]">
+                    <h1 className="text-[10px] sm:text-[13px] font-black tracking-wide text-white drop-shadow-xs uppercase">
+                      KARTU TANDA ANGGOTA
+                    </h1>
+                    <p className="text-[6.5px] sm:text-[8.5px] font-bold text-sky-100 tracking-tight uppercase">
+                      PEMBERDAYAAN KESEJAHTERAAN KELUARGA (PKK)
+                    </p>
+                    <p className="text-[7.5px] sm:text-[9.5px] font-black text-amber-300 tracking-wider uppercase mt-[1px]">
+                      KELURAHAN {kelurahanFormatted}
+                    </p>
+                  </div>
+                </div>
+
+                {/* CARD MAIN BODY */}
+                <div className="p-2 sm:p-2.5 flex gap-2 sm:gap-2.5 items-start flex-1 min-h-0 relative">
+                  {/* Left Photo Frame */}
+                  <div className="w-[68px] sm:w-[86px] shrink-0 flex flex-col items-center justify-between h-full">
+                    <div className="w-[66px] h-[88px] sm:w-[84px] sm:h-[112px] rounded-lg border-2 border-sky-600 overflow-hidden bg-white shadow-xs flex items-center justify-center">
+                      <img
+                        src={photoUrl}
+                        alt={namaFormatted}
+                        className={`w-full h-full ${photoUrl === PKK_LOGO_BASE64 ? 'object-contain p-2' : 'object-cover object-top'}`}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = PKK_LOGO_BASE64;
+                        }}
+                      />
+                    </div>
+
+                    {/* POJOK KIRI BAWAH: BADGE MEDAN UNTUK SEMUA */}
+                    <div 
+                      className="inline-flex items-stretch rounded-md sm:rounded-lg overflow-hidden border border-slate-900 shadow-[0_2px_6px_rgba(0,0,0,0.35)] select-none mt-auto mb-1 shrink-0 self-start"
+                      style={{ marginLeft: '2mm', marginBottom: '2mm' }}
+                    >
+                      <div className="bg-[#991b1b] text-white px-1.5 sm:px-2 py-0.5 text-[6px] sm:text-[8px] font-black tracking-tight flex items-center justify-center border-r border-slate-900">
+                        MEDAN
+                      </div>
+                      <div className="bg-[#1e3a8a] text-white px-1.5 sm:px-2.5 py-0.5 text-[5.5px] sm:text-[7.5px] font-black tracking-tight flex items-center justify-center leading-none text-center whitespace-nowrap">
+                        UNTUK SEMUA
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Center Details List - TEXT BLACK AS REQUESTED */}
+                  <div className="flex-1 min-w-0 pr-[54px] sm:pr-[68px] font-black text-[6.5px] sm:text-[8.5px] leading-[1.25] text-black uppercase">
+                    <div className="flex items-baseline mb-[1px]">
+                      <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">NIK</div>
+                      <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>
+                      <div className="flex-1 min-w-0 font-black text-black pl-1.5 break-all">{regNo}</div>
+                    </div>
+
+                    <div className="flex items-baseline mb-[1px]">
+                      <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">NAMA</div>
+                      <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>
+                      <div className="flex-1 min-w-0 font-black text-black pl-1.5 break-words">{namaFormatted}</div>
+                    </div>
+
+                    <div className="flex items-baseline mb-[1px]">
+                      <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">JABATAN</div>
+                      <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>
+                      <div className="flex-1 min-w-0 font-black text-black pl-1.5 break-words">{jabatanFormatted}</div>
+                    </div>
+
+                    <div className="flex items-baseline mb-[1px]">
+                      <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">TEMPAT/TGL LAHIR</div>
+                      <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>
+                      <div className="flex-1 min-w-0 pl-1.5 break-words">{ttlFormatted}</div>
+                    </div>
+
+                    <div className="flex items-baseline mb-[1px]">
+                      <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">JENIS KELAMIN</div>
+                      <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>
+                      <div className="flex-1 min-w-0 pl-1.5">{genderFormatted}</div>
+                    </div>
+
+                    {/* ALAMAT */}
+                    <div className="flex items-baseline mb-[4px] sm:mb-[6px]">
+                      <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">ALAMAT</div>
+                      <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>
+                      <div className="flex-1 min-w-0 pl-1.5 break-words">{alamatFormatted}</div>
+                    </div>
+
+                    {/* Region Block */}
+                    <div className="flex items-baseline mb-[1px]">
+                      <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">DESA/KELURAHAN</div>
+                      <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>
+                      <div className="flex-1 min-w-0 pl-1.5 font-black">{kelurahanFormatted}</div>
+                    </div>
+
+                    <div className="flex items-baseline mb-[1px]">
+                      <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">KECAMATAN</div>
+                      <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>
+                      <div className="flex-1 min-w-0 pl-1.5 font-black">{kecamatanFormatted}</div>
+                    </div>
+
+                    <div className="flex items-baseline mb-[1px]">
+                      <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">KABUPATEN/KOTA</div>
+                      <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>
+                      <div className="flex-1 min-w-0 pl-1.5 font-black">{kotaFormatted}</div>
+                    </div>
+
+                    <div className="flex items-baseline">
+                      <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">PROVINSI</div>
+                      <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>
+                      <div className="flex-1 min-w-0 pl-1.5 font-black">{provinsiFormatted}</div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Right QR Code */}
+                  <div className="absolute right-2 bottom-1.5 sm:right-2.5 sm:bottom-2 flex flex-col items-center">
+                    <div className="w-[42px] h-[42px] sm:w-[54px] sm:h-[54px] p-0.5 bg-white rounded border border-slate-300 shadow-xs">
+                      <img
+                        src={qrUrl}
+                        alt="QR Verification"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <span className="text-[4.5px] sm:text-[6px] font-black text-black mt-0.5 text-center leading-none tracking-tight opacity-80">
+                      SCAN VERIFIKASI
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              /* BACK SIDE - Updated with 10 Programs & Signature Area */
+              <div
+                className="relative w-[342px] h-[216px] sm:w-[430px] sm:h-[272px] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-sky-600 font-sans text-black shrink-0 select-none flex flex-col animate-in slide-in-from-left-4 duration-300"
+                style={{
+                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                  backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(3, 105, 161, 0.08) 1px, transparent 0), linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                  backgroundSize: '16px 16px, 100% 100%',
+                }}
+              >
+                {/* 10 Program Pokok PKK Header */}
+                <div className="bg-sky-700 py-1.5 text-center border-b border-sky-600">
+                  <h2 className="text-[8px] sm:text-[10px] font-black text-white uppercase tracking-wider">
+                    10 Program Pokok PKK
+                  </h2>
+                </div>
+
+                {/* Programs List - 2 Columns */}
+                <div className="p-3 sm:p-4 grid grid-cols-2 gap-x-4 gap-y-1.5 flex-1 items-start content-start">
+                  {[
+                    'Penghayatan dan Pengamalan Pancasila',
+                    'Gotong Royong',
+                    'Pangan',
+                    'Sandang',
+                    'Perumahan dan Tata Laksana Rumah Tangga',
+                    'Pendidikan dan Keterampilan',
+                    'Kesehatan',
+                    'Pengembangan Kehidupan Berkoperasi',
+                    'Kelestarian Lingkungan Hidup',
+                    'Perencanaan Sehat'
+                  ].map((prog, idx) => (
+                    <div key={idx} className="flex gap-1.5 items-start">
+                      <span className="text-[7px] sm:text-[8px] font-black text-sky-700">{idx + 1}.</span>
+                      <p className="text-[6px] sm:text-[7.5px] font-black text-black leading-tight uppercase">
+                        {prog}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Signature Area (Missing in user image) */}
+                <div className="px-4 pb-3 flex justify-end">
+                  <div className="text-center w-[120px] sm:w-[150px]">
+                    <p className="text-[5.5px] sm:text-[7px] font-bold text-black uppercase">
+                      Medan, {formatDateToIndonesianFull(new Date().toISOString())}
+                    </p>
+                    <p className="text-[6px] sm:text-[7.5px] font-black text-black uppercase mt-0.5">
+                      Ketua TP PKK Kelurahan {kelurahanFormatted}
+                    </p>
+                    <div className="h-8 sm:h-10 my-1 flex items-center justify-center italic text-slate-300 text-[10px]">
+                      ( Tanda Tangan & Stempel )
+                    </div>
+                    <p className="text-[6.5px] sm:text-[8px] font-black text-black uppercase border-t border-black pt-0.5">
+                      Ny. Fransiska F.A. Tarigan
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            )}
           </div>
         </div>
 

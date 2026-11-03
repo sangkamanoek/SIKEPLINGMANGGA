@@ -11,6 +11,7 @@ import {
   Award,
   Calendar,
   User,
+  Volume2,
 } from 'lucide-react';
 import { UserAccount, LaporanHarianItem, isPkkRole } from '../types';
 import {
@@ -136,7 +137,7 @@ export const DeadlineNotifAlert: React.FC<DeadlineNotifAlertProps> = ({
         </div>
 
         {/* Action Button */}
-        <div className="shrink-0 relative z-10">
+        <div className="shrink-0 relative z-10 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => onNavigate('daftar_tugas_khusus')}
@@ -145,6 +146,16 @@ export const DeadlineNotifAlert: React.FC<DeadlineNotifAlertProps> = ({
             <ClipboardList className="w-4 h-4 text-amber-400" />
             <span>Buka &amp; Kirim Bukti Tugas</span>
             <ArrowRight className="w-4 h-4 text-amber-400" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('open-notif-sound-modal'))}
+            title="Pengaturan Bunyi & Getar Notifikasi HP"
+            className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs inline-flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <Volume2 className="w-4 h-4 text-slate-950" />
+            <span>Bunyi &amp; Getar HP</span>
           </button>
         </div>
       </div>

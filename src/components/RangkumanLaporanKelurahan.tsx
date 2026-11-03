@@ -810,6 +810,69 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       });
   };
 
+  /**
+   * REKAP KUNJUNGAN HARIAN DOOR-TO-DOOR (Spesifik permintaan user)
+   */
+  const [copiedKunjunganWA, setCopiedKunjunganWA] = useState(false);
+  const handleCopyKunjunganRecapWA = () => {
+    const lines: string[] = [];
+    const dateLabel = selectedDate === todayIso ? `Hari Ini (${selectedDate})` : selectedDate;
+
+    lines.push(`*REKAP KUNJUNGAN HARIAN DOOR-TO-DOOR*`);
+    lines.push(`*KELURAHAN MANGGA, KEC. MEDAN TUNTUNGAN*`);
+    lines.push(`Periode / Tanggal: ${dateLabel}`);
+    lines.push(`Total Kunjungan: ${totalStats.totalKunjunganWarga} Rumah`);
+    lines.push(``);
+    lines.push(`----------------------------------------`);
+
+    // Detail Per Lingkungan Hari Ini
+    consolidatedKeplingData.forEach((it) => {
+      if (it.kunjungan.length > 0) {
+        lines.push(`*${it.kepling.lingkungan}*`);
+        lines.push(`Total Kunjungan : ${it.kunjungan.length} Warga`);
+        lines.push(`Rincian :`);
+        it.kunjungan.forEach((w) => {
+          lines.push(`- ${w.namaWarga.toUpperCase()} (${(w.alamat || '-').toUpperCase()})`);
+        });
+        lines.push(``);
+      }
+    });
+
+    // Kalkulasi Kumulatif (Sampai Dengan Hari Ini)
+    lines.push(`*TOTAL KUNJUNGAN PER LINGKUNGAN SAMPAI DENGAN HARI INI:*`);
+    
+    // Use unique environments from official KEPLING_ACCOUNTS data
+    const envs = Array.from(new Set(KEPLING_ACCOUNTS.map(u => u.lingkungan))).sort((a, b) => {
+        const numA = parseInt(a.replace(/[^0-9]/g, ''), 10) || 0;
+        const numB = parseInt(b.replace(/[^0-9]/g, ''), 10) || 0;
+        return numA - numB;
+    });
+
+    const allVisits = kunjunganList || [];
+    envs.forEach((env) => {
+      const count = allVisits.filter(v => v.lingkungan === env).length;
+      lines.push(`- ${env}: ${count} Warga`);
+    });
+
+    lines.push(``);
+    lines.push(`*TOTAL SELURUH KUNJUNGAN: ${allVisits.length} Warga*`);
+    lines.push(``);
+    lines.push(`#MedanUntukSemua`);
+    lines.push(`#SemuaUntukMedan`);
+
+    const fullText = lines.join('\n');
+    navigator.clipboard
+      .writeText(fullText)
+      .then(() => {
+        setCopiedKunjunganWA(true);
+        showToast('Rekap Kunjungan WA berhasil disalin!');
+        setTimeout(() => setCopiedKunjunganWA(false), 3000);
+      })
+      .catch(() => {
+        showToast('Gagal menyalin format kunjungan');
+      });
+  };
+
   // Salin Format WhatsApp Khusus Tren & Statistik Mingguan
   const handleCopyWeeklyWhatsApp = () => {
     if (!weeklyStats) return;
@@ -928,6 +991,25 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
                   : 'Salin Format WhatsApp'}
               </span>
             </button>
+
+            {viewMode === 'HARIAN' && (
+              <button
+                id="btn-salin-wa-kunjungan"
+                type="button"
+                onClick={handleCopyKunjunganRecapWA}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer ${
+                  copiedKunjunganWA
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-amber-500 hover:bg-amber-400 text-amber-950 hover:text-black font-extrabold'
+                }`}
+                title="Salin Rekap Kunjungan Warga (Harian + Kumulatif)"
+              >
+                {copiedKunjunganWA ? <Check className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
+                <span>
+                  {copiedKunjunganWA ? 'Rekap Kunjungan Disalin!' : 'Salin Rekap Kunjungan'}
+                </span>
+              </button>
+            )}
 
             <button
               id="btn-cetak-rangkuman"

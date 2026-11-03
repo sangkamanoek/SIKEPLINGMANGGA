@@ -4,6 +4,7 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
   "totalRealisasiNominal": 8131933028,
   "persentaseWpLunas": 43.56874031436794,
   "totalWpBelumLunas": 12745,
+  "totalBermasalah": 0,
   "year": 2026,
   "lingkunganSummaries": [
     {
@@ -14,7 +15,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "realisasiNominal": 1267366548,
       "wpLunas": 484,
       "targetNominal": 4361531086,
-      "sisaNominal": 3094164538
+      "sisaNominal": 3094164538,
+      "totalBermasalah": 0
     },
     {
       "totalWp": 940,
@@ -24,7 +26,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "persentaseRealisasi": 27.74225936131488,
       "sisaNominal": 656423978,
       "lingkungan": 2,
-      "targetNominal": 908447970
+      "targetNominal": 908447970,
+      "totalBermasalah": 0
     },
     {
       "targetNominal": 734356653,
@@ -34,7 +37,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "lingkungan": 3,
       "sisaNominal": 372823042,
       "totalWp": 1058,
-      "persentaseRealisasi": 49.23133868578161
+      "persentaseRealisasi": 49.23133868578161,
+      "totalBermasalah": 0
     },
     {
       "lingkungan": 4,
@@ -44,7 +48,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "realisasiNominal": 301163746,
       "persentaseWpLunas": 30.926724137931032,
       "persentaseRealisasi": 33.29813787378246,
-      "totalWp": 928
+      "totalWp": 928,
+      "totalBermasalah": 0
     },
     {
       "lingkungan": 5,
@@ -54,7 +59,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "totalWp": 2260,
       "realisasiNominal": 4963508089,
       "persentaseRealisasi": 43.983223922411675,
-      "sisaNominal": 6321494797
+      "sisaNominal": 6321494797,
+      "totalBermasalah": 0
     },
     {
       "persentaseRealisasi": 63.20368988333398,
@@ -64,7 +70,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "persentaseWpLunas": 63.561643835616444,
       "realisasiNominal": 66076357,
       "targetNominal": 104545094,
-      "totalWp": 730
+      "totalWp": 730,
+      "totalBermasalah": 0
     },
     {
       "realisasiNominal": 38163967,
@@ -74,7 +81,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "targetNominal": 116293160,
       "sisaNominal": 78129193,
       "lingkungan": 7,
-      "wpLunas": 259
+      "wpLunas": 259,
+      "totalBermasalah": 0
     },
     {
       "sisaNominal": 39850931,
@@ -84,7 +92,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "persentaseRealisasi": 61.8910125251609,
       "realisasiNominal": 64720021,
       "totalWp": 628,
-      "targetNominal": 104570952
+      "targetNominal": 104570952,
+      "totalBermasalah": 0
     },
     {
       "persentaseRealisasi": 39.77966330503981,
@@ -94,7 +103,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "targetNominal": 116831924,
       "totalWp": 503,
       "realisasiNominal": 46475346,
-      "sisaNominal": 70356578
+      "sisaNominal": 70356578,
+      "totalBermasalah": 0
     },
     {
       "persentaseWpLunas": 47.22689075630252,
@@ -104,7 +114,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "persentaseRealisasi": 46.78153734100824,
       "realisasiNominal": 35177457,
       "totalWp": 595,
-      "lingkungan": 10
+      "lingkungan": 10,
+      "totalBermasalah": 0
     },
     {
       "sisaNominal": 62519925,
@@ -114,7 +125,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "targetNominal": 125769988,
       "persentaseRealisasi": 50.29026718202439,
       "wpLunas": 400,
-      "realisasiNominal": 63250063
+      "realisasiNominal": 63250063,
+      "totalBermasalah": 0
     },
     {
       "wpLunas": 283,
@@ -124,7 +136,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "totalWp": 790,
       "targetNominal": 88170283,
       "sisaNominal": 59024249,
-      "realisasiNominal": 29146034
+      "realisasiNominal": 29146034,
+      "totalBermasalah": 0
     },
     {
       "wpLunas": 375,
@@ -134,7 +147,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "persentaseWpLunas": 51.51098901098901,
       "persentaseRealisasi": 49.52534398869192,
       "totalWp": 728,
-      "sisaNominal": 46892717
+      "sisaNominal": 46892717,
+      "totalBermasalah": 0
     },
     {
       "persentaseWpLunas": 44.75743348982786,
@@ -144,7 +158,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "targetNominal": 88584024,
       "sisaNominal": 54130312,
       "persentaseRealisasi": 38.89382130574696,
-      "totalWp": 639
+      "totalWp": 639,
+      "totalBermasalah": 0
     },
     {
       "persentaseWpLunas": 64.45623342175067,
@@ -154,7 +169,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "lingkungan": 15,
       "wpLunas": 486,
       "persentaseRealisasi": 64.14174984201854,
-      "realisasiNominal": 73497613
+      "realisasiNominal": 73497613,
+      "totalBermasalah": 0
     },
     {
       "wpLunas": 285,
@@ -164,7 +180,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "lingkungan": 16,
       "totalWp": 600,
       "realisasiNominal": 108928988,
-      "sisaNominal": 122033732
+      "sisaNominal": 122033732,
+      "totalBermasalah": 0
     },
     {
       "realisasiNominal": 43466096,
@@ -174,7 +191,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "persentaseRealisasi": 39.1656920468609,
       "lingkungan": 17,
       "totalWp": 596,
-      "targetNominal": 110980028
+      "targetNominal": 110980028,
+      "totalBermasalah": 0
     },
     {
       "sisaNominal": 75238779,
@@ -184,7 +202,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "persentaseWpLunas": 46.93877551020408,
       "lingkungan": 18,
       "persentaseRealisasi": 35.21970322118107,
-      "wpLunas": 322
+      "wpLunas": 322,
+      "totalBermasalah": 0
     },
     {
       "sisaNominal": 68367531,
@@ -194,7 +213,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "realisasiNominal": 69128790,
       "lingkungan": 19,
       "targetNominal": 137496321,
-      "totalWp": 840
+      "totalWp": 840,
+      "totalBermasalah": 0
     },
     {
       "persentaseRealisasi": 76.33293751744651,
@@ -204,7 +224,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "lingkungan": 20,
       "wpLunas": 335,
       "targetNominal": 57597486,
-      "sisaNominal": 13631633
+      "sisaNominal": 13631633,
+      "totalBermasalah": 0
     },
     {
       "persentaseRealisasi": 23.504276204003546,
@@ -214,7 +235,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "targetNominal": 212430230,
       "lingkungan": 21,
       "persentaseWpLunas": 42.82536151279199,
-      "totalWp": 899
+      "totalWp": 899,
+      "totalBermasalah": 0
     },
     {
       "sisaNominal": 43339509,
@@ -224,7 +246,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "realisasiNominal": 50778362,
       "lingkungan": 22,
       "totalWp": 534,
-      "persentaseRealisasi": 53.95188125324254
+      "persentaseRealisasi": 53.95188125324254,
+      "totalBermasalah": 0
     },
     {
       "targetNominal": 130948425,
@@ -234,7 +257,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "totalWp": 1166,
       "persentaseWpLunas": 52.48713550600343,
       "lingkungan": 23,
-      "sisaNominal": 68643386
+      "sisaNominal": 68643386,
+      "totalBermasalah": 0
     },
     {
       "sisaNominal": 84720726,
@@ -244,7 +268,8 @@ export const PRECOMPUTED_PBB_SUMMARY_2026 = {
       "targetNominal": 104677346,
       "persentaseRealisasi": 19.06488916904714,
       "lingkungan": 24,
-      "totalWp": 633
+      "totalWp": 633,
+      "totalBermasalah": 0
     }
   ],
   "persentaseRealisasiNominal": 39.830025445742784,

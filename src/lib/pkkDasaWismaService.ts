@@ -199,7 +199,9 @@ export const saveDasaWisma = async (
 
   if (db) {
     try {
-      await setDoc(doc(db, PKK_DASA_WISMA_COLLECTION, item.id), item, { merge: true });
+      // Deep sanitization to ensure no undefined values are written to Firestore
+      const sanitized = JSON.parse(JSON.stringify(item));
+      await setDoc(doc(db, PKK_DASA_WISMA_COLLECTION, item.id), sanitized, { merge: true });
     } catch (err) {
       console.warn('[saveDasaWisma to firestore error]:', err);
     }
@@ -225,39 +227,83 @@ export const exportDasaWismaToExcel = (items: KelompokDasaWisma[]): void => {
     'No',
     'Lingkungan',
     'Nama Kelompok Dasa Wisma',
+    'Nama Kepala Rumah Tangga (KRT)',
     'Nama Ketua Dawis',
     'Kontak HP/WA',
     'Jumlah KK',
-    'Jumlah Jiwa',
+    'Daftar Anggota Kepala Keluarga',
+    'Total Jiwa',
+    'Laki-Laki',
+    'Perempuan',
+    'PUS',
+    'WUS',
+    'Akseptor KB',
+    'Ibu Hamil',
+    'Ibu Menyusui',
+    'Ibu Nifas',
     'Jumlah Balita',
-    'Jumlah Ibu Hamil',
     'Jumlah Lansia',
+    'Makanan Pokok',
     'Jamban Sehat (KK)',
-    'SPAL Sehat (KK)',
+    'SPAL (KK)',
     'Pekarangan TOGA (KK)',
-    'Kegiatan Pokok',
+    'Sumber Air Minum',
+    'Sumber Air Bersih',
+    'Kriteria Rumah',
+    'Stiker P4K',
+    'Kegiatan Warga & PTP',
+    'Peringatan Validasi Logika',
   ];
 
-  const rows = items.map((it, idx) => [
-    idx + 1,
-    it.lingkunganNama,
-    it.namaKelompok,
-    it.namaKetuaDawis,
-    it.teleponKetua || '-',
-    it.jumlahKk,
-    it.jumlahJiwa,
-    it.jumlahBalita,
-    it.jumlahIbuHamil,
-    it.jumlahLansia,
-    it.punyaJambanSehat,
-    it.punyaSpal,
-    it.punyaToga,
-    it.kegiatanUtama || '-',
-  ]);
+  const rows = items.map((it, idx) => {
+    const ptpList: string[] = [];
+    if (it.ptpToga || it.punyaToga > 0) ptpList.push('TOGA');
+    if (it.ptpWarungHidup) ptpList.push('Warung Hidup');
+    if (it.ptpPeternakan) ptpList.push('Peternakan');
+    if (it.ptpPerikanan) ptpList.push('Perikanan');
+    if (it.kegiatanPosyandu) ptpList.push('Posyandu');
+    if (it.kegiatanUp2kKoperasi) ptpList.push('UP2K');
+
+    const daftarKkText = (it.daftarKkAnggota || [])
+      .map((k, kIdx) => `${kIdx + 1}. ${k.namaKepalaKeluarga}${k.nomorKk ? ` (${k.nomorKk})` : ''}`)
+      .join(', ') || '-';
+
+    return [
+      idx + 1,
+      it.lingkunganNama,
+      it.namaKelompok,
+      it.namaKrt || '-',
+      it.namaKetuaDawis,
+      it.teleponKetua || '-',
+      it.jumlahKk || 0,
+      daftarKkText,
+      it.jumlahJiwa || 0,
+      it.jumlahLakiLaki || 0,
+      it.jumlahPerempuan || 0,
+      it.jumlahPus || 0,
+      it.jumlahWus || 0,
+      it.jumlahAkseptorKb || 0,
+      it.jumlahIbuHamil || 0,
+      it.jumlahIbuMenyusui || 0,
+      it.jumlahIbuNifas || 0,
+      it.jumlahBalita || 0,
+      it.jumlahLansia || 0,
+      it.makananPokok || 'Beras',
+      it.punyaJambanSehat || 0,
+      it.punyaSpal || 0,
+      it.punyaToga || 0,
+      it.sumberAirMinum || 'Air Galon / Kemasan',
+      it.sumberAirBersih || 'PDAM',
+      it.kriteriaRumah || 'Layak Huni',
+      it.stikerP4k || 'Menempel',
+      ptpList.join(', ') || it.kegiatanUtama || '-',
+      it.validationWarnings ? it.validationWarnings.join('; ') : 'Valid',
+    ];
+  });
 
   const ws = XLSX.utils.aoa_to_sheet([
     ['TIM PENGGERAK PKK KELURAHAN MANGGA'],
-    ['REKAPITULASI DATA KELOMPOK DASA WISMA 24 LINGKUNGAN'],
+    ['REKAPITULASI DATA LENGKAP KELOMPOK DASA WISMA 24 LINGKUNGAN'],
     [`Dicetak pada: ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}`],
     [],
     headers,
@@ -267,5 +313,5 @@ export const exportDasaWismaToExcel = (items: KelompokDasaWisma[]): void => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Dasa Wisma PKK');
   const dateStr = new Date().toISOString().split('T')[0];
-  XLSX.writeFile(wb, `Data_Dasa_Wisma_PKK_Kelurahan_Mangga_${dateStr}.xlsx`);
+  XLSX.writeFile(wb, `Data_Dasa_Wisma_PKK_Lengkap_${dateStr}.xlsx`);
 };

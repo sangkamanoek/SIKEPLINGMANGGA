@@ -161,7 +161,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300 max-w-7xl mx-auto">
       {/* Hero Welcome Banner TP-PKK */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-tosca-800 via-tosca-700 to-tosca-800 text-white shadow-xl p-6 sm:p-8 border border-tosca-600/30">
+      <div className="relative overflow-hidden rounded-3xl bg-pkk-teal text-white shadow-xl p-6 sm:p-8 border border-pkk-dark">
         <div className="absolute right-0 top-0 translate-x-10 -translate-y-8 w-72 h-72 rounded-full bg-white/10 blur-2xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
@@ -258,18 +258,18 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
         {/* Module 1: Buku Kas Umum (BKU) */}
         <div
           onClick={() => onNavigateTab('keuangan_pkk')}
-          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-tosca-500 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
+          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-pkk-teal shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
         >
-          <div className="absolute top-0 right-0 w-24 h-24 bg-tosca-50 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
+          <div className="absolute top-0 right-0 w-24 h-24 bg-pkk-light/30 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
           <div>
-            <div className="w-12 h-12 rounded-xl bg-tosca-100 text-tosca-800 flex items-center justify-center mb-4 group-hover:bg-tosca-700 group-hover:text-white transition-colors">
+            <div className="w-12 h-12 rounded-xl bg-pkk-light text-pkk-teal flex items-center justify-center mb-4 group-hover:bg-pkk-teal group-hover:text-white transition-colors">
               <Wallet className="w-6 h-6" />
             </div>
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-base font-bold text-slate-900 group-hover:text-tosca-800 transition-colors">
+              <h2 className="text-base font-bold text-slate-900 group-hover:text-pkk-teal transition-colors">
                 Laporan Keuangan PKK
               </h2>
-              <span className="text-[10px] font-black text-tosca-800 bg-tosca-50 px-2 py-0.5 rounded-full border border-tosca-200">
+              <span className="text-[10px] font-black text-pkk-teal bg-pkk-light px-2 py-0.5 rounded-full border border-pkk-teal/20">
                 {transaksiList.length} Transaksi
               </span>
             </div>
@@ -277,7 +277,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
               Buku Kas Umum (BKU), penerimaan iuran, belanja operasional 4 Pokja, pencatatan kwitansi dan export rekapitulasi keuangan kas PKK.
             </p>
           </div>
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-tosca-700 group-hover:translate-x-1 transition-transform">
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-pkk-teal group-hover:translate-x-1 transition-transform">
             <span>Buka Buku Kas Umum</span>
             <ChevronRight className="w-4 h-4" />
           </div>
@@ -286,18 +286,18 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
         {/* Module 2: Laporan Kegiatan 4 Pokja */}
         <div
           onClick={() => onNavigateTab('kegiatan_pkk')}
-          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-tosca-500 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
+          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-pkk-teal shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
         >
-          <div className="absolute top-0 right-0 w-24 h-24 bg-tosca-50 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
+          <div className="absolute top-0 right-0 w-24 h-24 bg-pkk-light/30 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
           <div>
-            <div className="w-12 h-12 rounded-xl bg-tosca-100 text-tosca-800 flex items-center justify-center mb-4 group-hover:bg-tosca-700 group-hover:text-white transition-colors">
+            <div className="w-12 h-12 rounded-xl bg-pkk-light text-pkk-teal flex items-center justify-center mb-4 group-hover:bg-pkk-teal group-hover:text-white transition-colors">
               <FileText className="w-6 h-6" />
             </div>
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-base font-bold text-slate-900 group-hover:text-tosca-800 transition-colors">
+              <h2 className="text-base font-bold text-slate-900 group-hover:text-pkk-teal transition-colors">
                 Laporan Kegiatan PKK
               </h2>
-              <span className="text-[10px] font-black text-tosca-800 bg-tosca-50 px-2 py-0.5 rounded-full border border-tosca-200">
+              <span className="text-[10px] font-black text-pkk-teal bg-pkk-light px-2 py-0.5 rounded-full border border-pkk-teal/20">
                 {kegiatanList.length} Kegiatan
               </span>
             </div>
@@ -305,7 +305,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
               Pencatatan dan dokumentasi kegiatan Pokja I, Pokja II, Pokja III, Pokja IV, serta kegiatan TP-PKK di tingkat 24 lingkungan secara real-time.
             </p>
           </div>
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-tosca-700 group-hover:translate-x-1 transition-transform">
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-pkk-teal group-hover:translate-x-1 transition-transform">
             <span>Catat & Lihat Kegiatan</span>
             <ChevronRight className="w-4 h-4" />
           </div>
@@ -314,18 +314,18 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
         {/* Module 3: Dasa Wisma */}
         <div
           onClick={() => onNavigateTab('dasa_wisma')}
-          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-tosca-500 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
+          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-pkk-teal shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
         >
-          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
+          <div className="absolute top-0 right-0 w-24 h-24 bg-pkk-light/30 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
           <div>
-            <div className="w-12 h-12 rounded-xl bg-tosca-100 text-tosca-800 flex items-center justify-center mb-4 group-hover:bg-tosca-700 group-hover:text-white transition-colors">
+            <div className="w-12 h-12 rounded-xl bg-pkk-light text-pkk-teal flex items-center justify-center mb-4 group-hover:bg-pkk-teal group-hover:text-white transition-colors">
               <Users className="w-6 h-6" />
             </div>
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-base font-bold text-slate-900 group-hover:text-tosca-800 transition-colors">
+              <h2 className="text-base font-bold text-slate-900 group-hover:text-pkk-teal transition-colors">
                 Data Dasa Wisma
               </h2>
-              <span className="text-[10px] font-black text-tosca-800 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+              <span className="text-[10px] font-black text-pkk-teal bg-pkk-light px-2 py-0.5 rounded-full border border-pkk-teal/20">
                 {dawisStats.totalKelompok} Dasa Wisma
               </span>
             </div>
@@ -333,7 +333,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
               Database kelompok Dasa Wisma binaan PKK di 24 lingkungan. Rekap data keluarga, ibu hamil, balita, lansia, jamban sehat, dan pekarangan toga.
             </p>
           </div>
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-tosca-700 group-hover:translate-x-1 transition-transform">
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-pkk-teal group-hover:translate-x-1 transition-transform">
             <span>Buka Data Dasa Wisma</span>
             <ChevronRight className="w-4 h-4" />
           </div>

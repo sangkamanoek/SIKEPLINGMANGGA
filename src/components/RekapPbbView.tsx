@@ -581,6 +581,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [formStatus, setFormStatus] = useState<'Belum Bayar' | 'Sudah Bayar'>('Belum Bayar');
   const [formTglBayar, setFormTglBayar] = useState<string>('');
   const [formKeterangan, setFormKeterangan] = useState<string>('');
+  const [formIsBermasalah, setFormIsBermasalah] = useState<boolean>(false);
+  const [formMasalahNote, setFormMasalahNote] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
 
   // Debounced NOP check state for instant validation
@@ -634,6 +636,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     setFormLingkungan(targetLingNum);
     setFormStatus('Belum Bayar');
     setFormKeterangan('');
+    setFormIsBermasalah(false);
+    setFormMasalahNote('');
     setFormError(null);
     setIsWpModalOpen(true);
   };
@@ -655,6 +659,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     setFormStatus(item.status === 'Sudah Bayar' ? 'Sudah Bayar' : 'Belum Bayar');
     setFormTglBayar(item.tglBayar || (item.status === 'Sudah Bayar' ? (item.updatedAt ? item.updatedAt.split('T')[0] : new Date().toISOString().split('T')[0]) : ''));
     setFormKeterangan(item.keterangan || '');
+    setFormIsBermasalah(Boolean(item.isBermasalah));
+    setFormMasalahNote(item.masalahNote || '');
     setFormError(null);
     setIsWpModalOpen(true);
   };
@@ -709,6 +715,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         lingkungan: formLingkungan,
         status: formStatus,
         keterangan: formKeterangan.trim(),
+        isBermasalah: formIsBermasalah,
+        masalahNote: formMasalahNote.trim(),
         tglBayar: effectiveTglBayar,
         updatedAt: new Date().toISOString(),
       };
@@ -737,6 +745,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         lingkungan: formLingkungan,
         status: formStatus,
         keterangan: formKeterangan.trim(),
+        isBermasalah: formIsBermasalah,
+        masalahNote: formMasalahNote.trim(),
         tglBayar: formStatus === 'Sudah Bayar' ? todayIso : null,
         updatedAt: new Date().toISOString(),
       };
@@ -812,7 +822,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
   // Dynamic summary data per Lingkungan
   const summaryByLingkungan = useMemo(() => {
-    const dataMap: Record<number, { targetNominal: number; realisasiNominal: number; totalWp: number; wpLunas: number }> = {};
+    const dataMap: Record<number, { targetNominal: number; realisasiNominal: number; totalWp: number; wpLunas: number; bermasalahCount: number }> = {};
 
     // Initialize 24 Lingkungan with 0 baseline
     for (let i = 1; i <= 24; i++) {
@@ -821,6 +831,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         realisasiNominal: 0,
         totalWp: 0,
         wpLunas: 0,
+        bermasalahCount: 0,
       };
     }
 
@@ -835,6 +846,9 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           dataMap[ling].wpLunas += 1;
           const actualPaid = item.jumlahBayar !== undefined && item.jumlahBayar !== null ? Number(item.jumlahBayar) : nominal;
           dataMap[ling].realisasiNominal += actualPaid;
+        }
+        if (item.isBermasalah) {
+          dataMap[ling].bermasalahCount += 1;
         }
       }
     });
@@ -852,6 +866,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         totalWp: val.totalWp,
         wpLunas: val.wpLunas,
         wpBelumLunas: Math.max(0, val.totalWp - val.wpLunas),
+        totalBermasalah: val.bermasalahCount,
         targetNominal: target,
         realisasiNominal: realisasi,
         sisaNominal: Math.max(0, target - realisasi),
@@ -912,11 +927,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     let realisasi = 0;
     let wp = 0;
     let lunas = 0;
+    let bermasalah = 0;
 
     if (selectedLingkungan === 'all') {
       wp = spptList.length;
       const lunasItems = spptList.filter(item => item.status === 'Sudah Bayar');
       lunas = lunasItems.length;
+      bermasalah = spptList.filter(item => item.isBermasalah).length;
       target = spptList.reduce((acc, item) => acc + (Number(item.pbbTerutang) || 0), 0);
       realisasi = lunasItems.reduce((acc, item) => {
         const actualPaid = item.jumlahBayar !== undefined && item.jumlahBayar !== null 
@@ -930,6 +947,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         realisasi += item.realisasiNominal;
         wp += item.totalWp;
         lunas += item.wpLunas;
+        bermasalah += item.totalBermasalah;
       });
     }
 
@@ -943,6 +961,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       totalWp: wp,
       wpLunas: lunas,
       wpBelumLunas: Math.max(0, wp - lunas),
+      totalBermasalah: bermasalah,
       persentaseRealisasi: persentase,
       persentaseWpLunas: persentaseWp,
     };
@@ -1044,6 +1063,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           if (item.status !== 'Belum Bayar' || item.pbbTerutang < 500000) return false;
         } else if (selectedNopClassification === 'menunggak_kecil') {
           if (item.status !== 'Belum Bayar' || item.pbbTerutang >= 500000) return false;
+        } else if (selectedNopClassification === 'bermasalah') {
+          if (!item.isBermasalah) return false;
         } else if (selectedNopClassification === 'blok_ganjil') {
           const clean = stripNonDigits(item.nop);
           if (clean.length >= 13) {
@@ -1778,7 +1799,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       )}
 
       {/* Summary KPI Cards */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isKepling ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-4`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isKepling ? 'lg:grid-cols-5' : 'lg:grid-cols-6'} gap-4`}>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Ketetapan (Target)</span>
@@ -1838,6 +1859,21 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           <div className="flex justify-between text-[11px] font-semibold text-slate-600 pt-0.5">
             <span>{kelurahanTotals.persentaseWpLunas.toFixed(1)}% Lunas</span>
             <span>{kelurahanTotals.wpBelumLunas.toLocaleString('id-ID')} Belum</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50/50 to-white shadow-2xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">NOP Bermasalah</span>
+            <div className="p-2 bg-rose-100 text-rose-700 rounded-xl">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-lg sm:text-xl font-black text-rose-900">
+            {kelurahanTotals.totalBermasalah.toLocaleString('id-ID')} <span className="text-xs text-slate-500 font-normal">NOP</span>
+          </div>
+          <div className="text-[10px] text-rose-700 font-medium leading-tight pt-1">
+            Laporan kendala penagihan PBB dari lapangan oleh Kepling.
           </div>
         </div>
 
@@ -2560,6 +2596,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                 >
                   <option value="all">📁 Semua Golongan NOP</option>
                   <option value="nop_baru" className="text-rose-600 font-black">🆕 NOP BARU (Belum Masuk Lingkungan)</option>
+                  <option value="bermasalah" className="text-rose-700 font-black bg-rose-50">❌ NOP BERMASALAH (Laporan Lapangan)</option>
                   <option value="diskon_pembayaran" className="text-emerald-700 font-black bg-emerald-50">🏷️ Mendapat Diskon / Keringanan Pembayaran (Stimulus PBB)</option>
                   <option value="buku_1">📗 Buku 1 (Ketetapan ≤ Rp 100rb)</option>
                   <option value="buku_2">📘 Buku 2 (Rp 100rb - Rp 500rb)</option>
@@ -2723,6 +2760,12 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                           {item.jumlahBayar !== undefined && item.jumlahBayar !== null && item.jumlahBayar > item.pbbTerutang && (
                             <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-100 text-purple-900 border border-purple-300 flex items-center gap-1 whitespace-nowrap" title={`Termasuk Denda Keterlambatan Pembayaran PBB (+${formatRupiah(item.jumlahBayar - item.pbbTerutang)})`}>
                               ⚡ +DENDA
+                            </span>
+                          )}
+                          {item.isBermasalah && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-100 text-rose-900 border border-rose-300 flex items-center gap-1 whitespace-nowrap animate-pulse" title={item.masalahNote || 'Laporan kendala lapangan'}>
+                              <AlertTriangle className="w-3 h-3 text-rose-600" />
+                              <span>! BERMASALAH</span>
                             </span>
                           )}
                         </div>
@@ -3509,11 +3552,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                     {(() => {
                       const base = parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10) || 0;
                       const currentPaid = parseInt(formJumlahBayar.replace(/[^0-9]/g, ''), 10) || 0;
+                      const val1Pct = base > 0 ? base + Math.round(base * 0.01) : 0;
                       const val2Pct = base > 0 ? base + Math.round(base * 0.02) : 0;
-                      const val4Pct = base > 0 ? base + Math.round(base * 0.04) : 0;
                       const val10Disc = base > 0 ? base - Math.round(base * 0.10) : 0;
+                      const is1Pct = base > 0 && currentPaid === val1Pct;
                       const is2Pct = base > 0 && currentPaid === val2Pct;
-                      const is4Pct = base > 0 && currentPaid === val4Pct;
                       const is10Disc = base > 0 && currentPaid === val10Disc;
                       const isFull = base > 0 && currentPaid === base;
 
@@ -3525,9 +3568,27 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                               type="button"
                               onClick={() => {
                                 if (base > 0) {
+                                  const denda1 = Math.round(base * 0.01);
+                                  setFormJumlahBayar(String(base + denda1));
+                                  setFormKeterangan('Termasuk Denda Keterlambatan PBB 1% (1 Bulan)');
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold cursor-pointer border transition-all ${
+                                is1Pct
+                                  ? 'bg-purple-700 text-white border-purple-800 shadow-xs ring-1 ring-purple-400'
+                                  : 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300'
+                              }`}
+                              title="Denda 1% keterlambatan 1 bulan (Aturan Baru)"
+                            >
+                              ⚡ Denda 1% (1 bln)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (base > 0) {
                                   const denda2 = Math.round(base * 0.02);
                                   setFormJumlahBayar(String(base + denda2));
-                                  setFormKeterangan('Termasuk Denda Keterlambatan PBB 2% (1 Bulan)');
+                                  setFormKeterangan('Termasuk Denda Keterlambatan PBB 2% (2 Bulan)');
                                 }
                               }}
                               className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold cursor-pointer border transition-all ${
@@ -3535,27 +3596,9 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                                   ? 'bg-purple-700 text-white border-purple-800 shadow-xs ring-1 ring-purple-400'
                                   : 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300'
                               }`}
-                              title="Denda 2% keterlambatan 1 bulan (lewat 30 September)"
+                              title="Denda 2% keterlambatan 2 bulan"
                             >
-                              ⚡ Denda 2% (1 bln)
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (base > 0) {
-                                  const denda4 = Math.round(base * 0.04);
-                                  setFormJumlahBayar(String(base + denda4));
-                                  setFormKeterangan('Termasuk Denda Keterlambatan PBB 4% (2 Bulan)');
-                                }
-                              }}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold cursor-pointer border transition-all ${
-                                is4Pct
-                                  ? 'bg-purple-700 text-white border-purple-800 shadow-xs ring-1 ring-purple-400'
-                                  : 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300'
-                              }`}
-                              title="Denda 4% keterlambatan 2 bulan"
-                            >
-                              ⚡ Denda 4% (2 bln)
+                              ⚡ Denda 2% (2 bln)
                             </button>
                             <button
                               type="button"
@@ -3625,6 +3668,52 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                     })()}
                   </div>
                 )}
+                {/* Tandai Bermasalah */}
+                <div className="space-y-2 sm:col-span-2 p-4 bg-rose-50/50 border border-rose-200/60 rounded-2xl mt-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-rose-900 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-rose-600" />
+                      <span>NOP BERMASALAH?</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setFormIsBermasalah(!formIsBermasalah)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                        formIsBermasalah ? 'bg-rose-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          formIsBermasalah ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  
+                  {formIsBermasalah && (
+                    <div className="space-y-1.5 pt-1 animate-fade-in">
+                      <label className="text-[10px] font-bold text-rose-800 uppercase tracking-tight">Jenis / Catatan Masalah:</label>
+                      <select
+                        value={formMasalahNote}
+                        onChange={(e) => setFormMasalahNote(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-xl border border-rose-300 text-xs font-bold text-rose-950 bg-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                      >
+                        <option value="">-- Pilih Jenis Masalah --</option>
+                        <option value="Objek Pajak Tidak Ditemukan">Objek Pajak Tidak Ditemukan</option>
+                        <option value="WP Sudah Meninggal / Pindah">WP Sudah Meninggal / Pindah</option>
+                        <option value="Nama Berbeda dengan Sertifikat">Nama Berbeda dengan Sertifikat</option>
+                        <option value="Alamat Tidak Jelas">Alamat Tidak Jelas</option>
+                        <option value="NOP Ganda">NOP Ganda</option>
+                        <option value="Bangunan Sudah Runtuh/Dihapus">Bangunan Sudah Runtuh/Dihapus</option>
+                        <option value="Sengketa Lahan">Sengketa Lahan</option>
+                        <option value="Masalah Lainnya (Tulis di Keterangan)">Masalah Lainnya</option>
+                      </select>
+                      <p className="text-[10px] text-rose-600 font-medium">
+                        * NOP bertanda masalah akan muncul di rekapitulasi khusus NOP Bermasalah.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
               </div>
 
