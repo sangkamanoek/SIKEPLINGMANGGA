@@ -120,6 +120,15 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     return 'all';
   });
 
+  // Ensure kepling is strictly locked to their own lingkungan
+  useEffect(() => {
+    if (isKepling && keplingLingkunganNum) {
+      if (selectedLingkungan !== String(keplingLingkunganNum)) {
+        setSelectedLingkungan(String(keplingLingkunganNum));
+      }
+    }
+  }, [isKepling, keplingLingkunganNum, selectedLingkungan]);
+
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [selectedNopClassification, setSelectedNopClassification] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -1800,14 +1809,14 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
       {/* Summary KPI Cards */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${isKepling ? 'lg:grid-cols-5' : 'lg:grid-cols-6'} gap-4`}>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2 overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Ketetapan (Target)</span>
             <div className="p-2 bg-slate-100 text-slate-700 rounded-xl">
               <Coins className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-black text-slate-900">{formatRupiah(kelurahanTotals.targetNominal)}</div>
+          <div className="text-sm sm:text-base md:text-lg font-black text-slate-900 tracking-tight break-words">{formatRupiah(kelurahanTotals.targetNominal)}</div>
           <div className="text-xs text-slate-500 font-medium">
             {selectedLingkungan === 'all'
               ? 'Akumulasi 24 Lingkungan Kelurahan'
@@ -1815,41 +1824,41 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-white shadow-2xs space-y-2">
+        <div className="bg-white p-5 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-white shadow-2xs space-y-2 overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Total Realisasi Terbayar</span>
             <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-black text-emerald-900">{formatRupiah(kelurahanTotals.realisasiNominal)}</div>
+          <div className="text-sm sm:text-base md:text-lg font-black text-emerald-900 tracking-tight break-words">{formatRupiah(kelurahanTotals.realisasiNominal)}</div>
           <div className="flex items-center gap-1 text-xs font-bold text-emerald-700">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Capaian Nominal: {kelurahanTotals.persentaseRealisasi.toFixed(2)}%</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/40 to-white shadow-2xs space-y-2">
+        <div className="bg-white p-5 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/40 to-white shadow-2xs space-y-2 overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">Sisa Tunggakan PBB</span>
             <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
               <XCircle className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-black text-amber-900">{formatRupiah(kelurahanTotals.sisaNominal)}</div>
+          <div className="text-sm sm:text-base md:text-lg font-black text-amber-900 tracking-tight break-words">{formatRupiah(kelurahanTotals.sisaNominal)}</div>
           <div className="text-xs text-amber-700 font-medium">
             Belum Terbayar: {(100 - kelurahanTotals.persentaseRealisasi).toFixed(2)}%
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2 overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Status Wajib Pajak (WP)</span>
             <div className="p-2 bg-teal-100 text-teal-700 rounded-xl">
               <BarChart3 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-black text-slate-900">
+          <div className="text-sm sm:text-base md:text-lg font-black text-slate-900 tracking-tight break-words">
             {kelurahanTotals.wpLunas.toLocaleString('id-ID')}{' '}
             <span className="text-xs text-slate-500 font-normal">/ {kelurahanTotals.totalWp.toLocaleString('id-ID')} WP</span>
           </div>
@@ -1862,14 +1871,14 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50/50 to-white shadow-2xs space-y-2">
+        <div className="bg-white p-5 rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50/50 to-white shadow-2xs space-y-2 overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">NOP Bermasalah</span>
             <div className="p-2 bg-rose-100 text-rose-700 rounded-xl">
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-black text-rose-900">
+          <div className="text-sm sm:text-base md:text-lg font-black text-rose-900 tracking-tight break-words">
             {kelurahanTotals.totalBermasalah.toLocaleString('id-ID')} <span className="text-xs text-slate-500 font-normal">NOP</span>
           </div>
           <div className="text-[10px] text-rose-700 font-medium leading-tight pt-1">
@@ -1879,14 +1888,14 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
         {/* Progres Bulanan PBB (Hanya untuk Super Admin / Kasi Pemerintahan, disembunyikan untuk Akun Kepling) */}
         {!isKepling && (
-          <div className="bg-white p-5 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/40 to-white shadow-2xs space-y-2">
+          <div className="bg-white p-5 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/40 to-white shadow-2xs space-y-2 overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Progres Bulanan (PBB)</span>
               <div className="p-2 bg-indigo-100 text-indigo-700 rounded-xl">
                 <Calendar className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-lg sm:text-xl font-black text-indigo-900">
+            <div className="text-sm sm:text-base md:text-lg font-black text-indigo-900 tracking-tight break-words">
               {formatRupiah(monthlyProgress.nominalBulanIni)}
             </div>
             <div className="flex items-center gap-1 text-[11px] font-black text-emerald-600">
@@ -2608,22 +2617,27 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   <option value="blok_genap">🔢 Blok NOP Genap</option>
                 </select>
 
-                <select
-                  value={selectedLingkungan}
-                  onChange={(e) => setSelectedLingkungan(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  {!isKepling && <option value="all">Semua Lingkungan (1-24)</option>}
-                  {!isKepling && spptList.some(item => item.lingkungan === 0) && (
-                    <option value="0" className="text-rose-600 font-extrabold bg-rose-50">⚠️ TERDETEKSI NOP BARU (0)</option>
-                  )}
-                  {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={String(n)}>
-                      Lingkungan {n} {isKepling && n === keplingLingkunganNum ? '👑 (Lingkungan Anda)' : ''}
-                    </option>
-                  ))}
-                  {isKepling && <option value="all">Tampilkan Semua Lingkungan</option>}
-                </select>
+                {isKepling ? (
+                  <div className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-xs font-black text-emerald-900 flex items-center gap-2 shadow-xs">
+                    <span>👑 Lingkungan {keplingLingkunganNum} (Wilayah Anda)</span>
+                  </div>
+                ) : (
+                  <select
+                    value={selectedLingkungan}
+                    onChange={(e) => setSelectedLingkungan(e.target.value)}
+                    className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="all">Semua Lingkungan (1-24)</option>
+                    {spptList.some(item => item.lingkungan === 0) && (
+                      <option value="0" className="text-rose-600 font-extrabold bg-rose-50">⚠️ TERDETEKSI NOP BARU (0)</option>
+                    )}
+                    {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={String(n)}>
+                        Lingkungan {n}
+                      </option>
+                    ))}
+                  </select>
+                )}
 
                 {canManageWp && (searchQuery || selectedLingkungan !== 'all' || selectedNopClassification !== 'all') && filteredSpptList.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5">

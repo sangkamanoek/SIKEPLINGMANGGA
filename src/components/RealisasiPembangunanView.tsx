@@ -2101,12 +2101,12 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
 
                     {/* SUPERVISI SUPER ADMIN: SUDAH DITANGANI / BELUM */}
                     {(currentUser.role === 'super_admin' || isKelurahanAdmin(currentUser.role)) && (
-                      <div className="p-3 sm:p-3.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl border border-indigo-500/40 flex flex-wrap items-center justify-between gap-3 shadow-md">
-                        <div className="flex items-center gap-2.5">
+                      <div className="p-3 sm:p-3.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl border border-indigo-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md overflow-hidden">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 shrink-0">
                             <Shield className="w-4 h-4" />
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-[11px] font-black text-white uppercase tracking-wider">
                                 Supervisi Super Admin
@@ -2119,39 +2119,39 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                                 Status: {mon.statusTindakLanjut === 'SELESAI_DIPERBAIKI' ? 'Sudah Ditangani' : 'Belum Ditangani'}
                               </span>
                             </div>
-                            <p className="text-[10px] text-slate-300">
+                            <p className="text-[10px] text-slate-300 truncate">
                               Ubah status tindak lanjut monitoring dengan 1 klik:
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800">
                           <button
                             type="button"
                             onClick={() => handleToggleSupervisiStatus(mon, 'SELESAI_DIPERBAIKI')}
-                            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                            className={`px-3 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
                               mon.statusTindakLanjut === 'SELESAI_DIPERBAIKI'
                                 ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-900'
                                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-emerald-300 border border-slate-700'
                             }`}
                             title="Tandai Sudah Ditangani"
                           >
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                            <span>Sudah Ditangani</span>
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <span className="truncate">Sudah Ditangani</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => handleToggleSupervisiStatus(mon, 'MENUNGGU_TINDAK_LANJUT')}
-                            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                            className={`px-3 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
                               mon.statusTindakLanjut !== 'SELESAI_DIPERBAIKI'
                                 ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-400 ring-offset-2 ring-offset-slate-900'
                                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-rose-300 border border-slate-700'
                             }`}
                             title="Tandai Belum Ditangani"
                           >
-                            <AlertCircle className="w-4 h-4 text-rose-400" />
-                            <span>Belum Ditangani</span>
+                            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                            <span className="truncate">Belum Ditangani</span>
                           </button>
                         </div>
                       </div>

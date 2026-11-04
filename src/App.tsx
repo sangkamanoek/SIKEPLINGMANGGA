@@ -49,7 +49,8 @@ import { NotifikasiSoundSettingsModal } from './components/NotifikasiSoundSettin
 import { useAgendaTugasRealtimeAlert } from './hooks/useAgendaTugasRealtimeAlert';
 
 import { getDefaultTargetsCapaianMap } from './data/targetsData';
-import { fetchAllReports, saveReportToServer, subscribeReportsFromFirestore } from './lib/reportsApi';
+import { fetchAllReports, saveReportToServer, subscribeReportsFromFirestore, deleteReportFromServer } from './lib/reportsApi';
+import { DetailLaporanModal } from './components/DetailLaporanModal';
 import { subscribeKunjungan, KunjunganWargaData } from './lib/kunjunganService';
 import { getTodayLocalIso } from './lib/formatter';
 import { safeGetLocalStorage, safeSetLocalStorage } from './lib/safeStorage';
@@ -238,6 +239,30 @@ export default function App() {
     showToast('Berhasil keluar dari akun.', 'info');
   };
 
+  const [selectedReportForModal, setSelectedReportForModal] = useState<LaporanHarianItem | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
+
+  const handleSelectReport = (report: LaporanHarianItem) => {
+    setSelectedReportForModal(report);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleUpdateReport = async (updatedItem: LaporanHarianItem) => {
+    const updated = reports.map((r) => (r.id === updatedItem.id ? updatedItem : r));
+    setReports(updated);
+    safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(updated));
+    await saveReportToServer(updatedItem).catch(() => {});
+    showToast('Laporan harian berhasil diperbarui!', 'success');
+  };
+
+  const handleDeleteReport = async (id: string) => {
+    const updated = reports.filter((r) => r.id !== id);
+    setReports(updated);
+    safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(updated));
+    await deleteReportFromServer(id).catch(() => {});
+    showToast('Laporan harian berhasil dihapus.', 'success');
+  };
+
   const handleSaveReport = async (item: LaporanHarianItem) => {
     const updated = [item, ...reports.filter((r) => r.id !== item.id)];
     setReports(updated);
@@ -270,7 +295,7 @@ export default function App() {
         setActiveTab('hub');
       }
     } else if (activeAccount?.role === 'kepling') {
-      const restrictedForKepling = ['monitoring', 'rekap_pbb', 'surat_kedinasan'];
+      const restrictedForKepling = ['monitoring', 'surat_kedinasan'];
       if (restrictedForKepling.includes(activeTab)) {
         setActiveTab('hub');
       }
@@ -370,7 +395,7 @@ export default function App() {
         {activeTab === 'monitoring' && (
           <MonitoringSuperAdmin
             reports={reports}
-            onSelectReport={() => {}}
+            onSelectReport={handleSelectReport}
             onDraftForKepling={handleDraftForKepling}
             onSwitchToRiwayat={handleSwitchToRiwayat}
             onOpenCapaianDashboard={() => handleTabChange('capaian_admin')}
@@ -385,11 +410,12 @@ export default function App() {
             isLoading={false}
             onRefresh={() => {}}
             sheetMeta={null}
-            onSelectReport={() => {}}
+            onSelectReport={handleSelectReport}
             hasGoogleAuth={false}
             activeAccount={activeAccount}
             initialPetugasFilter={selectedRiwayatKepling}
             isAdmin={activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris'}
+            onDeleteReport={activeAccount?.role === 'super_admin' ? handleDeleteReport : undefined}
           />
         )}
 
@@ -605,6 +631,21 @@ export default function App() {
         isOpen={isNotifSoundModalOpen}
         onClose={() => setIsNotifSoundModalOpen(false)}
         currentUser={activeAccount}
+      />
+
+      <DetailLaporanModal
+        item={selectedReportForModal}
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedReportForModal(null);
+        }}
+        sheetMeta={null}
+        hasGoogleAuth={false}
+        isAdmin={activeAccount?.role === 'super_admin' || activeAccount?.role === 'sekretaris'}
+        attendanceList={attendanceList}
+        onUpdateReport={handleUpdateReport}
+        onDeleteReport={activeAccount?.role === 'super_admin' ? handleDeleteReport : undefined}
       />
 
       {/* Floating Toast Notification */}

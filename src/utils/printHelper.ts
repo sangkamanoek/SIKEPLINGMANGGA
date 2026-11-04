@@ -30,7 +30,7 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
         <style>
           @page {
             size: A4 portrait;
-            margin: 10mm 12mm 12mm 12mm;
+            margin: 8mm 8mm 10mm 20mm; /* Margin kiri 20mm khusus binder & lubang perforator */
           }
           * {
             box-sizing: border-box;
@@ -43,11 +43,11 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
             background: #ffffff !important;
             color: #0f172a;
             font-family: 'Times New Roman', Times, serif, 'Segoe UI', sans-serif;
-            font-size: 11px;
-            line-height: 1.5;
+            font-size: 10px;
+            line-height: 1.35;
           }
           body {
-            padding: 10px 14px;
+            padding: 2px 4px;
           }
           img {
             max-width: 100%;
@@ -62,15 +62,22 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
           table:not(.no-print-border) th,
           table:not(.no-print-border) td {
             border: 1px solid #000000;
-            padding: 6px 8px;
+            padding: 3px 5px;
             text-align: left;
-            font-size: 10px;
-            vertical-align: top;
+            font-size: 9px;
+            vertical-align: middle;
+            line-height: 1.25;
           }
           table:not(.no-print-border) th {
             background-color: #f1f5f9;
             font-weight: 700;
             color: #000000;
+          }
+          .table-compact th,
+          .table-compact td {
+            padding: 2.5px 3.5px !important;
+            font-size: 8.5px !important;
+            line-height: 1.2 !important;
           }
           /* KTA Card styling isolation so no black borders or giant table padding ever leak into ID cards */
           .kta-card-root, .kta-card-root * {

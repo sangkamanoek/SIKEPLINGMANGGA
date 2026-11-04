@@ -363,6 +363,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         Alamat: v.alamat,
         Perlinsos: v.perlinsos || '-',
         IKD: v.ikd || '-',
+        'BPJS TK': v.bpjsTk || '-',
         'Pembayaran PBB': v.pbb || '-',
         'Kategori Program': v.kategoriBansos || '-',
         'Status Penyaluran': v.statusBansos || '-',
@@ -386,6 +387,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
           'Alamat',
           'Perlinsos',
           'IKD',
+          'BPJS TK',
           'Pembayaran PBB',
           'Kategori Program',
           'Status Penyaluran',
@@ -401,6 +403,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
           r.Alamat,
           r.Perlinsos,
           r.IKD,
+          r['BPJS TK'],
           r['Pembayaran PBB'],
           r['Kategori Program'],
           r['Status Penyaluran'],
@@ -733,6 +736,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                   <th className="p-3.5">Alamat</th>
                   <th className="p-3.5 text-center">Perlinsos</th>
                   <th className="p-3.5 text-center">IKD</th>
+                  <th className="p-3.5 text-center">BPJS</th>
                   <th className="p-3.5 text-center">PBB</th>
                   <th className="p-3.5 text-center">Foto</th>
                   <th className="p-3.5">Catatan</th>
@@ -776,6 +780,19 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                         }`}
                       >
                         {item.ikd || '-'}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-center whitespace-nowrap">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          item.bpjsTk === 'Aktif' || item.bpjsTk === 'Sudah Daftar (Agen Perisai)'
+                            ? 'bg-purple-100 text-purple-800'
+                            : item.bpjsTk === 'Non-Aktif'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {item.bpjsTk || '-'}
                       </span>
                     </td>
                     <td className="p-3.5 text-center whitespace-nowrap">
@@ -997,7 +1014,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                   );
                 })()}
 
-                <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                <div className="grid grid-cols-4 gap-1.5 text-center text-[10px]">
                   <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
                     <div className="text-slate-400 font-medium">Perlinsos</div>
                     <div className="font-bold text-slate-800">{item.perlinsos || '-'}</div>
@@ -1005,6 +1022,10 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                   <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
                     <div className="text-slate-400 font-medium">IKD</div>
                     <div className="font-bold text-slate-800">{item.ikd || '-'}</div>
+                  </div>
+                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                    <div className="text-slate-400 font-medium">BPJS</div>
+                    <div className="font-bold text-purple-800">{item.bpjsTk || '-'}</div>
                   </div>
                   <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
                     <div className="text-slate-400 font-medium">PBB</div>

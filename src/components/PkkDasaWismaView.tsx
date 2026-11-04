@@ -47,6 +47,73 @@ import {
   validateDasaWismaData,
   generateDasaWismaSheetsCsv,
 } from '../lib/dasaWismaAiParser';
+import {
+  ROMAN_NUMERALS,
+  formatNamaEyd,
+  formatKelompokEyd,
+  formatAlamatEyd,
+  formatTeksEyd,
+  formatNomorTelepon,
+  formatTanggalResmiIndonesia,
+} from '../utils/eydHelper';
+
+export { ROMAN_NUMERALS };
+
+export const getLingkunganRoman = (nomor?: number | string | null): string => {
+  if (!nomor) return 'Lingkungan I';
+  const n = typeof nomor === 'string' ? parseInt(nomor.replace(/[^0-9]/g, ''), 10) : nomor;
+  if (n >= 1 && n <= 24) {
+    return `Lingkungan ${ROMAN_NUMERALS[n - 1]}`;
+  }
+  return typeof nomor === 'string' && nomor.trim() ? nomor : `Lingkungan ${nomor}`;
+};
+
+export const resolveItemLingkungan = (item?: Partial<KelompokDasaWisma> | null, activeUser?: UserAccount): string => {
+  if (!item) return 'Lingkungan I';
+
+  // 1. If lingkunganNomor is valid (1-24)
+  if (typeof item.lingkunganNomor === 'number' && item.lingkunganNomor >= 1 && item.lingkunganNomor <= 24) {
+    return `Lingkungan ${ROMAN_NUMERALS[item.lingkunganNomor - 1]}`;
+  }
+
+  // 2. If lingkunganNama exists and contains a Roman numeral or digit
+  if (item.lingkunganNama && item.lingkunganNama.trim()) {
+    const raw = item.lingkunganNama.trim();
+    const matchDigit = raw.match(/\d+/);
+    if (matchDigit) {
+      const num = parseInt(matchDigit[0], 10);
+      if (num >= 1 && num <= 24) return `Lingkungan ${ROMAN_NUMERALS[num - 1]}`;
+    }
+    for (let i = 23; i >= 0; i--) {
+      const rom = ROMAN_NUMERALS[i];
+      const regex = new RegExp(`\\b${rom}\\b`, 'i');
+      if (regex.test(raw)) return `Lingkungan ${rom}`;
+    }
+    return raw;
+  }
+
+  // 3. Check createdByName (e.g. "Ketua PKK Lingkungan I")
+  if (item.createdByName) {
+    const raw = item.createdByName;
+    const matchDigit = raw.match(/lingkungan\s*(\d+)/i);
+    if (matchDigit) {
+      const num = parseInt(matchDigit[1], 10);
+      if (num >= 1 && num <= 24) return `Lingkungan ${ROMAN_NUMERALS[num - 1]}`;
+    }
+    for (let i = 23; i >= 0; i--) {
+      const rom = ROMAN_NUMERALS[i];
+      const regex = new RegExp(`lingkungan\\s*${rom}\\b`, 'i');
+      if (regex.test(raw)) return `Lingkungan ${rom}`;
+    }
+  }
+
+  // 4. Fallback to activeUser if activeUser is PKK Lingkungan
+  if (activeUser?.nomorLingkungan && activeUser.nomorLingkungan >= 1 && activeUser.nomorLingkungan <= 24) {
+    return `Lingkungan ${ROMAN_NUMERALS[activeUser.nomorLingkungan - 1]}`;
+  }
+
+  return 'Lingkungan I';
+};
 
 interface PkkDasaWismaViewProps {
   currentUser: UserAccount;
@@ -54,6 +121,10 @@ interface PkkDasaWismaViewProps {
 }
 
 export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser, onShowToast }) => {
+  const isPkkLingkungan =
+    currentUser?.role === 'ketua_pkk_lingkungan' ||
+    (typeof currentUser?.nomorLingkungan === 'number' && currentUser.nomorLingkungan >= 1);
+
   const [dawisList, setDawisList] = useState<KelompokDasaWisma[]>([]);
   const [allKeluargaList, setAllKeluargaList] = useState<DataKeluarga[]>([]);
   const [filterLingkungan, setFilterLingkungan] = useState<string>('ALL');
@@ -69,6 +140,7 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
   // Modals
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<KelompokDasaWisma | null>(null);
+  const [printingItem, setPrintingItem] = useState<KelompokDasaWisma | null>(null);
 
   // Anggota Kepala Keluarga (KK) State
   const [formDaftarKk, setFormDaftarKk] = useState<KkAnggotaDasaWisma[]>([]);
@@ -349,9 +421,9 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
 
     const newKk: KkAnggotaDasaWisma = {
       id: 'kk_man_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      namaKepalaKeluarga: manualKkNama.trim(),
+      namaKepalaKeluarga: formatNamaEyd(manualKkNama),
       nomorKk: manualKkNomor.trim() || undefined,
-      alamat: manualKkAlamat.trim() || undefined,
+      alamat: manualKkAlamat.trim() ? formatAlamatEyd(manualKkAlamat) : undefined,
       jumlahJiwa: parseInt(manualKkJiwa, 10) || 0,
       jumlahLakiLaki: parseInt(manualKkLaki, 10) || 0,
       jumlahPerempuan: parseInt(manualKkPerempuan, 10) || 0,
@@ -452,11 +524,15 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
   const handleOpenAdd = () => {
     setEditingItem(null);
     setFormNama('');
-    setFormLingkunganNomor(currentUser.nomorLingkungan || 1);
+    const defaultLkNomor =
+      typeof currentUser?.nomorLingkungan === 'number' && currentUser.nomorLingkungan >= 1
+        ? currentUser.nomorLingkungan
+        : 1;
+    setFormLingkunganNomor(defaultLkNomor);
     setFormNamaKetua('');
     setFormNamaKrt('');
     setFormTelepon('');
-    setFormRtRw('00/00');
+    setFormRtRw('');
     setFormDaftarKk([]);
     setFormJumlahKk('');
     setFormJumlahJiwa('');
@@ -533,6 +609,23 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
     setIsModalOpen(true);
   };
 
+  const handleFormatAllEyd = () => {
+    if (formNama) setFormNama(formatKelompokEyd(formNama));
+    if (formNamaKetua) setFormNamaKetua(formatNamaEyd(formNamaKetua));
+    if (formNamaKrt) setFormNamaKrt(formatNamaEyd(formNamaKrt));
+    if (formTelepon) setFormTelepon(formatNomorTelepon(formTelepon));
+    if (formDaftarKk.length > 0) {
+      setFormDaftarKk((prev) =>
+        prev.map((k) => ({
+          ...k,
+          namaKepalaKeluarga: formatNamaEyd(k.namaKepalaKeluarga),
+          alamat: k.alamat ? formatAlamatEyd(k.alamat) : undefined,
+        }))
+      );
+    }
+    showAlert('✨ Seluruh isian telah dirapikan otomatis sesuai kaidah EYD Bahasa Indonesia!', 'success');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNama.trim()) {
@@ -546,17 +639,34 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
 
     setIsSubmitting(true);
     try {
+      const resolvedLkNum = isPkkLingkungan && typeof currentUser.nomorLingkungan === 'number' && currentUser.nomorLingkungan >= 1
+        ? currentUser.nomorLingkungan
+        : (formLingkunganNomor || 1);
+      const resolvedLkNama = `Lingkungan ${ROMAN_NUMERALS[resolvedLkNum - 1]}`;
       const computedJumlahKk = formDaftarKk.length > 0 ? formDaftarKk.length : (parseInt(formJumlahKk, 10) || 0);
 
+      const formattedNamaKelompok = formatKelompokEyd(formNama);
+      const formattedNamaKetua = formatNamaEyd(formNamaKetua);
+      const formattedNamaKrt = formatNamaEyd(formNamaKrt);
+      const formattedTelepon = formatNomorTelepon(formTelepon);
+      const formattedCreatedBy = formatNamaEyd(currentUser.nama || `Ketua PKK ${resolvedLkNama}`);
+
+      const cleanedDaftarKk = formDaftarKk.map((kk) => ({
+        ...kk,
+        namaKepalaKeluarga: formatNamaEyd(kk.namaKepalaKeluarga),
+        alamat: kk.alamat ? formatAlamatEyd(kk.alamat) : undefined,
+      }));
+
       const rawObj: Partial<KelompokDasaWisma> = {
-        namaKelompok: formNama.trim(),
-        lingkunganNomor: formLingkunganNomor,
-        lingkunganNama: `Lingkungan ${formLingkunganNomor}`,
-        namaKetuaDawis: formNamaKetua.trim(),
-        namaKrt: formNamaKrt.trim(),
-        teleponKetua: formTelepon.trim(),
-        rtRw: formRtRw.trim(),
-        daftarKkAnggota: formDaftarKk,
+        namaKelompok: formattedNamaKelompok,
+        lingkunganNomor: resolvedLkNum,
+        lingkunganNama: resolvedLkNama,
+        namaKetuaDawis: formattedNamaKetua,
+        namaKrt: formattedNamaKrt,
+        teleponKetua: formattedTelepon,
+        rtRw: '',
+        daftarKkAnggota: cleanedDaftarKk,
+        createdByName: formattedCreatedBy,
         jumlahKk: computedJumlahKk,
         jumlahJiwa: parseInt(formJumlahJiwa, 10) || 0,
         jumlahLakiLaki: parseInt(formLakiLaki, 10) || 0,
@@ -1112,10 +1222,10 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
                 onChange={(e) => setFilterLingkungan(e.target.value || 'ALL')}
                 className="px-3 py-2 text-[10px] font-black uppercase tracking-wider bg-transparent text-slate-700 focus:outline-none border-l border-slate-100 cursor-pointer"
               >
-                <option value="">Lingkungan</option>
+                <option value="">Semua Lingkungan</option>
                 {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>
-                    Lk {n}
+                    Lingkungan {ROMAN_NUMERALS[n - 1]}
                   </option>
                 ))}
               </select>
@@ -1189,7 +1299,7 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="px-2.5 py-0.5 rounded-full bg-pkk-light border border-pkk-teal/20 text-pkk-teal text-[11px] font-black">
-                          {item.lingkunganNama}
+                          {resolveItemLingkungan(item, currentUser)}
                         </span>
                         <span className="text-[10px] text-slate-400 font-mono">
                           {item.id}
@@ -1199,12 +1309,12 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex-1">
                           <h3 className="text-sm font-black text-slate-900 leading-tight">
-                            {item.namaKelompok}
+                            {formatKelompokEyd(item.namaKelompok)}
                           </h3>
                           <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-medium">
-                            <span>{item.lingkunganNama}</span>
+                            <span className="font-bold text-pkk-teal">{resolveItemLingkungan(item, currentUser)}</span>
                             <span aria-hidden="true" className="opacity-30">/</span>
-                            <span>Ketua: {item.namaKetuaDawis}</span>
+                            <span>Ketua: {formatNamaEyd(item.namaKetuaDawis)}</span>
                           </div>
                         </div>
                         {item.teleponKetua && (
@@ -1315,10 +1425,23 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
 
                     <div className="pt-3 mt-4 border-t border-slate-100 flex items-center justify-between text-xs">
                       <span className="text-[10px] text-slate-400">
-                        Input: {item.createdByName || 'Kader'}
+                        Input: {formatNamaEyd(item.createdByName) || 'Kader'}
                       </span>
 
                       <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPrintingItem(item);
+                            setTimeout(() => {
+                              printOfficialDocument('lembar-cetak-dasa-wisma-single', `FORM_DASAWISMA_${(item.namaKelompok || 'kelompok').replace(/[^a-zA-Z0-9]/g, '_')}`);
+                            }, 150);
+                          }}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                          title="Cetak Formulir Dasa Wisma"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(item)}
@@ -1375,38 +1498,70 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
               {/* Section 1: Identitas & Wilayah */}
               <section className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-black text-[10px]">01</div>
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Identitas & Wilayah</h4>
-                  <div className="flex-1 h-px bg-slate-100" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-black text-[10px]">01</div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Identitas &amp; Wilayah</h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleFormatAllEyd}
+                    className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-[11px] font-bold flex items-center gap-1.5 transition-colors border border-purple-200 cursor-pointer shadow-2xs"
+                    title="Rapikan penulisan huruf kapital & ejaan baku otomatis sesuai kaidah Bahasa Indonesia (EYD V)"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Rapikan Ejaan (EYD)</span>
+                  </button>
                 </div>
+                <div className="h-px bg-slate-100" />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Nama Kelompok</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Nama Kelompok</label>
+                      <span className="text-[10px] text-purple-600 font-semibold">Auto-EYD</span>
+                    </div>
                     <input
                       type="text"
                       value={formNama}
                       onChange={(e) => setFormNama(e.target.value)}
+                      onBlur={() => {
+                        if (formNama.trim()) setFormNama(formatKelompokEyd(formNama));
+                      }}
                       placeholder="Contoh: Dasa Wisma Mawar I"
                       className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all font-semibold"
                       required
                     />
+                    <p className="text-[10px] text-slate-400">
+                      Format baku: Awalan <em>Dasa Wisma</em> &amp; akhiran angka Romawi (I sd XXIV).
+                    </p>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Wilayah Lingkungan</label>
-                    <select
-                      value={formLingkunganNomor}
-                      onChange={(e) => setFormLingkunganNomor(parseInt(e.target.value, 10))}
-                      className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all font-bold"
-                    >
-                      {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
-                        <option key={n} value={n}>
-                          Lingkungan {n}
-                        </option>
-                      ))}
-                    </select>
+                    {isPkkLingkungan ? (
+                      <div className="w-full px-4 py-3 text-sm bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 font-bold flex items-center justify-between shadow-2xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>Lingkungan {ROMAN_NUMERALS[(currentUser.nomorLingkungan || 1) - 1]}</span>
+                        </div>
+                        <span className="text-[10px] uppercase font-black bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded-md">
+                          Otomatis Akun PKK Anda
+                        </span>
+                      </div>
+                    ) : (
+                      <select
+                        value={formLingkunganNomor}
+                        onChange={(e) => setFormLingkunganNomor(parseInt(e.target.value, 10))}
+                        className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all font-bold"
+                      >
+                        {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                          <option key={n} value={n}>
+                            Lingkungan {ROMAN_NUMERALS[n - 1]}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
 
@@ -1417,9 +1572,15 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
                       type="text"
                       value={formNamaKrt}
                       onChange={(e) => setFormNamaKrt(e.target.value)}
+                      onBlur={() => {
+                        if (formNamaKrt.trim()) setFormNamaKrt(formatNamaEyd(formNamaKrt));
+                      }}
                       placeholder="Nama Kepala Keluarga"
                       className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all font-semibold"
                     />
+                    <p className="text-[10px] text-slate-400">
+                      Format baku EYD: Huruf kapital pada setiap awal kata nama orang.
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -1428,10 +1589,16 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
                       type="text"
                       value={formNamaKetua}
                       onChange={(e) => setFormNamaKetua(e.target.value)}
-                      placeholder="Nama Kader"
+                      onBlur={() => {
+                        if (formNamaKetua.trim()) setFormNamaKetua(formatNamaEyd(formNamaKetua));
+                      }}
+                      placeholder="Nama Kader Ketua"
                       className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all font-semibold"
                       required
                     />
+                    <p className="text-[10px] text-slate-400">
+                      Format baku EYD: Huruf kapital pada setiap awal kata nama ketua.
+                    </p>
                   </div>
                 </div>
 
@@ -1442,20 +1609,15 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
                       type="tel"
                       value={formTelepon}
                       onChange={(e) => setFormTelepon(e.target.value)}
-                      placeholder="0812xxxxxxxx"
-                      className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all"
+                      onBlur={() => {
+                        if (formTelepon.trim()) setFormTelepon(formatNomorTelepon(formTelepon));
+                      }}
+                      placeholder="Contoh: 0812-3456-7890"
+                      className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all font-mono"
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">RT / RW</label>
-                    <input
-                      type="text"
-                      value={formRtRw}
-                      onChange={(e) => setFormRtRw(e.target.value)}
-                      placeholder="01 / 02"
-                      className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 transition-all"
-                    />
+                    <p className="text-[10px] text-slate-400">
+                      Otomatis dirapikan dengan tanda hubung standar (08xx-xxxx-xxxx).
+                    </p>
                   </div>
                 </div>
               </section>
@@ -2065,6 +2227,195 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
           </div>
         </div>
       )}
+
+      {/* HIDDEN SINGLE DASA WISMA PRINT SHEET */}
+      <div className="hidden">
+        <div id="lembar-cetak-dasa-wisma-single" className="p-3 bg-white text-slate-900 font-sans text-[9px] leading-tight print:p-0">
+          {printingItem && (
+            <div>
+              <KopSuratPkk className="mb-2" />
+
+              <div className="text-center my-2 pb-1.5 border-b-2 border-black">
+                <h2 className="text-xs font-black uppercase text-slate-900 tracking-wider">
+                  LEMBAR PENDATAAN KELOMPOK DASA WISMA
+                </h2>
+                <p className="text-[11px] font-black text-slate-900 uppercase mt-0.5">
+                  {formatKelompokEyd(printingItem.namaKelompok)}
+                </p>
+                <p className="text-[8.5px] text-slate-600 font-medium">
+                  TP-PKK Kelurahan Mangga • Kecamatan Medan Tuntungan • Kota Medan
+                </p>
+              </div>
+
+              {/* 01. Identitas Kelompok & Wilayah */}
+              <h3 className="font-bold text-[8.5px] uppercase bg-slate-100 border border-black px-1.5 py-0.5 mb-0.5">
+                01. IDENTITAS KELOMPOK &amp; WILAYAH BINAAN
+              </h3>
+              <div className="grid grid-cols-2 gap-3 border border-black p-2 mb-2 text-[8.5px] font-sans">
+                <div className="space-y-0.5">
+                  <p><strong>Nama Kelompok:</strong> {formatKelompokEyd(printingItem.namaKelompok)}</p>
+                  <p><strong>Wilayah Lingkungan:</strong> {resolveItemLingkungan(printingItem, currentUser)}</p>
+                  <p><strong>Kepala Rumah Tangga (KRT) Utama:</strong> {formatNamaEyd(printingItem.namaKrt) || '-'}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <p><strong>Ketua Dasa Wisma:</strong> {formatNamaEyd(printingItem.namaKetuaDawis) || '-'}</p>
+                  <p><strong>Kontak Ketua:</strong> {formatNomorTelepon(printingItem.teleponKetua) || '-'}</p>
+                  <p><strong>Kader Pendata / Pelapor:</strong> {formatNamaEyd(printingItem.createdByName) || '-'}</p>
+                </div>
+              </div>
+
+              {/* 02. Kependudukan & Kelompok Khusus */}
+              <h3 className="font-bold text-[8.5px] uppercase bg-slate-100 border border-black px-1.5 py-0.5 mb-0.5">
+                02. KEPENDUDUKAN &amp; KELOMPOK KHUSUS
+              </h3>
+              <table className="w-full border-collapse border border-black text-[8px] mb-2 text-center font-sans table-compact">
+                <thead>
+                  <tr className="bg-slate-100 font-bold">
+                    <th className="border border-black p-0.5">Jml KK</th>
+                    <th className="border border-black p-0.5">Total Jiwa</th>
+                    <th className="border border-black p-0.5">L</th>
+                    <th className="border border-black p-0.5">P</th>
+                    <th className="border border-black p-0.5">PUS</th>
+                    <th className="border border-black p-0.5">WUS</th>
+                    <th className="border border-black p-0.5">KB</th>
+                    <th className="border border-black p-0.5">Bumil</th>
+                    <th className="border border-black p-0.5">Busui</th>
+                    <th className="border border-black p-0.5">Nifas</th>
+                    <th className="border border-black p-0.5">Balita</th>
+                    <th className="border border-black p-0.5">Lansia</th>
+                    <th className="border border-black p-0.5">Buta Aksara</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-black p-0.5 font-bold">{printingItem.jumlahKk || 0}</td>
+                    <td className="border border-black p-0.5 font-bold">{printingItem.jumlahJiwa || 0}</td>
+                    <td className="border border-black p-0.5">{printingItem.jumlahLakiLaki || 0}</td>
+                    <td className="border border-black p-0.5">{printingItem.jumlahPerempuan || 0}</td>
+                    <td className="border border-black p-0.5">{printingItem.jumlahPus || 0}</td>
+                    <td className="border border-black p-0.5">{printingItem.jumlahWus || 0}</td>
+                    <td className="border border-black p-0.5">{printingItem.jumlahAkseptorKb || 0}</td>
+                    <td className="border border-black p-0.5">{printingItem.jumlahIbuHamil || 0}</td>
+                    <td className="border border-black p-0.5">{printingItem.jumlahIbuMenyusui || 0}</td>
+                    <td className="border border-black p-0.5">{printingItem.jumlahIbuNifas || 0}</td>
+                    <td className="border border-black p-0.5">{printingItem.jumlahBalita || 0}</td>
+                    <td className="border border-black p-0.5">{printingItem.jumlahLansia || 0}</td>
+                    <td className="border border-black p-0.5">{printingItem.jumlahButaAksara || 0}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* 03. Sanitasi & Fasilitas Rumah */}
+              <h3 className="font-bold text-[8.5px] uppercase bg-slate-100 border border-black px-1.5 py-0.5 mb-0.5">
+                03. SANITASI, SUMBER AIR &amp; FASILITAS RUMAH
+              </h3>
+              <div className="grid grid-cols-2 gap-3 border border-black p-2 mb-2 text-[8.5px] font-sans">
+                <div className="space-y-0.5">
+                  <p><strong>Jamban Sehat (WC):</strong> {printingItem.punyaJambanSehat || 0} KK</p>
+                  <p><strong>Saluran Air Limbah (SPAL):</strong> {printingItem.punyaSpal || 0} KK</p>
+                  <p><strong>Pemanfaatan TOGA:</strong> {printingItem.punyaToga || 0} KK</p>
+                  <p><strong>Makanan Pokok:</strong> {formatTeksEyd(printingItem.makananPokok) || 'Beras'}</p>
+                </div>
+                <div className="space-y-0.5">
+                  <p><strong>Sumber Air Minum:</strong> {formatTeksEyd(printingItem.sumberAirMinum) || 'Air Galon / Isi Ulang'}</p>
+                  <p><strong>Sumber Air Bersih:</strong> {formatTeksEyd(printingItem.sumberAirBersih) || 'PDAM / Perpipaan'}</p>
+                  <p><strong>Kriteria Rumah:</strong> {formatTeksEyd(printingItem.kriteriaRumah) || 'Layak Huni'}</p>
+                  <p><strong>Stiker P4K:</strong> {formatTeksEyd(printingItem.stikerP4k) || 'Menempel'}</p>
+                </div>
+              </div>
+
+              {/* 04. Pemanfaatan Pekarangan & Industri Rumah Tangga */}
+              <h3 className="font-bold text-[8.5px] uppercase bg-slate-100 border border-black px-1.5 py-0.5 mb-0.5">
+                04. PEMANFAATAN PEKARANGAN (PTP), INDUSTRI RUMAH TANGGA &amp; KEGIATAN WARGA
+              </h3>
+              <div className="border border-black p-2 mb-2 text-[8.5px] font-sans space-y-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-0.5">
+                    <p><strong>PTP Peternakan:</strong> {printingItem.ptpPeternakan ? 'Ya (Aktif)' : 'Tidak'}</p>
+                    <p><strong>PTP Perikanan:</strong> {printingItem.ptpPerikanan ? 'Ya (Aktif)' : 'Tidak'}</p>
+                    <p><strong>PTP Warung Hidup:</strong> {printingItem.ptpWarungHidup ? 'Ya (Aktif)' : 'Tidak'}</p>
+                    <p><strong>PTP Tanaman Obat (TOGA):</strong> {printingItem.ptpToga || (printingItem.punyaToga || 0) > 0 ? 'Ya (Aktif)' : 'Tidak'}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p><strong>Industri Rumah Tangga Pangan:</strong> {printingItem.industriPangan ? 'Ada (Aktif)' : 'Tidak Ada'}</p>
+                    <p><strong>Industri Rumah Tangga Sandang:</strong> {printingItem.industriSandang ? 'Ada (Aktif)' : 'Tidak Ada'}</p>
+                    <p><strong>Kegiatan Posyandu Balita / Lansia:</strong> {printingItem.kegiatanPosyandu !== false ? 'Aktif' : 'Tidak Aktif'}</p>
+                    <p><strong>Kegiatan UP2K / Koperasi:</strong> {printingItem.kegiatanUp2kKoperasi ? 'Aktif' : 'Tidak Aktif'}</p>
+                  </div>
+                </div>
+                {printingItem.kegiatanUtama && (
+                  <div className="pt-1 border-t border-dashed border-slate-300">
+                    <p><strong>Catatan Program / Kegiatan Pokok:</strong> &ldquo;{printingItem.kegiatanUtama}&rdquo;</p>
+                  </div>
+                )}
+              </div>
+
+              {/* 05. Daftar Anggota Keluarga / Kepala Rumah Tangga (KRT) */}
+              <h3 className="font-bold text-[8.5px] uppercase bg-slate-100 border border-black px-1.5 py-0.5 mb-0.5">
+                05. DAFTAR ANGGOTA KELUARGA / KEPALA RUMAH TANGGA (KRT)
+              </h3>
+              {Array.isArray(printingItem.daftarKkAnggota) && printingItem.daftarKkAnggota.length > 0 ? (
+                <table className="w-full border-collapse border border-black text-[8px] font-sans mb-2 table-compact">
+                  <thead>
+                    <tr className="bg-slate-100 font-bold">
+                      <th className="border border-black p-0.5 text-center" style={{ width: '26px' }}>No</th>
+                      <th className="border border-black p-0.5 text-left" style={{ width: '28%' }}>Nama Kepala Keluarga (KRT)</th>
+                      <th className="border border-black p-0.5 text-center" style={{ width: '16%' }}>Nomor KK</th>
+                      <th className="border border-black p-0.5 text-center" style={{ width: '16%' }}>NIK</th>
+                      <th className="border border-black p-0.5 text-left" style={{ width: '32%' }}>Alamat Domisili</th>
+                      <th className="border border-black p-0.5 text-center" style={{ width: '8%' }}>Jiwa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printingItem.daftarKkAnggota.map((m, idx) => (
+                      <tr key={m.id || idx}>
+                        <td className="border border-black p-0.5 text-center">{idx + 1}</td>
+                        <td className="border border-black p-0.5 font-bold text-left">{formatNamaEyd(m.namaKepalaKeluarga)}</td>
+                        <td className="border border-black p-0.5 font-mono text-center text-[7.5px]">{m.nomorKk || '-'}</td>
+                        <td className="border border-black p-0.5 font-mono text-center text-[7.5px]">{m.nik || '-'}</td>
+                        <td className="border border-black p-0.5 text-left text-[8px]">{formatAlamatEyd(m.alamat)}</td>
+                        <td className="border border-black p-0.5 text-center font-bold">{m.jumlahJiwa || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="border border-black p-2 mb-2 text-[8.5px] font-sans">
+                  <p><strong>Kepala Rumah Tangga (KRT) Terdata:</strong> {formatNamaEyd(printingItem.namaKrt) || '-'}</p>
+                  <p><strong>Total Akumulasi Jiwa:</strong> {printingItem.jumlahJiwa || 0} Jiwa ({printingItem.jumlahLakiLaki || 0} Laki-laki / {printingItem.jumlahPerempuan || 0} Perempuan)</p>
+                </div>
+              )}
+
+              {/* Tanda Tangan Resmi Pengesahan */}
+              <div className="mt-4 text-[8.5px] font-sans avoid-break">
+                <div className="text-right mb-2">
+                  <p className="font-semibold">{formatTanggalResmiIndonesia()}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="font-bold">Mengetahui,</p>
+                    <p className="text-[8px] text-slate-700">Ketua TP-PKK Kelurahan Mangga</p>
+                    <div className="h-10"></div>
+                    <p className="font-bold underline">( .................................................. )</p>
+                  </div>
+                  <div>
+                    <p className="font-bold">Kader Pendata / Pelapor,</p>
+                    <p className="text-[8px] text-slate-700">{resolveItemLingkungan(printingItem, currentUser)}</p>
+                    <div className="h-10"></div>
+                    <p className="font-bold underline">({formatNamaEyd(printingItem.createdByName) || '..................................................'})</p>
+                  </div>
+                  <div>
+                    <p className="font-bold">Ketua Kelompok Dasa Wisma,</p>
+                    <p className="text-[8px] text-slate-700">{formatKelompokEyd(printingItem.namaKelompok)}</p>
+                    <div className="h-10"></div>
+                    <p className="font-bold underline">({formatNamaEyd(printingItem.namaKetuaDawis) || '..................................................'})</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
