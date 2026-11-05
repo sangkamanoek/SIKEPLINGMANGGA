@@ -53,9 +53,37 @@ export const getReportIsoDate = (d: any): string => {
   return getTodayLocalIso();
 };
 
+export const ROMAN_NUMERALS = [
+  'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
+  'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX',
+  'XXI', 'XXII', 'XXIII', 'XXIV'
+];
+
+export const getLingkunganIndex = (lingkunganStr?: string): number => {
+  if (!lingkunganStr) return 0;
+  const matchNum = lingkunganStr.match(/\d+/);
+  if (matchNum) {
+    const n = parseInt(matchNum[0], 10);
+    if (n >= 1 && n <= 24) return n;
+  }
+  for (let i = 0; i < ROMAN_NUMERALS.length; i++) {
+    const rom = ROMAN_NUMERALS[i];
+    const reg = new RegExp(`\\b${rom}\\b`, 'i');
+    if (reg.test(lingkunganStr)) return i + 1;
+  }
+  return 0;
+};
+
 export const isKunjunganMatchingKepling = (kj: KunjunganWargaData, kepling: UserAccount): boolean => {
+  if (!kj || !kepling) return false;
+  if (kj.keplingId && kepling.id && kj.keplingId === kepling.id) return true;
   if (kj.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase()) return true;
   if (kj.lingkungan?.trim().toLowerCase() === kepling.lingkungan.trim().toLowerCase()) return true;
+
+  const kjLkNum = kj.lingkunganNomor || getLingkunganIndex(kj.lingkungan);
+  const keplingLkNum = kepling.nomorLingkungan || getLingkunganIndex(kepling.lingkungan);
+  if (kjLkNum > 0 && keplingLkNum > 0 && kjLkNum === keplingLkNum) return true;
+
   return false;
 };
 

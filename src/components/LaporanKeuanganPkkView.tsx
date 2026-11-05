@@ -64,6 +64,18 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
   });
   const [endDate, setEndDate] = useState<string>(todayStr);
 
+  const { currentMonthName, lastMonthName, currentYearStr } = useMemo(() => {
+    const d = new Date();
+    const curM = d.toLocaleDateString('id-ID', { month: 'long' });
+    const prevD = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    const lastM = prevD.toLocaleDateString('id-ID', { month: 'long' });
+    return {
+      currentMonthName: curM,
+      lastMonthName: lastM,
+      currentYearStr: String(d.getFullYear()),
+    };
+  }, []);
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -548,7 +560,7 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
                 periodFilter === 'THIS_MONTH' ? 'bg-tosca-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              📅 Bulan Ini (Oktober)
+              📅 Bulan Ini ({currentMonthName})
             </button>
             <button
               onClick={() => setPeriodFilter('LAST_MONTH')}
@@ -556,7 +568,7 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
                 periodFilter === 'LAST_MONTH' ? 'bg-tosca-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              🗓️ Bulan Lalu (September)
+              🗓️ Bulan Lalu ({lastMonthName})
             </button>
             <button
               onClick={() => setPeriodFilter('THIS_YEAR')}
@@ -564,7 +576,7 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
                 periodFilter === 'THIS_YEAR' ? 'bg-tosca-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              🏆 Tahun 2026
+              🏆 Tahun {currentYearStr}
             </button>
             <button
               onClick={() => setPeriodFilter('ALL')}

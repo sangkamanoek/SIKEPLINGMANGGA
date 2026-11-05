@@ -54,7 +54,12 @@ import {
 import { ModalEditTargetCapaian } from './ModalEditTargetCapaian';
 import { GrafikTrenBulanan } from './GrafikTrenBulanan';
 import { GrafikTrenMingguan } from './GrafikTrenMingguan';
-import { isReportMatchingKepling, getReportIsoDate, isKunjunganMatchingKepling } from '../lib/formatter';
+import { isReportMatchingKepling, getReportIsoDate, isKunjunganMatchingKepling, getLingkunganIndex } from '../lib/formatter';
+import {
+  getLocalKunjunganList,
+  subscribeKunjunganWarga,
+  KunjunganWargaData,
+} from '../lib/kunjunganService';
 import {
   Map,
   MapPin,
@@ -118,7 +123,7 @@ interface DashboardCapaianKeplingProps {
   attendanceList?: AbsenApelItem[];
   eventAttendanceList?: EventAttendance[];
   customEvents?: CustomEvent[];
-  kunjunganList?: any[];
+  kunjunganList?: KunjunganWargaData[];
 }
 
 type PeriodCategory = 'MINGGUAN' | 'BULANAN' | 'TAHUNAN' | 'HARIAN';
@@ -354,6 +359,34 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   });
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => getLocalSpptForYear(pbbYear));
   const [isSyncingPbb, setIsSyncingPbb] = useState(false);
+
+  // Real-time Kunjungan Warga State
+  const [liveKunjunganList, setLiveKunjunganList] = useState<KunjunganWargaData[]>(() => {
+    if (Array.isArray(kunjunganList) && kunjunganList.length > 0) return kunjunganList;
+    return getLocalKunjunganList();
+  });
+
+  useEffect(() => {
+    if (Array.isArray(kunjunganList) && kunjunganList.length > 0) {
+      setLiveKunjunganList(kunjunganList);
+    }
+  }, [kunjunganList]);
+
+  useEffect(() => {
+    // Purge obsolete v1 cache key if present
+    try {
+      if (localStorage.getItem('sikepling_kunjungan_harian_list_v1')) {
+        localStorage.removeItem('sikepling_kunjungan_harian_list_v1');
+      }
+    } catch {}
+
+    const unsub = subscribeKunjunganWarga((items) => {
+      if (Array.isArray(items) && items.length > 0) {
+        setLiveKunjunganList(items);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Placeholders for removed WebGIS logic
   const myLingkunganStats = useMemo(() => ({
@@ -696,18 +729,18 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     return map;
   }, [filteredReportsByPeriod, periodPbbOverview.lingkunganSummaries]);
 
-  // Memori Kunjungan Harian (prioritas props, fallback localStorage tanpa network query)
+  // Memori Kunjungan Harian (prioritas live state, props, lalu getLocalKunjunganList)
   const effectiveKunjunganList = useMemo(() => {
+    if (Array.isArray(liveKunjunganList) && liveKunjunganList.length > 0) return liveKunjunganList;
     if (Array.isArray(kunjunganList) && kunjunganList.length > 0) return kunjunganList;
-    try {
-      const stored = localStorage.getItem('sikepling_kunjungan_harian_list_v1');
-      if (stored) return JSON.parse(stored);
-    } catch {}
-    return [];
-  }, [kunjunganList]);
+    return getLocalKunjunganList();
+  }, [liveKunjunganList, kunjunganList]);
 
   // Filter Kunjungan Warga berdasarkan Periode Terpilih
   const filteredKunjunganByPeriod = useMemo(() => {
+    if (isCumulativePeriod) {
+      return effectiveKunjunganList;
+    }
     return effectiveKunjunganList.filter((kj: any) => {
       if (!kj) return false;
       const dateIso =
@@ -716,7 +749,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         (kj.createdAt ? String(kj.createdAt).split('T')[0] : '');
       return checkDateInPeriod(dateIso, period, now);
     });
-  }, [effectiveKunjunganList, period, now]);
+  }, [effectiveKunjunganList, period, isCumulativePeriod, now]);
 
   // Aggregasi untuk Seluruh 24 Kepling (7 Kriteria Kinerja Terpadu)
   const keplingSummaryList = useMemo(() => {
@@ -845,9 +878,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       const bpjsPercentage = targetBpjs > 0 ? Math.round((effective.bpjs / targetBpjs) * 100) : 0;
 
       // 6. KUNJUNGAN HARIAN (Bobot 10%)
-      const kKunjunganRecords = filteredKunjunganByPeriod.filter((kj: any) =>
-        isKunjunganMatchingKepling(kj, k)
-      );
+      const kKunjunganRecords = (isCumulativePeriod || mode === 'super_admin')
+        ? effectiveKunjunganList.filter((kj: any) => isKunjunganMatchingKepling(kj, k))
+        : filteredKunjunganByPeriod.filter((kj: any) => isKunjunganMatchingKepling(kj, k));
       const targetKunjunganHarian = targetPerlinsos;
       const totalKunjungan = kKunjunganRecords.length;
       const kunjunganPercentage =
@@ -933,6 +966,8 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     filteredEventAttendanceByPeriod,
     filteredCustomEventsByPeriod,
     filteredKunjunganByPeriod,
+    effectiveKunjunganList,
+    mode,
     periodPbbOverview.lingkunganSummaries,
     pbbOverview.lingkunganSummaries,
   ]);
@@ -1079,7 +1114,12 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       totalApelHadir += item.totalApelHadir;
     });
 
-    const totalKunjungan = Math.max(totalKunjunganSum, filteredKunjunganByPeriod.length);
+    const allTimeKunjunganCount = effectiveKunjunganList.length;
+    const periodKunjunganCount = filteredKunjunganByPeriod.length;
+    // Di menu Capaian Target Superadmin / periode kumulatif, pastikan total kunjungan mencerminkan data riil dari menu Kunjungan Warga (230 Warga)
+    const totalKunjungan = (isCumulativePeriod || mode === 'super_admin')
+      ? Math.max(totalKunjunganSum, allTimeKunjunganCount)
+      : Math.max(totalKunjunganSum, periodKunjunganCount);
 
     const activeKeplingCount = keplingSummaryList.filter((k) => k.reportCount > 0).length;
     const kepatuhanRate = Math.round((activeKeplingCount / 24) * 100);
@@ -1117,7 +1157,15 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       activeKeplingCount,
       kepatuhanRate,
     };
-  }, [filteredReportsByPeriod, keplingSummaryList, distinctApelDatesInPeriod]);
+  }, [
+    filteredReportsByPeriod,
+    keplingSummaryList,
+    distinctApelDatesInPeriod,
+    effectiveKunjunganList,
+    filteredKunjunganByPeriod,
+    isCumulativePeriod,
+    mode,
+  ]);
 
   const handlePrint = () => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -1223,20 +1271,24 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   <option value="WEEK_4">🔹 Minggu IV (Tgl 22 - Akhir Bulan)</option>
                 </optgroup>
                 <optgroup label="🗓️ Peringkat Per Bulan">
-                  <option value="THIS_MONTH">🌟 Bulan Ini (Oktober 2026)</option>
-                  <option value="MONTH_2026-09">🍂 Bulan September 2026</option>
-                  <option value="MONTH_2026-08">☀️ Bulan Agustus 2026</option>
-                  <option value="MONTH_2026-07">🌴 Bulan Juli 2026</option>
-                  <option value="MONTH_2026-06">🌿 Bulan Juni 2026</option>
-                  <option value="MONTH_2026-05">🌱 Bulan Mei 2026</option>
-                  <option value="MONTH_2026-04">🌷 Bulan April 2026</option>
-                  <option value="MONTH_2026-03">🌸 Bulan Maret 2026</option>
-                  <option value="MONTH_2026-02">❄️ Bulan Februari 2026</option>
-                  <option value="MONTH_2026-01">🎯 Bulan Januari 2026</option>
+                  <option value="THIS_MONTH">
+                    🌟 Bulan Ini ({INDONESIAN_MONTH_NAMES[now.getMonth()]} {now.getFullYear()})
+                  </option>
+                  {Array.from({ length: now.getMonth() }, (_, i) => {
+                    const mIdx = now.getMonth() - 1 - i;
+                    const mNum = String(mIdx + 1).padStart(2, '0');
+                    const mName = INDONESIAN_MONTH_NAMES[mIdx];
+                    const val = `MONTH_${now.getFullYear()}-${mNum}`;
+                    return (
+                      <option key={val} value={val}>
+                        📅 Bulan {mName} {now.getFullYear()}
+                      </option>
+                    );
+                  })}
                 </optgroup>
                 <optgroup label="🏆 Peringkat Per Tahun">
-                  <option value="THIS_YEAR">🌟 Tahun 2026 (Akumulasi Tahunan)</option>
-                  <option value="YEAR_2025">📜 Tahun 2025</option>
+                  <option value="THIS_YEAR">🌟 Tahun {now.getFullYear()} (Akumulasi Tahunan)</option>
+                  <option value={`YEAR_${now.getFullYear() - 1}`}>📜 Tahun {now.getFullYear() - 1}</option>
                   <option value="ALL">🏆 Kumulatif (Sepanjang Waktu)</option>
                 </optgroup>
                 <optgroup label="⚡ Harian">

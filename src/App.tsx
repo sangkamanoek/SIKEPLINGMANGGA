@@ -437,6 +437,7 @@ export default function App() {
             onNavigateToForm={() => handleTabChange('form')}
             onOpenRekapPbb={() => handleTabChange('rekap_pbb')}
             attendanceList={attendanceList}
+            kunjunganList={kunjunganList}
           />
         )}
 
