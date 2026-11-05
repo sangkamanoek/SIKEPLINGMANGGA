@@ -376,7 +376,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     const totalLaporanMasuk = keplingWeeklyList.reduce((acc, k) => acc + k.totalLaporan, 0);
     const persenLaporanMasuk = Math.round((totalLaporanMasuk / totalTargetLaporan) * 100);
 
-    const totalKunjunganWarga = keplingWeeklyList.reduce((acc, k) => acc + k.totalKunjungan, 0);
+    const totalKunjunganWarga = kunjunganList.length;
     const totalKeplingAktifKunjungan = keplingWeeklyList.filter((k) => k.totalKunjungan > 0).length;
 
     const totalPbbWp = keplingWeeklyList.reduce((acc, k) => acc + k.pbbWp, 0);
