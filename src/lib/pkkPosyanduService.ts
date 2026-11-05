@@ -2,6 +2,7 @@ import {
   collection, 
   onSnapshot, 
   doc, 
+  getDoc,
   setDoc, 
   deleteDoc, 
   getDocs,
@@ -23,20 +24,79 @@ export const getLocalPosyanduReports = (): PosyanduReport[] => {
   return safeGetLocalStorage<PosyanduReport[]>(POSYANDU_STORAGE_KEY, []);
 };
 
+/**
+ * Fetch all posyandu reports from Firestore and update local storage & IndexedDB
+ */
 export const fetchPosyanduReports = async (): Promise<PosyanduReport[]> => {
   if (!db) return getLocalPosyanduReports();
-  const q = collection(db, COLLECTION_NAME);
-  const snapshot = await getDocs(q);
-  const items = snapshot.docs.map(doc => ({
-    ...doc.data(),
-    id: doc.id
-  })) as PosyanduReport[];
-  items.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
-  
-  // Back up fetched data
-  savePosyanduToIndexedDB(items).catch(() => {});
-  safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(items));
-  return items;
+  try {
+    const q = collection(db, COLLECTION_NAME);
+    const snapshot = await getDocs(q);
+    const items = snapshot.docs.map(doc => ({
+      ...doc.data(),
+      id: doc.id
+    })) as PosyanduReport[];
+    items.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+    
+    // Merge with any existing local reports that may have pending offline changes
+    const local = getLocalPosyanduReports();
+    const map = new Map<string, PosyanduReport>();
+    local.forEach(item => { if (item && item.id) map.set(item.id, item); });
+    items.forEach(item => { if (item && item.id) map.set(item.id, item); });
+
+    const merged = Array.from(map.values());
+    merged.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+
+    // Back up fetched data
+    savePosyanduToIndexedDB(merged).catch(() => {});
+    safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(merged));
+    return merged;
+  } catch (err) {
+    console.warn('[pkkPosyanduService] fetchPosyanduReports warning:', err);
+    return getLocalPosyanduReports();
+  }
+};
+
+/**
+ * Fetch a single posyandu report directly by document ID (e.g. posyandu_1791883394877)
+ */
+export const fetchSinglePosyanduReport = async (id: string): Promise<PosyanduReport | null> => {
+  if (!id) return null;
+
+  // 1. Check local storage
+  const localList = getLocalPosyanduReports();
+  const localFound = localList.find(x => x.id === id);
+  if (localFound) return localFound;
+
+  // 2. Check IndexedDB
+  try {
+    const idbList = await getPosyanduFromIndexedDB();
+    const idbFound = idbList.find(x => x.id === id);
+    if (idbFound) {
+      const updated = [idbFound, ...localList.filter(x => x.id !== id)];
+      safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(updated));
+      return idbFound;
+    }
+  } catch {}
+
+  // 3. Query Firestore directly by Document Reference
+  if (db) {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, id);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const item = { ...snap.data(), id: snap.id } as PosyanduReport;
+        await saveSinglePosyanduToIndexedDB(item).catch(() => {});
+        const updated = [item, ...localList.filter(x => x.id !== id)];
+        safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(updated));
+        return item;
+      }
+    } catch (e) {
+      console.warn(`[pkkPosyanduService] Failed to fetch single doc "${id}":`, e);
+    }
+  }
+
+  return null;
 };
 
 export const subscribePosyanduReports = (onUpdate: (items: PosyanduReport[]) => void) => {
@@ -46,16 +106,32 @@ export const subscribePosyanduReports = (onUpdate: (items: PosyanduReport[]) => 
   // Asynchronously hydrate from IndexedDB to restore any photos that may have been stripped by localStorage quota
   getPosyanduFromIndexedDB().then((idbItems) => {
     if (idbItems && idbItems.length > 0) {
-      const merged = (initial.length > 0 ? initial : idbItems).map((localItem) => {
-        const idbMatch = idbItems.find(x => x.id === localItem.id);
+      const map = new Map<string, PosyanduReport>();
+      
+      // Seed with IDB items first
+      idbItems.forEach((item) => {
+        if (item && item.id) map.set(item.id, item);
+      });
+
+      // Overlay with current local items
+      const current = getLocalPosyanduReports();
+      current.forEach((localItem) => {
+        if (!localItem || !localItem.id) return;
+        const idbMatch = map.get(localItem.id);
         if (idbMatch && Array.isArray(idbMatch.dokumentasiFoto) && idbMatch.dokumentasiFoto.some(f => f.url && f.url.startsWith('data:'))) {
           const localHasPhotos = Array.isArray(localItem.dokumentasiFoto) && localItem.dokumentasiFoto.some(f => f.url && f.url.length > 50);
-          if (!localHasPhotos) {
-            return { ...localItem, dokumentasiFoto: idbMatch.dokumentasiFoto };
-          }
+          map.set(localItem.id, {
+            ...idbMatch,
+            ...localItem,
+            dokumentasiFoto: localHasPhotos ? localItem.dokumentasiFoto : idbMatch.dokumentasiFoto,
+          });
+        } else {
+          map.set(localItem.id, { ...(idbMatch || {}), ...localItem });
         }
-        return localItem;
       });
+
+      const merged = Array.from(map.values());
+      merged.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
       safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(merged));
       onUpdate(merged);
     }
@@ -66,18 +142,36 @@ export const subscribePosyanduReports = (onUpdate: (items: PosyanduReport[]) => 
   if (!db) return () => {};
 
   const q = collection(db, COLLECTION_NAME);
-  return onSnapshot(q, (snapshot) => {
-    const items = snapshot.docs.map(doc => ({
-      ...doc.data(),
-      id: doc.id
-    })) as PosyanduReport[];
-    items.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
-    
-    // Asynchronously backup to IndexedDB so full photo data is preserved even if localStorage hits quota
-    savePosyanduToIndexedDB(items).catch(() => {});
-    safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(items));
-    onUpdate(items);
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const serverItems = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      })) as PosyanduReport[];
+
+      // Merge server items with any existing local memory items
+      const current = getLocalPosyanduReports();
+      const map = new Map<string, PosyanduReport>();
+      current.forEach(item => { if (item?.id) map.set(item.id, item); });
+      serverItems.forEach(item => { if (item?.id) map.set(item.id, item); });
+
+      const items = Array.from(map.values());
+      items.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+      
+      // Asynchronously backup to IndexedDB so full photo data is preserved even if localStorage hits quota
+      savePosyanduToIndexedDB(items).catch(() => {});
+      safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(items));
+      onUpdate(items);
+    },
+    (error) => {
+      console.warn('[pkkPosyanduService] onSnapshot listener warning:', error);
+      // Fallback: fetch using getDocs
+      fetchPosyanduReports().then((items) => {
+        if (items && items.length > 0) onUpdate(items);
+      }).catch(() => {});
+    }
+  );
 };
 
 export const savePosyanduReport = async (item: PosyanduReport) => {
@@ -110,5 +204,6 @@ export const deletePosyanduReport = async (id: string) => {
     await deleteDoc(docRef);
   }
 };
+
 
 

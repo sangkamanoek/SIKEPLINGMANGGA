@@ -1009,29 +1009,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
               </div>
             </div>
 
-              <div className="p-6 rounded-2xl bg-white/10 border border-white/20 space-y-4">
-                <h4 className="text-[10px] font-black text-amber-400 uppercase tracking-widest flex items-center gap-2">
-                  <Activity className="w-3.5 h-3.5" />
-                  <span>Sistem Kerja & Biaya</span>
-                </h4>
-                <div className="space-y-4 text-[11px] text-white leading-relaxed">
-                  <p>Aplikasi ini menggunakan teknologi <strong>Heuristic Neural Parsing</strong> yang dirancang khusus untuk PKK:</p>
-                  <ul className="space-y-2.5">
-                    <li className="flex gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1 shrink-0" />
-                      <span><strong>Analisis Otomatis:</strong> Mengekstrak 30+ variabel data dari teks acak (WhatsApp/Catatan) secara instan tanpa perlu input manual satu per satu.</span>
-                    </li>
-                    <li className="flex gap-2 p-2 bg-amber-400/20 border border-amber-400/30 rounded-lg">
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1 shrink-0" />
-                      <span><strong>Biaya Rp 0 (Gratis Selamanya):</strong> Seluruh pemrosesan dilakukan secara LOKAL di browser Anda. Tidak ada biaya server atau biaya API yang dibebankan kepada kader.</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1 shrink-0" />
-                      <span><strong>Keamanan Data:</strong> Data Anda tetap berada di perangkat hingga Anda menekan tombol "Simpan" untuk mengirimnya ke Database Kelurahan.</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
+              {/* Bagian Sistem Kerja & Biaya disembunyikan sesuai permintaan pengguna */}
+
           </div>
 
           {/* Result Card from AI Extraction */}
