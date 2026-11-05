@@ -4,6 +4,7 @@ import {
   doc, 
   setDoc, 
   deleteDoc, 
+  getDocs,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { PosyanduReport } from '../types';
@@ -20,6 +21,22 @@ export const POSYANDU_STORAGE_KEY = 'sikepling_pkk_posyandu_v1';
 
 export const getLocalPosyanduReports = (): PosyanduReport[] => {
   return safeGetLocalStorage<PosyanduReport[]>(POSYANDU_STORAGE_KEY, []);
+};
+
+export const fetchPosyanduReports = async (): Promise<PosyanduReport[]> => {
+  if (!db) return getLocalPosyanduReports();
+  const q = collection(db, COLLECTION_NAME);
+  const snapshot = await getDocs(q);
+  const items = snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id
+  })) as PosyanduReport[];
+  items.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+  
+  // Back up fetched data
+  savePosyanduToIndexedDB(items).catch(() => {});
+  safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(items));
+  return items;
 };
 
 export const subscribePosyanduReports = (onUpdate: (items: PosyanduReport[]) => void) => {

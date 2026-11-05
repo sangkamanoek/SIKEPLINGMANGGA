@@ -362,6 +362,24 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
               </option>
             ))}
           </select>
+          
+          <button
+            type="button"
+            onClick={async () => {
+              onShowToast?.('Sedang menyinkronkan data...', 'info');
+              try {
+                const data = await import('../lib/pkkPosyanduService').then(m => m.fetchPosyanduReports());
+                setReports(data);
+                onShowToast?.('Data berhasil disinkronkan dengan server!', 'success');
+              } catch (e) {
+                onShowToast?.('Gagal menyinkronkan data.', 'error');
+              }
+            }}
+            className="px-3 py-2 rounded-xl border border-rose-300 text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 cursor-pointer flex items-center gap-1.5"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Sync Data</span>
+          </button>
         </div>
 
         <div className="text-xs text-slate-500 font-semibold">
