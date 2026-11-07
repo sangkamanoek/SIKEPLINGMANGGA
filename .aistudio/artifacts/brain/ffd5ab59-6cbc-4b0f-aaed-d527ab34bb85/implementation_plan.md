@@ -1,43 +1,82 @@
-# Rencana Peningkatan Modul Dasa Wisma PKK & Integrasi Asisten Digital AI
+# Perbaikan & Optimasi Fitur Surat Kedinasan (Firestore & Role Partitioning)
 
-Berdasarkan perbandingan antara modul yang ada dengan spesifikasi **Asisten Digital Pendataan Dasa Wisma PKK**, berikut adalah rencana peningkatan aplikasi secara menyeluruh:
+Investigasi mendalam dan perbaikan komprehensif pada modul **Surat Kedinasan** (baik untuk akun Kelurahan/Superadmin maupun PKK), mengatasi masalah data yang tidak tertampil akibat penyaringan string yang rapuh, penandaan kategori yang kurang eksplisit, dan query Firestore `orderBy` yang mengesampingkan dokumen tanpa field tertentu.
 
----
+## User Review & Critical Decisions
 
-## 📊 Perbandingan Singkat (Kondisi Saat Ini vs Target Prompt)
-
-| Fitur / Variabel | Modul Sebelum Peningkatan | Modul Target Peningkatan (Lengkap) |
-| :--- | :--- | :--- |
-| **Identitas & Wilayah** | Nama Kelompok, Lingkungan, Ketua, No HP | Nama Kelompok, Lingkungan, RT/RW, Kelurahan, Kecamatan, Kota, Nama Ketua & Kontak |
-| **Kependudukan & Demografi** | Jumlah KK, Jumlah Jiwa | Jumlah KK, Jumlah Jiwa (Laki-laki & Perempuan), Anak Usia Sekolah, Buta Aksara |
-| **Kelompok Khusus (PUS/WUS/Kesehatan)**| Balita, Ibu Hamil, Lansia | Balita, Lansia, **PUS, WUS, Ibu Hamil, Ibu Menyusui/Nifas, Angka Kelahiran/Kematian** |
-| **Kesehatan & Sanitasi** | Jamban Sehat, SPAL, TOGA | **Sumber Air Bersih, Jamban (Sehat/Kurang Sehat), Tempat Sampah, SPAL, Kriteria Rumah (Sehat/Kurang Sehat)** |
-| **PTP & Industri Rumah Tangga** | TOGA saja | **PTP (Peternakan, Perikanan, Warung Hidup, TOGA, Tanaman Keras), Industri Rumah Tangga (Pangan, Sandang, Jasa, Konveksi)** |
-| **Input Mentah / AI Parsing** | Input Manual per Lapangan | **Asisten AI Digitizer: Paste teks mentah / catatan WA / OCR -> Auto-extract ke Dasa Wisma** |
-| **Validasi Logika Data** | Manual | **Aturan Otomatis: (L+P)=Total, Jika Bumil maka WUS≥1, Badge Peringatan Logika** |
-| **Format Ekspor** | Cetak PDF & Excel Standar | **Cetak Resmi, Excel, dan Format CSV/Tabel Copy-Paste langsung ke Google Sheets** |
+> [!IMPORTANT] Pilihan Desain & Hasil Klarifikasi Pengguna
+> - **Penandaan Kategori Eksplisit (`kategori: 'KELURAHAN' | 'PKK'`)**: Setiap dokumen surat yang disimpan ke Firestore, Server API, dan IndexedDB akan menyertakan atribut `kategori` secara eksplisit, serta mencatat `dibuatOlehRole` dan `dibuatOlehNama`.
+> - **Tampilan Berdasarkan Peran Akun Aktif**: Tampilan modul Surat Kedinasan disesuaikan dengan peran aktif pengguna (`currentUser.role`), memastikan akun PKK melihat arsip Surat PKK dan akun Kelurahan/Superadmin melihat arsip Surat Kelurahan secara konsisten tanpa kehilangan data.
 
 ---
 
-## 🛠️ Langkah-Langkah Implementasi
+## 1. Overview & Core Concept
 
-### 1. Pembaruan Schema & Types (`src/types.ts`)
-- Memperluas interface `KelompokDasaWisma` untuk mencakup seluruh field standar Dasa Wisma PKK (PUS, WUS, Ibu Menyusui, Buta Aksara, Kriteria Rumah, Sumber Air, Sampah, PTP, Industri Rumah Tangga).
-
-### 2. Modul Asisten Digital AI Parser (`src/lib/dasaWismaAiParser.ts`)
-- Membuat parser cerdas (berbasis AI / aturan heuristik canggih) untuk mengekstrak teks acak/catatan kader menjadi objek data terstruktur.
-- Menerapkan fungsi validasi data otomatis:
-  - Validasi Jumlah `(L + P === Total)`.
-  - Validasi Logika `(Jika Ibu Hamil > 0, WUS minimal 1)`.
-  - Standardisasi Teks (misal: "pdam" -> "PDAM", "ada wc" -> "Jamban Sehat: Ya").
-
-### 3. Pembaruan UI Component (`src/components/PkkDasaWismaView.tsx`)
-- **Tab Asisten AI Digitizer**: Tempat kader menempelkan teks mentah/catatan WhatsApp -> Ekstrak Otomatis -> Verifikasi -> Simpan ke Firestore.
-- **Form Modal Input Lengkap**: Terbagi menjadi beberapa tab/accordion rapi agar kader tidak kebingungan.
-- **Tabel Rekapitulasi & Modul Copy-Paste Google Sheets**: Tombol *Copy CSV / Format Sheets* agar siap di-paste langsung ke Google Sheets/Excel.
-- **Badge Status Validasi**: Indikator visual jika ada data yang tidak sinkron/perlu konfirmasi.
+- **Problem Statement**: Pengguna melaporkan data Surat Kedinasan yang sudah di-input tidak muncul di layar. Investigasi menunjukkan bahwa penyebab utamanya adalah:
+  1. *Fragile Filter*: Penyaringan data sebelumnya mengandalkan pencarian kata kunci string `"pkk"` pada nomor/asal surat, sehingga surat PKK atau Kelurahan dengan nomor resmi (contoh: `005/SK/X/2026`) yang tidak memuat string `"pkk"` menjadi tersembunyi.
+  2. *Missing Metadata Fields*: Input dari Buku 2 PKK (`PkkBukuAdministrasiView.tsx`) tidak mengisi field `dibuatOlehRole` dan `kategori`.
+  3. *Firestore Query Boundary*: Query Firestore `orderBy('tanggalSurat')` mengeksklusi dokumen jika field `tanggalSurat` kosong atau formatted secara berbeda.
+- **Solusi**: 
+  1. Menambahkan penandaan kategori `kategori: 'KELURAHAN' | 'PKK'` dan `dibuatOlehRole` pada setiap operasi pembuatan & pembaruan surat (`saveSuratItem`).
+  2. Memperbaiki query real-time Firestore di `suratService.ts` tanpa batasan `orderBy` yang kaku, serta melakukan pengurutan (*sorting*) aman di sisi JavaScript.
+  3. Memperbarui logika penyaringan di `SuratKedinasanView.tsx` dan `PkkBukuAdministrasiView.tsx` agar menggunakan atribut `kategori` dan `dibuatOlehRole` secara konsisten.
 
 ---
 
-## 🎯 Hasil Akhir
-Modul Dasa Wisma PKK akan menjadi 100% lengkap, cerdas, efisien, dan ramah pengguna bagi kader di lapangan.
+## 2. User Experience & Visual Design
+
+- **Tampilan Tabel & Form Surat Kedinasan Kelurahan**:
+  - Menampilkan daftar Surat Masuk, Surat Keluar, Surat Keputusan, dan Undangan Resmi khusus Kelurahan secara rapi.
+  - Penanda badge kategori warna emerald untuk Kelurahan dan indigo untuk PKK.
+- **Tampilan Buku 2 Agenda Surat PKK**:
+  - Menampilkan seluruh agenda Surat Masuk dan Surat Keluar PKK tanpa ada dokumen yang tersembunyi.
+  - Pengunggahan berkas lampiran PDF/gambar (hingga 50MB via Server API dan IndexedDB, serta penyimpanan metadata di Firestore).
+
+---
+
+## 3. Key Product Decisions & Trade-Offs
+
+- **Decision 1: Penggunaan Tag Kategori Eksplisit (`kategori`)**:
+  - *Pendekatan*: Menambahkan field `kategori` (`'KELURAHAN'` atau `'PKK'`) pada interface `SuratKedinasanItem` dan selalu mengisi field ini saat pengisian form.
+  - *Alasan*: Menghilangkan ketergantungan pada pencarian substring string `"pkk"` yang sering gagal jika nomor atau asal surat menggunakan format standar kedinasan.
+- **Decision 2: Optimasi Real-Time Sync Firestore**:
+  - *Pendekatan*: Mengambil seluruh dokumen koleksi `surat_kedinasan` dari Firestore tanpa `orderBy` yang kaku di query Firestore SDK, kemudian menggabungkan (*smart merge*) dengan IndexedDB & Server API dan melakukan sorting aman berdasarkan `tanggalSurat` atau `createdAt`.
+  - *Alasan*: Mencegah dokumen baru atau dokumen lama tanpa field `tanggalSurat` hilang dari snapshot Firestore.
+
+---
+
+## 4. Technical Architecture & Data Strategy
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        DATA PERSISTENCE LAYER                          │
+│                                                                        │
+│   ┌───────────────────┐     ┌───────────────────┐     ┌─────────────┐  │
+│   │ Cloud Firestore   │ ◄──►│ Server REST API   │ ◄──►│ IndexedDB & │  │
+│   │ (surat_kedinasan) │     │ (/api/surat)      │     │ LocalStorage│  │
+│   └─────────┬─────────┘     └─────────┬─────────┘     └──────┬──────┘  │
+└─────────────┼─────────────────────────┼──────────────────────┼─────────┘
+              │                         │                      │
+              ▼                         ▼                      ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       SURAT SERVICE (smartMerge)                       │
+│  - Memeriksa kategori ('KELURAHAN' | 'PKK')                            │
+│  - Menjaga lampiran berkas PDF/Gambar (fileUrl, fileName)              │
+│  - Mempublikasikan update ke UI via subscribeSurat & BroadcastChannel  │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                          FRONTEND UI VIEWS                             │
+│  ┌──────────────────────────────┐    ┌──────────────────────────────┐  │
+│  │ SuratKedinasanView.tsx       │    │ PkkBukuAdministrasiView.tsx  │  │
+│  │ (Modul Kedinasan Kelurahan)  │    │ (Buku 2 Agenda Surat PKK)    │  │
+│  └──────────────────────────────┘    └──────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Perubahan Berkas Kunci**:
+  1. `src/types.ts`: Memperbarui `SuratKedinasanItem` dengan `kategori?: 'KELURAHAN' | 'PKK'`.
+  2. `src/lib/suratService.ts`: Memperbarui `subscribeSurat`, `smartMergeSurat`, dan `saveSuratItem` agar menangani tag `kategori` dan Firestore query tanpa kegagalan `orderBy`.
+  3. `src/components/SuratKedinasanView.tsx`: Menggunakan `kategori` untuk pemisahan data dan menyertakan metadata peran saat pembuatan surat.
+  4. `src/components/PkkBukuAdministrasiView.tsx`: Menyertakan `kategori: 'PKK'`, `dibuatOlehRole`, dan `dibuatOlehNama` saat membuat Surat Masuk/Keluar Buku 2 PKK.

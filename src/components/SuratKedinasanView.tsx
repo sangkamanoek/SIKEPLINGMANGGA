@@ -103,17 +103,18 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
   const filteredList = useMemo(() => {
     return suratList.filter((item) => {
       // 1. Separation Logic: PKK vs Kelurahan
-      const itemIsPkk = isPkkRole(item.dibuatOlehRole || '') || 
-                        (item.asalSurat || '').toLowerCase().includes('pkk') || 
-                        (item.nomorSurat || '').toLowerCase().includes('pkk');
-      
-      const userIsPkk = isPkkRole(currentUser.role);
-      const userIsSuperAdmin = currentUser.role === 'super_admin';
+      const isPkk = isPkkRole(currentUser.role);
+      const itemIsPkk = item.kategori === 'PKK' || (
+        !item.kategori && (
+          isPkkRole(item.dibuatOlehRole || '') ||
+          (item.asalSurat || '').toLowerCase().includes('pkk') ||
+          (item.nomorSurat || '').toLowerCase().includes('pkk') ||
+          (item.tujuanSurat || '').toLowerCase().includes('pkk')
+        )
+      );
 
-      if (!userIsSuperAdmin) {
-        if (userIsPkk && !itemIsPkk) return false;
-        if (!userIsPkk && itemIsPkk) return false;
-      }
+      if (isPkk && !itemIsPkk) return false;
+      if (!isPkk && itemIsPkk) return false;
 
       // 2. Regular Filters
       if (filterJenis !== 'ALL' && item.jenisSurat !== filterJenis) return false;
@@ -231,6 +232,7 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
       tanggalSurat: formTanggal,
       jenisSurat: formJenis,
       perihal: formPerihal.trim(),
+      kategori: isPkkRole(currentUser.role) ? 'PKK' : 'KELURAHAN',
       asalSurat: formJenis === 'SURAT_MASUK' ? formAsalTujuan.trim() : undefined,
       tujuanSurat: formJenis !== 'SURAT_MASUK' ? formAsalTujuan.trim() : undefined,
       sifat: formSifat,

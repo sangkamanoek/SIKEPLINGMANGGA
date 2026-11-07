@@ -739,7 +739,7 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
             <div className="p-4 sm:p-6 overflow-y-auto bg-slate-200 flex flex-col items-center">
               <div
                 id="lembar-cetak-posyandu-a4"
-                className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300"
+                className="bg-white text-slate-900 w-[180mm] min-w-[180mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300"
               >
                 {/* Kop Surat PKK Resmi */}
                 <KopSuratPkk />

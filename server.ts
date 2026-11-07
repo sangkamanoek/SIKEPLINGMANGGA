@@ -870,7 +870,7 @@ app.post('/api/gemini/improve-pkk', async (req, res) => {
     });
     const response = await ai.models.generateContent({
       model: "gemini-3.8-flash",
-      contents: `Tolong perbaiki dan buatkan uraian kegiatan PKK berikut menjadi Bahasa Indonesia yang baik, benar, formal, dan informatif. Pertahankan inti informasinya:\n\n"${text}"`,
+      contents: `Perbaiki teks berikut agar sesuai dengan kaidah Bahasa Indonesia yang baik dan benar (KBBI), formal, dan informatif. Pertahankan inti informasi dari teks berikut:\n\n"${text}"`,
       config: {
         temperature: 0.7,
         topP: 0.95,
@@ -1465,14 +1465,60 @@ app.post('/api/reports', (req, res) => {
     );
 
     if (existingIndex >= 0) {
-      // Update existing report with deep merge of kinerja to preserve infrastructure data
+      const existing = reportsCache[existingIndex];
+      const eKin = existing.kinerja || {};
+      const iKin = item.kinerja || {};
+
+      const parseNum = (v: any) => {
+        if (!v) return 0;
+        const n = parseFloat(String(v).replace(/[^0-9.-]/g, ''));
+        return isNaN(n) ? 0 : n;
+      };
+
+      const combineNotes = (a?: string, b?: string) => {
+        if (!a || !a.trim()) return b ? b.trim() : '';
+        if (!b || !b.trim()) return a.trim();
+        if (a.toLowerCase() === b.toLowerCase() || a.toLowerCase().includes(b.toLowerCase())) return a.trim();
+        if (b.toLowerCase().includes(a.toLowerCase())) return b.trim();
+        return `${a.trim()}\n• ${b.trim()}`;
+      };
+
+      // Merge photos deduplicated
+      const photoMap = new Map();
+      (existing.dokumentasiFoto || []).forEach((p: any) => {
+        const k = p.url || p.id || p.name || Math.random();
+        photoMap.set(k, p);
+      });
+      (item.dokumentasiFoto || []).forEach((p: any) => {
+        const k = p.url || p.id || p.name || Math.random();
+        if (!photoMap.has(k)) photoMap.set(k, p);
+      });
+      const mergedPhotos = Array.from(photoMap.values());
+
       reportsCache[existingIndex] = {
-        ...reportsCache[existingIndex],
+        ...existing,
         ...item,
+        id: existing.id,
         kinerja: {
-          ...(reportsCache[existingIndex].kinerja || {}),
-          ...(item.kinerja || {}),
+          ...eKin,
+          ...iKin,
+          opsirPbbWp: parseNum(eKin.opsirPbbWp) + parseNum(iKin.opsirPbbWp),
+          opsirPbbKeterangan: combineNotes(eKin.opsirPbbKeterangan, iKin.opsirPbbKeterangan),
+          perlinsosKk: parseNum(eKin.perlinsosKk) + parseNum(iKin.perlinsosKk),
+          perlinsosKeterangan: combineNotes(eKin.perlinsosKeterangan, iKin.perlinsosKeterangan),
+          perlinsosMenolakKk: parseNum(eKin.perlinsosMenolakKk) + parseNum(iKin.perlinsosMenolakKk),
+          perlinsosTidakDiTempatKk: parseNum(eKin.perlinsosTidakDiTempatKk) + parseNum(iKin.perlinsosTidakDiTempatKk),
+          ikdOrang: parseNum(eKin.ikdOrang) + parseNum(iKin.ikdOrang),
+          ikdKeterangan: combineNotes(eKin.ikdKeterangan, iKin.ikdKeterangan),
+          bpjsKetenagakerjaanOrang: parseNum(eKin.bpjsKetenagakerjaanOrang) + parseNum(iKin.bpjsKetenagakerjaanOrang),
+          bpjsKetenagakerjaanKeterangan: combineNotes(eKin.bpjsKetenagakerjaanKeterangan, iKin.bpjsKetenagakerjaanKeterangan),
+          kegiatanLainnya: combineNotes(eKin.kegiatanLainnya, iKin.kegiatanLainnya),
+          poskamlingKeterangan: combineNotes(eKin.poskamlingKeterangan, iKin.poskamlingKeterangan),
+          posyanduKeterangan: combineNotes(eKin.posyanduKeterangan, iKin.posyanduKeterangan),
         },
+        dokumentasiFoto: mergedPhotos,
+        jumlahDokumentasi: mergedPhotos.length,
+        updatedAt: new Date().toISOString(),
       };
     } else {
       // Add new report at the beginning

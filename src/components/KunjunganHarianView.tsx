@@ -29,6 +29,10 @@ import {
   Eye,
   Loader2,
   Upload,
+  HeartHandshake,
+  Smartphone,
+  ShieldCheck,
+  Coins,
 } from 'lucide-react';
 import { compressImageFile } from '../lib/imageCompressor';
 import * as XLSX from 'xlsx';
@@ -43,6 +47,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { getTodayLocalIso, formatTanggalIndonesia } from '../lib/formatter';
+import { printOfficialDocument } from '../utils/printHelper';
 
 interface KunjunganHarianViewProps {
   currentUser?: UserAccount;
@@ -222,6 +227,72 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   // Photo count
   const fotoCount = useMemo(() => {
     return filteredVisits.filter((v) => !!v.fotoUrl).length;
+  }, [filteredVisits]);
+
+  // Rekapitulasi 4 Pilar Kunjungan Warga (Perlinsos, PBB, IKD, dan BPJS)
+  const rekapKategoriStats = useMemo(() => {
+    const list = filteredVisits;
+
+    let perlinsosSudah = 0;
+    let perlinsosBelum = 0;
+    let perlinsosMenolak = 0;
+
+    let pbbLunas = 0;
+    let pbbBelum = 0;
+
+    let ikdSudah = 0;
+    let ikdProses = 0;
+    let ikdBelum = 0;
+
+    let bpjsAktif = 0;
+    let bpjsBelum = 0;
+
+    list.forEach((v) => {
+      // 1. Perlinsos
+      const p = (v.perlinsos || '').toLowerCase();
+      const sb = (v.statusBansos || '').toLowerCase();
+      if (p === 'sudah' || sb === 'sudah' || sb === 'layak') {
+        perlinsosSudah++;
+      } else if (p === 'menolak' || sb === 'menolak') {
+        perlinsosMenolak++;
+      } else {
+        perlinsosBelum++;
+      }
+
+      // 2. PBB
+      const pb = (v.pbb || '').toLowerCase();
+      if (pb === 'sudah' || pb === 'lunas') {
+        pbbLunas++;
+      } else {
+        pbbBelum++;
+      }
+
+      // 3. IKD
+      const ik = (v.ikd || '').toLowerCase();
+      if (ik === 'sudah') {
+        ikdSudah++;
+      } else if (ik === 'proses') {
+        ikdProses++;
+      } else {
+        ikdBelum++;
+      }
+
+      // 4. BPJS (Ketenagakerjaan / Mandiri / PBI)
+      const bp = (v.bpjsTk || '').toLowerCase();
+      if (bp.includes('aktif') || bp.includes('perisai') || bp.includes('sudah')) {
+        bpjsAktif++;
+      } else {
+        bpjsBelum++;
+      }
+    });
+
+    return {
+      total: list.length,
+      perlinsos: { sudah: perlinsosSudah, belum: perlinsosBelum, menolak: perlinsosMenolak },
+      pbb: { lunas: pbbLunas, belum: pbbBelum },
+      ikd: { sudah: ikdSudah, proses: ikdProses, belum: ikdBelum },
+      bpjs: { aktif: bpjsAktif, belum: bpjsBelum },
+    };
   }, [filteredVisits]);
 
   // Chart data: daily visits over last 14 days
@@ -485,7 +556,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   };
 
   const handlePrint = () => {
-    window.print();
+    printOfficialDocument('print-area-kunjungan', `Rekap_Kunjungan_Warga_${selectedDate || getTodayLocalIso()}`);
   };
 
   return (
@@ -714,8 +785,168 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         </div>
       </div>
 
+      {/* 2.5 REKAPITULASI 4 PILAR KUNJUNGAN: PERLINSOS, PBB, IKD, DAN BPJS */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Rekapitulasi Kunjungan Warga (Perlinsos, PBB, IKD & BPJS)</span>
+            </h3>
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+              {rekapKategoriStats.total} KK Terdata
+            </span>
+          </div>
+          <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
+            Sinkron otomatis dari catatan lapangan
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* 1. REKAP PERLINSOS / BANSOS */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                  <HeartHandshake className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Pilar 1</div>
+                  <div className="text-xs font-black text-slate-900">Rekap Perlinsos</div>
+                </div>
+              </div>
+              <span className="text-xs font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100">
+                {rekapKategoriStats.perlinsos.sudah} KK
+              </span>
+            </div>
+            <div className="space-y-1.5 text-[11px] pt-1 border-t border-slate-100">
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Sudah Menerima / Terdaftar:</span>
+                <strong className="text-emerald-700 font-bold">{rekapKategoriStats.perlinsos.sudah} KK</strong>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Belum Terdaftar Bansos:</span>
+                <strong className="text-slate-700 font-bold">{rekapKategoriStats.perlinsos.belum} KK</strong>
+              </div>
+              {rekapKategoriStats.perlinsos.menolak > 0 && (
+                <div className="flex justify-between items-center text-amber-700 font-medium">
+                  <span>Warga Menolak:</span>
+                  <strong>{rekapKategoriStats.perlinsos.menolak} KK</strong>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 2. REKAP PBB-P2 */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Coins className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Pilar 2</div>
+                  <div className="text-xs font-black text-slate-900">Rekap PBB-P2</div>
+                </div>
+              </div>
+              <span className="text-xs font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100">
+                {rekapKategoriStats.pbb.lunas} Lunas
+              </span>
+            </div>
+            <div className="space-y-1.5 text-[11px] pt-1 border-t border-slate-100">
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Sudah Bayar / Lunas:</span>
+                <strong className="text-emerald-700 font-bold">{rekapKategoriStats.pbb.lunas} WP</strong>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Belum Bayar / Menunggak:</span>
+                <strong className="text-rose-600 font-bold">{rekapKategoriStats.pbb.belum} WP</strong>
+              </div>
+              <div className="flex justify-between items-center text-slate-400 text-[10px]">
+                <span>Tingkat Kepatuhan:</span>
+                <span className="font-bold text-slate-700">
+                  {rekapKategoriStats.total > 0
+                    ? `${Math.round((rekapKategoriStats.pbb.lunas / rekapKategoriStats.total) * 100)}%`
+                    : '0%'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. REKAP IKD (IDENTITAS DIGITAL) */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Pilar 3</div>
+                  <div className="text-xs font-black text-slate-900">Aktivasi IKD</div>
+                </div>
+              </div>
+              <span className="text-xs font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
+                {rekapKategoriStats.ikd.sudah} Aktif
+              </span>
+            </div>
+            <div className="space-y-1.5 text-[11px] pt-1 border-t border-slate-100">
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Sudah Aktivasi IKD:</span>
+                <strong className="text-blue-700 font-bold">{rekapKategoriStats.ikd.sudah} Orang</strong>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Belum / Belum Aktivasi:</span>
+                <strong className="text-slate-700 font-bold">{rekapKategoriStats.ikd.belum} Orang</strong>
+              </div>
+              {rekapKategoriStats.ikd.proses > 0 && (
+                <div className="flex justify-between items-center text-amber-700 font-medium">
+                  <span>Dalam Proses:</span>
+                  <strong>{rekapKategoriStats.ikd.proses} Orang</strong>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 4. REKAP BPJS (KETENAGAKERJAAN / KESEHATAN) */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-tight">Pilar 4</div>
+                  <div className="text-xs font-black text-slate-900">Rekap BPJS</div>
+                </div>
+              </div>
+              <span className="text-xs font-black text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100">
+                {rekapKategoriStats.bpjs.aktif} Terdaftar
+              </span>
+            </div>
+            <div className="space-y-1.5 text-[11px] pt-1 border-t border-slate-100">
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Aktif / Agen Perisai:</span>
+                <strong className="text-purple-700 font-bold">{rekapKategoriStats.bpjs.aktif} Jiwa</strong>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Belum Terdaftar:</span>
+                <strong className="text-slate-700 font-bold">{rekapKategoriStats.bpjs.belum} Jiwa</strong>
+              </div>
+              <div className="flex justify-between items-center text-slate-400 text-[10px]">
+                <span>Cakupan Perlindungan:</span>
+                <span className="font-bold text-slate-700">
+                  {rekapKategoriStats.total > 0
+                    ? `${Math.round((rekapKategoriStats.bpjs.aktif / rekapKategoriStats.total) * 100)}%`
+                    : '0%'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 3. DAFTAR KUNJUNGAN: TABEL ATAU KARTU */}
-      <div ref={printAreaRef} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div id="print-area-kunjungan" ref={printAreaRef} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {filteredVisits.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <Users className="w-12 h-12 text-slate-300 mx-auto" />

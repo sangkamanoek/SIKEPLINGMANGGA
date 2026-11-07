@@ -20,7 +20,7 @@ import {
   Printer,
   RefreshCw,
 } from 'lucide-react';
-import { UserAccount, LaporanKegiatanPkk, PokjaPkkType } from '../types';
+import { UserAccount, LaporanKegiatanPkk, PokjaPkkType, FotoDokumentasi } from '../types';
 import {
   subscribePkkKegiatan,
   savePkkKegiatan,
@@ -30,6 +30,7 @@ import {
   POKJA_LABELS,
 } from '../lib/pkkKegiatanService';
 import { KopSuratPkk } from './KopSuratPkk';
+import { SignatureBlock } from './SignatureBlock';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument, downloadPdfDocument } from '../utils/printHelper';
 import { compressMultipleFiles } from '../lib/imageCompressor';
@@ -154,7 +155,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
   const [formJumlahPeserta, setFormJumlahPeserta] = useState<string>('20');
   const [formUraian, setFormUraian] = useState<string>('');
   const [formTindakLanjut, setFormTindakLanjut] = useState<string>('');
-  const [formFotos, setFormFotos] = useState<{ id: string; url: string; name: string; timestamp: string }[]>([]);
+  const [formFotos, setFormFotos] = useState<FotoDokumentasi[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [alertMsg, setAlertMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -211,7 +212,10 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
     try {
       const compressedList = await compressMultipleFiles(files, 720, 0.45);
       if (compressedList.length > 0) {
-        setFormFotos((prev) => [...prev, ...compressedList]);
+        setFormFotos((prev) => [
+          ...prev,
+          ...compressedList.map((f) => ({ ...f, keterangan: '' })),
+        ]);
       }
     } catch (err) {
       console.warn('Gagal memproses foto:', err);
@@ -781,7 +785,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                 id="lembar-cetak-pkk-kegiatan"
                 style={{
                   width: '100%',
-                  maxWidth: '190mm',
+                  maxWidth: '180mm',
                   margin: '0 auto',
                   fontFamily: "'Times New Roman', Times, serif",
                   color: '#000000',
@@ -1295,20 +1299,49 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                 />
 
                 {formFotos.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-2">
+                  <div className="space-y-3 pt-2">
                     {formFotos.map((ft, idx) => (
-                      <div
-                        key={ft.id || idx}
-                        className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 group"
-                      >
-                        <img src={ft.url} alt="upload" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setFormFotos(formFotos.filter((_, i) => i !== idx))}
-                          className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 opacity-90 hover:opacity-100 cursor-pointer"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
+                      <div key={ft.id || idx} className="flex gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 shrink-0">
+                          <img src={ft.url} alt="upload" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <input
+                              type="text"
+                              value={ft.keterangan || ''}
+                              onChange={(e) => {
+                                const newFotos = [...formFotos];
+                                newFotos[idx].keterangan = e.target.value;
+                                setFormFotos(newFotos);
+                              }}
+                              placeholder="Tambah keterangan foto..."
+                              className="w-full px-2 py-1 text-[10px] border border-slate-300 rounded-lg bg-white focus:outline-tosca-600"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newFotos = [...formFotos];
+                                formalizeText(newFotos[idx].keterangan || '', (improved) => {
+                                  newFotos[idx].keterangan = improved;
+                                  setFormFotos(newFotos);
+                                }, setIsFormalizingUraian); // Reusing Uraian loading state for simplicity
+                              }}
+                              disabled={isFormalizingUraian || (ft.keterangan || '').trim().length < 5}
+                              className="p-1 ml-1 rounded-lg bg-tosca-50 text-tosca-700 hover:bg-tosca-100 border border-tosca-200 cursor-pointer disabled:opacity-50"
+                              title="Perbaiki bahasa keterangan dengan AI"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setFormFotos(formFotos.filter((_, i) => i !== idx))}
+                            className="text-[10px] text-rose-600 font-bold hover:underline cursor-pointer"
+                          >
+                            Hapus Foto
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1343,7 +1376,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
           id="lembar-cetak-rekap-semua-pkk"
           style={{
             width: '100%',
-            maxWidth: '190mm',
+            maxWidth: '180mm',
             margin: '0 auto',
             fontFamily: "'Times New Roman', Times, serif",
             color: '#000000',
@@ -1576,31 +1609,13 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
           )}
 
           {/* 6. KOLOM PENGESAHAN TANDA TANGAN REKAP */}
-          <div style={{ marginTop: '24px', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-            <table style={{ width: '100%', border: 'none', fontSize: '9pt', fontFamily: "'Times New Roman', Times, serif" }}>
-              <tbody>
-                <tr>
-                  <td style={{ width: '50%', textAlign: 'center', verticalAlign: 'top', border: 'none', padding: '0 10px' }}>
-                    <div>Mengetahui,</div>
-                    <div style={{ fontWeight: 'bold' }}>Ketua Tim Penggerak PKK Kelurahan Mangga</div>
-                    <div style={{ height: '65px' }} />
-                    <div style={{ fontWeight: 'bold', textDecoration: 'underline' }}>
-                      NY. FRANSISKA FERY ARAPENTA TARIGAN
-                    </div>
-                    <div style={{ fontSize: '8pt', color: '#475569' }}>Ketua Tim Penggerak PKK Kelurahan Mangga</div>
-                  </td>
-                  <td style={{ width: '50%', textAlign: 'center', verticalAlign: 'top', border: 'none', padding: '0 10px' }}>
-                    <div>Medan, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                    <div style={{ fontWeight: 'bold' }}>Sekretaris Tim Penggerak PKK Kelurahan Mangga</div>
-                    <div style={{ height: '65px' }} />
-                    <div style={{ fontWeight: 'bold', textDecoration: 'underline' }}>
-                      NUR AISYAH DEWI, A.MD
-                    </div>
-                    <div style={{ fontSize: '8pt', color: '#475569' }}>Sekretaris Tim Penggerak PKK Kelurahan Mangga</div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div style={{ marginTop: '24px', paddingLeft: '2cm', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+            <SignatureBlock
+              leftName="NY. FRANSISKA FERY ARAPENTA TARIGAN"
+              leftRole="Ketua Tim Penggerak PKK Kelurahan Mangga"
+              rightName="NUR AISYAH DEWI, A.MD"
+              rightRole="Sekretaris Tim Penggerak PKK Kelurahan Mangga"
+            />
           </div>
 
           {/* 7. FOOTER RESMI DOKUMEN REKAP */}

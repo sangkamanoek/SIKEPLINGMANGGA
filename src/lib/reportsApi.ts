@@ -8,7 +8,10 @@ import {
   shouldFilterReport,
 } from './firestoreService';
 import { purgeAllClientCache } from './purgeCache';
-import { safeGetLocalStorage } from './safeStorage';
+import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
+import { consolidateAllReports } from './reportConsolidator';
+
+import { getReportsFromIndexedDB, saveSingleReportToIndexedDB } from './indexedDbStorage';
 
 export const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
 export const LOCAL_STORAGE_KEY_DELETED = 'kepling_deleted_reports_v1';
@@ -37,13 +40,37 @@ export const isReportDeleted = (r: LaporanHarianItem): boolean => {
 };
 
 /**
- * Fetch all reports strictly online from Server API buffer and Firestore.
- * Does NOT read from or write to client device cache (LocalStorage / IndexedDB).
+ * Fetch all reports with instant offline fallback from HP IndexedDB & LocalStorage
  */
 export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   const map = new Map<string, LaporanHarianItem>();
 
-  // 1. Fetch directly from Server API buffer (/api/reports)
+  // 1. Fetch from HP IndexedDB & LocalStorage first for instant 0ms result
+  try {
+    const idbReports = await getReportsFromIndexedDB();
+    if (Array.isArray(idbReports)) {
+      idbReports.forEach((r) => {
+        if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
+          map.set(r.id, r);
+        }
+      });
+    }
+  } catch (e) {}
+
+  try {
+    const localRaw = safeGetLocalStorage<LaporanHarianItem[]>(LOCAL_STORAGE_KEY_LAPORAN, []);
+    if (Array.isArray(localRaw)) {
+      localRaw.forEach((r) => {
+        if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
+          if (!map.has(r.id)) {
+            map.set(r.id, r);
+          }
+        }
+      });
+    }
+  } catch (e) {}
+
+  // 2. Fetch directly from Server API buffer (/api/reports)
   try {
     const res = await fetch(`/api/reports?light=true&_t=${Date.now()}`, {
       cache: 'no-store',
@@ -67,7 +94,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     console.warn('[Online API] Error reading /api/reports:', e);
   }
 
-  // 2. ALWAYS fetch from Firestore ('reports' & 'laporan_harian' collections) to ensure old reports are retrieved
+  // 3. ALWAYS fetch from Firestore ('reports' & 'laporan_harian' collections)
   try {
     const firestoreReports = await fetchReportsFromFirestore();
     if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
@@ -82,28 +109,15 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     console.warn('[Online Firestore] Error reading Firestore reports:', err);
   }
 
-  // 3. ALSO merge local storage reports
-  try {
-    const localRaw = safeGetLocalStorage<LaporanHarianItem[]>(LOCAL_STORAGE_KEY_LAPORAN, []);
-    if (Array.isArray(localRaw)) {
-      localRaw.forEach((r) => {
-        if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
-          if (!map.has(r.id)) {
-            map.set(r.id, r);
-          }
-        }
-      });
-    }
-  } catch (e) {}
-
   const merged = Array.from(map.values());
-  merged.sort((a, b) => {
+  const consolidated = consolidateAllReports(merged);
+  consolidated.sort((a, b) => {
     const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.tanggal ? new Date(a.tanggal).getTime() : 0);
     const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.tanggal ? new Date(b.tanggal).getTime() : 0);
     return timeB - timeA;
   });
 
-  return merged;
+  return consolidated;
 };
 
 /**
@@ -167,7 +181,16 @@ export const saveReportToServer = async (item: LaporanHarianItem): Promise<boole
     return false;
   }
 
-  // Concurrently save to Firebase Firestore and Server API buffer
+  // 1. Immediately save to HP local storage (LocalStorage + IndexedDB) for instant offline availability
+  try {
+    saveSingleReportToIndexedDB(item).catch(() => {});
+    const current = safeGetLocalStorage<LaporanHarianItem[]>(LOCAL_STORAGE_KEY_LAPORAN, []);
+    const idx = current.findIndex((x) => x.id === item.id);
+    const updated = idx >= 0 ? current.map((x) => (x.id === item.id ? item : x)) : [item, ...current];
+    safeSetLocalStorage(LOCAL_STORAGE_KEY_LAPORAN, JSON.stringify(updated));
+  } catch (e) {}
+
+  // 2. Concurrently save to Firebase Firestore and Server API buffer
   const firestorePromise = saveReportToFirestore(item).catch(() => {
     return false;
   });

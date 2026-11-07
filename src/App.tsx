@@ -5,6 +5,7 @@ import {
   ALL_ACCOUNTS,
   getEffectiveProfile,
   syncProfilesWithServer,
+  syncBuku1ToPkkProfiles,
 } from './data/keplingList';
 import { HeaderBanner } from './components/HeaderBanner';
 import { MobileBottomNav, AppTabType } from './components/MobileBottomNav';
@@ -22,6 +23,7 @@ import { DaftarTugasKhususView } from './components/DaftarTugasKhususView';
 import { AgendaKelurahanView } from './components/AgendaKelurahanView';
 
 import { AbsenKegiatanKhusus } from './components/AbsenKegiatanKhusus';
+import { useFeatureNotifications } from './hooks/useFeatureNotifications';
 import { KunjunganHarianView } from './components/KunjunganHarianView';
 import { DashboardPbbKasi } from './components/DashboardPbbKasi';
 import { DashboardPerlinsosKasi } from './components/DashboardPerlinsosKasi';
@@ -55,8 +57,14 @@ import { subscribeKunjungan, KunjunganWargaData } from './lib/kunjunganService';
 import { getTodayLocalIso } from './lib/formatter';
 import { safeGetLocalStorage, safeSetLocalStorage } from './lib/safeStorage';
 import { subscribeAttendance, loadAllAttendance } from './lib/attendanceApi';
-import { getReportsFromIndexedDB, getVisitsFromIndexedDB } from './lib/indexedDbStorage';
+import {
+  getReportsFromIndexedDB,
+  getVisitsFromIndexedDB,
+  saveReportsToIndexedDB,
+  saveVisitsToIndexedDB,
+} from './lib/indexedDbStorage';
 import { subscribeTargetsFromFirestore } from './lib/firestoreService';
+import { consolidateDailyReport, consolidateAllReports, findMatchingDailyReport } from './lib/reportConsolidator';
 
 const ACTIVE_ACCOUNT_STORAGE_KEY = 'sikepling_active_account_id';
 const ACTIVE_TAB_STORAGE_KEY = 'sikepling_active_tab_v2';
@@ -100,8 +108,47 @@ export default function App() {
   });
   const [kunjunganList, setKunjunganList] = useState<KunjunganWargaData[]>([]);
   const [attendanceList, setAttendanceList] = useState<AbsenApelItem[]>(() => loadAllAttendance());
+  const [presensiSubTab, setPresensiSubTab] = useState<'apel' | 'khusus'>('apel');
+  const [selectedAbsensiDate, setSelectedAbsensiDate] = useState<string>(() => getTodayLocalIso());
   const [targetsMap, setTargetsMap] = useState(getDefaultTargetsCapaianMap);
   const [selectedRiwayatKepling, setSelectedRiwayatKepling] = useState<string>('');
+
+  // Sinkronisasi otomatis: Presensi yang dicatat di Form Laporan otomatis digabung ke attendanceList
+  const effectiveAttendanceList = useMemo(() => {
+    const list = [...attendanceList];
+    const existingKeys = new Set(
+      list.map((a) => `${a.accountId || a.keplingId}_${a.tanggal || (a.createdAt ? a.createdAt.slice(0, 10) : '')}`)
+    );
+
+    reports.forEach((r) => {
+      if (r.absenApel && r.absenApel.status) {
+        const dateStr = r.tanggal || (r.createdAt ? r.createdAt.slice(0, 10) : '');
+        const accId = r.keplingId || r.jabatan || 'kepling';
+        const key = `${accId}_${dateStr}`;
+        if (!existingKeys.has(key)) {
+          existingKeys.add(key);
+          list.push({
+            id: `absen_rep_${r.id}`,
+            accountId: accId,
+            keplingId: r.keplingId || accId,
+            namaKepling: r.namaKepling || 'Kepala Lingkungan',
+            lingkungan: (r as any).lingkungan || r.jabatan || 'Lingkungan',
+            tanggal: dateStr,
+            jam: r.absenApel.jam || '07:35 WIB',
+            waktuLengkap: r.absenApel.waktuLengkap || r.createdAt || new Date().toISOString(),
+            status: r.absenApel.status as any,
+            fotoSelfieUrl: r.absenApel.fotoSelfieUrl || '',
+            lokasiGps: r.absenApel.lokasiGps || 'Halaman Kantor Kelurahan Mangga (GPS)',
+            catatan: r.absenApel.catatan || '',
+            createdAt: r.createdAt || new Date().toISOString(),
+            updatedAt: r.updatedAt || r.createdAt || new Date().toISOString(),
+          });
+        }
+      }
+    });
+
+    return list;
+  }, [attendanceList, reports]);
 
   // Modals
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -117,48 +164,92 @@ export default function App() {
   // Real-time audio chime & mobile vibration alert for Agenda Kelurahan & Tugas Khusus Lurah
   const { activeAlert, dismissAlert, replayAlertSound } = useAgendaTugasRealtimeAlert(activeAccount);
 
+  // Unread feature notifications engine (tracks unread new reports since last application/tab visit)
+  const { unreadCounts, markFeatureAsSeen } = useFeatureNotifications({
+    activeAccount,
+    activeTab,
+    reports,
+    kunjunganList,
+    attendanceList: effectiveAttendanceList,
+  });
+
   useEffect(() => {
     const handleOpenFullSelector = () => setIsAccountModalOpen(true);
     const handleOpenNotifSound = () => setIsNotifSoundModalOpen(true);
+    const handleProfileUpdate = () => {
+      setActiveAccount((prev) => {
+        const base = ALL_ACCOUNTS.find((a) => a.id === prev.id) || prev;
+        return getEffectiveProfile(base);
+      });
+    };
     window.addEventListener('open-account-selector-full', handleOpenFullSelector);
     window.addEventListener('open-notif-sound-modal', handleOpenNotifSound);
+    window.addEventListener('sikepling_profile_updated', handleProfileUpdate);
     return () => {
       window.removeEventListener('open-account-selector-full', handleOpenFullSelector);
       window.removeEventListener('open-notif-sound-modal', handleOpenNotifSound);
+      window.removeEventListener('sikepling_profile_updated', handleProfileUpdate);
     };
   }, []);
 
   // Sync custom profiles from server / Firestore on start
   useEffect(() => {
+    syncBuku1ToPkkProfiles();
     syncProfilesWithServer().then(() => {
+      syncBuku1ToPkkProfiles();
       setActiveAccount((prev) => (prev ? getEffectiveProfile(prev) : prev));
     }).catch(() => {});
 
-    // Hydrate reports from IndexedDB if memory or localStorage was evicted on mobile
+    // Instant offline hydration from IndexedDB on startup (0ms mobile load)
     getReportsFromIndexedDB().then((idbReports) => {
       if (idbReports && idbReports.length > 0) {
-        setReports((prev) => (prev.length === 0 ? idbReports : prev));
+        setReports((prev) => {
+          const map = new Map<string, LaporanHarianItem>();
+          prev.forEach((r) => { if (r && r.id) map.set(r.id, r); });
+          idbReports.forEach((r) => {
+            if (r && r.id && !map.has(r.id)) {
+              map.set(r.id, r);
+            }
+          });
+          const merged = Array.from(map.values());
+          return consolidateAllReports(merged);
+        });
       }
     }).catch(() => {});
 
     // Hydrate visits from IndexedDB
     getVisitsFromIndexedDB().then((idbVisits) => {
       if (idbVisits && idbVisits.length > 0) {
-        setKunjunganList((prev) => (prev.length === 0 ? idbVisits : prev));
+        setKunjunganList((prev) => {
+          const map = new Map<string, KunjunganWargaData>();
+          prev.forEach((v) => { if (v && v.id) map.set(v.id, v); });
+          idbVisits.forEach((v) => {
+            if (v && v.id && !map.has(v.id)) {
+              map.set(v.id, v);
+            }
+          });
+          return Array.from(map.values());
+        });
       }
     }).catch(() => {});
 
-    // Use real-time subscription for reports
+    // Use real-time subscription for reports with automatic IndexedDB + LocalStorage sync
     const unsub = subscribeReportsFromFirestore((fetched) => {
       if (Array.isArray(fetched)) {
-        setReports(fetched);
-        safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(fetched));
+        const unified = consolidateAllReports(fetched);
+        setReports(unified);
+        safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(unified));
+        saveReportsToIndexedDB(unified).catch(() => {});
       }
     });
 
-    // Use real-time subscription for kunjungan
+    // Use real-time subscription for kunjungan with automatic IndexedDB sync
     const unsubKunjungan = subscribeKunjungan((fetched) => {
-      setKunjunganList(fetched);
+      if (Array.isArray(fetched)) {
+        setKunjunganList(fetched);
+        saveVisitsToIndexedDB(fetched).catch(() => {});
+        safeSetLocalStorage('sikepling_kunjungan_warga_v1', JSON.stringify(fetched));
+      }
     });
 
     // Use real-time subscription for attendance
@@ -202,9 +293,10 @@ export default function App() {
 
   const handleTabChange = useCallback((tab: AppTabType) => {
     setActiveTab(tab);
+    markFeatureAsSeen(tab);
     safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  }, [markFeatureAsSeen]);
 
   const handleAccountSelect = useCallback((acc: UserAccount) => {
     const effective = getEffectiveProfile(acc);
@@ -248,7 +340,7 @@ export default function App() {
   };
 
   const handleUpdateReport = async (updatedItem: LaporanHarianItem) => {
-    const updated = reports.map((r) => (r.id === updatedItem.id ? updatedItem : r));
+    const updated = consolidateAllReports(reports.map((r) => (r.id === updatedItem.id ? updatedItem : r)));
     setReports(updated);
     safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(updated));
     await saveReportToServer(updatedItem).catch(() => {});
@@ -264,11 +356,33 @@ export default function App() {
   };
 
   const handleSaveReport = async (item: LaporanHarianItem) => {
-    const updated = [item, ...reports.filter((r) => r.id !== item.id)];
+    // Otomatis cek jika Kepling ini sudah pernah mengirim laporan pada tanggal yang sama
+    const existing = findMatchingDailyReport(reports, item);
+    let finalItem = item;
+    let oldIdToDelete: string | null = null;
+
+    if (existing && existing.id !== item.id) {
+      // Gabungkan laporan baru ke dalam laporan yang sudah ada (auto-consolidate)
+      finalItem = consolidateDailyReport(existing, item);
+      oldIdToDelete = item.id;
+    }
+
+    const updated = consolidateAllReports([
+      finalItem,
+      ...reports.filter((r) => r.id !== finalItem.id && r.id !== oldIdToDelete),
+    ]);
     setReports(updated);
     safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(updated));
-    await saveReportToServer(item).catch(() => {});
-    showToast('Laporan harian berhasil disimpan dan disinkronkan!', 'success');
+    await saveReportToServer(finalItem).catch(() => {});
+    if (oldIdToDelete) {
+      await deleteReportFromServer(oldIdToDelete).catch(() => {});
+    }
+    showToast(
+      existing
+        ? 'Laporan harian berhasil otomatis digabungkan dengan laporan sebelumnya!'
+        : 'Laporan harian berhasil disimpan dan disinkronkan!',
+      'success'
+    );
     handleTabChange('riwayat');
   };
 
@@ -368,7 +482,8 @@ export default function App() {
             <SmartHubDashboard
               activeAccount={activeAccount}
               reports={reports}
-              attendanceList={attendanceList}
+              attendanceList={effectiveAttendanceList}
+              unreadCounts={unreadCounts}
               onNavigate={(tab) => handleTabChange(tab as AppTabType)}
               onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
               onOpenPPTModal={() => setIsPPTModalOpen(true)}
@@ -385,7 +500,8 @@ export default function App() {
             hasGoogleAuth={false}
             onConnectGoogle={() => {}}
             activeAccount={activeAccount}
-            attendanceList={attendanceList}
+            attendanceList={effectiveAttendanceList}
+            existingReports={reports}
             onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
             onBackToRangkuman={() => handleTabChange('hub')}
           />
@@ -400,6 +516,8 @@ export default function App() {
             onSwitchToRiwayat={handleSwitchToRiwayat}
             onOpenCapaianDashboard={() => handleTabChange('capaian_admin')}
             onOpenPbb={() => handleTabChange('rekap_pbb')}
+            attendanceList={effectiveAttendanceList}
+            currentUser={activeAccount}
           />
         )}
 
@@ -436,7 +554,10 @@ export default function App() {
             onSelectKeplingRiwayat={handleSwitchToRiwayat}
             onNavigateToForm={() => handleTabChange('form')}
             onOpenRekapPbb={() => handleTabChange('rekap_pbb')}
-            attendanceList={attendanceList}
+            onNavigateToKunjungan={() => handleTabChange('kunjungan')}
+            onNavigateToDatabaseKeluarga={() => handleTabChange('database_keluarga')}
+            onNavigateToPresensi={() => handleTabChange('kegiatan_khusus')}
+            attendanceList={effectiveAttendanceList}
             kunjunganList={kunjunganList}
           />
         )}
@@ -482,10 +603,47 @@ export default function App() {
 
         {/* TAB: Presensi Apel & Kegiatan Khusus */}
         {activeTab === 'kegiatan_khusus' && (
-          <AbsenKegiatanKhusus
-            activeAccount={activeAccount}
-            showToast={(msg, type) => showToast(msg, type === 'warning' ? 'error' : type)}
-          />
+          <div className="space-y-4">
+            {/* Sub-tab navigation: Rekap Presensi Apel 24 Kepling vs Absensi Kegiatan Khusus */}
+            <div className="bg-white rounded-2xl p-2 border border-slate-200 shadow-2xs flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPresensiSubTab('apel')}
+                className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  presensiSubTab === 'apel'
+                    ? 'bg-teal-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <span>📋 Rekap Presensi Apel 24 Kepling</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPresensiSubTab('khusus')}
+                className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  presensiSubTab === 'khusus'
+                    ? 'bg-teal-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <span>🎯 Kegiatan Khusus & Event QR</span>
+              </button>
+            </div>
+
+            {presensiSubTab === 'apel' ? (
+              <RekapAbsensiSuperAdmin
+                attendanceList={effectiveAttendanceList}
+                currentUser={activeAccount}
+                selectedDate={selectedAbsensiDate}
+                onDateChange={setSelectedAbsensiDate}
+              />
+            ) : (
+              <AbsenKegiatanKhusus
+                activeAccount={activeAccount}
+                showToast={(msg, type) => showToast(msg, type === 'warning' ? 'error' : type)}
+              />
+            )}
+          </div>
         )}
 
         {/* TAB 11: Kunjungan Warga */}
@@ -503,7 +661,7 @@ export default function App() {
               reports={reports}
               targetsMap={targetsMap}
               currentUser={activeAccount}
-              attendanceList={attendanceList}
+              attendanceList={effectiveAttendanceList}
               selectedDate={todayIso}
               onDateChange={() => {}}
               onOpenRekapPbb={() => handleTabChange('rekap_pbb')}
@@ -644,7 +802,7 @@ export default function App() {
         sheetMeta={null}
         hasGoogleAuth={false}
         isAdmin={activeAccount?.role === 'super_admin' || activeAccount?.role === 'sekretaris'}
-        attendanceList={attendanceList}
+        attendanceList={effectiveAttendanceList}
         onUpdateReport={handleUpdateReport}
         onDeleteReport={activeAccount?.role === 'super_admin' ? handleDeleteReport : undefined}
       />

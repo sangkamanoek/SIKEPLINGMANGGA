@@ -54,6 +54,7 @@ export interface FotoDokumentasi {
   namaFile?: string;
   timestamp: string;
   kategori?: 'poskamling' | 'posyandu' | 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'apel' | 'umum' | 'infrastruktur' | 'lainnya' | string;
+  keterangan?: string;
 }
 
 export interface InfoAbsenApelLaporan {
@@ -729,7 +730,7 @@ export interface LaporanKegiatanPkk {
   jumlahPeserta?: number;
   uraianHasil: string;
   tindakLanjut?: string;
-  fotoDokumentasi?: { id: string; url: string; name: string; timestamp: string }[];
+  fotoDokumentasi?: FotoDokumentasi[];
   pelaporNama: string;
   pelaporRole: string;
   createdAt: string;
@@ -841,6 +842,7 @@ export interface SuratKedinasanItem {
   tanggalSurat: string; // YYYY-MM-DD
   jenisSurat: JenisSuratKedinasan;
   perihal: string;
+  kategori?: 'KELURAHAN' | 'PKK';
   asalSurat?: string; // Untuk surat masuk
   tujuanSurat?: string; // Untuk surat keluar
   sifat: 'BIASA' | 'PENTING' | 'RAHASIA' | 'SEGERA';
@@ -868,6 +870,7 @@ export interface AgendaKelurahanItem {
   peserta: string; // Target participants / audience
   statusSelesai: StatusAgendaType;
   catatan?: string; // Notes or additional descriptions
+  fotoDokumenUrl?: string; // Optional photo/document image
   penanggungJawab?: string;
   createdByName?: string;
   createdByRole?: string;

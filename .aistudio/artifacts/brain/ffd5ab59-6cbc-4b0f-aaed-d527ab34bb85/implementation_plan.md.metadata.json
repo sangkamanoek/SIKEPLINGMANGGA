@@ -1,6 +1,6 @@
 {
-  "summary": "Rencana Peningkatan Modul Dasa Wisma PKK dengan Asisten Digital AI Parser, Field Pendataan Lengkap, Validasi Logika Otomatis, dan Ekspor Tabel CSV/Sheets.",
-  "updatedAt": "2026-11-03T14:53:22.401613163Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Rencana implementasi perbaikan dan optimasi fitur Surat Kedinasan (Firestore & Role Partitioning) untuk mengatasi data yang tidak tertampil di superadmin maupun PKK.",
+  "updatedAt":  "2026-11-07T19:31:34.003205803Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

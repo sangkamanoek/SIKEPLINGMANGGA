@@ -40,6 +40,7 @@ import {
 } from '../lib/pkkKeuanganService';
 import { getTodayLocalIso, formatTanggalIndonesia } from '../lib/formatter';
 import { KopSuratPkk } from './KopSuratPkk';
+import { SignatureBlock } from './SignatureBlock';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { compressImageFile } from '../lib/imageCompressor';
 
@@ -1248,24 +1249,13 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
               </div>
 
               {/* Official Signatures */}
-              <div className="pt-8 grid grid-cols-2 text-center text-xs font-semibold gap-6 break-inside-avoid">
-                <div>
-                  <p>Mengetahui,</p>
-                  <p className="font-bold">Ketua Tim Penggerak PKK</p>
-                  <p>Kelurahan Mangga</p>
-                  <div className="h-16" />
-                  <p className="font-bold underline uppercase">Ny. Fransiska Fery Arapenta Tarigan</p>
-                  <p className="text-[10px] text-slate-500 font-normal">Ketua Tim Penggerak PKK Kelurahan Mangga</p>
-                </div>
-
-                <div>
-                  <p>Medan, {formatTanggalIndonesia(new Date())}</p>
-                  <p className="font-bold">Sekretaris / Bendahara Tim Penggerak PKK</p>
-                  <p>Kelurahan Mangga</p>
-                  <div className="h-16" />
-                  <p className="font-bold underline uppercase">Nur Aisyah Dewi, A.Md</p>
-                  <p className="text-[10px] text-slate-500 font-normal">Sekretaris Tim Penggerak PKK Kelurahan Mangga</p>
-                </div>
+              <div style={{ marginTop: '24px', paddingLeft: '2cm', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                <SignatureBlock
+                  leftName="NY. FRANSISKA FERY ARAPENTA TARIGAN"
+                  leftRole="Ketua Tim Penggerak PKK Kelurahan Mangga"
+                  rightName="NUR AISYAH DEWI, A.MD"
+                  rightRole="Sekretaris Tim Penggerak PKK Kelurahan Mangga"
+                />
               </div>
             </div>
           </div>

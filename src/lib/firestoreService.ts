@@ -1,8 +1,15 @@
-export const cleanFirestoreData = (data: any) => {
+export const cleanFirestoreData = (data: any): any => {
+  if (data === null || data === undefined) return null;
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => (typeof item === 'object' ? cleanFirestoreData(item) : item));
+  }
+  if (typeof data !== 'object') return data;
   const cleaned: any = {};
-  for (const key of Object.keys(data || {})) {
+  for (const key of Object.keys(data)) {
     if (data[key] !== undefined) {
-      cleaned[key] = data[key];
+      cleaned[key] = typeof data[key] === 'object' ? cleanFirestoreData(data[key]) : data[key];
     }
   }
   return cleaned;

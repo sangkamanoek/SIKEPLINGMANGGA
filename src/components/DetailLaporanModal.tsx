@@ -249,9 +249,22 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       const kNamaKepling = (k.namaKepling || '').trim().toLowerCase();
       const kNomor = k.lingkunganNomor ? Number(k.lingkunganNomor) : extractNomorLingkungan(k.lingkungan);
 
+      // STRICT VALIDATION: If both report and visit have lingkungan numbers, they MUST match!
+      if (targetNomor > 0 && kNomor > 0 && targetNomor !== kNomor) {
+        return false;
+      }
+
+      // If both have kepling names and they differ, do not cross-match unless keplingId explicitly matches
+      if (itemNamaKeplingLower && kNamaKepling && itemNamaKeplingLower !== kNamaKepling) {
+        if (!item.keplingId || !kKeplingId || item.keplingId.toLowerCase() !== kKeplingId) {
+          return false;
+        }
+      }
+
+      // Check positive matches
       if (item.keplingId && kKeplingId && item.keplingId.toLowerCase() === kKeplingId) return true;
-      if (targetNomor && kNomor && targetNomor === kNomor) return true;
       if (itemNamaKeplingLower && kNamaKepling && itemNamaKeplingLower === kNamaKepling) return true;
+      if (targetNomor > 0 && kNomor > 0 && targetNomor === kNomor) return true;
 
       return false;
     });
@@ -685,7 +698,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               @media print {
                 .no-print { display: none !important; }
                 body { background: white !important; margin: 0 !important; padding: 0 !important; }
-                @page { size: A4 portrait; margin: 6mm 8mm 6mm 8mm; }
+                @page { size: A4 portrait; margin: 6mm 8mm 6mm 20mm; }
               }
               body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #000; padding: 12px; margin: 0; }
               .print-table { border-collapse: collapse; width: 100%; }
@@ -701,7 +714,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                 <button onclick="window.close()" style="background: rgba(255,255,255,0.2); color: white; font-weight: bold; padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px;">Tutup</button>
               </div>
             </div>
-            <div style="background: white; max-width: 195mm; margin: 0 auto; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="background: white; max-width: 180mm; margin: 0 auto; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
               ${contentHtml}
             </div>
             <script>
@@ -769,7 +782,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
       const filename = generateReportPdfFileName(item, displayTanggal);
 
       const opt = {
-        margin: [5, 6, 5, 6],
+        margin: [5, 20, 5, 6],
         filename: filename,
         image: { type: 'jpeg', quality: 0.96 },
         html2canvas: {
@@ -1132,7 +1145,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
               {/* Tampilan Visual Lembar A4 di dalam Modal */}
               <div className="bg-slate-200 p-2 sm:p-4 rounded-xl overflow-x-auto flex flex-col items-center gap-4">
-                <div className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300">
+                <div className="bg-white text-slate-900 w-[180mm] min-w-[180mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300">
                   {/* Kop Surat Berdasarkan Role Petugas */}
                   {isPkkRole(item.petugasRole || '') ? (
                     <KopSuratPkk />
@@ -1534,7 +1547,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
                 {/* TAMPILAN HALAMAN 2 JIKA FOTO > 6 DI MODAL PREVIEW */}
                 {item.dokumentasiFoto && item.dokumentasiFoto.length > 6 && (
-                  <div className="bg-white text-slate-900 w-[190mm] min-w-[190mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300 mt-4">
+                  <div className="bg-white text-slate-900 w-[180mm] min-w-[180mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300 mt-4">
                     {/* Header Lampiran */}
                     <div className="text-center pb-2 border-b-[2px] border-black mb-3">
                       <h2 className="text-[11.5pt] font-black uppercase tracking-[0.04em] font-serif">
@@ -2959,7 +2972,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
       <div
         id="lembar-cetak-laporan-kepling"
-        className="hidden print:block bg-white text-slate-900 w-[190mm] mx-auto font-serif text-[8pt] leading-tight"
+        className="hidden print:block bg-white text-slate-900 w-[180mm] mx-auto font-serif text-[8pt] leading-tight"
         style={{ paddingTop: '8px', paddingLeft: '4px', paddingRight: '4px', textTransform: 'uppercase' }}
       >
         {/* ================= HALAMAN 1 : LAPORAN UTAMA ================= */}

@@ -248,9 +248,10 @@ export const subscribeSurat = (
 
   try {
     if (db) {
-      const q = query(collection(db, SURAT_COLLECTION), orderBy('tanggalSurat', 'desc'));
+      // Query without orderBy to ensure no documents are excluded if tanggalSurat is missing/different
+      const colRef = collection(db, SURAT_COLLECTION);
       unsubscribeFirestore = onSnapshot(
-        q,
+        colRef,
         (snapshot) => {
           const remoteItems: SuratKedinasanItem[] = [];
           snapshot.forEach((docSnap) => {
@@ -313,8 +314,15 @@ export const subscribeSurat = (
 export const saveSuratItem = async (item: SuratKedinasanItem): Promise<void> => {
   const current = getLocalSuratList();
   const index = current.findIndex((x) => x.id === item.id);
+  
+  const isPkkDetected = (item.dibuatOlehRole && item.dibuatOlehRole.toLowerCase().includes('pkk')) ||
+                        (item.asalSurat && item.asalSurat.toLowerCase().includes('pkk')) ||
+                        (item.nomorSurat && item.nomorSurat.toLowerCase().includes('pkk')) ||
+                        (item.tujuanSurat && item.tujuanSurat.toLowerCase().includes('pkk'));
+
   const payload: SuratKedinasanItem = {
     ...item,
+    kategori: item.kategori || (isPkkDetected ? 'PKK' : 'KELURAHAN'),
     updatedAt: new Date().toISOString(),
   };
 

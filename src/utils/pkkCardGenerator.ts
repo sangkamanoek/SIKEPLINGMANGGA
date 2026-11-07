@@ -418,7 +418,7 @@ export const generateBatchPkkCardHtml = (
     .join('');
 
   return `
-    <div style="width: 190mm; margin: 0 auto; padding: 6mm 0; font-family: Arial, sans-serif;">
+    <div style="width: 180mm; margin: 0 auto; padding: 6mm 0; font-family: Arial, sans-serif;">
       <div style="text-align: center; margin-bottom: 5mm; border-bottom: 2px solid #0284c7; padding-bottom: 3mm;">
         <h2 style="font-size: 13pt; font-weight: 900; color: #0369a1; margin: 0; text-transform: uppercase;">
           LEMBAR CETAK KARTU TANDA ANGGOTA PKK — KELURAHAN ${kel.toUpperCase()}

@@ -442,7 +442,7 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
                   <td className="py-3 px-3.5 text-center text-emerald-300">
                     {overview.persentaseWpLunas.toFixed(1)}% Kepatuhan
                   </td>
-                  <td className="py-3 px-3.5 text-right text-amber-300">
+                  <td className="py-3 px-3.5 text-right text-amber-300 whitespace-nowrap">
                     {formatRupiah(overview.totalRealisasiNominal)}
                   </td>
                   <td colSpan={2} className="py-3 px-3.5 text-center text-emerald-400 font-bold">

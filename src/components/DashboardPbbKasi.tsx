@@ -629,7 +629,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
                 <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
                   Target Ketetapan PBB ({pbbYear})
                 </span>
-                <span className="text-xl sm:text-2xl font-black text-white block mt-1">
+                <span className="text-base sm:text-lg font-black text-white block mt-1 whitespace-nowrap truncate" title={formatRupiah(pbbOverview.totalTargetNominal)}>
                   {formatRupiah(pbbOverview.totalTargetNominal)}
                 </span>
                 <span className="text-[11px] text-emerald-300 mt-1 block">
@@ -641,7 +641,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
                 <span className="text-[11px] font-bold text-emerald-200 uppercase tracking-wider block">
                   Realisasi Terbayar (Lunas)
                 </span>
-                <span className="text-xl sm:text-2xl font-black text-amber-300 block mt-1">
+                <span className="text-base sm:text-lg font-black text-amber-300 block mt-1 whitespace-nowrap truncate" title={formatRupiah(pbbOverview.totalRealisasiNominal)}>
                   {formatRupiah(pbbOverview.totalRealisasiNominal)}
                 </span>
                 <div className="flex items-center justify-between text-[11px] text-emerald-200 mt-1">
@@ -654,7 +654,7 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
                 <span className="text-[11px] font-bold text-rose-300 uppercase tracking-wider block">
                   Sisa Belum Bayar
                 </span>
-                <span className="text-xl sm:text-2xl font-black text-rose-200 block mt-1">
+                <span className="text-base sm:text-lg font-black text-rose-200 block mt-1 whitespace-nowrap truncate" title={formatRupiah(pbbOverview.totalSisaNominal)}>
                   {formatRupiah(pbbOverview.totalSisaNominal)}
                 </span>
                 <span className="text-[11px] text-slate-300 mt-1 block">

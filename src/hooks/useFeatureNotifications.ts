@@ -25,6 +25,7 @@ interface UseFeatureNotificationsProps {
   activeTab: string;
   reports: LaporanHarianItem[];
   kunjunganList: any[];
+  attendanceList?: any[];
   customEvents?: any[];
 }
 
@@ -36,7 +37,7 @@ function getStorageKey(feature: string, userId: string): string {
 
 export function getItemId(item: any): string {
   if (!item) return '';
-  return String(item.id || item._id || item.noSurat || item.nomor || item.nomorSurat || item.idDokumen || '');
+  return String(item.id || item._id || item.noSurat || item.nomor || item.nomorSurat || item.idDokumen || item.nop || '');
 }
 
 function loadSeenIds(feature: string, userId: string): Set<string> {
@@ -83,6 +84,7 @@ export function useFeatureNotifications({
   activeTab,
   reports,
   kunjunganList,
+  attendanceList = [],
   customEvents = [],
 }: UseFeatureNotificationsProps) {
   const userId = activeAccount.id || activeAccount.nama || 'user';
@@ -191,12 +193,14 @@ export function useFeatureNotifications({
       ? (kunjunganList || []).filter((k) => isKunjunganMatchingKepling(k, activeAccount))
       : (kunjunganList || []);
 
+    const effectiveEvents = (customEvents && customEvents.length > 0) ? customEvents : (attendanceList || []);
+
     return {
       kunjungan: relevantKunjungan,
       riwayat: relevantReports,
       surat_kedinasan: suratItems || [],
       realisasi_pembangunan: pembangunanItems || [],
-      kegiatan_khusus: customEvents || [],
+      kegiatan_khusus: effectiveEvents,
       kegiatan_pkk: pkkKegiatanItems || [],
       posyandu_pkk: pkkPosyanduItems || [],
       dasa_wisma: pkkDasaWismaItems || [],
@@ -208,6 +212,7 @@ export function useFeatureNotifications({
     activeAccount,
     kunjunganList,
     reports,
+    attendanceList,
     suratItems,
     pembangunanItems,
     customEvents,

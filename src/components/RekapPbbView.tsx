@@ -1816,7 +1816,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               <Coins className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-sm sm:text-base md:text-lg font-black text-slate-900 tracking-tight break-words">{formatRupiah(kelurahanTotals.targetNominal)}</div>
+          <div className="text-xs sm:text-sm font-black text-slate-900 tracking-tight truncate" title={formatRupiah(kelurahanTotals.targetNominal)}>{formatRupiah(kelurahanTotals.targetNominal)}</div>
           <div className="text-xs text-slate-500 font-medium">
             {selectedLingkungan === 'all'
               ? 'Akumulasi 24 Lingkungan Kelurahan'
@@ -1831,7 +1831,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-sm sm:text-base md:text-lg font-black text-emerald-900 tracking-tight break-words">{formatRupiah(kelurahanTotals.realisasiNominal)}</div>
+          <div className="text-xs sm:text-sm font-black text-emerald-900 tracking-tight truncate" title={formatRupiah(kelurahanTotals.realisasiNominal)}>{formatRupiah(kelurahanTotals.realisasiNominal)}</div>
           <div className="flex items-center gap-1 text-xs font-bold text-emerald-700">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Capaian Nominal: {kelurahanTotals.persentaseRealisasi.toFixed(2)}%</span>
@@ -1845,7 +1845,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               <XCircle className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-sm sm:text-base md:text-lg font-black text-amber-900 tracking-tight break-words">{formatRupiah(kelurahanTotals.sisaNominal)}</div>
+          <div className="text-xs sm:text-sm font-black text-amber-900 tracking-tight truncate" title={formatRupiah(kelurahanTotals.sisaNominal)}>{formatRupiah(kelurahanTotals.sisaNominal)}</div>
           <div className="text-xs text-amber-700 font-medium">
             Belum Terbayar: {(100 - kelurahanTotals.persentaseRealisasi).toFixed(2)}%
           </div>

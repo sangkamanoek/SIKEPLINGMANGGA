@@ -120,6 +120,9 @@ interface DashboardCapaianKeplingProps {
   onOpenReportDetail?: (report: LaporanHarianItem) => void;
   onNavigateToForm?: () => void;
   onOpenRekapPbb?: () => void;
+  onNavigateToKunjungan?: () => void;
+  onNavigateToDatabaseKeluarga?: () => void;
+  onNavigateToPresensi?: () => void;
   attendanceList?: AbsenApelItem[];
   eventAttendanceList?: EventAttendance[];
   customEvents?: CustomEvent[];
@@ -314,6 +317,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   onOpenReportDetail,
   onNavigateToForm,
   onOpenRekapPbb,
+  onNavigateToKunjungan,
+  onNavigateToDatabaseKeluarga,
+  onNavigateToPresensi,
   attendanceList = [],
   eventAttendanceList = [],
   customEvents = [],
@@ -1700,7 +1706,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 </div>
 
                 {/* 2. Perlinsos (Dengan Target & Capaian Resmi) */}
-                <div className="bg-white rounded-2xl p-5 border-2 border-blue-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                <div
+                  onClick={() => onNavigateToDatabaseKeluarga?.()}
+                  className="bg-white rounded-2xl p-5 border-2 border-blue-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+                  title="Klik untuk membuka Database Data Keluarga (Perlinsos)"
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[11px] font-black text-blue-900 uppercase tracking-wider">
@@ -1761,7 +1771,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 </div>
 
                 {/* 3. IKD */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                <div
+                  onClick={() => onNavigateToDatabaseKeluarga?.()}
+                  className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+                  title="Klik untuk membuka Database Kependudukan (IKD)"
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wider">
                       3. Identitas Digital (IKD)
@@ -1786,7 +1800,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 </div>
 
                 {/* 4. BPJS Ketenagakerjaan */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                <div
+                  onClick={() => onNavigateToDatabaseKeluarga?.()}
+                  className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+                  title="Klik untuk membuka Database Keluarga & BPJS"
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
                       4. BPJS TK
@@ -2085,10 +2103,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             )}
 
             {/* Total Perlinsos (Target vs Realisasi Kelurahan) */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-blue-200 shadow-xs">
+            <div
+              onClick={() => onNavigateToDatabaseKeluarga?.()}
+              className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-blue-200 shadow-xs cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group"
+              title="Klik untuk membuka Database Data Keluarga (Perlinsos)"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-[11px] font-black text-blue-900 uppercase block">
-                  Total Perlinsos
+                <span className="text-[10px] sm:text-[11px] font-black text-blue-900 uppercase block group-hover:text-blue-700 transition-colors">
+                  Total Perlinsos ↗
                 </span>
                 <span className="text-[10px] bg-blue-100 text-blue-900 font-black px-1.5 py-0.5 rounded">
                   {kelurahanTotals.perlinsosPercentage}%
@@ -2112,10 +2134,16 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </div>
 
             {/* Total IKD */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs">
-              <span className="text-[10px] sm:text-[11px] font-bold text-purple-700 uppercase block">
-                Total IKD Warga
-              </span>
+            <div
+              onClick={() => onNavigateToDatabaseKeluarga?.()}
+              className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs cursor-pointer hover:border-purple-400 hover:shadow-md transition-all group"
+              title="Klik untuk membuka Database Kependudukan (IKD)"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] sm:text-[11px] font-bold text-purple-700 uppercase block group-hover:text-purple-900 transition-colors">
+                  Total IKD Warga ↗
+                </span>
+              </div>
               <div className="text-2xl sm:text-3xl font-black text-purple-800 mt-1">
                 {kelurahanTotals.totalIkd}
                 <span className="text-xs font-semibold text-slate-500 ml-1">Orang</span>
@@ -2126,10 +2154,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </div>
 
             {/* Total BPJS Ketenagakerjaan */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-teal-200 shadow-xs">
+            <div
+              onClick={() => onNavigateToDatabaseKeluarga?.()}
+              className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-teal-200 shadow-xs cursor-pointer hover:border-teal-400 hover:shadow-md transition-all group"
+              title="Klik untuk membuka Database Keluarga & BPJS"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-[11px] font-black text-teal-900 uppercase block">
-                  Total BPJS TK
+                <span className="text-[10px] sm:text-[11px] font-black text-teal-900 uppercase block group-hover:text-teal-700 transition-colors">
+                  Total BPJS TK ↗
                 </span>
                 <span className="text-[10px] bg-teal-100 text-teal-900 font-black px-1.5 py-0.5 rounded">
                   {kelurahanTotals.bpjsPercentage}%
@@ -2153,10 +2185,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </div>
 
             {/* Total Kunjungan Warga (Door-to-Door) */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-amber-200 shadow-xs">
+            <div
+              onClick={() => onNavigateToKunjungan?.()}
+              className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-amber-200 shadow-xs cursor-pointer hover:border-amber-400 hover:shadow-md transition-all group"
+              title="Klik untuk membuka Menu Kunjungan Warga (Door-to-Door)"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-[11px] font-black text-amber-900 uppercase block">
-                  Total Kunjungan
+                <span className="text-[10px] sm:text-[11px] font-black text-amber-900 uppercase block group-hover:text-amber-700 transition-colors">
+                  Total Kunjungan ↗
                 </span>
                 <span className="text-[10px] bg-amber-100 text-amber-900 font-black px-1.5 py-0.5 rounded">
                   {kelurahanTotals.kunjunganPercentage}%
@@ -2180,10 +2216,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </div>
 
             {/* Absensi Apel Pagi */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-200 shadow-xs">
+            <div
+              onClick={() => onNavigateToPresensi?.()}
+              className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-200 shadow-xs cursor-pointer hover:border-emerald-400 hover:shadow-md transition-all group"
+              title="Klik untuk membuka Rekap Hasil Presensi Apel"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-[11px] font-black text-emerald-900 uppercase block">
-                  Absensi Apel Pagi
+                <span className="text-[10px] sm:text-[11px] font-black text-emerald-900 uppercase block group-hover:text-emerald-700 transition-colors">
+                  Absensi Apel Pagi ↗
                 </span>
                 <span className="text-[10px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.5 rounded">
                   {kelurahanTotals.apelRatePercentage}%
@@ -2778,7 +2818,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </div>
 
                     {/* 3. Perlinsos */}
-                    <div className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg">
+                    <div
+                      onClick={() => onNavigateToDatabaseKeluarga?.()}
+                      className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors"
+                      title="Klik untuk membuka Database Data Keluarga (Perlinsos)"
+                    >
                       <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">📋 Perlinsos (20%)</div>
                       <span
                         className={`inline-block font-black px-1.5 py-0.5 rounded text-[11px] ${
@@ -2814,7 +2858,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     )}
 
                     {/* 5. BPJS Ketenagakerjaan */}
-                    <div className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg">
+                    <div
+                      onClick={() => onNavigateToDatabaseKeluarga?.()}
+                      className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-teal-50 transition-colors"
+                      title="Klik untuk membuka Database Keluarga (BPJS)"
+                    >
                       <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">🛡️ BPJS TK (10%)</div>
                       <span className="inline-block font-black text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded text-[11px]">
                         {item.bpjsPercentage}%
@@ -2823,7 +2871,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </div>
 
                     {/* 6. Kunjungan Harian */}
-                    <div className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg">
+                    <div
+                      onClick={() => onNavigateToKunjungan?.()}
+                      className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-amber-50 transition-colors"
+                      title="Klik untuk membuka Buku Kunjungan Warga"
+                    >
                       <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">🏠 Kunjungan (10%)</div>
                       <span className="inline-block font-black text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded text-[11px]">
                         {item.kunjunganPercentage}%

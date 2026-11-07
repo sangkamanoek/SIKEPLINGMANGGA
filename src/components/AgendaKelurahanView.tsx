@@ -32,6 +32,8 @@ import {
   deleteAgendaItem,
   exportAgendaToExcel,
 } from '../lib/agendaService';
+import { fileToCompressedBase64 } from '../utils/imageCompressor';
+import { Camera, Image as ImageIcon } from 'lucide-react';
 
 interface AgendaKelurahanViewProps {
   currentUser: UserAccount;
@@ -62,6 +64,8 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
   const [formStatus, setFormStatus] = useState<StatusAgendaType>('BELUM');
   const [formCatatan, setFormCatatan] = useState('');
   const [formPenanggungJawab, setFormPenanggungJawab] = useState('');
+  const [formFotoUrl, setFormFotoUrl] = useState<string | undefined>(undefined);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Subscribe to real-time changes
@@ -107,6 +111,7 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
     setFormStatus('BELUM');
     setFormCatatan('');
     setFormPenanggungJawab(currentUser.nama);
+    setFormFotoUrl(undefined);
     setIsModalOpen(true);
   };
 
@@ -120,6 +125,7 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
     setFormStatus(item.statusSelesai);
     setFormCatatan(item.catatan || '');
     setFormPenanggungJawab(item.penanggungJawab || item.createdByName || currentUser.nama);
+    setFormFotoUrl(item.fotoDokumenUrl);
     setIsModalOpen(true);
   };
 
@@ -141,6 +147,7 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
         peserta: formPeserta.trim(),
         statusSelesai: formStatus,
         catatan: formCatatan.trim() || undefined,
+        fotoDokumenUrl: formFotoUrl,
         penanggungJawab: formPenanggungJawab.trim() || currentUser.nama,
         createdByName: editingItem ? editingItem.createdByName : currentUser.nama,
         createdByRole: editingItem ? editingItem.createdByRole : currentUser.role,
@@ -162,6 +169,21 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
       if (onShowToast) onShowToast('Gagal menyimpan agenda kegiatan.', 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressing(true);
+    try {
+      const compressed = await fileToCompressedBase64(file, 1024, 1024, 0.7);
+      setFormFotoUrl(compressed);
+    } catch (err) {
+      if (onShowToast) onShowToast('Gagal memproses foto. Silakan coba lagi.', 'error');
+    } finally {
+      setIsCompressing(false);
     }
   };
 
@@ -580,6 +602,26 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
                         </div>
                       </div>
                     )}
+
+                    {/* Foto Dokumen Attachment Display */}
+                    {item.fotoDokumenUrl && (
+                      <div className="mt-2 space-y-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Lampiran Foto Dokumen:</span>
+                        <div className="relative group/photo w-full sm:w-64 aspect-video rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
+                          <img
+                            src={item.fotoDokumenUrl}
+                            alt="Foto Dokumen Agenda"
+                            className="w-full h-full object-cover cursor-zoom-in hover:scale-105 transition-transform duration-500"
+                            onClick={() => window.open(item.fotoDokumenUrl, '_blank')}
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <span className="text-white text-[10px] font-bold flex items-center gap-1">
+                              <Search className="w-3 h-3" /> Klik untuk Perbesar
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Column: Quick Status & Actions */}
@@ -778,6 +820,47 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
                   placeholder="Tambahkan rincian hasil rapat, poin penting, atau instruksi tindak lanjut..."
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white resize-none"
                 />
+              </div>
+
+              {/* Upload Foto Dokumen */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 block">
+                  Lampiran Foto Dokumen (Opsional)
+                </label>
+                
+                {formFotoUrl ? (
+                  <div className="relative w-full aspect-video rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50 overflow-hidden group">
+                    <img src={formFotoUrl} alt="Preview Dokumen" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormFotoUrl(undefined)}
+                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase transition-all shadow-md cursor-pointer"
+                      >
+                        Hapus Foto
+                      </button>
+                      <label className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase transition-all shadow-md cursor-pointer">
+                        Ganti Foto
+                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full aspect-video rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 transition-all cursor-pointer group">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      {isCompressing ? (
+                        <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mb-2" />
+                      ) : (
+                        <ImageIcon className="w-8 h-8 text-slate-400 group-hover:text-emerald-500 mb-2" />
+                      )}
+                      <p className="text-xs font-bold text-slate-500 group-hover:text-emerald-700">
+                        {isCompressing ? 'Memproses Foto...' : 'Klik untuk Unggah Foto Dokumen'}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1">PNG, JPG up to 10MB</p>
+                    </div>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isCompressing} />
+                  </label>
+                )}
               </div>
 
               {/* Modal Action Buttons */}

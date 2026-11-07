@@ -11,6 +11,11 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
+import {
+  DEFAULT_PKK_LINGKUNGAN_NAMES,
+  ROMAN_NUMERALS,
+  syncBuku1ToPkkProfiles,
+} from '../data/keplingList';
 
 export interface PkkBuku1Anggota {
   id: string;
@@ -76,7 +81,7 @@ const DEFAULT_BUKU1_ITEMS: PkkBuku1Anggota[] = [
     id: 'anggota_pkk_ketua',
     nik: '12711020010001',
     nama: 'Ny. Fransiska Fery Arapenta Tarigan',
-    jabatan: 'Ketua Tim Penggerak PKK',
+    jabatan: 'Ketua Tim Penggerak PKK Kelurahan',
     jenisKelamin: 'P',
     tempatLahir: 'Medan',
     tanggalLahir: '1985-05-12',
@@ -92,7 +97,7 @@ const DEFAULT_BUKU1_ITEMS: PkkBuku1Anggota[] = [
     id: 'anggota_pkk_sekretaris',
     nik: '12711020010002',
     nama: 'Nur Aisyah Dewi, A.Md',
-    jabatan: 'Sekretaris Tim Penggerak PKK',
+    jabatan: 'Sekretaris Tim Penggerak PKK Kelurahan',
     jenisKelamin: 'P',
     tempatLahir: 'Medan',
     tanggalLahir: '1990-08-20',
@@ -104,11 +109,33 @@ const DEFAULT_BUKU1_ITEMS: PkkBuku1Anggota[] = [
     keterangan: 'Sekretaris Tim Penggerak PKK Kelurahan Mangga Periode Aktif',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
+  ...Array.from({ length: 24 }, (_, i) => {
+    const nomor = i + 1;
+    const roman = ROMAN_NUMERALS[i];
+    const pad = String(nomor).padStart(2, '0');
+    return {
+      id: `anggota_pkk_lingkungan_${nomor}`,
+      nik: `127110200100${pad}`,
+      nama: DEFAULT_PKK_LINGKUNGAN_NAMES[i] || `Ketua PKK Lingkungan ${roman}`,
+      jabatan: `Ketua Tim Penggerak PKK Lingkungan ${roman}`,
+      jenisKelamin: 'P' as const,
+      tempatLahir: 'Medan',
+      tanggalLahir: '1988-01-01',
+      statusPerkawinan: 'Kawin',
+      statusPernikahan: 'Kawin',
+      alamat: `Lingkungan ${roman}, Kelurahan Mangga`,
+      pendidikan: 'SMA / S-1',
+      pekerjaan: 'Ibu Rumah Tangga / Ketua TP PKK Lingkungan',
+      keterangan: `Ketua TP PKK Lingkungan ${roman}`,
+      createdAt: `2026-01-01T00:00:${pad}.000Z`,
+    };
+  }),
 ];
 
 export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => {
   const stored = safeGetLocalStorage<PkkBuku1Anggota[]>(BUKU1_KEY, DEFAULT_BUKU1_ITEMS);
   const effectiveStored = Array.isArray(stored) && stored.length > 0 ? stored : DEFAULT_BUKU1_ITEMS;
+  syncBuku1ToPkkProfiles(effectiveStored);
   onUpdate(effectiveStored);
 
   let unsub: Unsubscribe | undefined;
@@ -127,6 +154,7 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
         });
         items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         safeSetLocalStorage(BUKU1_KEY, JSON.stringify(items));
+        syncBuku1ToPkkProfiles(items);
         onUpdate(items);
       });
     }
@@ -137,7 +165,10 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
     if (typeof BroadcastChannel !== 'undefined') {
       bc = new BroadcastChannel(BUKU1_CHAN);
       bc.onmessage = (e) => {
-        if (e.data && e.data.items) onUpdate(e.data.items);
+        if (e.data && e.data.items) {
+          syncBuku1ToPkkProfiles(e.data.items);
+          onUpdate(e.data.items);
+        }
       };
     }
   } catch (e) {}
@@ -154,6 +185,7 @@ export const saveBuku1Item = async (item: PkkBuku1Anggota) => {
   const idx = current.findIndex((x) => x.id === item.id);
   const updated = idx >= 0 ? current.map((x) => (x.id === item.id ? payload : x)) : [payload, ...current];
   safeSetLocalStorage(BUKU1_KEY, JSON.stringify(updated));
+  syncBuku1ToPkkProfiles(updated);
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(BUKU1_CHAN);

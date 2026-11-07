@@ -30,7 +30,7 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
         <style>
           @page {
             size: A4 portrait;
-            margin: 8mm 8mm 10mm 20mm; /* Margin kiri 20mm khusus binder & lubang perforator */
+            margin: 10mm 10mm 10mm 20mm; /* Margin kiri 20mm khusus binder & lubang perforator */
           }
           * {
             box-sizing: border-box;
@@ -238,7 +238,7 @@ export const downloadPdfDocument = async (targetIdOrHtml: string, filename = 'Do
     const cleanFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
 
     const opt = {
-      margin: [8, 10, 10, 10], // top, left, bottom, right in mm
+      margin: [10, 20, 10, 10], // top, left, bottom, right in mm
       filename: cleanFilename,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, logging: false },

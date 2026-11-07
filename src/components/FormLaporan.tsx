@@ -32,6 +32,7 @@ import {
   getNamaHariIndonesia,
   formatTanggalIndonesia,
   getTodayLocalIso,
+  getReportIsoDate,
   NAMA_HARI,
   formatReportToText,
 } from '../lib/formatter';
@@ -48,6 +49,7 @@ interface FormLaporanProps {
   activeAccount?: UserAccount;
   preselectedKepling?: UserAccount | null;
   attendanceList?: AbsenApelItem[];
+  existingReports?: LaporanHarianItem[];
   onOpenAbsenApel?: () => void;
   onBackToRangkuman?: () => void;
 }
@@ -77,6 +79,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   activeAccount,
   preselectedKepling,
   attendanceList = [],
+  existingReports = [],
   onOpenAbsenApel,
   onBackToRangkuman,
 }) => {
@@ -321,6 +324,19 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     checkApel();
   }, [selectedAccountId, rawDate, namaKepling, jabatan, attendanceList]);
 
+  // Cek apakah Kepling ini sudah memiliki laporan yang tersimpan pada tanggal yang dipilih
+  const existingReportForDate = useMemo(() => {
+    if (!existingReports || existingReports.length === 0) return null;
+    return existingReports.find((r) => {
+      const repDate = getReportIsoDate(r);
+      if (repDate !== rawDate) return false;
+      const accMatch = selectedAccountId && r.keplingId === selectedAccountId;
+      const nameMatch = namaKepling && r.namaKepling?.trim().toLowerCase() === namaKepling.trim().toLowerCase();
+      const lkMatch = jabatan && r.jabatan?.trim().toLowerCase() === jabatan.trim().toLowerCase();
+      return Boolean(accMatch || nameMatch || lkMatch);
+    });
+  }, [existingReports, rawDate, selectedAccountId, namaKepling, jabatan]);
+
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setRawDate(val);
@@ -502,7 +518,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     };
 
     return {
-      id: 'lap_' + Date.now(),
+      id: existingReportForDate?.id || ('lap_' + Date.now()),
       keplingId: selectedAccountId,
       hari,
       tanggal: tanggalText,
@@ -623,6 +639,22 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
             <strong>
               {preselectedKepling ? `${preselectedKepling.lingkungan} (${preselectedKepling.nama})` : activeAccount?.nama || 'Petugas'}
             </strong>
+          </div>
+        </div>
+      )}
+
+      {existingReportForDate && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-2xl p-4 shadow-sm flex items-start gap-3">
+          <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-xs">
+            ⚡
+          </div>
+          <div className="text-xs text-amber-950 space-y-1">
+            <p className="font-extrabold text-sm text-amber-900">
+              Laporan Tambahan Hari Ini ({existingReportForDate.tanggal || rawDate})
+            </p>
+            <p className="leading-relaxed">
+              Anda sudah mengirim laporan pada tanggal ini. Entri kinerja, keterangan kegiatan baru, serta foto dokumentasi tambahan yang Anda simpan akan <strong>otomatis digabungkan (*auto-consolidated*)</strong> ke dalam laporan harian tanggal ini tanpa menimpa data sebelumnya.
+            </p>
           </div>
         </div>
       )}

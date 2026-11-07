@@ -25,7 +25,7 @@ import {
   CreditCard,
 } from 'lucide-react';
 import { PkkCardModal } from './PkkCardModal';
-import { UserAccount, SuratKedinasanItem, JenisSuratKedinasan } from '../types';
+import { UserAccount, SuratKedinasanItem, JenisSuratKedinasan, isPkkRole } from '../types';
 import { KopSuratPkk } from './KopSuratPkk';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument } from '../utils/printHelper';
@@ -91,8 +91,15 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
   useEffect(() => {
     const unsub1 = subscribeBuku1((items) => setBuku1List(items));
     const unsub2 = subscribeSurat((items) => {
-      // Filter for PKK-related letters
-      setSuratList(items.filter(s => s.asalSurat?.toLowerCase().includes('pkk') || s.nomorSurat?.toLowerCase().includes('pkk') || s.tujuanSurat?.toLowerCase().includes('pkk')));
+      // Filter for PKK-related letters explicitly
+      setSuratList(items.filter(s => {
+        if (s.kategori === 'PKK') return true;
+        if (s.kategori === 'KELURAHAN') return false;
+        return isPkkRole(s.dibuatOlehRole || '') ||
+               s.asalSurat?.toLowerCase().includes('pkk') ||
+               s.nomorSurat?.toLowerCase().includes('pkk') ||
+               s.tujuanSurat?.toLowerCase().includes('pkk');
+      }));
     });
     const unsub3 = subscribePkkKeuangan((items) => setKeuanganList(items));
     const unsub4 = subscribeBuku4((items) => setBuku4List(items));
@@ -300,6 +307,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           tanggalSurat: b2Tanggal,
           jenisSurat: b2Jenis,
           perihal: b2Perihal,
+          kategori: 'PKK',
           asalSurat: isMasuk ? b2AsalTujuan : 'Nur Aisyah Dewi, A.Md (Sekretaris Tim Penggerak PKK)',
           tujuanSurat: isMasuk ? 'PKK Kelurahan Mangga' : b2AsalTujuan,
           sifat: 'BIASA',
@@ -308,7 +316,10 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           fileUrl: b2FileUrl,
           fileName: b2FileName,
           penandatangan: 'Ny. Fransiska Fery Arapenta Tarigan (Ketua Tim Penggerak PKK)',
+          dibuatOlehNama: currentUser.nama,
+          dibuatOlehRole: currentUser.role,
           createdAt: editingItem?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
         await saveSuratItem(item);
       } else if (activeBook === 3) {

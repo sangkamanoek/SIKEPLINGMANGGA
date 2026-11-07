@@ -55,6 +55,7 @@ import {
   consolidateKunjunganWithReports,
   isKunjunganOnDate,
 } from '../lib/kunjunganService';
+import { consolidateDailyReport } from '../lib/reportConsolidator';
 
 interface RangkumanLaporanKelurahanProps {
   reports: LaporanHarianItem[];
@@ -199,6 +200,35 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
   const effectiveKunjunganList = useMemo(() => {
     return consolidateKunjunganWithReports(kunjunganList, reports);
   }, [kunjunganList, reports]);
+
+  // Statistik Kunjungan Terpadu (Perlinsos, PBB, IKD, BPJS)
+  const kunjunganStats = useMemo(() => {
+    const stats = { perlinsos: 0, pbb: 0, ikd: 0, bpjs: 0, total: effectiveKunjunganList.length };
+    effectiveKunjunganList.forEach(k => {
+      if (k.perlinsos === 'Sudah') stats.perlinsos++;
+      if (k.pbb === 'Sudah') stats.pbb++;
+      if (k.ikd === 'Sudah') stats.ikd++;
+      if (k.bpjsTk === 'Aktif' || k.bpjsTk === 'Sudah Daftar (Agen Perisai)') stats.bpjs++;
+    });
+    return stats;
+  }, [effectiveKunjunganList]);
+
+  // RENDER: Widget Rekap Kunjungan
+  const KunjunganSummaryWidget = () => (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      {[
+        { label: 'Perlinsos', value: kunjunganStats.perlinsos, color: 'text-blue-600' },
+        { label: 'PBB', value: kunjunganStats.pbb, color: 'text-emerald-600' },
+        { label: 'IKD', value: kunjunganStats.ikd, color: 'text-purple-600' },
+        { label: 'BPJS', value: kunjunganStats.bpjs, color: 'text-amber-600' },
+      ].map((s) => (
+        <div key={s.label} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          <p className="text-sm text-gray-500 font-medium">{s.label}</p>
+          <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+        </div>
+      ))}
+    </div>
+  );
 
   // Statistik Terpadu Mingguan (Apel, Laporan, Kunjungan, & Sektoral)
   const weeklyStats = useMemo(() => {
@@ -459,8 +489,11 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     return KEPLING_ACCOUNTS.map((kepling) => {
       const nomor = kepling.nomorLingkungan || 0;
 
-      // Cari Laporan Kinerja Terlebih Dahulu dengan pencocokan presisi
-      const laporan = reportsOnDate.find((r) => isReportMatchingKepling(r, kepling));
+      // Cari dan otomatis gabungkan seluruh laporan kinerja Kepling pada tanggal ini
+      const matchingReports = reportsOnDate.filter((r) => isReportMatchingKepling(r, kepling));
+      const laporan = matchingReports.length > 0
+        ? matchingReports.reduce((acc, curr) => consolidateDailyReport(acc, curr))
+        : undefined;
 
       // Cari Presensi Apel di attendanceList dengan pencocokan fuzzy (ID, nomor, lingkungan, nama)
       let absen = attendanceOnDate.find((a) => isAttendanceMatchingKepling(a, kepling));
@@ -539,7 +572,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
         isApelNihil,
         laporan,
         isMelapor,
-        kunjungan,
+        kunjungan: Array.isArray(kunjungan) ? kunjungan : [],
       };
     });
   }, [attendanceOnDate, reportsOnDate, kunjunganOnDate, selectedDate]);
@@ -557,7 +590,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
         const matchNama = item.kepling.nama.toLowerCase().includes(q);
         const matchLingkungan = item.kepling.lingkungan.toLowerCase().includes(q);
         const matchNomor = String(item.nomor).includes(q);
-        const matchWarga = item.kunjungan.some(
+        const matchWarga = (item.kunjungan || []).some(
           (k) =>
             (k.namaWarga && k.namaWarga.toLowerCase().includes(q)) ||
             (k.alamat && k.alamat.toLowerCase().includes(q))
@@ -610,7 +643,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
           totalInfrastrukturTemuan += 1;
         }
       }
-      totalKunjunganWarga += item.kunjungan.length;
+      totalKunjunganWarga += (item.kunjungan || []).length;
     });
 
     const totalMelapor = consolidatedKeplingData.filter((k) => k.isMelapor).length;
@@ -1037,6 +1070,8 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
         </div>
       </div>
 
+      {viewMode === 'HARIAN' && <KunjunganSummaryWidget />}
+
       {/* Mode Switcher Tabs: Rangkuman Harian vs Statistik Mingguan */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs">
         <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl w-full sm:w-auto">
@@ -1274,7 +1309,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
             <span>
               Dari{' '}
               <strong className="text-slate-800">
-                {consolidatedKeplingData.filter((k) => k.kunjungan.length > 0).length}
+                {consolidatedKeplingData.filter((k) => (k.kunjungan || []).length > 0).length}
               </strong>{' '}
               lingkungan aktif
             </span>
@@ -1901,9 +1936,9 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
                         <Users className="w-3.5 h-3.5 text-blue-600" />
                         <span>Kunjungan Sambang Warga Harian:</span>
                       </div>
-                      {item.kunjungan.length > 0 ? (
+                      {(item.kunjungan || []).length > 0 ? (
                         <span className="text-[11px] font-black text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">
-                          {item.kunjungan.length} Warga Dikunjungi
+                          {(item.kunjungan || []).length} Warga Dikunjungi
                         </span>
                       ) : (
                         <span className="text-[11px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
@@ -1912,9 +1947,9 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
                       )}
                     </div>
 
-                    {item.kunjungan.length > 0 ? (
+                    {(item.kunjungan || []).length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {item.kunjungan.map((w, wIdx) => (
+                        {(item.kunjungan || []).map((w, wIdx) => (
                           <div
                             key={w.id || wIdx}
                             className="p-2.5 rounded-xl border border-blue-100 bg-blue-50/40 text-xs flex flex-col justify-between"
@@ -2639,8 +2674,8 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
                         {it.isMelapor ? `${kin.bpjsKetenagakerjaanOrang || 0} Org` : 'NIHIL'}
                       </td>
                       <td className="border border-black p-1 text-[8pt]">
-                        {it.kunjungan.length > 0
-                          ? `${it.kunjungan.length} Warga (${it.kunjungan.map((w) => w.namaWarga).slice(0, 2).join(', ')})`
+                        {(it.kunjungan || []).length > 0
+                          ? `${(it.kunjungan || []).length} Warga (${(it.kunjungan || []).map((w) => w.namaWarga).slice(0, 2).join(', ')})`
                           : 'NIHIL'}
                       </td>
                     </tr>

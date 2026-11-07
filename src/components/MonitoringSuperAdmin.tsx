@@ -41,6 +41,7 @@ import {
   Database,
   Bell,
   Camera,
+  UserCheck,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import QRCode from 'react-qr-code';
@@ -76,6 +77,7 @@ import {
   RuasJalanLingkungan,
   LingkunganPolygon,
   isPkkRole,
+  AbsenApelItem,
 } from '../types';
 import { 
   KEPLING_ACCOUNTS, 
@@ -111,6 +113,7 @@ import {
 } from '../lib/pbbService';
 import { SpptPbbItem } from '../data/pbbSampleData';
 import { RekapCapaianPbb24Lingkungan } from './RekapCapaianPbb24Lingkungan';
+import { RekapAbsensiSuperAdmin } from './RekapAbsensiSuperAdmin';
 
 interface MonitoringSuperAdminProps {
   reports: LaporanHarianItem[];
@@ -124,6 +127,8 @@ interface MonitoringSuperAdminProps {
   onOpenCapaianDashboard?: () => void;
   onOpenPbb?: () => void;
   sheetMeta?: SheetMetadata | null;
+  attendanceList?: AbsenApelItem[];
+  currentUser?: UserAccount;
 }
 
 export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.memo(({
@@ -138,11 +143,14 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
   onOpenCapaianDashboard,
   onOpenPbb,
   sheetMeta,
+  attendanceList = [],
+  currentUser,
 }) => {
   const todayIso = getTodayLocalIso();
 
-  // Tab mode for Monitoring Dashboard: Laporan Harian vs Realisasi PBB vs Akun vs Tugas Khusus
-  const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PBB_REALISASI' | 'ACCOUNTS' | 'TUGAS_KHUSUS'>('LAPORAN');
+  // Tab mode for Monitoring Dashboard: Laporan Harian vs Presensi Apel vs Realisasi PBB vs Akun vs Tugas Khusus
+  const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PRESENSI' | 'PBB_REALISASI' | 'ACCOUNTS' | 'TUGAS_KHUSUS'>('LAPORAN');
+  const [selectedPresensiDate, setSelectedPresensiDate] = useState<string>(todayIso);
 
   // Tugas Khusus Lurah states
   const [tugasList, setTugasList] = useState<TugasKhusus[]>(() => getTugasKhususList());
@@ -609,8 +617,11 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
               <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white mt-1">
                 Monitoring Laporan Harian 24 Kepala Lingkungan
               </h2>
-              <p className="text-xs text-slate-300 font-normal mt-0.5">
-                Kelurahan Mangga • Kecamatan Medan Tuntungan • Total Database: <strong>{reports.length} Laporan</strong>
+              <p className="text-xs text-slate-300 font-normal mt-0.5 flex flex-wrap items-center gap-2">
+                <span>Kelurahan Mangga • Kecamatan Medan Tuntungan • Total Database: <strong>{reports.length} Laporan</strong></span>
+                <span className="text-[10px] text-emerald-300 font-bold bg-emerald-900/80 px-2 py-0.5 rounded-full border border-emerald-500/40 inline-flex items-center gap-1 shadow-sm">
+                  ⚡ Auto-Simpan HP Aktif (IndexedDB Fast Cache)
+                </span>
               </p>
             </div>
           </div>
@@ -829,11 +840,11 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
       </div>
 
       {/* Main Monitoring Tab Switcher (Laporan Harian vs Realisasi PBB vs Akun) */}
-      <div className="flex items-center gap-2 p-1.5 bg-slate-800 rounded-2xl border border-slate-700 shadow-2xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 p-1.5 bg-slate-800 rounded-2xl border border-slate-700 shadow-2xs overflow-hidden max-w-full mb-3">
         <button
           type="button"
           onClick={() => setActiveMainTab('LAPORAN')}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
+          className={`flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer snap-start shrink-0 ${
             activeMainTab === 'LAPORAN'
               ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
               : 'text-slate-300 hover:text-white hover:bg-slate-700'
@@ -848,8 +859,28 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
 
         <button
           type="button"
+          onClick={() => setActiveMainTab('PRESENSI')}
+          className={`flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer snap-start shrink-0 ${
+            activeMainTab === 'PRESENSI'
+              ? 'bg-teal-600 text-white shadow-sm border border-teal-500'
+              : 'text-slate-300 hover:text-white hover:bg-slate-700'
+          }`}
+        >
+          <UserCheck className="w-4 h-4 text-teal-300" />
+          <span>Hasil Presensi Apel</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold hidden sm:inline-block ${
+            activeMainTab === 'PRESENSI'
+              ? 'bg-white/20 text-white'
+              : 'bg-teal-100 text-teal-800'
+          }`}>
+            24 Kepling
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveMainTab('PBB_REALISASI')}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
+          className={`flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer snap-start shrink-0 ${
             activeMainTab === 'PBB_REALISASI'
               ? 'bg-amber-400 text-slate-950 shadow-sm border border-amber-300'
               : 'text-slate-300 hover:text-white hover:bg-slate-700'
@@ -869,7 +900,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
         <button
           type="button"
           onClick={() => setActiveMainTab('ACCOUNTS')}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
+          className={`flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer snap-start shrink-0 ${
             activeMainTab === 'ACCOUNTS'
               ? 'bg-indigo-600 text-white shadow-sm border border-indigo-500'
               : 'text-slate-300 hover:text-white hover:bg-slate-700'
@@ -889,7 +920,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
         <button
           type="button"
           onClick={() => setActiveMainTab('TUGAS_KHUSUS')}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer ${
+          className={`flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer snap-start shrink-0 ${
             activeMainTab === 'TUGAS_KHUSUS'
               ? 'bg-rose-600 text-white shadow-sm border border-rose-500'
               : 'text-slate-300 hover:text-white hover:bg-slate-700'
@@ -1494,6 +1525,17 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
       </>
       )}
 
+      {activeMainTab === 'PRESENSI' && (
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <RekapAbsensiSuperAdmin
+            attendanceList={attendanceList}
+            currentUser={currentUser || (ALL_ACCOUNTS[0] as UserAccount)}
+            selectedDate={selectedPresensiDate}
+            onDateChange={setSelectedPresensiDate}
+          />
+        </div>
+      )}
+
       {activeMainTab === 'PBB_REALISASI' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
           {/* Header & Global Stats */}
@@ -1582,11 +1624,11 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
                 <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">Target Ketetapan</span>
-                <span className="text-xl font-black text-white block mt-1">{formatRupiah(pbbOverview.totalTargetNominal)}</span>
+                <span className="text-sm sm:text-base font-black text-white block mt-1 tracking-tight truncate whitespace-nowrap">{formatRupiah(pbbOverview.totalTargetNominal)}</span>
               </div>
               <div className="bg-emerald-900/50 backdrop-blur-md p-4 rounded-2xl border border-emerald-500/40">
                 <span className="text-[11px] font-bold text-emerald-200 uppercase tracking-wider block">Realisasi (Lunas)</span>
-                <span className="text-xl font-black text-amber-300 block mt-1">{formatRupiah(pbbOverview.totalRealisasiNominal)}</span>
+                <span className="text-sm sm:text-base font-black text-amber-300 block mt-1 tracking-tight truncate whitespace-nowrap">{formatRupiah(pbbOverview.totalRealisasiNominal)}</span>
                 <div className="flex items-center justify-between text-[11px] text-emerald-200 mt-1">
                   <span>Capaian:</span>
                   <span className="font-bold text-white">{pbbOverview.persentaseRealisasiNominal.toFixed(2)}%</span>
@@ -1594,7 +1636,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
               </div>
               <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
                 <span className="text-[11px] font-bold text-rose-300 uppercase tracking-wider block">Sisa Belum Bayar</span>
-                <span className="text-xl font-black text-rose-200 block mt-1">{formatRupiah(pbbOverview.totalSisaNominal)}</span>
+                <span className="text-sm sm:text-base font-black text-rose-200 block mt-1 tracking-tight truncate whitespace-nowrap">{formatRupiah(pbbOverview.totalSisaNominal)}</span>
               </div>
               <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
                 <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">Kepatuhan Wajib Pajak</span>
