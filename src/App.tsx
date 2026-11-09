@@ -266,15 +266,17 @@ export default function App() {
       }
     });
     
-    // Trigger silent background sync for other data
+    // Delay initial full pull by 5 seconds so mobile initial render is completely instant & smooth
+    const initialSyncTimeout = setTimeout(() => {
+      import('./lib/syncManager').then(m => m.runSilentBackgroundSync()).catch(console.error);
+    }, 5000);
+
     const syncInterval = setInterval(() => {
       import('./lib/syncManager').then(m => m.runSilentBackgroundSync()).catch(console.error);
     }, 600000); // 10 minutes
     
-    // Initial sync
-    import('./lib/syncManager').then(m => m.runSilentBackgroundSync()).catch(console.error);
-    
     return () => {
+      clearTimeout(initialSyncTimeout);
       unsub();
       unsubKunjungan();
       unsubAttendance();

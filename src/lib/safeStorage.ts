@@ -310,20 +310,83 @@ export function safeRemoveLocalStorage(key: string): void {
 }
 
 /**
- * Clears volatile keys while preserving permanent auth or target credentials
+ * Cleans obsolete cache, volatile logs, orphaned tokens, and frees browser memory
+ * without deleting essential accounts or master data.
  */
-export function clearVolatileStorage(): void {
+export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedApproxBytes: number } {
+  let freedCount = 0;
+  let freedBytes = 0;
+
   try {
+    memoryFallbackStorage.clear();
+
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && !k.includes('password') && !k.includes('account') && !k.includes('profile')) {
-        keysToRemove.push(k);
+      if (!k) continue;
+
+      const lower = k.toLowerCase();
+      // Whitelist critical persistent items that should NEVER be wiped
+      const isEssential =
+        lower.includes('account') ||
+        lower.includes('profile') ||
+        lower.includes('password') ||
+        lower.includes('active_tab') ||
+        lower.includes('auth') ||
+        lower.includes('device_id') ||
+        k === 'sikepling_laporan_harian_list' ||
+        k === 'sikepling_surat_kedinasan_v1' ||
+        k === 'sikepling_attendance_list_v1' ||
+        k === 'sikepling_kunjungan_warga_v1' ||
+        k === 'sikepling_data_keluarga_v1' ||
+        k === 'sikepling_pkk_buku_1_v1' ||
+        k === 'sikepling_pkk_buku_4_v1' ||
+        k === 'sikepling_pkk_buku_5_v1' ||
+        k === 'sikepling_pkk_kegiatan_v1' ||
+        k === 'sikepling_pkk_keuangan_v1' ||
+        k === 'sikepling_pkk_dasa_wisma_v2' ||
+        k === 'sikepling_sppt_pbb_records_2026_v3';
+
+      if (!isEssential) {
+        // Obsolete versions, temporary logs, old sync backups, stale caches
+        if (
+          lower.includes('backup') ||
+          lower.includes('old') ||
+          lower.includes('temp') ||
+          lower.includes('cache') ||
+          lower.includes('log') ||
+          lower.includes('_v1') ||
+          lower.includes('draft') ||
+          lower.includes('seen_items') ||
+          lower.includes('google_cached') ||
+          lower.includes('cleaned_reports') ||
+          lower.includes('dismissed') ||
+          lower.includes('network_clock')
+        ) {
+          keysToRemove.push(k);
+        }
       }
     }
-    keysToRemove.forEach((k) => localStorage.removeItem(k));
-    memoryFallbackStorage.clear();
+
+    keysToRemove.forEach((key) => {
+      try {
+        const val = localStorage.getItem(key);
+        if (val) freedBytes += val.length * 2;
+        localStorage.removeItem(key);
+        freedCount++;
+      } catch {}
+    });
+
+    // Also clear session storage non-essential items
+    try {
+      sessionStorage.clear();
+    } catch {}
+
+    console.log(`[Memory Cleaner] Cleaned ${freedCount} keys (~${(freedBytes / 1024).toFixed(1)} KB freed).`);
   } catch (err) {
-    console.warn('[safeStorage] Error clearing volatile storage:', err);
+    console.warn('[Memory Cleaner] Error during memory optimization:', err);
   }
+
+  return { freedKeys: freedCount, freedApproxBytes: freedBytes };
 }
+

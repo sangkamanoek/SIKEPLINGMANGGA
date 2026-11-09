@@ -165,13 +165,17 @@ export const pullAllDataFromFirestore = async (
     });
     safeSetLocalStorage(STORAGE_KEY_SUBMISSIONS, JSON.stringify(subs));
 
-    // 14. PBB SPPT (3 Tahun)
-    for (const year of [2025, 2026, 2027]) {
-      onProgress(`Mengambil Data PBB SPPT Tahun ${year}...`);
-      const pbbSnap = await getDocs(collection(db, `pbb_sppt_${year}`));
+    // 14. PBB SPPT (Hanya Tahun Aktif 2026 agar ringan di memori HP)
+    onProgress('Mengambil Data PBB SPPT Tahun 2026...');
+    try {
+      const pbbSnap = await getDocs(collection(db, 'pbb_sppt_2026'));
       const pbb: any[] = [];
       pbbSnap.forEach(d => pbb.push({ ...d.data(), id: d.id }));
-      safeSetLocalStorage(`sikepling_sppt_pbb_records_${year}_v3`, JSON.stringify(pbb));
+      if (pbb.length > 0) {
+        safeSetLocalStorage('sikepling_sppt_pbb_records_2026_v3', JSON.stringify(pbb));
+      }
+    } catch (e) {
+      console.warn('PBB SPPT pull error:', e);
     }
 
     // 15. Attendance

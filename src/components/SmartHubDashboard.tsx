@@ -25,9 +25,11 @@ import {
   Wallet,
   RefreshCw,
   Database,
+  Trash2,
 } from 'lucide-react';
 import { saveReportToFirestore } from '../lib/firestoreService';
 import { fetchAllReports } from '../lib/reportsApi';
+import { optimizeAndCleanBrowserMemory } from '../lib/safeStorage';
 import { UserAccount, LaporanHarianItem, AbsenApelItem } from '../types';
 import { DeadlineNotifAlert } from './DeadlineNotifAlert';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
@@ -126,6 +128,23 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       alert('Gagal menyinkronkan data ke Firestore.');
     } finally {
       setIsSyncingFirestore(false);
+    }
+  };
+
+  const [isCleaningMemory, setIsCleaningMemory] = useState(false);
+
+  const handleCleanBrowserMemory = () => {
+    if (!window.confirm('Bersihkan memori sementara browser HP/komputer? Data akun dan laporan utama tetap aman di Cloud Firestore.')) {
+      return;
+    }
+    setIsCleaningMemory(true);
+    try {
+      const res = optimizeAndCleanBrowserMemory();
+      alert(`Pembersihan Memori Selesai!\n• Berhasil membuang ${res.freedKeys} entri data lama/sementara.\n• Memori browser kini lebih ringan dan responsif.`);
+    } catch {
+      alert('Gagal membersihkan memori browser.');
+    } finally {
+      setIsCleaningMemory(false);
     }
   };
 
@@ -830,6 +849,16 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             >
               <RefreshCw className={`w-4 h-4 text-indigo-200 ${isSyncingFirestore ? 'animate-spin' : ''}`} />
               <span>{isSyncingFirestore ? 'Menyinkronkan...' : 'Sinkronkan Firestore'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleCleanBrowserMemory}
+              disabled={isCleaningMemory}
+              className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 hover:border-rose-500/50 text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+              title="Bersihkan memori & cache sementara browser HP/komputer yang memperlambat sistem"
+            >
+              <Trash2 className="w-4 h-4 text-rose-400" />
+              <span>{isCleaningMemory ? 'Membersihkan...' : 'Bersihkan Memori'}</span>
             </button>
             <button
               onClick={onOpenPPTModal}
