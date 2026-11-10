@@ -1629,14 +1629,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
                                 <span className="text-xs font-black text-slate-900 truncate">
                                   {kk.namaKepalaKeluarga}
                                 </span>
-                                <span
-                                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
-                                    kk.sumberData === 'DATABASE_KELUARGA'
-                                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                      : 'bg-slate-100 text-slate-600 border border-slate-200'
-                                  }`}
-                                >
-                                  {kk.sumberData === 'DATABASE_KELUARGA' ? 'Database' : 'Manual'}
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 bg-slate-100 text-slate-600 border border-slate-200">
+                                  Manual
                                 </span>
                               </div>
                               <p className="text-[10px] text-slate-400 truncate mt-0.5">
