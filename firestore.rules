@@ -58,27 +58,8 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Absensi Harian & Apel
-    match /attendance/{attendanceId} {
-      allow read: if true;
-      allow create, update: if request.resource.data.keys().hasAll(['id', 'tanggal'])
-                   && isValidString(request.resource.data.id, 1, 100);
-      allow delete: if true;
-    }
-
-    match /attendance_qr/{date} {
-      allow read: if true;
-      allow create, update: if request.resource.data.keys().hasAll(['id', 'token', 'tanggal'])
-                            && isValidString(request.resource.data.id, 1, 100);
-      allow delete: if false;
-    }
-
     // Agenda & Kegiatan Khusus
     match /custom_events/{eventId} {
-      allow read, write: if true;
-    }
-
-    match /event_attendance/{attendanceId} {
       allow read, write: if true;
     }
 

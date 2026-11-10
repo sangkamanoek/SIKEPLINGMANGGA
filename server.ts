@@ -199,31 +199,6 @@ const saveStoredPembangunan = (items: any[]) => {
 
 let pembangunanCache = loadStoredPembangunan();
 
-// Attendance Data File (Presensi Apel Pagi Buffer)
-const ATTENDANCE_FILE = path.join(DATA_DIR, 'attendance.json');
-
-const loadStoredAttendance = (): any[] => {
-  try {
-    if (fs.existsSync(ATTENDANCE_FILE)) {
-      const content = fs.readFileSync(ATTENDANCE_FILE, 'utf-8');
-      return JSON.parse(content) || [];
-    }
-  } catch (err) {
-    console.error('Error reading attendance file:', err);
-  }
-  return [];
-};
-
-const saveStoredAttendance = (attendance: any[]) => {
-  try {
-    fs.writeFileSync(ATTENDANCE_FILE, JSON.stringify(attendance, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('Error saving attendance file:', err);
-  }
-};
-
-let attendanceCache = loadStoredAttendance();
-
 const DEFAULT_TARGETS_LIST = new Array(24).fill(0);
 
 const DEFAULT_PERLINSOS_BASELINES = new Array(24).fill(0);
@@ -302,32 +277,6 @@ const saveStoredPbb = (pbbData: Record<string, any[]>) => {
 };
 
 let pbbCache: Record<string, any[]> = loadStoredPbb();
-
-// Data Keluarga (Kartu Keluarga) Server Buffer File
-const DATA_KELUARGA_FILE = path.join(DATA_DIR, 'data_keluarga.json');
-
-const loadStoredDataKeluarga = (): any[] => {
-  try {
-    if (fs.existsSync(DATA_KELUARGA_FILE)) {
-      const content = fs.readFileSync(DATA_KELUARGA_FILE, 'utf-8');
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (err) {
-    console.error('Error reading Data Keluarga file:', err);
-  }
-  return [];
-};
-
-const saveStoredDataKeluarga = (list: any[]) => {
-  try {
-    fs.writeFileSync(DATA_KELUARGA_FILE, JSON.stringify(list, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('Error saving Data Keluarga file:', err);
-  }
-};
-
-let dataKeluargaCache: any[] = loadStoredDataKeluarga();
 
 // Accounts Data File (Dynamic accounts & soft-deleted IDs)
 const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
@@ -1354,137 +1303,13 @@ app.post('/api/pbb/clear-all', (_req, res) => {
   }
 });
 
-// ==========================================
-// DATA KELUARGA (KARTU KELUARGA) SERVER BUFFER ENDPOINTS
-// ==========================================
-
-// GET all Data Keluarga from server buffer (~2ms response)
-app.get('/api/data-keluarga', (_req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  return res.json({ success: true, count: dataKeluargaCache.length, data: dataKeluargaCache });
-});
-
-// POST save / update single Data Keluarga record
-app.post('/api/data-keluarga', (req, res) => {
-  try {
-    const { item } = req.body;
-    if (!item || !item.id) {
-      return res.status(400).json({ success: false, message: 'Data Keluarga tidak lengkap' });
-    }
-    const cleanKk = (item.nomorKk || '').replace(/[^0-9]/g, '');
-    const cleanNik = (item.nikKepalaKeluarga || '').replace(/[^0-9]/g, '');
-
-    const index = dataKeluargaCache.findIndex(
-      (x) =>
-        x.id === item.id ||
-        (cleanKk && x.nomorKk && x.nomorKk.replace(/[^0-9]/g, '') === cleanKk) ||
-        (cleanNik && x.nikKepalaKeluarga && x.nikKepalaKeluarga.replace(/[^0-9]/g, '') === cleanNik)
-    );
-
-    if (index >= 0) {
-      dataKeluargaCache[index] = { ...dataKeluargaCache[index], ...item, updatedAt: new Date().toISOString() };
-    } else {
-      dataKeluargaCache.unshift({ ...item, updatedAt: new Date().toISOString() });
-    }
-    saveStoredDataKeluarga(dataKeluargaCache);
-    return res.json({ success: true, data: dataKeluargaCache[index >= 0 ? index : 0], total: dataKeluargaCache.length });
-  } catch (err: any) {
-    console.error('Error saving Data Keluarga to server buffer:', err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// POST batch save / update Data Keluarga records
-app.post('/api/data-keluarga/batch', (req, res) => {
-  try {
-    const { items } = req.body;
-    if (!Array.isArray(items)) {
-      return res.status(400).json({ success: false, message: 'items harus berupa array' });
-    }
-
-    const itemMap = new Map<string, any>();
-    dataKeluargaCache.forEach((k) => itemMap.set(k.id, k));
-
-    let updatedCount = 0;
-    const now = new Date().toISOString();
-
-    for (const item of items) {
-      if (!item || !item.id) continue;
-      const cleanKk = (item.nomorKk || '').replace(/[^0-9]/g, '');
-      const cleanNik = (item.nikKepalaKeluarga || '').replace(/[^0-9]/g, '');
-
-      // Check existing in map
-      let targetId = item.id;
-      if (!itemMap.has(targetId)) {
-        for (const [id, existing] of itemMap.entries()) {
-          if (
-            (cleanKk && existing.nomorKk && existing.nomorKk.replace(/[^0-9]/g, '') === cleanKk) ||
-            (cleanNik && existing.nikKepalaKeluarga && existing.nikKepalaKeluarga.replace(/[^0-9]/g, '') === cleanNik)
-          ) {
-            targetId = id;
-            break;
-          }
-        }
-      }
-
-      if (itemMap.has(targetId)) {
-        itemMap.set(targetId, { ...itemMap.get(targetId), ...item, id: targetId, updatedAt: now });
-      } else {
-        itemMap.set(item.id, { ...item, updatedAt: now });
-      }
-      updatedCount++;
-    }
-
-    dataKeluargaCache = Array.from(itemMap.values()).sort((a, b) => {
-      if (a.lingkunganNomor !== b.lingkunganNomor) return (a.lingkunganNomor || 0) - (b.lingkunganNomor || 0);
-      return (a.namaKepalaKeluarga || '').localeCompare(b.namaKepalaKeluarga || '');
-    });
-
-    saveStoredDataKeluarga(dataKeluargaCache);
-    return res.json({ success: true, updatedCount, total: dataKeluargaCache.length, data: dataKeluargaCache });
-  } catch (err: any) {
-    console.error('Error batch saving Data Keluarga to server buffer:', err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// DELETE single Data Keluarga record
-app.delete('/api/data-keluarga/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    dataKeluargaCache = dataKeluargaCache.filter((x) => x.id !== id);
-    saveStoredDataKeluarga(dataKeluargaCache);
-    return res.json({ success: true, message: `Data Keluarga ${id} dihapus dari server buffer` });
-  } catch (err: any) {
-    console.error('Error deleting Data Keluarga from server buffer:', err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// POST wipe all Data Keluarga records on server
-app.post('/api/data-keluarga/wipe', (_req, res) => {
-  try {
-    dataKeluargaCache = [];
-    saveStoredDataKeluarga(dataKeluargaCache);
-    return res.json({ success: true, message: 'Seluruh data keluarga server berhasil dikosongkan' });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
-
 // POST wipe all operational and entry data on server
 app.post('/api/wipe-all-data', (_req, res) => {
   try {
     pbbCache = {};
     saveStoredPbb(pbbCache);
-    dataKeluargaCache = [];
-    saveStoredDataKeluarga(dataKeluargaCache);
     reportsCache = [];
     saveStoredReports(reportsCache);
-    attendanceCache = [];
-    saveStoredAttendance(attendanceCache);
     deletedReportsCache = [];
     saveStoredDeletedReports(deletedReportsCache);
     suratCache = [];
@@ -1892,13 +1717,9 @@ app.post('/api/reset-all-system-data', (_req, res) => {
     }
     saveStoredPbb(pbbCache);
 
-    // 4. Reset attendance
-    attendanceCache = [];
-    saveStoredAttendance([]);
-
     return res.json({
       success: true,
-      message: 'Seluruh data capaian, laporan, presensi, dan SPPT berhasil dibersihkan (Akun & Sandi tetap aman).',
+      message: 'Seluruh data capaian, laporan, dan SPPT berhasil dibersihkan (Akun & Sandi tetap aman).',
     });
   } catch (err: any) {
     console.error('Error wiping all system data:', err);
@@ -1992,75 +1813,6 @@ app.post('/api/profiles', (req, res) => {
     });
   } catch (err: any) {
     console.error('Error saving profile:', err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// GET all attendance records
-app.get('/api/attendance', (_req, res) => {
-  res.json({ success: true, data: attendanceCache });
-});
-
-// POST save single attendance record
-app.post('/api/attendance', (req, res) => {
-  try {
-    const item = req.body;
-    if (!item || !item.id) {
-      return res.status(400).json({ success: false, message: 'Data presensi tidak lengkap' });
-    }
-
-    const index = attendanceCache.findIndex((a) => a.id === item.id);
-    if (index >= 0) {
-      attendanceCache[index] = item;
-    } else {
-      attendanceCache = [item, ...attendanceCache];
-    }
-    saveStoredAttendance(attendanceCache);
-
-    return res.json({ success: true, data: item, total: attendanceCache.length });
-  } catch (err: any) {
-    console.error('Error saving attendance buffer:', err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// POST batch sync attendance records
-app.post('/api/attendance/batch', (req, res) => {
-  try {
-    const { items } = req.body;
-    if (!Array.isArray(items)) {
-      return res.status(400).json({ success: false, message: 'items harus berupa array' });
-    }
-
-    let addedCount = 0;
-    for (const item of items) {
-      if (!item || !item.id) continue;
-      const index = attendanceCache.findIndex((a) => a.id === item.id);
-      if (index >= 0) {
-        attendanceCache[index] = item;
-      } else {
-        attendanceCache = [item, ...attendanceCache];
-        addedCount++;
-      }
-    }
-
-    saveStoredAttendance(attendanceCache);
-    return res.json({ success: true, addedCount, total: attendanceCache.length, data: attendanceCache });
-  } catch (err: any) {
-    console.error('Error batch syncing attendance:', err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// DELETE attendance record by ID
-app.delete('/api/attendance/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    attendanceCache = attendanceCache.filter((a) => a.id !== id);
-    saveStoredAttendance(attendanceCache);
-    return res.json({ success: true, message: `Presensi ${id} berhasil dihapus`, total: attendanceCache.length });
-  } catch (err: any) {
-    console.error('Error deleting attendance:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });

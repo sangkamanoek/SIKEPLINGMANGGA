@@ -57,13 +57,23 @@ export interface FotoDokumentasi {
   keterangan?: string;
 }
 
-export interface InfoAbsenApelLaporan {
-  status: StatusAbsenApel | string;
-  jam?: string; // e.g. "07:35 WIB"
+export type StatusAbsenApel = 'Hadir' | 'Izin' | 'Sakit' | 'Dinas Luar' | 'Tidak Mengikuti Apel';
+
+export interface AbsenApelItem {
+  id: string;
+  accountId: string;
+  namaKepling: string;
+  lingkungan: string;
+  nomorLingkungan?: number;
+  tanggal: string;
+  status: StatusAbsenApel;
+  jam?: string;
   waktuLengkap?: string;
   fotoSelfieUrl?: string;
   lokasiGps?: string;
   catatan?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LaporanHarianItem {
@@ -76,7 +86,6 @@ export interface LaporanHarianItem {
   kelurahan: string; // e.g. "Kelurahan Mangga"
   kecamatan: string; // e.g. "Kecamatan Medan Tuntungan"
   kinerja: KinerjaHarian;
-  absenApel?: InfoAbsenApelLaporan;
   jumlahDokumentasi: number;
   dokumentasiFoto?: FotoDokumentasi[];
   petugasNama?: string;
@@ -91,6 +100,7 @@ export interface LaporanHarianItem {
   updatedAt?: string;
   sheetRowIndex?: number;
   spreadsheetUrl?: string;
+  absenApel?: any;
 }
 
 export interface PosyanduReport {
@@ -296,8 +306,6 @@ export interface KeplingTargetCapaian {
 
 export type TargetsCapaianMap = Record<string, KeplingTargetCapaian>;
 
-export type StatusAbsenApel = 'Hadir' | 'Izin' | 'Sakit' | 'Dinas Luar' | 'Tidak Mengikuti Apel';
-
 export interface CustomEvent {
   id: string;
   title: string;
@@ -325,24 +333,6 @@ export interface EventAttendance {
   fotoSelfieUrl?: string;
   lokasiGps?: string;
   catatan?: string;
-}
-
-export interface AbsenApelItem {
-  id: string; // e.g. "absen_kepling_1_2026-09-13" or timestamp
-  accountId: string; // e.g. "kepling_1" or "super_admin"
-  keplingId?: string;
-  namaKepling: string;
-  lingkungan: string;
-  nomorLingkungan?: number;
-  tanggal: string; // YYYY-MM-DD
-  jam: string; // HH:mm:ss WIB
-  waktuLengkap: string; // ISO String timestamp
-  status: StatusAbsenApel;
-  fotoSelfieUrl?: string; // base64 or photo URL
-  lokasiGps?: string; // e.g. "3.5234, 98.6123 (GPS Verified)" or "Kelurahan Mangga"
-  catatan?: string; // Optional reason for Izin/Sakit/Dinas Luar
-  createdAt: string;
-  updatedAt?: string;
 }
 
 // ==========================================

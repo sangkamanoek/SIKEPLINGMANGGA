@@ -25,10 +25,9 @@ import {
   Check,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { LaporanHarianItem, TargetsCapaianMap, UserAccount, AbsenApelItem } from '../types';
+import { LaporanHarianItem, TargetsCapaianMap, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { isReportMatchingKepling } from '../lib/formatter';
-import { RekapAbsensiSuperAdmin } from './RekapAbsensiSuperAdmin';
 import { calculateEffectiveKinerja } from '../data/targetsData';
 import {
   AVAILABLE_PBB_YEARS,
@@ -51,9 +50,6 @@ interface DashboardPbbKasiProps {
   currentUser: UserAccount;
   onSelectKeplingRiwayat?: (namaKepling: string) => void;
   onOpenRekapPbb?: () => void;
-  attendanceList: AbsenApelItem[];
-  selectedDate: string;
-  onDateChange: (date: string) => void;
   onOpenSelfiePreview?: (photo: { url: string; title: string }) => void;
 }
 
@@ -66,9 +62,6 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   currentUser,
   onSelectKeplingRiwayat,
   onOpenRekapPbb,
-  attendanceList,
-  selectedDate,
-  onDateChange,
   onOpenSelfiePreview,
 }) => {
   const [period, setPeriod] = useState<PeriodFilter>('all');
@@ -1274,26 +1267,6 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
         </>
       )}
 
-      {subView === 'presensi_apel' && (
-        <div className="space-y-4">
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-900 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-emerald-700 shrink-0" />
-              <span>
-                <strong>Modul Pengawasan Kedisiplinan Kasi Pemerintahan:</strong> Memonitor presensi apel pagi harian, mingguan, bulanan, serta rekapan kepling yang tidak mengikuti apel.
-              </span>
-            </div>
-          </div>
-
-          <RekapAbsensiSuperAdmin
-            attendanceList={attendanceList}
-            currentUser={currentUser}
-            selectedDate={selectedDate}
-            onDateChange={onDateChange}
-            onOpenSelfiePreview={onOpenSelfiePreview}
-          />
-        </div>
-      )}
     </div>
   );
 };

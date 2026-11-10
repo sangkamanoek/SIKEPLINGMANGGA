@@ -24,32 +24,6 @@
       },
       "required": ["id", "namaKepling", "tanggal"]
     },
-    "Attendance": {
-      "title": "Presensi Apel",
-      "description": "Catatan kehadiran apel pagi Kepling.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "accountId": { "type": "string" },
-        "namaKepling": { "type": "string" },
-        "tanggal": { "type": "string" },
-        "status": { "type": "string", "enum": ["Hadir", "Izin", "Sakit", "Dinas Luar", "Tidak Mengikuti Apel"] },
-        "waktuLengkap": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "accountId", "tanggal", "status"]
-    },
-    "AttendanceQR": {
-      "title": "QR Code Apel Pagi",
-      "description": "QR code untuk validasi lokasi apel pagi Kepling.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "token": { "type": "string" },
-        "tanggal": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "token", "tanggal"]
-    },
     "Target": {
       "title": "Target Capaian",
       "description": "Target kinerja dan penyesuaian (override) untuk tiap Kepling.",
@@ -308,14 +282,6 @@
     "reports/{reportId}": {
       "schema": "Report",
       "description": "Koleksi utama laporan harian."
-    },
-    "attendance/{attendanceId}": {
-      "schema": "Attendance",
-      "description": "Koleksi presensi apel pagi."
-    },
-    "attendance_qr/{date}": {
-      "schema": "AttendanceQR",
-      "description": "Koleksi untuk QR code harian."
     },
     "targets_capaian/{keplingId}": {
       "schema": "Target",

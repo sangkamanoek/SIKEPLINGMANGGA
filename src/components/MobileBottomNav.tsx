@@ -45,7 +45,6 @@ interface MobileBottomNavProps {
   activeTab: AppTabType;
   onSelectTab: (tab: AppTabType) => void;
   activeAccount: UserAccount;
-  hasAbsenToday?: boolean;
   hasLaporToday?: boolean;
   unreadCounts?: Record<string, number>;
 }
@@ -54,7 +53,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeTab,
   onSelectTab,
   activeAccount,
-  hasAbsenToday,
   hasLaporToday,
   unreadCounts,
 }) => {
@@ -171,7 +169,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         >
           <div className="relative">
             <Home className={`w-5 h-5 ${activeTab === 'hub' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-            {isKepling && (!hasAbsenToday || !hasLaporToday) && (
+            {isKepling && !hasLaporToday && (
               <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-500 animate-ping" />
             )}
           </div>

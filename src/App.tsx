@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { UserAccount, LaporanHarianItem, AbsenApelItem, isPkkRole } from './types';
+import { UserAccount, LaporanHarianItem, isPkkRole } from './types';
 import {
   SUPER_ADMIN_ACCOUNT,
   ALL_ACCOUNTS,
@@ -18,7 +18,6 @@ import { ComponentLoader } from './components/ComponentLoader';
 
 // Modals - Eager for fast user interaction
 import { AccountSelectorModal } from './components/AccountSelectorModal';
-import { AbsenApelModal } from './components/AbsenApelModal';
 import { UbahPasswordModal } from './components/UbahPasswordModal';
 import { EditProfileModal } from './components/EditProfileModal';
 import { AppUpdateModal } from './components/AppUpdateModal';
@@ -52,9 +51,6 @@ const RekapPbbView = React.lazy(() =>
 const DashboardCapaianKepling = React.lazy(() =>
   import('./components/DashboardCapaianKepling').then((m) => ({ default: m.DashboardCapaianKepling }))
 );
-const RekapAbsensiSuperAdmin = React.lazy(() =>
-  import('./components/RekapAbsensiSuperAdmin').then((m) => ({ default: m.RekapAbsensiSuperAdmin }))
-);
 const SuratKedinasanView = React.lazy(() =>
   import('./components/SuratKedinasanView').then((m) => ({ default: m.SuratKedinasanView }))
 );
@@ -66,9 +62,6 @@ const DaftarTugasKhususView = React.lazy(() =>
 );
 const AgendaKelurahanView = React.lazy(() =>
   import('./components/AgendaKelurahanView').then((m) => ({ default: m.AgendaKelurahanView }))
-);
-const AbsenKegiatanKhusus = React.lazy(() =>
-  import('./components/AbsenKegiatanKhusus').then((m) => ({ default: m.AbsenKegiatanKhusus }))
 );
 const KunjunganHarianView = React.lazy(() =>
   import('./components/KunjunganHarianView').then((m) => ({ default: m.KunjunganHarianView }))
@@ -109,7 +102,6 @@ import { fetchAllReports, saveReportToServer, subscribeReportsFromFirestore, del
 import { subscribeKunjungan, getLocalKunjunganList, KunjunganWargaData } from './lib/kunjunganService';
 import { getTodayLocalIso } from './lib/formatter';
 import { safeGetLocalStorage, safeSetLocalStorage } from './lib/safeStorage';
-import { subscribeAttendance, loadAllAttendance } from './lib/attendanceApi';
 import {
   getReportsFromIndexedDB,
   getVisitsFromIndexedDB,
@@ -160,52 +152,11 @@ export default function App() {
     return safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_LOCAL_KEY, []);
   });
   const [kunjunganList, setKunjunganList] = useState<KunjunganWargaData[]>(() => getLocalKunjunganList());
-  const [attendanceList, setAttendanceList] = useState<AbsenApelItem[]>(() => loadAllAttendance());
-  const [presensiSubTab, setPresensiSubTab] = useState<'apel' | 'khusus'>('apel');
-  const [selectedAbsensiDate, setSelectedAbsensiDate] = useState<string>(() => getTodayLocalIso());
   const [targetsMap, setTargetsMap] = useState(getDefaultTargetsCapaianMap);
   const [selectedRiwayatKepling, setSelectedRiwayatKepling] = useState<string>('');
 
-  // Sinkronisasi otomatis: Presensi yang dicatat di Form Laporan otomatis digabung ke attendanceList
-  const effectiveAttendanceList = useMemo(() => {
-    const list = [...attendanceList];
-    const existingKeys = new Set(
-      list.map((a) => `${a.accountId || a.keplingId}_${a.tanggal || (a.createdAt ? a.createdAt.slice(0, 10) : '')}`)
-    );
-
-    reports.forEach((r) => {
-      if (r.absenApel && r.absenApel.status) {
-        const dateStr = r.tanggal || (r.createdAt ? r.createdAt.slice(0, 10) : '');
-        const accId = r.keplingId || r.jabatan || 'kepling';
-        const key = `${accId}_${dateStr}`;
-        if (!existingKeys.has(key)) {
-          existingKeys.add(key);
-          list.push({
-            id: `absen_rep_${r.id}`,
-            accountId: accId,
-            keplingId: r.keplingId || accId,
-            namaKepling: r.namaKepling || 'Kepala Lingkungan',
-            lingkungan: (r as any).lingkungan || r.jabatan || 'Lingkungan',
-            tanggal: dateStr,
-            jam: r.absenApel.jam || '07:35 WIB',
-            waktuLengkap: r.absenApel.waktuLengkap || r.createdAt || new Date().toISOString(),
-            status: r.absenApel.status as any,
-            fotoSelfieUrl: r.absenApel.fotoSelfieUrl || '',
-            lokasiGps: r.absenApel.lokasiGps || 'Halaman Kantor Kelurahan Mangga (GPS)',
-            catatan: r.absenApel.catatan || '',
-            createdAt: r.createdAt || new Date().toISOString(),
-            updatedAt: r.updatedAt || r.createdAt || new Date().toISOString(),
-          });
-        }
-      }
-    });
-
-    return list;
-  }, [attendanceList, reports]);
-
   // Modals
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-  const [isAbsenApelModalOpen, setIsAbsenApelModalOpen] = useState(false);
   const [isUbahPasswordOpen, setIsUbahPasswordOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isPPTModalOpen, setIsPPTModalOpen] = useState(false);
@@ -223,7 +174,6 @@ export default function App() {
     activeTab,
     reports,
     kunjunganList,
-    attendanceList: effectiveAttendanceList,
   });
 
   useEffect(() => {
@@ -305,12 +255,7 @@ export default function App() {
       }
     });
 
-    // Use real-time subscription for attendance
-    const unsubAttendance = subscribeAttendance((fetched) => {
-      if (Array.isArray(fetched)) {
-        setAttendanceList(fetched);
-      }
-    });
+
 
     // Use real-time subscription for targets
     const unsubTargets = subscribeTargetsFromFirestore((map) => {
@@ -332,7 +277,6 @@ export default function App() {
       clearTimeout(initialSyncTimeout);
       unsub();
       unsubKunjungan();
-      unsubAttendance();
       unsubTargets();
       clearInterval(syncInterval);
     };
@@ -555,7 +499,6 @@ export default function App() {
         onOpenEditProfile={() => setIsEditProfileOpen(true)}
         onOpenPPTModal={() => setIsPPTModalOpen(true)}
         onOpenSyncVerification={() => setIsSyncVerificationOpen(true)}
-        onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
         onOpenUpdateModal={() => setIsAppUpdateOpen(true)}
         onOpenNotifSoundSettings={() => setIsNotifSoundModalOpen(true)}
         onLogout={handleLogout}
@@ -588,10 +531,8 @@ export default function App() {
             <SmartHubDashboard
               activeAccount={activeAccount}
               reports={reports}
-              attendanceList={effectiveAttendanceList}
               unreadCounts={unreadCounts}
               onNavigate={(tab) => handleTabChange(tab as AppTabType)}
-              onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
               onOpenPPTModal={() => setIsPPTModalOpen(true)}
               onOpenUpdateModal={() => setIsAppUpdateOpen(true)}
             />
@@ -606,9 +547,7 @@ export default function App() {
             hasGoogleAuth={false}
             onConnectGoogle={() => {}}
             activeAccount={activeAccount}
-            attendanceList={effectiveAttendanceList}
             existingReports={reports}
-            onOpenAbsenApel={() => setIsAbsenApelModalOpen(true)}
             onBackToRangkuman={() => handleTabChange('hub')}
           />
         )}
@@ -622,7 +561,6 @@ export default function App() {
             onSwitchToRiwayat={handleSwitchToRiwayat}
             onOpenCapaianDashboard={() => handleTabChange('capaian_admin')}
             onOpenPbb={() => handleTabChange('rekap_pbb')}
-            attendanceList={effectiveAttendanceList}
             currentUser={activeAccount}
           />
         )}
@@ -637,7 +575,7 @@ export default function App() {
             onSelectReport={handleSelectReport}
             hasGoogleAuth={false}
             activeAccount={activeAccount}
-            initialPetugasFilter={selectedRiwayatKepling}
+            initialPetugasFilter={activeAccount.role === 'kepling' ? activeAccount.nama : selectedRiwayatKepling}
             isAdmin={activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris'}
             onDeleteReport={activeAccount?.role === 'super_admin' ? handleDeleteReport : undefined}
           />
@@ -661,8 +599,6 @@ export default function App() {
             onNavigateToForm={() => handleTabChange('form')}
             onOpenRekapPbb={() => handleTabChange('rekap_pbb')}
             onNavigateToKunjungan={() => handleTabChange('kunjungan')}
-            onNavigateToPresensi={() => handleTabChange('kegiatan_khusus')}
-            attendanceList={effectiveAttendanceList}
             kunjunganList={kunjunganList}
           />
         )}
@@ -697,52 +633,6 @@ export default function App() {
           />
         )}
 
-
-        {/* TAB: Presensi Apel & Kegiatan Khusus */}
-        {activeTab === 'kegiatan_khusus' && (
-          <div className="space-y-4">
-            {/* Sub-tab navigation: Rekap Presensi Apel 24 Kepling vs Absensi Kegiatan Khusus */}
-            <div className="bg-white rounded-2xl p-2 border border-slate-200 shadow-2xs flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPresensiSubTab('apel')}
-                className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  presensiSubTab === 'apel'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-              >
-                <span>📋 Rekap Presensi Apel 24 Kepling</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPresensiSubTab('khusus')}
-                className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  presensiSubTab === 'khusus'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-              >
-                <span>🎯 Kegiatan Khusus & Event QR</span>
-              </button>
-            </div>
-
-            {presensiSubTab === 'apel' ? (
-              <RekapAbsensiSuperAdmin
-                attendanceList={effectiveAttendanceList}
-                currentUser={activeAccount}
-                selectedDate={selectedAbsensiDate}
-                onDateChange={setSelectedAbsensiDate}
-              />
-            ) : (
-              <AbsenKegiatanKhusus
-                activeAccount={activeAccount}
-                showToast={(msg, type) => showToast(msg, type === 'warning' ? 'error' : type)}
-              />
-            )}
-          </div>
-        )}
-
         {/* TAB 11: Kunjungan Warga */}
         {activeTab === 'kunjungan' && (
           <KunjunganHarianView
@@ -758,9 +648,6 @@ export default function App() {
               reports={reports}
               targetsMap={targetsMap}
               currentUser={activeAccount}
-              attendanceList={effectiveAttendanceList}
-              selectedDate={todayIso}
-              onDateChange={() => {}}
               onOpenRekapPbb={() => handleTabChange('rekap_pbb')}
             />
           ) : activeAccount.role === 'kasi_pembangunan' ? (
@@ -825,13 +712,6 @@ export default function App() {
         onClose={() => setIsAccountModalOpen(false)}
         activeAccount={activeAccount}
         onSelectAccount={handleAccountSelect}
-      />
-
-      <AbsenApelModal
-        isOpen={isAbsenApelModalOpen}
-        onClose={() => setIsAbsenApelModalOpen(false)}
-        activeAccount={activeAccount}
-        onAbsenSuccess={() => showToast('Presensi apel pagi berhasil dicatat!', 'success')}
       />
 
       <UbahPasswordModal
@@ -909,7 +789,6 @@ export default function App() {
             sheetMeta={null}
             hasGoogleAuth={false}
             isAdmin={activeAccount?.role === 'super_admin' || activeAccount?.role === 'sekretaris'}
-            attendanceList={effectiveAttendanceList}
             onUpdateReport={handleUpdateReport}
             onDeleteReport={activeAccount?.role === 'super_admin' ? handleDeleteReport : undefined}
           />

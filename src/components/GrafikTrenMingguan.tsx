@@ -22,7 +22,7 @@ import {
   Compass,
   Zap,
 } from 'lucide-react';
-import { LaporanHarianItem, UserAccount, AbsenApelItem } from '../types';
+import { LaporanHarianItem, UserAccount } from '../types';
 import { isReportMatchingKepling, getReportIsoDate, isKunjunganMatchingKepling } from '../lib/formatter';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 
@@ -30,7 +30,6 @@ interface GrafikTrenMingguanProps {
   reports: LaporanHarianItem[];
   activeAccount: UserAccount;
   mode: 'kepling' | 'super_admin';
-  attendanceList?: AbsenApelItem[];
   kunjunganList?: any[];
   title?: string;
 }
@@ -45,9 +44,6 @@ interface WeeklyDataPoint {
   pbb: number;
   kunjungan: number;
   laporanCount: number;
-  apelHadir: number;
-  apelTotal: number;
-  apelRate: number;
   avgKelurahanScore?: number;
 }
 
@@ -70,7 +66,6 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
   reports,
   activeAccount,
   mode,
-  attendanceList = [],
   kunjunganList = [],
   title,
 }) => {
@@ -155,18 +150,7 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
         ? weekReports.filter((r) => isReportMatchingKepling(r, selectedKeplingAccount))
         : weekReports;
 
-      // 2. Absensi pada minggu ini
-      const weekAttendance = attendanceList.filter((a: any) => isDateInWeek(a.date || a.tanggal));
-      const targetAttendance = selectedKeplingAccount
-        ? weekAttendance.filter(
-            (a: any) =>
-              a.accountId === selectedKeplingAccount.id ||
-              a.nomorLingkungan === selectedKeplingAccount.nomorLingkungan ||
-              a.namaKepling?.trim().toLowerCase() === selectedKeplingAccount.nama.trim().toLowerCase()
-          )
-        : weekAttendance;
-
-      // 3. Kunjungan pada minggu ini
+      // 2. Kunjungan pada minggu ini
       const weekKunjungan = kunjunganList.filter((k) => isDateInWeek(k.tanggal || k.createdAt));
       const targetKunjungan = selectedKeplingAccount
         ? weekKunjungan.filter((k) => isKunjunganMatchingKepling(k, selectedKeplingAccount))
@@ -189,20 +173,10 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
         }
       });
 
-      const uniqueApelDays = new Set(
-        weekAttendance.map((a: any) => (a.date || a.tanggal)?.split('T')[0]).filter(Boolean)
-      );
-      const apelTotal = uniqueApelDays.size > 0 ? uniqueApelDays.size : Math.min(5, w.endDay - w.startDay + 1);
-      const apelHadir = targetAttendance.filter(
-        (a) => a.status === 'Hadir' || a.status === 'Dinas Luar'
-      ).length;
-      const apelRate = apelTotal > 0 ? Math.min(100, Math.round((apelHadir / apelTotal) * 100)) : 100;
-
       // Kunjungan
       const kunjunganCount = targetKunjungan.length;
 
       // Perhitungan Skor Mingguan (0 - 100)
-      // Normalisasi skor mingguan proporsional
       const targetPerlinsosMinggu = selectedKeplingAccount ? 25 : 25 * 24; // ~100 KK per bulan / 4 minggu
       const targetPbbMinggu = selectedKeplingAccount ? 20 : 20 * 24;
       const targetKunjunganMinggu = selectedKeplingAccount ? 15 : 15 * 24;
@@ -216,10 +190,9 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
       const compScore = Math.min(
         100,
         Math.round(
-          apelRate * 0.25 +
-            pPerlinsos * 0.25 +
-            pPbb * 0.2 +
-            pKunjungan * 0.15 +
+          pPerlinsos * 0.35 +
+            pPbb * 0.30 +
+            pKunjungan * 0.20 +
             pPoskamling * 0.15
         )
       );
@@ -227,16 +200,13 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
       // Hitung Benchmark Kelurahan (Rata-rata 24 Lingkungan)
       const allWeekPerlinsos = weekReports.reduce((s, r) => s + (Number((r.kinerja as any)?.perlinsosKk || (r.kinerja as any)?.perlinsos) || 0), 0) / 24;
       const allWeekPbb = weekReports.reduce((s, r) => s + (Number((r.kinerja as any)?.opsirPbbWp || (r.kinerja as any)?.pbb) || 0), 0) / 24;
-      const allWeekApelHadir = weekAttendance.filter((a) => a.status === 'Hadir' || a.status === 'Dinas Luar').length / 24;
-      const allWeekApelRate = apelTotal > 0 ? Math.min(100, Math.round((allWeekApelHadir / apelTotal) * 100)) : 80;
 
       const benchmarkScore = Math.min(
         100,
         Math.round(
-          allWeekApelRate * 0.25 +
-            Math.min(100, (allWeekPerlinsos / 25) * 100) * 0.25 +
-            Math.min(100, (allWeekPbb / 20) * 100) * 0.2 +
-            Math.min(100, ((weekKunjungan.length / 24) / 15) * 100) * 0.15 +
+          Math.min(100, (allWeekPerlinsos / 25) * 100) * 0.35 +
+            Math.min(100, (allWeekPbb / 20) * 100) * 0.30 +
+            Math.min(100, ((weekKunjungan.length / 24) / 15) * 100) * 0.20 +
             70 * 0.15
         )
       );
@@ -250,15 +220,11 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
         pbb: totalPbb,
         kunjungan: kunjunganCount,
         laporanCount: targetReports.length,
-        apelHadir,
-        apelTotal,
-        apelRate,
         avgKelurahanScore: benchmarkScore,
       };
     });
   }, [
     reports,
-    attendanceList,
     kunjunganList,
     selectedYear,
     selectedMonth,
@@ -429,7 +395,7 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
           }`}
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
-          <span>Apel Pagi & Kunjungan Warga</span>
+          <span>Kunjungan Warga</span>
         </button>
 
         <button
@@ -564,10 +530,6 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
                           <span className="font-bold text-white">{point?.pbb} WP</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>🌅 Apel Pagi:</span>
-                          <span className="font-bold text-white">{point?.apelRate}% ({point?.apelHadir}/{point?.apelTotal})</span>
-                        </div>
-                        <div className="flex justify-between">
                           <span>🏠 Kunjungan:</span>
                           <span className="font-bold text-white">{point?.kunjungan} Rumah</span>
                         </div>
@@ -656,18 +618,6 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
               />
             )}
 
-            {/* Garis Apel */}
-            {(activeMetricMode === 'ATTENDANCE_VISIT' || activeMetricMode === 'ALL_INDICATORS') && (
-              <Line
-                type="monotone"
-                dataKey="apelRate"
-                name="Kehadiran Apel (%)"
-                stroke="#0284c7"
-                strokeWidth={2.5}
-                dot={{ r: 4, fill: '#0284c7' }}
-              />
-            )}
-
             {/* Garis Kunjungan Warga */}
             {(activeMetricMode === 'ATTENDANCE_VISIT' || activeMetricMode === 'ALL_INDICATORS') && (
               <Line
@@ -693,7 +643,6 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
               <th className="px-3.5 py-2.5 text-center">Skor Komposit</th>
               <th className="px-3.5 py-2.5 text-center">Perlinsos</th>
               <th className="px-3.5 py-2.5 text-center">PBB</th>
-              <th className="px-3.5 py-2.5 text-center">Apel</th>
               <th className="px-3.5 py-2.5 text-center">Kunjungan</th>
               <th className="px-3.5 py-2.5 text-center">Status</th>
             </tr>
@@ -735,9 +684,6 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
                   </td>
                   <td className="px-3.5 py-2.5 text-center font-semibold text-slate-700">
                     {w.pbb} WP
-                  </td>
-                  <td className="px-3.5 py-2.5 text-center font-semibold text-slate-700">
-                    {w.apelRate}% ({w.apelHadir}/{w.apelTotal})
                   </td>
                   <td className="px-3.5 py-2.5 text-center font-semibold text-slate-700">
                     {w.kunjungan}

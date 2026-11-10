@@ -325,7 +325,6 @@ export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedAppro
         lower.includes('device_id') ||
         k === 'sikepling_laporan_harian_list' ||
         k === 'sikepling_surat_kedinasan_v1' ||
-        k === 'sikepling_attendance_list_v1' ||
         k === 'sikepling_kunjungan_warga_v1' ||
         k === 'sikepling_pkk_buku_1_v1' ||
         k === 'sikepling_pkk_buku_4_v1' ||

@@ -32,7 +32,7 @@ import {
 import { saveReportToFirestore } from '../lib/firestoreService';
 import { fetchAllReports } from '../lib/reportsApi';
 import { optimizeAndCleanBrowserMemory } from '../lib/safeStorage';
-import { UserAccount, LaporanHarianItem, AbsenApelItem, isPkkRole } from '../types';
+import { UserAccount, LaporanHarianItem, isPkkRole } from '../types';
 import { DeadlineNotifAlert } from './DeadlineNotifAlert';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { SpptPbbItem } from '../data/pbbSampleData';
@@ -54,11 +54,8 @@ import {
 interface SmartHubDashboardProps {
   activeAccount: UserAccount;
   reports: LaporanHarianItem[];
-  attendanceList: AbsenApelItem[];
   unreadCounts?: Record<string, number>;
   onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan' | 'daftar_tugas_khusus' | 'agenda' | string) => void;
-
-  onOpenAbsenApel: () => void;
   onOpenPPTModal: () => void;
   onOpenUpdateModal?: () => void;
   isGoogleConnected?: boolean;
@@ -70,10 +67,8 @@ interface SmartHubDashboardProps {
 export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
   activeAccount,
   reports,
-  attendanceList,
   unreadCounts = {},
   onNavigate,
-  onOpenAbsenApel,
   onOpenPPTModal,
   onOpenUpdateModal,
   isGoogleConnected = false,
@@ -309,10 +304,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
     (r) => r.petugasNama === activeAccount.nama && r.tanggalLaporan?.startsWith(todayStr)
   );
 
-  const hasAbsenApelToday = attendanceList.some(
-    (a) => a.accountId === activeAccount.id && a.tanggal?.startsWith(todayStr)
-  );
-
   const todayReportsCount = reports.filter((r) => r.tanggalLaporan?.startsWith(todayStr)).length;
   const uniqueKeplingsWithReportsToday = new Set(
     reports
@@ -320,9 +311,11 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       .map((r) => r.petugasNama)
   ).size;
 
-  const todayApelCount = attendanceList.filter(
-    (a) => a.tanggal.startsWith(todayStr) && a.status === 'Hadir'
-  ).length;
+  const todayApelCount = uniqueKeplingsWithReportsToday;
+  const hasAbsenApelToday = hasSubmittedReportToday;
+  const onOpenAbsenApel = () => {
+    onNavigate('form');
+  };
 
   const isPbbAllowed =
     isKepling ||
@@ -339,10 +332,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             ? reports.filter(r => String(r.lingkungan) === String(activeAccount.nomorLingkungan) || r.petugasNama === activeAccount.nama || r.namaKepling === activeAccount.nama).length
             : reports.length;
           return { num: count, label: `${count} Laporan` };
-        }
-        case 'kegiatan_khusus': {
-          const count = attendanceList.length;
-          return { num: count, label: `${count} Absen` };
         }
         case 'kunjungan': {
           let count = 0;
@@ -403,7 +392,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           return { num: reports.length, label: `${reports.length} Data` };
       }
     };
-  }, [reports, attendanceList, pbbSummary, spptList, isKepling, activeAccount, todayReportsCount]);
+  }, [reports, pbbSummary, spptList, isKepling, activeAccount, todayReportsCount]);
 
   // Define menu items for UIX filtering strictly tailored per role
   const menuItems = useMemo(() => {
@@ -504,7 +493,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         {
           id: 'dashboard_kasi',
           title: 'Dashboard Kasi Tata Pemerintahan',
-          desc: 'Monitoring leaderboard penerimaan Opsir PBB, capaian IKD, dan presensi apel pagi 24 Kepling.',
+          desc: 'Monitoring leaderboard penerimaan Opsir PBB dan capaian IKD 24 Kepling.',
           category: 'capaian',
           icon: Award,
           iconBg: 'bg-teal-50 text-teal-700',
@@ -523,28 +512,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           badge: `PBB-P2 ${pbbYear}`,
           badgeColor: 'bg-emerald-100 text-emerald-800',
           action: () => onNavigate('rekap_pbb'),
-        },
-        {
-          id: 'database_keluarga',
-          title: 'Database Master Data Keluarga (KK & NIK)',
-          desc: 'Pencarian NIK/KK, struktur anggota keluarga, buku register kependudukan, dan verifikasi data warga.',
-          category: 'laporan',
-          icon: Users,
-          iconBg: 'bg-blue-50 text-blue-700',
-          badge: 'KEPENDUDUKAN',
-          badgeColor: 'bg-blue-100 text-blue-900',
-          action: () => onNavigate('database_keluarga'),
-        },
-        {
-          id: 'kegiatan_khusus',
-          title: 'Presensi Apel & Disiplin Kepling',
-          desc: 'Verifikasi foto selfie kehadiran, koordinat GPS apel, dan rekapitulasi kehadiran 24 Kepala Lingkungan.',
-          category: 'absen',
-          icon: UserCheck,
-          iconBg: 'bg-teal-50 text-teal-700',
-          badge: 'PRESENSI APEL',
-          badgeColor: 'bg-teal-100 text-teal-800',
-          action: () => onNavigate('kegiatan_khusus'),
         },
         {
           id: 'riwayat',
@@ -715,17 +682,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         badge: 'SAMBANG WARGA',
         badgeColor: 'bg-emerald-100 text-emerald-800',
         action: () => onNavigate('kunjungan'),
-      },
-      {
-        id: 'kegiatan_khusus',
-        title: 'Presensi Apel & Kegiatan',
-        desc: 'Absensi check-in kegiatan kelurahan dengan validasi koordinat GPS dan foto selfie kehadiran.',
-        category: 'absen',
-        icon: UserCheck,
-        iconBg: 'bg-teal-50 text-teal-700',
-        badge: 'GPS ABSEN',
-        badgeColor: 'bg-teal-100 text-teal-800',
-        action: () => onNavigate('kegiatan_khusus'),
       },
       ...(!isKepling
         ? [
@@ -1507,29 +1463,12 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
-                  hasAbsenApelToday ? 'bg-emerald-50/50 border-emerald-200' : 'bg-amber-50/60 border-amber-200'
-                }`}>
-                  <div>
-                    <p className="text-[11px] font-black text-slate-700 leading-none">1. Absensi Apel Pagi</p>
-                    <p className="text-[10px] text-slate-500 mt-1">{hasAbsenApelToday ? '✅ Sudah Terverifikasi Hadir' : '⚠️ Silakan lapor kehadiran apel pagi'}</p>
-                  </div>
-                  <button 
-                    onClick={onOpenAbsenApel}
-                    className={`px-3 py-1 text-[10px] font-black rounded-lg ${
-                      hasAbsenApelToday ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                    }`}
-                  >
-                    {hasAbsenApelToday ? 'Lihat' : 'Absen'}
-                  </button>
-                </div>
-
+              <div className="grid grid-cols-1 gap-3">
                 <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
                   hasSubmittedReportToday ? 'bg-emerald-50/50 border-emerald-200' : 'bg-rose-50/50 border-rose-200'
                 }`}>
                   <div>
-                    <p className="text-[11px] font-black text-slate-700 leading-none">2. Laporan Kegiatan Harian</p>
+                    <p className="text-[11px] font-black text-slate-700 leading-none">Laporan Kegiatan Harian</p>
                     <p className="text-[10px] text-slate-500 mt-1">{hasSubmittedReportToday ? '✅ Laporan hari ini sudah terkirim' : '⚠️ Wajib kirim laporan harian'}</p>
                   </div>
                   <button 
@@ -1763,7 +1702,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             { id: 'all', label: '🌟 Semua Menu' },
             { id: 'laporan', label: '📝 Pelaporan Harian' },
             { id: 'capaian', label: '📊 Target & Kinerja' },
-            { id: 'absen', label: '👤 Absensi GPS' },
           ].map((cat) => (
             <button
               key={cat.id}

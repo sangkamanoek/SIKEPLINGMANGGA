@@ -59,7 +59,7 @@ export const SAMPLE_AGENDA_ITEMS: AgendaKelurahanItem[] = [
     lokasi: 'Halaman Kantor Kelurahan Mangga',
     peserta: 'Lurah, Seklur, Seluruh Kasi, ASN, & 24 Kepala Lingkungan',
     statusSelesai: 'BELUM',
-    catatan: 'Presensi wajib diisi via fitur presensi GPS selfie SI-MANGGA sebelum jam 07:45 WIB.',
+    catatan: 'Peserta wajib hadir tepat waktu di Halaman Kantor Kelurahan Mangga.',
     penanggungJawab: 'Sekretaris Kelurahan / Lurah',
     createdByName: 'SUPER ADMIN',
     createdByRole: 'super_admin',

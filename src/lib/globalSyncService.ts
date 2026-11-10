@@ -170,13 +170,6 @@ export const pullAllDataFromFirestore = async (
       console.warn('PBB SPPT pull error:', e);
     }
 
-    // 15. Attendance
-    onProgress('Mengambil Data Presensi Apel...');
-    const attSnap = await getDocs(collection(db, 'attendance'));
-    const att: any[] = [];
-    attSnap.forEach(d => att.push({ ...d.data(), id: d.id }));
-    safeSetLocalStorage('sikepling_attendance_list_v1', JSON.stringify(att));
-
     onProgress('Semua data berhasil ditarik dari Cloud!');
     
     // Trigger window events to notify UI to refresh

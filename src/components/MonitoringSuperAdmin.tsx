@@ -77,7 +77,6 @@ import {
   RuasJalanLingkungan,
   LingkunganPolygon,
   isPkkRole,
-  AbsenApelItem,
 } from '../types';
 import { 
   KEPLING_ACCOUNTS, 
@@ -113,7 +112,6 @@ import {
 } from '../lib/pbbService';
 import { SpptPbbItem } from '../data/pbbSampleData';
 import { RekapCapaianPbb24Lingkungan } from './RekapCapaianPbb24Lingkungan';
-import { RekapAbsensiSuperAdmin } from './RekapAbsensiSuperAdmin';
 
 interface MonitoringSuperAdminProps {
   reports: LaporanHarianItem[];
@@ -127,7 +125,6 @@ interface MonitoringSuperAdminProps {
   onOpenCapaianDashboard?: () => void;
   onOpenPbb?: () => void;
   sheetMeta?: SheetMetadata | null;
-  attendanceList?: AbsenApelItem[];
   currentUser?: UserAccount;
 }
 
@@ -143,13 +140,12 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
   onOpenCapaianDashboard,
   onOpenPbb,
   sheetMeta,
-  attendanceList = [],
   currentUser,
 }) => {
   const todayIso = getTodayLocalIso();
 
-  // Tab mode for Monitoring Dashboard: Laporan Harian vs Presensi Apel vs Realisasi PBB vs Akun vs Tugas Khusus
-  const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PRESENSI' | 'PBB_REALISASI' | 'ACCOUNTS' | 'TUGAS_KHUSUS'>('LAPORAN');
+  // Tab mode for Monitoring Dashboard: Laporan Harian vs Realisasi PBB vs Akun vs Tugas Khusus
+  const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PBB_REALISASI' | 'ACCOUNTS' | 'TUGAS_KHUSUS'>('LAPORAN');
   const [selectedPresensiDate, setSelectedPresensiDate] = useState<string>(todayIso);
 
   // Tugas Khusus Lurah states
@@ -859,26 +855,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
 
         <button
           type="button"
-          onClick={() => setActiveMainTab('PRESENSI')}
-          className={`flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer snap-start shrink-0 ${
-            activeMainTab === 'PRESENSI'
-              ? 'bg-teal-600 text-white shadow-sm border border-teal-500'
-              : 'text-slate-300 hover:text-white hover:bg-slate-700'
-          }`}
-        >
-          <UserCheck className="w-4 h-4 text-teal-300" />
-          <span>Hasil Presensi Apel</span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold hidden sm:inline-block ${
-            activeMainTab === 'PRESENSI'
-              ? 'bg-white/20 text-white'
-              : 'bg-teal-100 text-teal-800'
-          }`}>
-            24 Kepling
-          </span>
-        </button>
-
-        <button
-          type="button"
           onClick={() => setActiveMainTab('PBB_REALISASI')}
           className={`flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer snap-start shrink-0 ${
             activeMainTab === 'PBB_REALISASI'
@@ -1523,17 +1499,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
         </div>
       )}
       </>
-      )}
-
-      {activeMainTab === 'PRESENSI' && (
-        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <RekapAbsensiSuperAdmin
-            attendanceList={attendanceList}
-            currentUser={currentUser || (ALL_ACCOUNTS[0] as UserAccount)}
-            selectedDate={selectedPresensiDate}
-            onDateChange={setSelectedPresensiDate}
-          />
-        </div>
       )}
 
       {activeMainTab === 'PBB_REALISASI' && (

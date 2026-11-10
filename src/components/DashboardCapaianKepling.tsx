@@ -34,7 +34,6 @@ import {
   UserAccount,
   TargetsCapaianMap,
   KeplingTargetCapaian,
-  AbsenApelItem,
   EventAttendance,
   type CustomEvent,
 } from '../types';
@@ -128,8 +127,6 @@ interface DashboardCapaianKeplingProps {
   onNavigateToForm?: () => void;
   onOpenRekapPbb?: () => void;
   onNavigateToKunjungan?: () => void;
-  onNavigateToPresensi?: () => void;
-  attendanceList?: AbsenApelItem[];
   eventAttendanceList?: EventAttendance[];
   customEvents?: CustomEvent[];
   kunjunganList?: KunjunganWargaData[];
@@ -324,8 +321,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   onNavigateToForm,
   onOpenRekapPbb,
   onNavigateToKunjungan,
-  onNavigateToPresensi,
-  attendanceList = [],
   eventAttendanceList = [],
   customEvents = [],
   kunjunganList = [],
@@ -597,27 +592,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   }, [reports, period, now]);
 
   // 2. Filter Apel Pagi records strictly by selected period
-  const filteredAttendanceByPeriod = useMemo(() => {
-    return (attendanceList || []).filter((a) => {
-      const dateIso = a.tanggal || (a.createdAt ? a.createdAt.split('T')[0] : '');
-      return checkDateInPeriod(dateIso, period, now);
-    });
-  }, [attendanceList, period, now]);
 
-  // Tanggal Apel Pagi yang tercatat secara global pada periode terpilih
-  const distinctApelDatesInPeriod = useMemo(() => {
-    const dates = new Set<string>();
-    filteredAttendanceByPeriod.forEach((a) => {
-      if (a.tanggal) dates.add(a.tanggal);
-    });
-    filteredReportsByPeriod.forEach((r) => {
-      if (r.absenApel?.status === 'Hadir' || r.absenApel?.status === 'Dinas Luar') {
-        const iso = getReportIsoDate(r);
-        if (iso) dates.add(iso);
-      }
-    });
-    return dates;
-  }, [filteredAttendanceByPeriod, filteredReportsByPeriod]);
 
   // 3. Filter Event Attendance by selected period
   const filteredEventAttendanceByPeriod = useMemo(() => {
@@ -763,6 +738,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   }, [effectiveKunjunganList, period, isCumulativePeriod, now]);
 
   // Aggregasi untuk Seluruh 24 Kepling (7 Kriteria Kinerja Terpadu)
+  const filteredAttendanceByPeriod = [];
+  const distinctApelDatesInPeriod = [];
+
   const keplingSummaryList = useMemo(() => {
     // Dynamic Poskamling target based on period:
     // Mingguan/Harian: 2 giat per minggu; Tahunan: 96 giat; Bulanan: 8 giat
@@ -827,39 +805,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
       const uniqueDays = new Set(kReports.map((r) => r.createdAt?.split('T')[0] || r.tanggal));
 
-      // 1. TINGKAT KEHADIRAN APEL PAGI (Bobot 15%) - Dihitung murni dalam periode yang dipilih
-      const kApelRecords = filteredAttendanceByPeriod.filter(
-        (a) =>
-          a.accountId === k.id ||
-          a.nomorLingkungan === k.nomorLingkungan ||
-          a.namaKepling?.trim().toLowerCase() === k.nama.trim().toLowerCase()
-      );
-      const kApelHadirList = kApelRecords.filter((a) => a.status === 'Hadir' || a.status === 'Dinas Luar');
-
-      // Kumpulkan tanggal-tanggal unik kehadiran apel kepling ini pada periode berjalan
-      const uniqueApelHadirDates = new Set<string>();
-      kApelHadirList.forEach((a) => {
-        if (a.tanggal) uniqueApelHadirDates.add(a.tanggal);
-        else if (a.createdAt) uniqueApelHadirDates.add(a.createdAt.split('T')[0]);
-      });
-      kReports.forEach((r) => {
-        if (r.absenApel?.status === 'Hadir' || r.absenApel?.status === 'Dinas Luar') {
-          const iso = getReportIsoDate(r);
-          if (iso) uniqueApelHadirDates.add(iso);
-        }
-      });
-      const totalApelHadir = uniqueApelHadirDates.size;
-
-      // Total sesi apel yang terselenggara di Kelurahan pada periode terpilih
-      const totalApelSessions = distinctApelDatesInPeriod.size > 0
-        ? distinctApelDatesInPeriod.size
-        : (totalApelHadir > 0 ? totalApelHadir : 1);
-
-      const apelPercentage = totalApelSessions > 0
-        ? Math.min(100, Math.round((totalApelHadir / totalApelSessions) * 100))
-        : (totalApelHadir > 0 ? 100 : 100);
-
-      // 2. KEHADIRAN KEGIATAN KHUSUS (Bobot 15%) - Dihitung murni dalam periode yang dipilih
+      // 1. KEHADIRAN KEGIATAN KHUSUS (Bobot 20%) - Dihitung murni dalam periode yang dipilih
       const kEventRecords = filteredEventAttendanceByPeriod.filter(
         (e) =>
           e.accountId === k.id ||
@@ -873,11 +819,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       const kegiatanPercentage =
         relevantEvents.length > 0 ? Math.min(100, Math.round((kegiatanHadir / relevantEvents.length) * 100)) : 100;
 
-      // 3. CAPAIAN PERLINSOS (Bobot 20%)
+      // 2. CAPAIAN PERLINSOS (Bobot 25%)
       const perlinsosPercentage =
         targetPerlinsos > 0 ? Math.round((effective.perlinsos / targetPerlinsos) * 100) : 0;
 
-      // 4. REALISASI PBB (Bobot 20%)
+      // 3. REALISASI PBB (Bobot 25%)
       const pbbPercentage =
         targetPbb > 0
           ? Math.round((effective.pbb / targetPbb) * 100)
@@ -885,10 +831,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           ? Math.round(lkSummary.persentaseWpLunas)
           : 0;
 
-      // 5. BPJS KETENAGAKERJAAN (Bobot 10%)
+      // 4. BPJS KETENAGAKERJAAN (Bobot 10%)
       const bpjsPercentage = targetBpjs > 0 ? Math.round((effective.bpjs / targetBpjs) * 100) : 0;
 
-      // 6. KUNJUNGAN HARIAN (Bobot 10%)
+      // 5. KUNJUNGAN HARIAN (Bobot 10%)
       const kKunjunganRecords = (isCumulativePeriod || mode === 'super_admin')
         ? effectiveKunjunganList.filter((kj: any) => isKunjunganMatchingKepling(kj, k))
         : filteredKunjunganByPeriod.filter((kj: any) => isKunjunganMatchingKepling(kj, k));
@@ -899,7 +845,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           ? Math.round((totalKunjungan / targetPerlinsos) * 100)
           : 0;
 
-      // 7. POSKAMLING / SISKAMLING (Bobot 10%)
+      // 6. POSKAMLING / SISKAMLING (Bobot 10%)
       const poskamlingGiatReports = kReports.filter(
         (r) =>
           r.kinerja?.poskamlingAdaGiat === true ||
@@ -910,17 +856,16 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       const poskamlingCount = poskamlingGiatReports.length;
       const poskamlingPercentage = Math.min(100, Math.round((poskamlingCount / targetPoskamlingBulan) * 100));
 
-      // SKOR KOMPOSIT 7 KRITERIA TERPADU (Indeks Kinerja Kepling / IKKT - Skala 100 Poin)
+      // SKOR KOMPOSIT 6 KRITERIA TERPADU (Indeks Kinerja Kepling / IKKT - Skala 100 Poin)
       // Bobot Resmi:
-      // Apel (15%) + Kegiatan (15%) + Perlinsos (20%) + PBB (20%) + BPJS (10%) + Kunjungan (10%) + Poskamling (10%) = 100%
+      // Kegiatan (20%) + Perlinsos (25%) + PBB (25%) + BPJS (10%) + Kunjungan (10%) + Poskamling (10%) = 100%
       const compositeScoreRaw =
-        Math.min(100, apelPercentage) * 0.15 +
-        Math.min(100, kegiatanPercentage) * 0.15 +
-        Math.min(110, perlinsosPercentage) * 0.2 +
-        Math.min(110, pbbPercentage) * 0.2 +
-        Math.min(100, bpjsPercentage) * 0.1 +
-        Math.min(100, kunjunganPercentage) * 0.1 +
-        Math.min(100, poskamlingPercentage) * 0.1;
+        Math.min(100, kegiatanPercentage) * 0.20 +
+        Math.min(110, perlinsosPercentage) * 0.25 +
+        Math.min(110, pbbPercentage) * 0.25 +
+        Math.min(100, bpjsPercentage) * 0.10 +
+        Math.min(100, kunjunganPercentage) * 0.10 +
+        Math.min(100, poskamlingPercentage) * 0.10;
 
       const compositeScore = Math.min(100, Math.round(compositeScoreRaw));
       const compositeScoreDecimal = Number(compositeScoreRaw.toFixed(1));
@@ -943,10 +888,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         perlinsosPercentage,
         pbbPercentage,
         bpjsPercentage,
-        // 7 Kriteria Kinerja
-        totalApelHadir,
-        totalApelSessions,
-        apelPercentage,
+        // Kriteria Kinerja
         kegiatanHadir,
         relevantEventsCount: relevantEvents.length,
         kegiatanPercentage,
@@ -959,13 +901,15 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         // Skor Komposit
         compositeScore,
         compositeScoreDecimal,
+        apelPercentage: 100,
+        totalApelHadir: 0,
         score: compositeScore,
         isPerlinsosOverridden: effective.isPerlinsosOverridden,
         isOverridden: effective.isOverridden,
         catatanPenyesuaian: targetConfig?.catatanPenyesuaian || '',
-        latestReport: kReports[0] || null,
       };
     });
+
   }, [
     period,
     isCumulativePeriod,
@@ -1145,7 +1089,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         ? Math.round((totalKunjungan / totalTargetPerlinsos) * 100)
         : 0;
 
-    const totalApelSessions = distinctApelDatesInPeriod.size > 0 ? distinctApelDatesInPeriod.size : 1;
+    const totalApelSessions = distinctApelDatesInPeriod.length > 0 ? distinctApelDatesInPeriod.length : 1;
     const totalExpectedApel = totalApelSessions * 24;
     const apelRatePercentage =
       totalExpectedApel > 0 ? Math.min(100, Math.round((totalApelHadir / totalExpectedApel) * 100)) : 100;
@@ -1945,7 +1889,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               reports={reports}
               activeAccount={activeAccount}
               mode="kepling"
-              attendanceList={attendanceList}
               kunjunganList={kunjunganList}
               title={`Tren Capaian & Konsistensi Kinerja Mingguan (${activeAccount.lingkungan})`}
             />
@@ -2221,26 +2164,24 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               </p>
             </div>
 
-            {/* Absensi Apel Pagi */}
+            {/* Total Laporan Harian */}
             <div
-              onClick={() => onNavigateToPresensi?.()}
-              className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-200 shadow-xs cursor-pointer hover:border-emerald-400 hover:shadow-md transition-all group"
-              title="Klik untuk membuka Rekap Hasil Presensi Apel"
+              className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-200 shadow-xs"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-[11px] font-black text-emerald-900 uppercase block group-hover:text-emerald-700 transition-colors">
-                  Absensi Apel Pagi ↗
+                <span className="text-[10px] sm:text-[11px] font-black text-emerald-900 uppercase block">
+                  Total Laporan Kinerja
                 </span>
                 <span className="text-[10px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.5 rounded">
-                  {kelurahanTotals.apelRatePercentage}%
+                  24 Lingkungan
                 </span>
               </div>
               <div className="text-2xl sm:text-3xl font-black text-emerald-900 mt-1">
-                {kelurahanTotals.totalApelHadir}
-                <span className="text-xs font-semibold text-slate-500 ml-1">Hadir</span>
+                {reports.length}
+                <span className="text-xs font-semibold text-slate-500 ml-1">Arsip</span>
               </div>
               <p className="text-[11px] text-slate-500 mt-1">
-                Dari {kelurahanTotals.totalApelSessions} Sesi Apel
+                Tersinkronisasi Real-Time
               </p>
             </div>
           </div>
@@ -2251,7 +2192,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               reports={reports}
               activeAccount={activeAccount}
               mode="super_admin"
-              attendanceList={attendanceList}
               kunjunganList={kunjunganList}
               title="Tren & Konsistensi Capaian Mingguan Se-Kelurahan Mangga"
             />

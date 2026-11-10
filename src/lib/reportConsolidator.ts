@@ -151,16 +151,6 @@ export function consolidateDailyReport(
 
   const mergedPhotos = Array.from(photoMap.values());
 
-  // Merge Absen Apel: preserve valid Hadir if either has it
-  const mergedAbsen = (() => {
-    if (!existing.absenApel) return incoming.absenApel;
-    if (!incoming.absenApel) return existing.absenApel;
-    if (incoming.absenApel.status === 'Hadir' && existing.absenApel.status !== 'Hadir') {
-      return incoming.absenApel;
-    }
-    return existing.absenApel;
-  })();
-
   // Keep the earlier createdAt to preserve original chronological order
   const eTime = existing.createdAt ? new Date(existing.createdAt).getTime() : Date.now();
   const iTime = incoming.createdAt ? new Date(incoming.createdAt).getTime() : Date.now();
@@ -169,7 +159,6 @@ export function consolidateDailyReport(
   return {
     ...existing,
     kinerja: mergedKinerja,
-    absenApel: mergedAbsen,
     dokumentasiFoto: mergedPhotos,
     jumlahDokumentasi: mergedPhotos.length,
     createdAt: earliestCreatedAt || existing.createdAt || new Date().toISOString(),

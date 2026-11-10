@@ -117,26 +117,6 @@ export const APP_VERSION_HISTORY: VersionRelease[] = [
         description: 'Integrasi data PBB dengan filter per-lingkungan dan realisasi penerimaan pajak.'
       }
     ]
-  },
-  {
-    version: 'v2.3.0',
-    releaseDate: '24 September 2026',
-    title: 'Presensi Apel Pagi Geotagged & Offline Engine',
-    highlights: [
-      'Presensi Apel Pagi GPS & Kamera Selfie',
-      'Penyimpanan Offline IndexedDB',
-      'Rekapitulasi Kehadiran 24 Kepling Super Admin'
-    ],
-    changes: [
-      {
-        category: 'FITUR BARU',
-        description: 'Fitur Presensi Apel Pagi Senin - Jumat (07.30 - 08.30 WIB) dengan validasi radius GPS dan foto selfie.'
-      },
-      {
-        category: 'PENINGKATAN',
-        description: 'Penyimpanan lokal tangguh berbasis IndexedDB yang mendukung kerja tanpa sinyal internet.'
-      }
-    ]
   }
 ];
 

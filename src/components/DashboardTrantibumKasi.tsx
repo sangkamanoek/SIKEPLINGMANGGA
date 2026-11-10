@@ -154,15 +154,6 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
             });
           }
         });
-      } else if (r.absenApel?.fotoSelfieUrl) {
-        photos.push({
-          url: r.absenApel.fotoSelfieUrl,
-          date: r.tanggal,
-          name: `Dokumentasi Patroli ${r.namaKepling}`,
-          keplingNama: r.namaKepling,
-          lingkungan: r.jabatan || 'Kepala Lingkungan',
-          notes: r.kinerja?.poskamlingKeterangan || r.uraianTugas || 'Situasi aman dan kondusif',
-        });
       }
     });
 
@@ -255,8 +246,7 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
               (p.name && p.name.toLowerCase().includes('ronda')) ||
               (p.name && p.name.toLowerCase().includes('siskamling'))
           );
-          const targetPhotos = posPhotos.length > 0 ? posPhotos : docPhotos;
-          targetPhotos.forEach((p) => {
+          posPhotos.forEach((p) => {
             if (p.url) {
               poskamlingPhotos.push({
                 url: p.url,
@@ -265,13 +255,6 @@ export const DashboardTrantibumKasi: React.FC<DashboardTrantibumKasiProps> = ({
                 category: p.kategori || 'poskamling',
               });
             }
-          });
-        } else if (r.absenApel?.fotoSelfieUrl) {
-          poskamlingPhotos.push({
-            url: r.absenApel.fotoSelfieUrl,
-            date: dateStr,
-            title: `Dokumentasi Patroli ${kepling.lingkungan}`,
-            category: 'poskamling',
           });
         }
       });

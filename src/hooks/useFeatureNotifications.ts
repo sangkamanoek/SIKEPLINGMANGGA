@@ -25,7 +25,6 @@ interface UseFeatureNotificationsProps {
   activeTab: string;
   reports: LaporanHarianItem[];
   kunjunganList: any[];
-  attendanceList?: any[];
   customEvents?: any[];
 }
 
@@ -84,7 +83,6 @@ export function useFeatureNotifications({
   activeTab,
   reports,
   kunjunganList,
-  attendanceList = [],
   customEvents = [],
 }: UseFeatureNotificationsProps) {
   const userId = activeAccount.id || activeAccount.nama || 'user';
@@ -193,7 +191,7 @@ export function useFeatureNotifications({
       ? (kunjunganList || []).filter((k) => isKunjunganMatchingKepling(k, activeAccount))
       : (kunjunganList || []);
 
-    const effectiveEvents = (customEvents && customEvents.length > 0) ? customEvents : (attendanceList || []);
+    const effectiveEvents = customEvents || [];
 
     return {
       kunjungan: relevantKunjungan,
@@ -212,7 +210,6 @@ export function useFeatureNotifications({
     activeAccount,
     kunjunganList,
     reports,
-    attendanceList,
     suratItems,
     pembangunanItems,
     customEvents,

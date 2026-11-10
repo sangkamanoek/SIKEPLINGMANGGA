@@ -60,18 +60,16 @@ export const isReportForPemerintahan = (item: LaporanHarianItem): boolean => {
   const kin: Partial<KinerjaHarian> = item.kinerja || {};
   const hasPbb = parseFloat(String(kin.opsirPbbWp || 0)) > 0 || Boolean(kin.opsirPbbKeterangan?.trim());
   const hasIkd = parseFloat(String(kin.ikdOrang || 0)) > 0 || Boolean(kin.ikdKeterangan?.trim());
-  const hasApel = Boolean(item.absenApel?.status || item.absenApel?.jam);
   
   const allText = [
-    item.absenApel?.catatan,
     kin.kegiatanLainnya,
     kin.opsirPbbKeterangan,
     kin.ikdKeterangan,
   ].filter(Boolean).join(' ').toLowerCase();
 
-  const hasKeywords = /\b(pbb|pajak|sppt|wp|ikd|kependudukan|identitas|ktp|kk|nik|domisili|apel|pemerintahan|pelayanan\s*surat|register|surat\s*keterangan|pemilu|tps|pilkada|bapenda|dukcapil)\b/i.test(allText);
+  const hasKeywords = /\b(pbb|pajak|sppt|wp|ikd|kependudukan|identitas|ktp|kk|nik|domisili|pemerintahan|pelayanan\s*surat|register|surat\s*keterangan|pemilu|tps|pilkada|bapenda|dukcapil)\b/i.test(allText);
 
-  return hasPbb || hasIkd || hasApel || hasKeywords;
+  return hasPbb || hasIkd || hasKeywords;
 };
 
 export const isReportForPembangunan = (item: LaporanHarianItem): boolean => {
@@ -82,7 +80,6 @@ export const isReportForPembangunan = (item: LaporanHarianItem): boolean => {
   const hasPosyandu = Boolean(kin.posyanduAdaGiat || kin.posyanduNama?.trim());
 
   const allText = [
-    item.absenApel?.catatan,
     kin.kegiatanLainnya,
     kin.perlinsosKeterangan,
     kin.bpjsKetenagakerjaanKeterangan,
@@ -107,7 +104,6 @@ export const isReportForTrantibum = (item: LaporanHarianItem): boolean => {
   );
 
   const allText = [
-    item.absenApel?.catatan,
     kin.kegiatanLainnya,
     kin.poskamlingPetugas,
     kin.poskamlingLokasi,
@@ -142,6 +138,12 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   const [selectedDate, setSelectedDate] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (initialPetugasFilter) {
+      setSelectedPetugas(initialPetugasFilter);
+    }
+  }, [initialPetugasFilter]);
 
   // Dynamic monthly list available for fast archive filtering
   const availableMonthsList = useMemo(() => {
@@ -309,8 +311,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
         (item.kinerja?.infrastrukturLokasi || '').toLowerCase().includes(term) ||
         (item.kinerja?.infrastrukturSubjek || '').toLowerCase().includes(term) ||
         (item.kinerja?.poskamlingLokasi || '').toLowerCase().includes(term) ||
-        (item.kinerja?.poskamlingKeterangan || '').toLowerCase().includes(term) ||
-        (item.absenApel?.catatan || '').toLowerCase().includes(term);
+        (item.kinerja?.poskamlingKeterangan || '').toLowerCase().includes(term);
 
       if (!matchesKeyword) return false;
 
@@ -411,7 +412,6 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
           kin.poskamlingKeterangan,
           kin.opsirPbbKeterangan,
           kin.perlinsosKeterangan,
-          item.absenApel?.catatan,
         ]
           .filter(Boolean)
           .join(' ')
@@ -554,7 +554,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 <span className="text-xs text-teal-200 font-medium">Akses Bidang Terfokus</span>
               </div>
               <h3 className="text-sm font-bold text-white mt-1">
-                Laporan & Data Kinerja: PBB-P2, IKD, Register Kependudukan & Presensi Apel
+                Laporan & Data Kinerja: PBB-P2, IKD & Register Kependudukan
               </h3>
               <p className="text-xs text-teal-100/80 mt-0.5">
                 Menampilkan arsip laporan yang berhubungan dengan tugas pokok dan fungsi Seksi Tata Pemerintahan Kelurahan Mangga.
@@ -758,21 +758,23 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
           </div>
 
           {/* Filter by Petugas Kepling (Tersedia untuk Admin & Tampilan Bersama) */}
-          <div>
-            <select
-              id="filter-petugas"
-              value={selectedPetugas}
-              onChange={(e) => setSelectedPetugas(e.target.value)}
-              className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
-            >
-              <option value="ALL">👤 Semua Petugas Kepling</option>
-              {listPetugas.map((petugas) => (
-                <option key={petugas.nama} value={petugas.nama}>
-                  👤 {petugas.label || petugas.nama}
-                </option>
-              ))}
-            </select>
-          </div>
+          {isAdmin && (
+            <div>
+              <select
+                id="filter-petugas"
+                value={selectedPetugas}
+                onChange={(e) => setSelectedPetugas(e.target.value)}
+                className="w-full px-3 py-2.5 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800 font-medium"
+              >
+                <option value="ALL">👤 Semua Petugas Kepling</option>
+                {listPetugas.map((petugas) => (
+                  <option key={petugas.nama} value={petugas.nama}>
+                    👤 {petugas.label || petugas.nama}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Filter by Periode Rentang Tanggal */}
           <div>
