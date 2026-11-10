@@ -398,65 +398,58 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
   const menuItems = useMemo(() => {
     const isPkk = isPkkRole(activeAccount.role);
 
+    const pkkItems = [
+      {
+        id: 'kegiatan_pkk',
+        title: 'Laporan & Dokumentasi Kegiatan PKK',
+        desc: 'Pencatatan dan dokumentasi foto kegiatan Pokja I, II, III, IV, Gotong Royong, PHBS, dan PKK Lingkungan.',
+        category: 'laporan',
+        icon: FileText,
+        iconBg: 'bg-teal-50 text-teal-700',
+        badge: 'GIAT POKJA',
+        badgeColor: 'bg-teal-100 text-teal-900',
+        bgGradient: 'bg-gradient-to-r from-teal-950 via-emerald-950 to-slate-900 text-white border-teal-600/60',
+        action: () => onNavigate('kegiatan_pkk'),
+      },
+      {
+        id: 'keuangan_pkk',
+        title: 'Buku Kas Umum (BKU) & Keuangan PKK',
+        desc: 'Kelola kas masuk, kas keluar BKU, bukti alokasi dana, kuitansi transaksi, dan rekapitulasi keuangan TP PKK.',
+        category: 'capaian',
+        icon: Wallet,
+        iconBg: 'bg-emerald-50 text-emerald-700',
+        badge: 'KAS BKU',
+        badgeColor: 'bg-emerald-100 text-emerald-900',
+        action: () => onNavigate('keuangan_pkk'),
+      },
+      {
+        id: 'posyandu_pkk',
+        title: 'Laporan Posyandu & Kesehatan Pokja IV',
+        desc: 'Dokumentasi penimbangan balita, skrining lansia, pemberian vitamin A, PMT, dan pencegahan stunting.',
+        category: 'laporan',
+        icon: Baby,
+        iconBg: 'bg-rose-50 text-rose-700',
+        badge: 'POKJA IV POSYANDU',
+        badgeColor: 'bg-rose-100 text-rose-800',
+        action: () => onNavigate('posyandu_pkk'),
+      },
+      {
+        id: 'buku_pkk',
+        title: '6 Buku Wajib Administrasi PKK',
+        desc: 'Buku 1 Data Anggota, Buku 4 Notulen Rapat, Buku 5 Inventaris Aset, dan buku register wajib administrasi PKK.',
+        category: 'laporan',
+        icon: BookOpen,
+        iconBg: 'bg-teal-50 text-teal-700',
+        badge: 'BUKU I-VI',
+        badgeColor: 'bg-teal-100 text-teal-800',
+        action: () => onNavigate('buku_pkk'),
+      },
+    ];
+
     // Dedicated Role Tim Penggerak PKK (Pusat Kendali Mandiri TP-PKK)
     if (isPkk) {
       return [
-        {
-          id: 'kegiatan_pkk',
-          title: 'Laporan & Dokumentasi Kegiatan PKK',
-          desc: 'Pencatatan dan dokumentasi foto kegiatan Pokja I, II, III, IV, Gotong Royong, PHBS, dan PKK Lingkungan.',
-          category: 'laporan',
-          icon: FileText,
-          iconBg: 'bg-teal-50 text-teal-700',
-          badge: 'GIAT POKJA',
-          badgeColor: 'bg-teal-100 text-teal-900',
-          bgGradient: 'bg-gradient-to-r from-teal-950 via-emerald-950 to-slate-900 text-white border-teal-600/60',
-          action: () => onNavigate('kegiatan_pkk'),
-        },
-        {
-          id: 'keuangan_pkk',
-          title: 'Buku Kas Umum (BKU) & Keuangan PKK',
-          desc: 'Kelola kas masuk, kas keluar BKU, bukti alokasi dana, kuitansi transaksi, dan rekapitulasi keuangan TP PKK.',
-          category: 'capaian',
-          icon: Wallet,
-          iconBg: 'bg-emerald-50 text-emerald-700',
-          badge: 'KAS BKU',
-          badgeColor: 'bg-emerald-100 text-emerald-900',
-          action: () => onNavigate('keuangan_pkk'),
-        },
-        {
-          id: 'dasa_wisma',
-          title: 'Kelompok Dasa Wisma 24 Lingkungan',
-          desc: 'Rekapitulasi kelompok 10-20 rumah tangga Dasa Wisma, jumlah KK/jiwa, balita, lansia, jamban, & fasilitas warga.',
-          category: 'laporan',
-          icon: Users,
-          iconBg: 'bg-teal-50 text-teal-700',
-          badge: 'DASA WISMA',
-          badgeColor: 'bg-teal-100 text-teal-800',
-          action: () => onNavigate('dasa_wisma'),
-        },
-        {
-          id: 'posyandu_pkk',
-          title: 'Laporan Posyandu & Kesehatan Pokja IV',
-          desc: 'Dokumentasi penimbangan balita, skrining lansia, pemberian vitamin A, PMT, dan pencegahan stunting.',
-          category: 'laporan',
-          icon: Baby,
-          iconBg: 'bg-rose-50 text-rose-700',
-          badge: 'POKJA IV POSYANDU',
-          badgeColor: 'bg-rose-100 text-rose-800',
-          action: () => onNavigate('posyandu_pkk'),
-        },
-        {
-          id: 'buku_pkk',
-          title: '6 Buku Wajib Administrasi PKK',
-          desc: 'Buku 1 Data Anggota, Buku 4 Notulen Rapat, Buku 5 Inventaris Aset, dan buku register wajib administrasi PKK.',
-          category: 'laporan',
-          icon: BookOpen,
-          iconBg: 'bg-teal-50 text-teal-700',
-          badge: 'BUKU I-VI',
-          badgeColor: 'bg-teal-100 text-teal-800',
-          action: () => onNavigate('buku_pkk'),
-        },
+        ...pkkItems,
         {
           id: 'daftar_tugas_khusus',
           title: 'Daftar Tugas Khusus & Petunjuk Giat',
@@ -788,62 +781,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
               badgeColor: 'bg-teal-100 text-teal-800',
               action: () => onNavigate('dashboard_kasi'),
             },
-            // Direct Superadmin Oversight for TP-PKK Data
-            {
-              id: 'keuangan_pkk',
-              title: 'Monitoring BKU & Keuangan PKK',
-              desc: 'Pengawasan saldo kas masuk/keluar BKU, alokasi dana, dan rekapitulasi transaksi TP PKK Kelurahan.',
-              category: 'capaian',
-              icon: Wallet,
-              iconBg: 'bg-emerald-50 text-emerald-700',
-              badge: 'KAS BKU PKK',
-              badgeColor: 'bg-emerald-100 text-emerald-900',
-              action: () => onNavigate('keuangan_pkk'),
-            },
-            {
-              id: 'kegiatan_pkk',
-              title: 'Monitoring Laporan Kegiatan PKK',
-              desc: 'Pantau dokumentasi dan laporan kegiatan Pokja I, II, III, IV, Gotong Royong, dan PKK Lingkungan.',
-              category: 'laporan',
-              icon: FileText,
-              iconBg: 'bg-teal-50 text-teal-700',
-              badge: 'GIAT PKK',
-              badgeColor: 'bg-teal-100 text-teal-900',
-              action: () => onNavigate('kegiatan_pkk'),
-            },
-            {
-              id: 'dasa_wisma',
-              title: 'Monitoring Kelompok Dasa Wisma',
-              desc: 'Rekapitulasi kelompok 10-20 rumah Dasa Wisma, statistik KK/jiwa, balita, lansia, & sanitasi 24 lingkungan.',
-              category: 'laporan',
-              icon: Users,
-              iconBg: 'bg-teal-50 text-teal-700',
-              badge: 'DASA WISMA',
-              badgeColor: 'bg-teal-100 text-teal-800',
-              action: () => onNavigate('dasa_wisma'),
-            },
-            {
-              id: 'posyandu_pkk',
-              title: 'Monitoring Posyandu Pokja IV',
-              desc: 'Pantau laporan posyandu balita, lansia, pemberian makanan tambahan (PMT), dan stunting per posyandu.',
-              category: 'laporan',
-              icon: Baby,
-              iconBg: 'bg-rose-50 text-rose-700',
-              badge: 'POSYANDU PKK',
-              badgeColor: 'bg-rose-100 text-rose-800',
-              action: () => onNavigate('posyandu_pkk'),
-            },
-            {
-              id: 'buku_pkk',
-              title: '6 Buku Wajib Administrasi PKK',
-              desc: 'Pemeriksaan Buku 1 Data Anggota, Buku 4 Notulen, Buku 5 Inventaris, dan register administrasi PKK.',
-              category: 'laporan',
-              icon: BookOpen,
-              iconBg: 'bg-teal-50 text-teal-700',
-              badge: 'BUKU PKK',
-              badgeColor: 'bg-teal-100 text-teal-800',
-              action: () => onNavigate('buku_pkk'),
-            },
+            ...pkkItems,
           ]
         : []),
     ];
@@ -993,7 +931,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-emerald-800 uppercase block tracking-wider">Pilar 1</span>
               <h4 className="text-xs font-bold text-slate-900 truncate">Kinerja Kepling & Layanan</h4>
-              <p className="text-[11px] text-slate-500 truncate">Presensi, Laporan Harian & PBB</p>
+              <p className="text-[11px] text-slate-500 truncate">Laporan Harian & PBB</p>
             </div>
           </div>
 
@@ -1014,7 +952,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-teal-800 uppercase block tracking-wider">Pilar 2</span>
               <h4 className="text-xs font-bold text-slate-900 truncate">Kegiatan TP-PKK</h4>
-              <p className="text-[11px] text-slate-500 truncate">Pusat Menu, Laporan & Dasa Wisma</p>
+              <p className="text-[11px] text-slate-500 truncate">Pusat Menu & Laporan PKK</p>
             </div>
           </div>
 
@@ -1067,7 +1005,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                       <p className="text-xs sm:text-sm font-black text-teal-400 mt-1">24 Lingkungan</p>
                     </div>
                     <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Presensi Apel</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase leading-none">Keaktifan</p>
                       <p className="text-xs sm:text-sm font-black text-emerald-400 mt-1">{todayApelCount} Hadir</p>
                     </div>
                   </div>
@@ -1414,7 +1352,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
-                        👤 Presensi &amp; Agenda
+                        👤 Keaktifan &amp; Agenda
                       </span>
                       {unreadCounts?.['riwayat'] && unreadCounts['riwayat'] > 0 ? (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-xs animate-pulse ring-1 ring-white/50">
@@ -1542,7 +1480,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
 
                   {hasAbsenApelToday ? (
                     <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between text-[11px] text-emerald-800 font-bold">
-                      <span>Presensi Tercatat</span>
+                      <span>Laporan Tercatat</span>
                       <button
                         onClick={onOpenAbsenApel}
                         className="underline hover:text-emerald-950 cursor-pointer"

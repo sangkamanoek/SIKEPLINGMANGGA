@@ -459,19 +459,6 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
               <Smartphone className="w-4 h-4" />
               <span>Capaian IKD</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => setSubView('presensi_apel')}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                subView === 'presensi_apel'
-                  ? 'bg-white text-emerald-950 shadow-md'
-                  : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
-              }`}
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>Presensi Apel Pagi 24 Kepling</span>
-            </button>
           </div>
 
           {(subView === 'pbb' || subView === 'ikd') && (

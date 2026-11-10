@@ -10,7 +10,7 @@ export const DEFAULT_KASI_PEMERINTAHAN: KepalaSeksiProfile = {
   id: 'kasi_pemerintahan',
   role: 'kasi_pemerintahan',
   namaSeksi: 'Seksi Tata Pemerintahan',
-  singkatan: 'Kasi Tata Pemerintahan (PBB, IKD & Apel)',
+  singkatan: 'Kasi Tata Pemerintahan (PBB & IKD)',
   namaPejabat: 'KASI TATA PEMERINTAHAN',
   nip: '19780512 200801 1 005',
   telepon: '0812-6011-2345',
@@ -31,7 +31,7 @@ export const DEFAULT_KASI_PEMERINTAHAN: KepalaSeksiProfile = {
   passwordDefault: 'pem_mangga2026',
   iconKey: 'pemerintahan',
   tupoksiRingkas:
-    'Melaksanakan perumusan kebijakan teknis, pengoordinasian, pembinaan, pemantauan, dan evaluasi penyelenggaraan tata pemerintahan kelurahan, optimalisasi realisasi PBB-P2, percepatan aktivasi IKD, penatausahaan registrasi kependudukan, serta penegakan disiplin apel 24 Kepala Lingkungan.',
+    'Melaksanakan perumusan kebijakan teknis, pengoordinasian, pembinaan, pemantauan, dan evaluasi penyelenggaraan tata pemerintahan kelurahan, optimalisasi realisasi PBB-P2, percepatan aktivasi IKD, serta pembinaan administrasi wilayah.',
   bidangTugas: [
     {
       judul: '1. Pengelolaan & Optimalisasi PBB-P2 (Pajak Bumi dan Bangunan)',
@@ -54,26 +54,7 @@ export const DEFAULT_KASI_PEMERINTAHAN: KepalaSeksiProfile = {
         'Fasilitasi pelayanan jemput bola aktivasi IKD di kantor kelurahan dan titik kumpul warga.',
       ],
     },
-    {
-      judul: '3. Penatausahaan Kependudukan & Database Keluarga',
-      deskripsi:
-        'Pengelolaan basis data keluarga (KK), Nomor Induk Kependudukan (NIK), buku register kependudukan, serta surat-surat pengantar/keterangan resmi.',
-      poinPenting: [
-        'Sinkronisasi Master Database Keluarga Kelurahan Mangga (24 Lingkungan).',
-        'Pencatatan mutasi penduduk (kelahiran, kematian, pindah datang/keluar).',
-        'Validasi data warga dan integrasi data spasial rumah/bangunan kelurahan.',
-      ],
-    },
-    {
-      judul: '4. Presensi & Disiplin Apel Aparatur Kelurahan',
-      deskripsi:
-        'Pengawasan kedisiplinan dan absensi apel pagi setiap hari kerja bagi 24 Kepala Lingkungan dan seluruh pegawai ASN/Non-ASN Kelurahan Mangga.',
-      poinPenting: [
-        'Pencatatan presensi apel pagi disertai foto selfie dan koordinat GPS resmi.',
-        'Rekapitulasi status kehadiran: Hadir, Izin, Sakit, Dinas Luar, atau Alpa.',
-        'Penyusunan laporan berkala disiplin aparatur untuk evaluasi Lurah dan Camat.',
-      ],
-    },
+
     {
       judul: '5. Ketatawilayahan & Pembinaan Kepala Lingkungan',
       deskripsi:
@@ -88,7 +69,7 @@ export const DEFAULT_KASI_PEMERINTAHAN: KepalaSeksiProfile = {
   indikatorKinerja: [
     { label: 'Realisasi Target PBB-P2', target: '100%', satuan: 'Target SPPT / Buku Ketetapan' },
     { label: 'Target IKD Warga', target: '50 - 100', satuan: 'Orang / Bulan per Lingkungan' },
-    { label: 'Tingkat Kehadiran Apel Kepling', target: '≥ 95%', satuan: 'Presensi Bulanan' },
+
     { label: 'Ketepatan Laporan Harian Kepling', target: '100%', satuan: '24 Lingkungan Aktif' },
   ],
   fiturAplikasi: [
@@ -100,14 +81,7 @@ export const DEFAULT_KASI_PEMERINTAHAN: KepalaSeksiProfile = {
       namaFitur: 'Rekap & Realisasi PBB-P2',
       kegunaan: 'Import CSV SPPT Bapenda, pencatatan lunas, dan ekspor lembar rekapitulasi resmi.',
     },
-    {
-      namaFitur: 'Database Keluarga & Registrasi',
-      kegunaan: 'Pencarian NIK, nomor KK, verifikasi data anggota keluarga, dan cetak register.',
-    },
-    {
-      namaFitur: 'Presensi Apel Kepling',
-      kegunaan: 'Verifikasi foto kehadiran selfie, koordinat GPS, dan laporan rekap apel mingguan.',
-    },
+
   ],
 };
 
@@ -188,7 +162,7 @@ export const DEFAULT_KASI_PEMBANGUNAN: KepalaSeksiProfile = {
       deskripsi:
         'Pembinaan kelembagaan kemasyarakatan, kelompok swadaya masyarakat (KSM), kelompok tani kota, dan Tim Penggerak PKK Kelurahan Mangga.',
       poinPenting: [
-        'Pendampingan kegiatan 10 Program Pokok PKK dan Dasawisma di tiap lingkungan.',
+        'Pendampingan kegiatan 10 Program Pokok PKK di tiap lingkungan.',
         'Pengembangan UMKM lokal, pelatihan keterampilan kerja warga, dan ekonomi kreatif.',
         'Penggerak gotong royong berkala (Jumat Bersih / Minggu Harmonis) di 24 lingkungan.',
       ],

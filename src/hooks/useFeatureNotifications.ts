@@ -4,7 +4,6 @@ import { subscribeSurat, getLocalSuratList } from '../lib/suratService';
 import { subscribeToPembangunan } from '../lib/pembangunanService';
 import { subscribePkkKegiatan, getLocalPkkKegiatanList } from '../lib/pkkKegiatanService';
 import { subscribePosyanduReports } from '../lib/pkkPosyanduService';
-import { subscribeDasaWisma, getLocalDasaWismaList } from '../lib/pkkDasaWismaService';
 import { subscribeTransaksiPkk, getLocalTransaksiPkk } from '../lib/pkkKeuanganService';
 import { getReportIsoDate, getTodayLocalIso, isReportMatchingKepling, isKunjunganMatchingKepling } from '../lib/formatter';
 
@@ -16,7 +15,6 @@ export type FeatureNotificationKey =
   | 'kegiatan_khusus'
   | 'kegiatan_pkk'
   | 'posyandu_pkk'
-  | 'dasa_wisma'
   | 'keuangan_pkk'
   | 'buku_pkk';
 
@@ -111,15 +109,6 @@ export function useFeatureNotifications({
 
   const [pkkPosyanduItems, setPkkPosyanduItems] = useState<any[]>([]);
 
-  const [pkkDasaWismaItems, setPkkDasaWismaItems] = useState<any[]>(() => {
-    if (!isPkk) return [];
-    try {
-      return getLocalDasaWismaList();
-    } catch {
-      return [];
-    }
-  });
-
   const [pkkKeuanganItems, setPkkKeuanganItems] = useState<any[]>(() => {
     if (!isPkk) return [];
     try {
@@ -138,8 +127,7 @@ export function useFeatureNotifications({
       realisasi_pembangunan: loadSeenIds('realisasi_pembangunan', userId),
       kegiatan_khusus: loadSeenIds('kegiatan_khusus', userId),
       kegiatan_pkk: loadSeenIds('kegiatan_pkk', userId),
-      posyandu_pkk: loadSeenIds('posyandu_pkk', userId),
-      dasa_wisma: loadSeenIds('dasa_wisma', userId),
+       posyandu_pkk: loadSeenIds('posyandu_pkk', userId),
       keuangan_pkk: loadSeenIds('keuangan_pkk', userId),
       buku_pkk: loadSeenIds('buku_pkk', userId),
     };
@@ -160,13 +148,11 @@ export function useFeatureNotifications({
 
     let unsubPkkKegiatan = () => {};
     let unsubPkkPosyandu = () => {};
-    let unsubPkkDawis = () => {};
     let unsubPkkKeuangan = () => {};
 
     if (isPkk) {
       unsubPkkKegiatan = subscribePkkKegiatan((items) => setPkkKegiatanItems(items));
       unsubPkkPosyandu = subscribePosyanduReports((items) => setPkkPosyanduItems(items));
-      unsubPkkDawis = subscribeDasaWisma((items) => setPkkDasaWismaItems(items));
       unsubPkkKeuangan = subscribeTransaksiPkk((items) => setPkkKeuanganItems(items));
     }
 
@@ -175,7 +161,6 @@ export function useFeatureNotifications({
       unsubPembangunan();
       unsubPkkKegiatan();
       unsubPkkPosyandu();
-      unsubPkkDawis();
       unsubPkkKeuangan();
     };
   }, [isPkk]);
@@ -201,7 +186,6 @@ export function useFeatureNotifications({
       kegiatan_khusus: effectiveEvents,
       kegiatan_pkk: pkkKegiatanItems || [],
       posyandu_pkk: pkkPosyanduItems || [],
-      dasa_wisma: pkkDasaWismaItems || [],
       keuangan_pkk: pkkKeuanganItems || [],
       buku_pkk: [],
     };
@@ -215,7 +199,6 @@ export function useFeatureNotifications({
     customEvents,
     pkkKegiatanItems,
     pkkPosyanduItems,
-    pkkDasaWismaItems,
     pkkKeuanganItems,
   ]);
 

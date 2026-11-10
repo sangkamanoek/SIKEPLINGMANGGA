@@ -53,27 +53,8 @@ export interface FotoDokumentasi {
   name: string;
   namaFile?: string;
   timestamp: string;
-  kategori?: 'poskamling' | 'posyandu' | 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'apel' | 'umum' | 'infrastruktur' | 'lainnya' | string;
+  kategori?: 'poskamling' | 'posyandu' | 'pbb' | 'perlinsos' | 'ikd' | 'bpjs' | 'umum' | 'infrastruktur' | 'lainnya' | string;
   keterangan?: string;
-}
-
-export type StatusAbsenApel = 'Hadir' | 'Izin' | 'Sakit' | 'Dinas Luar' | 'Tidak Mengikuti Apel';
-
-export interface AbsenApelItem {
-  id: string;
-  accountId: string;
-  namaKepling: string;
-  lingkungan: string;
-  nomorLingkungan?: number;
-  tanggal: string;
-  status: StatusAbsenApel;
-  jam?: string;
-  waktuLengkap?: string;
-  fotoSelfieUrl?: string;
-  lokasiGps?: string;
-  catatan?: string;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface LaporanHarianItem {
@@ -100,7 +81,6 @@ export interface LaporanHarianItem {
   updatedAt?: string;
   sheetRowIndex?: number;
   spreadsheetUrl?: string;
-  absenApel?: any;
 }
 
 export interface PosyanduReport {
@@ -579,96 +559,6 @@ export interface LaporanKegiatanPkk {
   updatedAt?: string;
 }
 
-export interface KkAnggotaDasaWisma {
-  id: string; // unique ID
-  namaKepalaKeluarga: string;
-  nomorKk?: string;
-  nik?: string;
-  alamat?: string;
-  jumlahJiwa?: number;
-  jumlahLakiLaki?: number;
-  jumlahPerempuan?: number;
-  jumlahBalita?: number;
-  jumlahLansia?: number;
-  sumberData?: 'MANUAL';
-}
-
-export interface KelompokDasaWisma {
-  id: string;
-  namaKelompok: string; // e.g. "Dasa Wisma Mawar 1"
-  lingkunganNomor: number;
-  lingkunganNama: string;
-  namaKetuaDawis: string;
-  teleponKetua?: string;
-  rtRw?: string;
-  kelurahan?: string;
-  kecamatan?: string;
-  kotaKabupaten?: string;
-  provinsi?: string;
-  
-  // Demografi & Kepala Keluarga
-  namaKrt?: string; // Nama Kepala Rumah Tangga
-  daftarKkAnggota?: KkAnggotaDasaWisma[]; // Daftar nama & profil Kepala Keluarga anggota Dasa Wisma (10-20 KK)
-  jumlahKk: number;
-  jumlahJiwa: number;
-  jumlahLakiLaki?: number;
-  jumlahPerempuan?: number;
-  jumlahRumah?: number;
-  jumlahKkDalamRumah?: number;
-  
-  // Kategori Khusus (Individu & Rekap)
-  jumlahBalita: number;
-  jumlahAnakSekolah?: number;
-  jumlahLansia: number;
-  jumlahPus?: number; // Pasangan Usia Subur
-  jumlahWus?: number; // Wanita Usia Subur
-  jumlahAkseptorKb?: number;
-  jumlahIbuHamil: number;
-  jumlahIbuMenyusui?: number;
-  jumlahIbuNifas?: number;
-  jumlahIbuMeninggal?: number;
-  jumlahBayiMeninggal?: number;
-  jumlahBalitaMeninggal?: number;
-  jumlahButaAksara?: number; // 3 Buta (Baca, Tulis, Hitung)
-  
-  // Kesehatan, Sanitasi & Rumah Tangga
-  makananPokok?: 'Beras' | 'Non-Beras' | string;
-  sumberAirMinum?: string; // 'PDAM', 'Air Galon', 'Depot Isi Ulang', 'Sumur', etc.
-  sumberAirBersih?: string; // 'PDAM', 'Sumur Bor/Terlindungi', 'Mata Air', 'Air Kemasan', 'Sungai'
-  punyaJambanSehat: number;
-  punyaTempatSampah?: number;
-  punyaSpal: number;
-  kriteriaRumah?: 'Layak Huni' | 'Tidak Layak Huni' | string;
-  kriteriaRumahSehat?: number;
-  kriteriaRumahKurangSehat?: number;
-  stikerP4k?: 'Menempel' | 'Tidak Menempel' | string;
-  
-  // Pemanfaatan Tanah Pekarangan (PTP) & Industri Rumah Tangga (UP2K)
-  punyaToga: number;
-  ptpPeternakan?: boolean;
-  ptpPerikanan?: boolean;
-  ptpWarungHidup?: boolean;
-  ptpToga?: boolean;
-  ptpTanamanKeras?: boolean;
-  industriPangan?: boolean;
-  industriSandang?: boolean;
-  industriJasa?: boolean;
-  industriKonveksi?: boolean;
-  
-  // Kegiatan Warga
-  kegiatanPosyandu?: boolean;
-  kegiatanBkb?: boolean;
-  kegiatanTabulin?: boolean;
-  kegiatanPaud?: boolean;
-  kegiatanUp2kKoperasi?: boolean;
-  
-  kegiatanUtama?: string;
-  validationWarnings?: string[];
-  createdByName?: string;
-  createdAt?: string;
-  updatedAt: string;
-}
-
 export type JenisSuratKedinasan =
   | 'SURAT_MASUK'
   | 'SURAT_KELUAR'
@@ -721,3 +611,12 @@ export interface AgendaKelurahanItem {
 }
 
 
+export interface PkkDasaWismaItem {
+  id: string;
+  namaKelompok: string;
+  lingkunganNomor: number;
+  namaKetua: string;
+  jumlahAnggota: number;
+  createdAt: string;
+  updatedAt?: string;
+}

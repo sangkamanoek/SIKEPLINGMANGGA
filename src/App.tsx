@@ -5,7 +5,6 @@ import {
   ALL_ACCOUNTS,
   getEffectiveProfile,
   syncProfilesWithServer,
-  syncBuku1ToPkkProfiles,
 } from './data/keplingList';
 import { HeaderBanner } from './components/HeaderBanner';
 import { MobileBottomNav, AppTabType } from './components/MobileBottomNav';
@@ -84,9 +83,7 @@ const PkkBukuAdministrasiView = React.lazy(() =>
 const PkkKegiatanView = React.lazy(() =>
   import('./components/PkkKegiatanView').then((m) => ({ default: m.PkkKegiatanView }))
 );
-const PkkDasaWismaView = React.lazy(() =>
-  import('./components/PkkDasaWismaView').then((m) => ({ default: m.PkkDasaWismaView }))
-);
+
 const PkkPosyanduView = React.lazy(() =>
   import('./components/PkkPosyanduView').then((m) => ({ default: m.PkkPosyanduView }))
 );
@@ -197,9 +194,7 @@ export default function App() {
 
   // Sync custom profiles from server / Firestore on start
   useEffect(() => {
-    syncBuku1ToPkkProfiles();
     syncProfilesWithServer().then(() => {
-      syncBuku1ToPkkProfiles();
       setActiveAccount((prev) => (prev ? getEffectiveProfile(prev) : prev));
     }).catch(() => {});
 
@@ -308,7 +303,6 @@ export default function App() {
   const KELURAHAN_RESTRICTED_TABS: AppTabType[] = useMemo(() => [
     'keuangan_pkk',
     'kegiatan_pkk',
-    'dasa_wisma',
     'posyandu_pkk',
     'buku_pkk',
   ], []);
@@ -456,7 +450,7 @@ export default function App() {
   useEffect(() => {
     if (isPkk) {
       const allowedPkkTabs = [
-        'hub', 'kegiatan_pkk', 'keuangan_pkk', 'dasa_wisma', 'posyandu_pkk',
+        'hub', 'kegiatan_pkk', 'keuangan_pkk', 'posyandu_pkk',
         'buku_pkk', 'surat_kedinasan', 'daftar_tugas_khusus', 'monitoring', 'realisasi_pembangunan'
       ];
       if (!allowedPkkTabs.includes(activeTab)) {
@@ -678,12 +672,7 @@ export default function App() {
             onShowToast={showToast}
           />
         )}
-        {activeTab === 'dasa_wisma' && (
-          <PkkDasaWismaView
-            currentUser={activeAccount}
-            onShowToast={showToast}
-          />
-        )}
+
         {activeTab === 'posyandu_pkk' && (
           <PkkPosyanduView
             currentUser={activeAccount}

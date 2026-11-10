@@ -22,7 +22,7 @@ import {
   Moon,
 } from 'lucide-react';
 import { FormKunjunganWarga, KunjunganWargaData } from './FormKunjunganWarga';
-import { LaporanHarianItem, FotoDokumentasi, KinerjaHarian, UserAccount, AbsenApelItem, EventAttendance } from '../types';
+import { LaporanHarianItem, FotoDokumentasi, KinerjaHarian, UserAccount, EventAttendance } from '../types';
 import type { CustomEvent } from '../types';
 import {
   subscribeCustomEventsFromFirestore,
@@ -38,7 +38,6 @@ import {
 } from '../lib/formatter';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { safeSetLocalStorage } from '../lib/safeStorage';
-import { loadAllAttendance, checkApelTimeStatus, calculateAbsentDays } from '../lib/attendanceApi';
 import { compressImageFile } from '../lib/imageCompressor';
 
 interface FormLaporanProps {
@@ -48,9 +47,7 @@ interface FormLaporanProps {
   onConnectGoogle: () => void;
   activeAccount?: UserAccount;
   preselectedKepling?: UserAccount | null;
-  attendanceList?: AbsenApelItem[];
   existingReports?: LaporanHarianItem[];
-  onOpenAbsenApel?: () => void;
   onBackToRangkuman?: () => void;
 }
 
@@ -78,9 +75,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   onConnectGoogle,
   activeAccount,
   preselectedKepling,
-  attendanceList = [],
   existingReports = [],
-  onOpenAbsenApel,
   onBackToRangkuman,
 }) => {
   const today = new Date();
@@ -90,8 +85,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   const [tanggalText, setTanggalText] = useState<string>(formatTanggalIndonesia(today));
   const [rawDate, setRawDate] = useState<string>(getTodayLocalIso(today));
 
-  // Attendance Apel state
-  const [todayApel, setTodayApel] = useState<AbsenApelItem | null>(null);
+  // Events state
   const [eventList, setEventList] = useState<CustomEvent[]>([]);
   const [eventAttendanceList, setEventAttendanceList] = useState<EventAttendance[]>([]);
 
@@ -303,27 +297,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
     }
   };
 
-  // Sync Absensi Apel Pagi for selected Kepling & date
-  useEffect(() => {
-    const checkApel = async () => {
-      try {
-        const list = attendanceList && attendanceList.length > 0 ? attendanceList : await loadAllAttendance();
-        const targetDate = rawDate || getTodayLocalIso(new Date());
-        const matched = list.find(
-          (a) =>
-            (a.accountId === selectedAccountId ||
-              a.namaKepling.toLowerCase() === namaKepling.toLowerCase() ||
-              a.lingkungan.toLowerCase() === jabatan.toLowerCase()) &&
-            a.tanggal === targetDate
-        );
-        setTodayApel(matched || null);
-      } catch (e) {
-        console.warn('Failed to load today apel for form:', e);
-      }
-    };
-    checkApel();
-  }, [selectedAccountId, rawDate, namaKepling, jabatan, attendanceList]);
-
   // Cek apakah Kepling ini sudah memiliki laporan yang tersimpan pada tanggal yang dipilih
   const existingReportForDate = useMemo(() => {
     if (!existingReports || existingReports.length === 0) return null;
@@ -527,31 +500,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
       kelurahan: kelurahan.trim(),
       kecamatan: kecamatan.trim(),
       kinerja,
-      absenApel: todayApel
-        ? {
-            status: todayApel.status,
-            jam: todayApel.jam,
-            waktuLengkap: todayApel.waktuLengkap,
-            fotoSelfieUrl: todayApel.fotoSelfieUrl,
-            lokasiGps: todayApel.lokasiGps,
-            catatan: todayApel.catatan,
-          }
-        : (() => {
-            const timeStat = checkApelTimeStatus();
-            if (timeStat.isLate) {
-              return {
-                status: 'Tidak Mengikuti Apel' as const,
-                jam: '-',
-                lokasiGps: '-',
-                catatan: 'Tidak Mengikuti Apel Pagi (Akses Ditutup Lewat 08.30 WIB)',
-              };
-            }
-            return {
-              status: 'Hadir' as const,
-              jam: '07:35 WIB',
-              lokasiGps: 'Halaman Kantor Kelurahan Mangga',
-            };
-          })(),
       jumlahDokumentasi: fotoList.length,
       dokumentasiFoto: fotoList,
       petugasRole: activeAccount?.role,
@@ -711,104 +659,6 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                 </div>
               </div>
             </div>
-
-            {/* Presensi Apel Pagi Status Card */}
-            {(() => {
-              const date = new Date();
-              const day = date.getDay();
-              if (day === 0 || day === 6) return null;
-
-              const timeStat = checkApelTimeStatus();
-              const isPastWindow = timeStat.isLate;
-              const isAbsent = !todayApel && isPastWindow;
-
-              return (
-                <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
-                  isAbsent || todayApel?.status === 'Tidak Mengikuti Apel'
-                    ? 'bg-rose-50/80 border-rose-200 text-rose-950'
-                    : todayApel
-                    ? 'bg-teal-50/90 border-teal-200 text-teal-950'
-                    : 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
-                }`}>
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-lg">📢</span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">Presensi Apel Pagi:</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-extrabold uppercase ${
-                          isAbsent || todayApel?.status === 'Tidak Mengikuti Apel'
-                            ? 'bg-rose-100 text-rose-900 border border-rose-300'
-                            : todayApel?.status === 'Hadir'
-                            ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                            : todayApel?.status === 'Izin'
-                            ? 'bg-blue-100 text-blue-900 border border-blue-300'
-                            : todayApel?.status === 'Sakit'
-                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                            : todayApel?.status === 'Dinas Luar'
-                            ? 'bg-purple-100 text-purple-900 border border-purple-300'
-                            : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                        }`}>
-                          {isAbsent || todayApel?.status === 'Tidak Mengikuti Apel'
-                            ? '✕ TIDAK MENGIKUTI APEL'
-                            : todayApel?.status
-                            ? `✓ ${String(todayApel.status).toUpperCase()}`
-                            : '✓ HADIR'}
-                        </span>
-                        <span className="text-[11px] text-slate-600 font-medium">
-                          {isAbsent
-                            ? '(Akses Ditutup Lewat 08.30 WIB)'
-                            : todayApel?.jam
-                            ? `(${todayApel.jam})`
-                            : '(07.35 WIB)'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 mt-0.5">
-                        {isAbsent
-                          ? 'Waktu pengisian presensi apel pagi resmi telah berakhir (07.30 - 08.30 WIB)'
-                          : todayApel?.lokasiGps
-                          ? `Lokasi: ${todayApel.lokasiGps}`
-                          : 'Otomatis tercatat & masuk ke Laporan Cetak PDF Resmi'}
-                      </p>
-                      {(isAbsent || todayApel?.status === 'Tidak Mengikuti Apel') && (
-                        <div className="mt-1">
-                          {(() => {
-                            const absentStat = calculateAbsentDays(
-                              attendanceList,
-                              selectedAccountId,
-                              rawDate
-                            );
-                            return (
-                              <span className="inline-block px-2.5 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10px] tracking-wide shadow-2xs">
-                                {absentStat.consecutiveDays > 0
-                                  ? `TIDAK MENGIKUTI APEL PAGI SELAMA ${absentStat.consecutiveDays} HARI`
-                                  : 'TIDAK MENGIKUTI APEL PAGI'}
-                              </span>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {onOpenAbsenApel && (
-                    <button
-                      type="button"
-                      onClick={onOpenAbsenApel}
-                      className={`px-3 py-1.5 rounded-lg text-white text-xs font-bold transition-colors shadow-2xs self-start sm:self-auto cursor-pointer ${
-                        isAbsent
-                          ? 'bg-rose-700 hover:bg-rose-800'
-                          : 'bg-teal-700 hover:bg-teal-800'
-                      }`}
-                    >
-                      {isAbsent
-                        ? 'Lihat Status Presensi'
-                        : todayApel
-                        ? 'Lihat / Ubah Presensi'
-                        : 'Isi Absen Apel'}
-                    </button>
-                  )}
-                </div>
-              );
-            })()}
 
             {/* Information Banner: Kumulatif Harian */}
             <div className="bg-blue-50/80 p-5 rounded-2xl border border-blue-200 flex items-start gap-4 text-blue-900 shadow-sm">

@@ -14,7 +14,6 @@ import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import {
   DEFAULT_PKK_LINGKUNGAN_NAMES,
   ROMAN_NUMERALS,
-  syncBuku1ToPkkProfiles,
 } from '../data/keplingList';
 import { PKK_DEFAULT_ANGGOTA_LIST } from '../data/pkkDefaultAnggota';
 

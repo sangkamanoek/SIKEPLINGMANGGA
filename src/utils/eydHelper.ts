@@ -84,51 +84,6 @@ export const formatNamaEyd = (rawName?: string | null): string => {
 };
 
 /**
- * Format nama kelompok Dasa Wisma sesuai EYD
- * Contoh: "dasa wisma lily 1" -> "Dasa Wisma Lily I"
- * Contoh: "mawar ii" -> "Dasa Wisma Mawar II"
- */
-export const formatKelompokEyd = (rawKelompok?: string | null): string => {
-  if (!rawKelompok) return '';
-  let str = rawKelompok.trim().replace(/\s+/g, ' ');
-  if (!str) return '';
-
-  // Bersihkan semua kemungkinan duplikasi awalan seperti "Dasa Wisma Dasawisma", "Dasawisma", "Dawis", dsb.
-  while (/^(dasa\s*wisma|dasawisma|dawis)\b\s*/i.test(str)) {
-    str = str.replace(/^(dasa\s*wisma|dasawisma|dawis)\b\s*/i, '').trim();
-  }
-
-  // Jika nama kelompok setelah dibersihkan kosong, kembalikan 'Dasa Wisma'
-  if (!str) return 'Dasa Wisma';
-
-  // Pisahkan per kata untuk format sisa nama kelompok
-  const words = str.split(' ');
-  const formattedWords = words.map((w, idx) => {
-    const lower = w.toLowerCase();
-    const upper = w.toUpperCase();
-
-    // Cek jika kata adalah angka romawi yang sudah diketik (i, ii, iii, dll.)
-    if (ROMAN_NUMERALS.includes(upper)) {
-      return upper;
-    }
-
-    // Cek jika kata adalah digit angka (misal "1", "2", "24")
-    const num = parseInt(w, 10);
-    if (!isNaN(num) && num >= 1 && num <= 24 && String(num) === w) {
-      return toRomanNumeral(num);
-    }
-
-    if (idx > 0 && KATA_TUGAS.has(lower)) {
-      return lower;
-    }
-
-    return lower.charAt(0).toUpperCase() + lower.slice(1);
-  });
-
-  return `Dasa Wisma ${formattedWords.join(' ')}`;
-};
-
-/**
  * Format alamat jalan/gang sesuai EYD & standar tata naskah
  * Contoh: "jl. vanili raya gg. melati no 12" -> "Jl. Vanili Raya Gg. Melati No. 12"
  */

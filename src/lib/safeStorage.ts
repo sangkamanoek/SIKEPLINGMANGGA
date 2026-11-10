@@ -200,7 +200,6 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
         localStorage.removeItem('cleaned_reports_v2_kepling21');
         localStorage.removeItem('google_cached_access_token');
         localStorage.removeItem('sikepling_bottom5_monthly_kepling_ids');
-        localStorage.removeItem('sikepling_data_keluarga_v1');
 
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
@@ -304,10 +303,6 @@ export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedAppro
 
   try {
     memoryFallbackStorage.clear();
-    // Always purge obsolete heavy data_keluarga local cache if present
-    try {
-      localStorage.removeItem('sikepling_data_keluarga_v1');
-    } catch {}
 
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {

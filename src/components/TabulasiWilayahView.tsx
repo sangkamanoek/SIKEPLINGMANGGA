@@ -45,7 +45,7 @@ interface TabulasiWilayahViewProps {
   onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
   onSelectHouseForMap?: (house: TitikRumahBangunan) => void;
   onSwitchToMap?: () => void;
-  onOpenDatabaseKeluarga?: () => void;
+
   onDeleteHouse?: (houseId: string, houseName?: string) => void;
   onDeleteBulkHouses?: (houseIds: string[]) => void;
   onClearAllHouses?: () => void;
@@ -59,7 +59,7 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
   onShowToast,
   onSelectHouseForMap,
   onSwitchToMap,
-  onOpenDatabaseKeluarga,
+
   onDeleteHouse,
   onDeleteBulkHouses,
   onClearAllHouses,
@@ -858,17 +858,7 @@ export const TabulasiWilayahView: React.FC<TabulasiWilayahViewProps> = ({
 
           {/* Quick Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            {onOpenDatabaseKeluarga && (
-              <button
-                type="button"
-                onClick={onOpenDatabaseKeluarga}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-xs font-black shadow-md cursor-pointer transition-transform hover:scale-[1.02]"
-                title="Buka Database Master Data Keluarga (KK)"
-              >
-                <Users className="w-4 h-4 text-blue-200" />
-                <span>Database Data Keluarga (KK)</span>
-              </button>
-            )}
+
             <button
               type="button"
               onClick={handleExportFullExcel}

@@ -298,25 +298,6 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
 
         {/* Header Actions Toolbar (Right) */}
         <div className="flex items-center gap-2 sm:gap-3 justify-end shrink-0">
-          {onOpenAbsenApel && !isPkkRole(activeAccount.role) && (
-            <button
-              id="btn-open-absen-apel-header"
-              type="button"
-              onClick={onOpenAbsenApel}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer shrink-0 border border-amber-300 hover:scale-[1.02] active:scale-[0.98]"
-              title="Absen Apel Pagi Kepling Kelurahan Mangga"
-            >
-              <UserCheck className="w-4 h-4 text-slate-950 shrink-0" />
-              <div className="flex flex-col text-left">
-                <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-slate-900/80 font-black leading-none">
-                  PRESENSI
-                </span>
-                <span className="leading-tight whitespace-nowrap text-[11px] sm:text-xs">
-                  Apel Pagi
-                </span>
-              </div>
-            </button>
-          )}
 
           {/* Google Connection Status Button */}
           <div className="hidden lg:flex items-center gap-2 shrink-0">

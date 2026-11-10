@@ -560,89 +560,18 @@ export const extractLingkunganNumber = (text: string): number | null => {
   return null;
 };
 
-export const findTargetPkkAccountIdForBuku1Member = (item: { jabatan?: string; id?: string }): string | null => {
-  if (!item) return null;
-  const jab = (item.jabatan || '').toLowerCase();
 
-  if (jab.includes('ketua') && jab.includes('kelurahan')) {
-    return 'ketua_pkk';
-  }
-  if (jab.includes('sekretaris') && jab.includes('kelurahan')) {
-    return 'sekretaris_pkk';
-  }
-  if (jab.includes('ketua') && (jab.includes('lingkungan') || jab.includes('ling') || jab.includes('tp pkk'))) {
-    const num = extractLingkunganNumber(item.jabatan || '');
-    if (num && num >= 1 && num <= 24) {
-      return `pkk_lingkungan_${num}`;
-    }
-  }
-  if (item.id && item.id.startsWith('anggota_pkk_lingkungan_')) {
-    const numStr = item.id.replace('anggota_pkk_lingkungan_', '');
-    const num = parseInt(numStr, 10);
-    if (!isNaN(num) && num >= 1 && num <= 24) {
-      return `pkk_lingkungan_${num}`;
-    }
-  }
-
-  return null;
-};
-
-export const syncBuku1ToPkkProfiles = (buku1Items?: any[]): void => {
-  try {
-    let items = buku1Items;
-    if (!items) {
-      const raw = localStorage.getItem('sikepling_pkk_buku_1_v1');
-      items = raw ? JSON.parse(raw) : [];
-    }
-    if (!Array.isArray(items)) return;
-
-    const profilesMap = getCustomProfiles();
-    let changed = false;
-
-    for (const item of items) {
-      if (!item || !item.nama || !item.nama.trim()) continue;
-      const targetId = findTargetPkkAccountIdForBuku1Member(item);
-      if (targetId) {
-        const cleanNama = item.nama.trim();
-        const existing = profilesMap[targetId];
-        if (!existing || existing.nama !== cleanNama) {
-          saveCustomProfile(targetId, { nama: cleanNama });
-          changed = true;
-        }
-      }
-    }
-
-    if (changed && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('sikepling_profile_updated'));
-    }
-  } catch (e) {
-    console.warn('syncBuku1ToPkkProfiles error:', e);
-  }
-};
 
 export const getEffectiveProfile = (account: UserAccount): UserAccount => {
   if (!account) return account;
   const map = getCustomProfiles();
   const custom = map[account.id];
 
-  // Dynamic Lookup from Buku I items if profile set in Buku 1
-  let dynamicBuku1Name: string | undefined;
-  try {
-    const rawBuku1 = localStorage.getItem('sikepling_pkk_buku_1_v1');
-    if (rawBuku1) {
-      const buku1Items: any[] = JSON.parse(rawBuku1);
-      if (Array.isArray(buku1Items)) {
-        const matched = buku1Items.find((item) => findTargetPkkAccountIdForBuku1Member(item) === account.id);
-        if (matched && matched.nama && matched.nama.trim()) {
-          dynamicBuku1Name = matched.nama.trim();
-        }
-      }
-    }
-  } catch (e) {}
+  // Dynamic Lookup from custom profiles
 
   // Auto-Fix (Self-Healing) for Sekretaris PKK if still using old default names
   if (account.id === 'sekretaris_pkk') {
-    const currentName = custom?.nama || dynamicBuku1Name || account.nama || '';
+    const currentName = custom?.nama || account.nama || '';
     const isOldPlaceholder =
       currentName.includes('Ny. Sekretaris') ||
       currentName === 'Ny. Sekretaris PKK Kelurahan Mangga' ||
@@ -660,7 +589,7 @@ export const getEffectiveProfile = (account: UserAccount): UserAccount => {
   const effectiveNama =
     custom?.nama && String(custom.nama).trim()
       ? String(custom.nama).trim()
-      : dynamicBuku1Name || account.nama;
+      : account.nama;
 
   return {
     ...account,

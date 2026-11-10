@@ -64,9 +64,6 @@ import {
 import {
   fetchSyncAuditLogs,
   SyncAuditLog,
-  saveAttendanceQRToFirestore,
-  subscribeAttendanceQRFromFirestore,
-  AttendanceQREntity,
 } from '../lib/firestoreService';
 import {
   LaporanHarianItem,
@@ -146,7 +143,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
 
   // Tab mode for Monitoring Dashboard: Laporan Harian vs Realisasi PBB vs Akun vs Tugas Khusus
   const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PBB_REALISASI' | 'ACCOUNTS' | 'TUGAS_KHUSUS'>('LAPORAN');
-  const [selectedPresensiDate, setSelectedPresensiDate] = useState<string>(todayIso);
 
   // Tugas Khusus Lurah states
   const [tugasList, setTugasList] = useState<TugasKhusus[]>(() => getTugasKhususList());
@@ -377,41 +373,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
   const [isResetting, setIsResetting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   
-  // Section: Generate QR Apel
-  const [currentQR, setCurrentQR] = useState<AttendanceQREntity | null>(null);
-  const [isGeneratingQR, setIsGeneratingQR] = useState(false);
-  const [copiedWa, setCopiedWa] = useState(false);
-
-  useEffect(() => {
-    const unsub = subscribeAttendanceQRFromFirestore(selectedDate, (qr) => {
-      setCurrentQR(qr);
-    });
-    return () => unsub();
-  }, [selectedDate]);
-
-  const generateApelQR = async () => {
-    setIsGeneratingQR(true);
-    try {
-      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const qrData: AttendanceQREntity = {
-        id: `qr_${selectedDate}`,
-        code: token,
-        expiresAt: new Date(Date.now() + 3600000).toISOString(),
-        active: true,
-        token,
-        tanggal: selectedDate,
-        createdAt: new Date().toISOString(),
-        lat: 3.514234, // Kantor Lurah center
-        lng: 98.633175, // Kantor Lurah center
-      };
-      await saveAttendanceQRToFirestore(qrData);
-    } catch (e) {
-      console.error('Failed to generate QR:', e);
-    } finally {
-      setIsGeneratingQR(false);
-    }
-  };
-
   // States for local device synchronization & backup to Firestore
   const [isDeviceSyncModalOpen, setIsDeviceSyncModalOpen] = useState(false);
   const [deviceSyncProgress, setDeviceSyncProgress] = useState('');
@@ -2335,7 +2296,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                     <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
                       <span className="text-[10px] font-bold text-slate-400 uppercase">Administrasi PKK</span>
                       <span className="text-base font-black text-slate-800">
-                        {deviceBackupStats.pkkKeuanganCount + deviceBackupStats.pkkKegiatanCount + deviceBackupStats.pkkDasaWismaCount} <span className="text-[10px] font-medium text-slate-500">item</span>
+                        {deviceBackupStats.pkkKeuanganCount + deviceBackupStats.pkkKegiatanCount} <span className="text-[10px] font-medium text-slate-500">item</span>
                       </span>
                     </div>
                     <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
@@ -2463,7 +2424,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                         `• Kunjungan: ${res.stats.visits.synced}/${res.stats.visits.total} berhasil\n` +
                         `• PKK Keuangan: ${res.stats.pkkKeuangan.synced}/${res.stats.pkkKeuangan.total} berhasil\n` +
                         `• PKK Kegiatan: ${res.stats.pkkKegiatan.synced}/${res.stats.pkkKegiatan.total} berhasil\n` +
-                        `• Dasa Wisma: ${res.stats.pkkDasaWisma.synced}/${res.stats.pkkDasaWisma.total} berhasil\n` +
                         `• Surat: ${res.stats.surat.synced}/${res.stats.surat.total} berhasil\n` +
                         `• Peta Poligon: ${res.stats.polygons.synced}/${res.stats.polygons.total} berhasil\n` +
                         `• Peta Rumah: ${res.stats.houses.synced}/${res.stats.houses.total} berhasil\n` +

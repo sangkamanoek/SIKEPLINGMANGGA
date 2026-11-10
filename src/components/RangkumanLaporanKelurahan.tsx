@@ -31,7 +31,7 @@ import {
   Activity,
   ArrowUpRight,
 } from 'lucide-react';
-import { LaporanHarianItem, AbsenApelItem, UserAccount, StatusAbsenApel } from '../types';
+import { LaporanHarianItem, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import {
   formatTanggalIndonesia,
@@ -59,24 +59,20 @@ import { consolidateDailyReport } from '../lib/reportConsolidator';
 
 interface RangkumanLaporanKelurahanProps {
   reports: LaporanHarianItem[];
-  attendanceList: AbsenApelItem[];
   kunjunganList: KunjunganWargaData[] | any[];
   currentUser: UserAccount;
   onOpenReportDetail?: (report: LaporanHarianItem) => void;
   onDraftForKepling?: (kepling: UserAccount) => void;
-  onOpenAbsenApel?: () => void;
   onRefreshData?: () => void;
   isRefreshing?: boolean;
 }
 
 export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps> = ({
   reports,
-  attendanceList,
   kunjunganList,
   currentUser,
   onOpenReportDetail,
   onDraftForKepling,
-  onOpenAbsenApel,
   onRefreshData,
   isRefreshing = false,
 }) => {
@@ -240,47 +236,15 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
 
     // 1. Data per hari dalam sepekan (Senin s/d Minggu)
     const dayBreakdown = weekInfo.days.map((day) => {
-      // Absen pada hari ini
-      const dayAttendances = attendanceList.filter((a) => isAttendanceMatchingDate(a, day.dateStr));
       // Laporan pada hari ini
       const dayReports = reports.filter((r) => isReportMatchingDate(r, day.dateStr));
       // Kunjungan pada hari ini
       const dayKunjungan = (effectiveKunjunganList || []).filter((k) => isKunjunganOnDate(k, day.dateStr));
 
-      // Hitung apel hadir (termasuk fallback dari laporan harian)
-      let hadirApelCount = 0;
-      let izinApelCount = 0;
-      let nihilApelCount = 0;
-
-      KEPLING_ACCOUNTS.forEach((kepling) => {
-        let att = dayAttendances.find((a) => isAttendanceMatchingKepling(a, kepling));
-        const rep = dayReports.find((r) => isReportMatchingKepling(r, kepling));
-        if (!att && rep?.absenApel?.status) {
-          att = { status: rep.absenApel.status as any } as any;
-        }
-
-        const st = (att?.status || '').toLowerCase();
-        if (st === 'hadir' || st.includes('hadir')) hadirApelCount++;
-        else if (
-          st === 'izin' ||
-          st === 'sakit' ||
-          st === 'dinas luar' ||
-          st.includes('izin') ||
-          st.includes('sakit') ||
-          st.includes('dinas')
-        )
-          izinApelCount++;
-        else nihilApelCount++;
-      });
-
       return {
         ...day,
-        totalHadirApel: hadirApelCount,
-        totalIzinApel: izinApelCount,
-        totalNihilApel: nihilApelCount,
         totalLaporan: dayReports.length,
         totalKunjungan: dayKunjungan.length,
-        persenApel: Math.round((hadirApelCount / 24) * 100),
         persenLaporan: Math.round((dayReports.length / 24) * 100),
       };
     });
@@ -288,54 +252,6 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     // 2. Data terakumulasi per Kepling sepanjang pekan (24 Kepling)
     const keplingWeeklyList = KEPLING_ACCOUNTS.map((kepling) => {
       const nomor = kepling.nomorLingkungan || 0;
-
-      // Cek kehadiran apel untuk 5 hari kerja (Senin s/d Jumat)
-      const attendancePerDay = weekInfo.workDays.map((day) => {
-        const dayAtts = attendanceList.filter((a) => isAttendanceMatchingDate(a, day.dateStr));
-        let att = dayAtts.find((a) => isAttendanceMatchingKepling(a, kepling));
-
-        // Cek laporan pada hari ini
-        const dayRep = reports.find(
-          (r) =>
-            isReportMatchingDate(r, day.dateStr) &&
-            isReportMatchingKepling(r, kepling)
-        );
-
-        if (!att && dayRep?.absenApel?.status) {
-          att = {
-            status: dayRep.absenApel.status as any,
-            jam: dayRep.absenApel.jam,
-            catatan: dayRep.absenApel.catatan,
-          } as any;
-        }
-
-        const st = (att?.status || '').toLowerCase();
-        const isHadir = st === 'hadir' || st.includes('hadir');
-        const isIzin =
-          st === 'izin' ||
-          st === 'sakit' ||
-          st === 'dinas luar' ||
-          st.includes('izin') ||
-          st.includes('sakit') ||
-          st.includes('dinas');
-
-        return {
-          dateStr: day.dateStr,
-          dayName: day.dayName,
-          shortDay: day.shortDay,
-          hasAttended: isHadir,
-          isIzin,
-          status: att?.status || 'Belum Hadir',
-          jam: att?.jam,
-          hasReport: Boolean(dayRep),
-          report: dayRep,
-        };
-      });
-
-      const totalHadirApel = attendancePerDay.filter((d) => d.hasAttended).length;
-      const totalIzinApel = attendancePerDay.filter((d) => d.isIzin).length;
-      const totalTidakApel = 5 - (totalHadirApel + totalIzinApel);
-      const persenApel = Math.round((totalHadirApel / 5) * 100);
 
       // Kumpulan laporan kepling ini dalam sepekan
       const keplingWeekReports = reports.filter(
@@ -370,20 +286,15 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
 
       // Status Disiplin Mingguan
       let predikat: 'SANGAT_DISIPLIN' | 'BAIK' | 'PERLU_PEMBINAAN' = 'BAIK';
-      if (persenApel >= 80 && persenLaporan >= 80) {
+      if (persenLaporan >= 80) {
         predikat = 'SANGAT_DISIPLIN';
-      } else if (persenApel < 60 || persenLaporan < 60) {
+      } else if (persenLaporan < 60) {
         predikat = 'PERLU_PEMBINAAN';
       }
 
       return {
         kepling,
         nomor,
-        attendancePerDay,
-        totalHadirApel,
-        totalIzinApel,
-        totalTidakApel,
-        persenApel,
         totalLaporan,
         persenLaporan,
         totalKunjungan: keplingWeekKunjungan.length,
@@ -396,12 +307,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     });
 
     // 3. Ringkasan Kelurahan Sepekan
-    const totalTargetApel = 24 * 5; // 120 target hadir apel sepekan
     const totalTargetLaporan = 24 * 5; // 120 target laporan sepekan
-    const totalHadirApelKelurahan = keplingWeeklyList.reduce((acc, k) => acc + k.totalHadirApel, 0);
-    const totalIzinApelKelurahan = keplingWeeklyList.reduce((acc, k) => acc + k.totalIzinApel, 0);
-    const totalTidakApelKelurahan = totalTargetApel - (totalHadirApelKelurahan + totalIzinApelKelurahan);
-    const persenKehadiranApel = Math.round((totalHadirApelKelurahan / totalTargetApel) * 100);
 
     const totalLaporanMasuk = keplingWeeklyList.reduce((acc, k) => acc + k.totalLaporan, 0);
     const persenLaporanMasuk = Math.round((totalLaporanMasuk / totalTargetLaporan) * 100);
@@ -425,11 +331,6 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       weekInfo,
       dayBreakdown,
       keplingWeeklyList,
-      totalTargetApel,
-      totalHadirApelKelurahan,
-      totalIzinApelKelurahan,
-      totalTidakApelKelurahan,
-      persenKehadiranApel,
       totalTargetLaporan,
       totalLaporanMasuk,
       persenLaporanMasuk,
@@ -445,7 +346,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       topDisiplin,
       perluPembinaan,
     };
-  }, [weekInfo, attendanceList, reports, kunjunganList]);
+  }, [weekInfo, reports, kunjunganList]);
 
   // Filter Kepling List Mingguan Berdasarkan Search & Filter Kepatuhan
   const filteredWeeklyKeplingList = useMemo(() => {
@@ -466,14 +367,6 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     });
   }, [weeklyStats, weeklyKepatuhanFilter, weeklySearchQuery]);
 
-  // 1. Filter Absensi Apel Pagi pada selectedDate dengan matcher fleksibel
-  const attendanceOnDate = useMemo(() => {
-    return attendanceList.filter((item) => {
-      if (!item) return false;
-      return isAttendanceMatchingDate(item, selectedDate);
-    });
-  }, [attendanceList, selectedDate]);
-
   // 2. Filter Laporan Kinerja pada selectedDate
   const reportsOnDate = useMemo(() => {
     return reports.filter((r) => isReportMatchingDate(r, selectedDate));
@@ -489,36 +382,11 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     return KEPLING_ACCOUNTS.map((kepling) => {
       const nomor = kepling.nomorLingkungan || 0;
 
-      // Cari dan otomatis gabungkan seluruh laporan kinerja Kepling pada tanggal ini
+      // Cari Presensi Apel di reports (fallback)
       const matchingReports = reportsOnDate.filter((r) => isReportMatchingKepling(r, kepling));
       const laporan = matchingReports.length > 0
         ? matchingReports.reduce((acc, curr) => consolidateDailyReport(acc, curr))
         : undefined;
-
-      // Cari Presensi Apel di attendanceList dengan pencocokan fuzzy (ID, nomor, lingkungan, nama)
-      let absen = attendanceOnDate.find((a) => isAttendanceMatchingKepling(a, kepling));
-
-      // 🛡️ FALLBACK UTAMA: Jika belum ada entri mandiri di attendanceList, namun Kepling
-      // sudah mengirimkan laporan harian (yang di dalamnya memuat presensi apel pagi),
-      // otomatis gunakan data presensi apel dari laporan tersebut agar tidak pernah hilang / false NIHIL!
-      if (!absen && laporan?.absenApel && laporan.absenApel.status) {
-        absen = {
-          id: `absen_report_${kepling.id}_${selectedDate}`,
-          accountId: kepling.id,
-          namaKepling: laporan.namaKepling || kepling.nama,
-          lingkungan: kepling.lingkungan,
-          nomorLingkungan: nomor,
-          tanggal: selectedDate,
-          jam: laporan.absenApel.jam || '07:35 WIB',
-          waktuLengkap: laporan.absenApel.waktuLengkap || laporan.createdAt || new Date().toISOString(),
-          status: (laporan.absenApel.status as StatusAbsenApel) || 'Hadir',
-          fotoSelfieUrl: laporan.absenApel.fotoSelfieUrl || '',
-          lokasiGps: laporan.absenApel.lokasiGps || 'Halaman Kantor Kelurahan Mangga (GPS)',
-          catatan: laporan.absenApel.catatan || '',
-          createdAt: laporan.createdAt || new Date().toISOString(),
-          updatedAt: laporan.createdAt || new Date().toISOString(),
-        };
-      }
 
       // Cari Kunjungan Warga
       let kunjungan = kunjunganOnDate.filter((k) => isKunjunganMatchingKepling(k, kepling));
@@ -549,33 +417,17 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
         }
       }
 
-      const statusLower = (absen?.status || '').toLowerCase().trim();
-      const isApelHadir = Boolean(absen && (statusLower === 'hadir' || statusLower.includes('hadir')));
-      const isApelIzinSakitDinas = Boolean(
-        absen &&
-        (statusLower === 'izin' ||
-          statusLower === 'sakit' ||
-          statusLower === 'dinas luar' ||
-          statusLower.includes('izin') ||
-          statusLower.includes('sakit') ||
-          statusLower.includes('dinas'))
-      );
-      const isApelNihil = !absen || statusLower.includes('tidak');
       const isMelapor = Boolean(laporan);
 
       return {
         kepling,
         nomor,
-        absen,
-        isApelHadir,
-        isApelIzinSakitDinas,
-        isApelNihil,
         laporan,
         isMelapor,
         kunjungan: Array.isArray(kunjungan) ? kunjungan : [],
       };
     });
-  }, [attendanceOnDate, reportsOnDate, kunjunganOnDate, selectedDate]);
+  }, [reportsOnDate, kunjunganOnDate, selectedDate]);
 
   // Filter Kepling Berdasarkan Status & Search
   const filteredKeplingList = useMemo(() => {
@@ -600,20 +452,6 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       return true;
     });
   }, [consolidatedKeplingData, filterStatus, searchQuery]);
-
-  // Daftar Kepling Hadir Apel, Izin/Sakit/DL, & Tidak Hadir Apel
-  const keplingHadirApel = useMemo(
-    () => consolidatedKeplingData.filter((item) => item.isApelHadir),
-    [consolidatedKeplingData]
-  );
-  const keplingIzinSakitDinas = useMemo(
-    () => consolidatedKeplingData.filter((item) => item.isApelIzinSakitDinas),
-    [consolidatedKeplingData]
-  );
-  const keplingTidakApel = useMemo(
-    () => consolidatedKeplingData.filter((item) => item.isApelNihil),
-    [consolidatedKeplingData]
-  );
 
   // Akumulasi Total Kelurahan
   const totalStats = useMemo(() => {
@@ -648,16 +486,10 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
 
     const totalMelapor = consolidatedKeplingData.filter((k) => k.isMelapor).length;
     const totalNihil = consolidatedKeplingData.length - totalMelapor;
-    const totalHadirApel = keplingHadirApel.length;
-    const totalIzinSakitDinas = keplingIzinSakitDinas.length;
-    const totalTidakApel = keplingTidakApel.length;
 
     return {
       totalMelapor,
       totalNihil,
-      totalHadirApel,
-      totalIzinSakitDinas,
-      totalTidakApel,
       totalPbbWp,
       totalPerlinsosKk,
       totalPerlinsosMenolak,
@@ -668,7 +500,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       totalInfrastrukturTemuan,
       totalKunjunganWarga,
     };
-  }, [consolidatedKeplingData, keplingHadirApel, keplingIzinSakitDinas, keplingTidakApel]);
+  }, [consolidatedKeplingData]);
 
   // Generator Salin Format WhatsApp Rangkuman Kelurahan
   const handleCopyWhatsApp = () => {
@@ -681,44 +513,8 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     lines.push('────────────────────────────');
     lines.push('');
 
-    // I. PRESENSI APEL PAGI
-    lines.push(`*I. PRESENSI APEL PAGI (24 KEPALA LINGKUNGAN)*`);
-    lines.push(`🟢 *Hadir Apel (${totalStats.totalHadirApel} Kepling):*`);
-    if (keplingHadirApel.length > 0) {
-      keplingHadirApel.forEach((it, idx) => {
-        const jamStr = it.absen?.jam ? ` (${it.absen.jam})` : '';
-        lines.push(`   ${idx + 1}. ${it.kepling.lingkungan} - ${it.kepling.nama}${jamStr}`);
-      });
-    } else {
-      lines.push(`   - NIHIL (Tidak ada kehadiran apel tercatat)`);
-    }
-
-    if (totalStats.totalIzinSakitDinas > 0) {
-      lines.push('');
-      lines.push(`🟡 *Izin / Sakit / Dinas Luar (${totalStats.totalIzinSakitDinas} Kepling):*`);
-      keplingIzinSakitDinas.forEach((it, idx) => {
-        const statusLabel = it.absen?.status || 'Izin';
-        const ketStr = it.absen?.catatan ? ` [${it.absen.catatan}]` : '';
-        lines.push(`   ${idx + 1}. ${it.kepling.lingkungan} - ${it.kepling.nama} (${statusLabel})${ketStr}`);
-      });
-    }
-
-    lines.push('');
-    lines.push(`🔴 *Tidak Hadir Apel / NIHIL (${totalStats.totalTidakApel} Kepling):*`);
-    if (keplingTidakApel.length > 0) {
-      keplingTidakApel.forEach((it, idx) => {
-        const ket = it.absen?.catatan ? ` [${it.absen.catatan}]` : ' [NIHIL / Belum Hadir]';
-        lines.push(`   ${idx + 1}. ${it.kepling.lingkungan} - ${it.kepling.nama}${ket}`);
-      });
-    } else {
-      lines.push(`   - NIHIL (Seluruh Kepling Telah Hadir/Tercatat)`);
-    }
-
-    lines.push('');
-    lines.push('────────────────────────────');
-    
-    // TOTAL KUNJUNGAN PER LINGKUNGAN
-    lines.push(`*TOTAL KUNJUNGAN WARGA PER LINGKUNGAN:*`);
+    // I. TOTAL KUNJUNGAN PER LINGKUNGAN
+    lines.push(`*I. TOTAL KUNJUNGAN WARGA PER LINGKUNGAN:*`);
     lines.push(``);
     consolidatedKeplingData.forEach((it) => {
       if (it.kunjungan.length > 0) {
@@ -740,15 +536,6 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
 
     consolidatedKeplingData.forEach((it) => {
       lines.push(`*📍 ${String(it.kepling.lingkungan || '').toUpperCase()} - ${it.kepling.nama || ''}*`);
-
-      // Status Apel
-      if (it.isApelHadir) {
-        lines.push(`   • Apel Pagi: Hadir${it.absen?.jam ? ` (${it.absen.jam})` : ''}`);
-      } else if (it.isApelIzinSakitDinas) {
-        lines.push(`   • Apel Pagi: ${it.absen?.status || 'Izin'}${it.absen?.catatan ? ` [${it.absen.catatan}]` : ''}`);
-      } else {
-        lines.push(`   • Apel Pagi: *NIHIL (Belum Hadir)*`);
-      }
 
       // Kinerja Harian
       if (it.laporan) {
@@ -807,11 +594,6 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
 
     // III. TOTAL REKAPITULASI KELURAHAN
     lines.push(`*III. TOTAL REKAPITULASI KELURAHAN MANGGA*`);
-    lines.push(`👥 Kepling Hadir Apel  : ${totalStats.totalHadirApel} / 24`);
-    if (totalStats.totalIzinSakitDinas > 0) {
-      lines.push(`🟡 Kepling Izin/Sakit/DL: ${totalStats.totalIzinSakitDinas} / 24`);
-    }
-    lines.push(`⚠️ Kepling Tidak Apel   : ${totalStats.totalTidakApel} / 24 (NIHIL)`);
     lines.push(`📑 Kepling Melapor      : ${totalStats.totalMelapor} / 24`);
     lines.push(`❌ Kepling NIHIL        : ${totalStats.totalNihil} / 24`);
     lines.push(`🏠 Total Kunjungan Warga: ${totalStats.totalKunjunganWarga} Warga`);
@@ -918,7 +700,6 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     lines.push(`*I. RINGKASAN INDIKATOR UTAMA SEPEKAN:*`);
     lines.push(`• Total Kunjungan Warga : *${weeklyStats.totalKunjunganWarga} Warga* (${weeklyStats.totalKeplingAktifKunjungan}/24 Kepling aktif)`);
     lines.push(`• Total Laporan Masuk   : *${weeklyStats.totalLaporanMasuk} / ${weeklyStats.totalTargetLaporan} Laporan* (${weeklyStats.persenLaporanMasuk}%)`);
-    lines.push(`• Kehadiran Apel Pagi   : *${weeklyStats.persenKehadiranApel}%* (Hadir: ${weeklyStats.totalHadirApelKelurahan}, Izin/DL: ${weeklyStats.totalIzinApelKelurahan}, Nihil: ${weeklyStats.totalTidakApelKelurahan})`);
     lines.push(`• Capaian Sektoral:`);
     lines.push(`  - Opsir PBB            : ${weeklyStats.totalPbbWp} WP`);
     lines.push(`  - Perlinsos            : ${weeklyStats.totalPerlinsosKk} KK`);
@@ -927,7 +708,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
     lines.push('');
     lines.push(`*II. TREN HARIAN (SENIN - MINGGU):*`);
     weeklyStats.dayBreakdown.forEach((d) => {
-      lines.push(`• ${d.dayName}, ${d.formatted}: Apel ${d.totalHadirApel}/24 (${d.persenApel}%) | Laporan ${d.totalLaporan}/24 | Kunjungan ${d.totalKunjungan} Warga`);
+      lines.push(`• ${d.dayName}, ${d.formatted}: Laporan ${d.totalLaporan}/24 | Kunjungan ${d.totalKunjungan} Warga`);
     });
     lines.push('');
     lines.push(`*III. TOP 3 KEPLING TERAKTIF KUNJUNGAN:*`);
@@ -998,7 +779,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
               Rangkuman Laporan Kelurahan (24 Kepling)
             </h1>
             <p className="text-white/95 font-medium text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-              Rangkuman seluruh laporan kinerja harian 24 Kepala Lingkungan, presensi apel pagi, dan kegiatan kunjungan sambang warga. Bagi kepling yang tidak melapor ditampilkan berstatus <strong>NIHIL</strong> secara transparan.
+              Rangkuman seluruh laporan kinerja harian 24 Kepala Lingkungan dan kegiatan kunjungan sambang warga. Bagi kepling yang tidak melapor ditampilkan berstatus <strong>NIHIL</strong> secara transparan.
             </p>
           </div>
 
@@ -1237,35 +1018,7 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
       {viewMode === 'HARIAN' && (
         <>
           {/* KPI Highlight Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Card 1: Presensi Apel Pagi */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-              Presensi Apel Pagi
-            </span>
-            <div className="p-2 rounded-xl bg-teal-50 text-teal-700">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-slate-900">
-              {totalStats.totalHadirApel}
-            </span>
-            <span className="text-xs font-bold text-slate-600">/ 24 Hadir</span>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-xs pt-2 border-t border-slate-100">
-            <span className="text-emerald-700 font-bold">🟢 Hadir: {totalStats.totalHadirApel}</span>
-            {totalStats.totalIzinSakitDinas > 0 && (
-              <span className="text-amber-700 font-bold">🟡 Izin/DL: {totalStats.totalIzinSakitDinas}</span>
-            )}
-            <span className="text-rose-700 font-black">
-              🔴 Tidak Apel: {totalStats.totalTidakApel} (NIHIL)
-            </span>
-          </div>
-        </div>
-
-        {/* Card 2: Laporan Kinerja Masuk */}
+        {/* Card 1: Laporan Kinerja Masuk */}
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
@@ -1289,266 +1042,9 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
           </div>
         </div>
 
-        {/* Card 3: Kunjungan Warga Sambang */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-              Kunjungan Sambang Warga
-            </span>
-            <div className="p-2 rounded-xl bg-blue-50 text-blue-700">
-              <Users className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-black text-blue-800">
-              {totalStats.totalKunjunganWarga}
-            </span>
-            <span className="text-xs font-bold text-slate-600">Warga Terdata</span>
-          </div>
-          <div className="mt-2 text-xs pt-2 border-t border-slate-100 text-slate-600">
-            <span>
-              Dari{' '}
-              <strong className="text-slate-800">
-                {consolidatedKeplingData.filter((k) => (k.kunjungan || []).length > 0).length}
-              </strong>{' '}
-              lingkungan aktif
-            </span>
-          </div>
-        </div>
-
-        {/* Card 4: Total Capaian Sektoral */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-              Akumulasi Sektoral
-            </span>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
-              <Sparkles className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
-            <div className="bg-slate-50 p-1.5 rounded-lg">
-              <span className="text-slate-600 block text-[10px]">PBB:</span>
-              <strong className="text-emerald-800 font-black">{totalStats.totalPbbWp} WP</strong>
-            </div>
-            <div className="bg-slate-50 p-1.5 rounded-lg">
-              <span className="text-slate-600 block text-[10px]">Perlinsos:</span>
-              <strong className="text-teal-800 font-black">{totalStats.totalPerlinsosKk} KK</strong>
-            </div>
-            <div className="bg-slate-50 p-1.5 rounded-lg">
-              <span className="text-slate-600 block text-[10px]">IKD:</span>
-              <strong className="text-blue-800 font-black">{totalStats.totalIkdOrang} Org</strong>
-            </div>
-            <div className="bg-slate-50 p-1.5 rounded-lg">
-              <span className="text-slate-600 block text-[10px]">BPJS:</span>
-              <strong className="text-purple-800 font-black">{totalStats.totalBpjsOrang} Org</strong>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* BAGIAN I: DAFTAR PRESENSI APEL PAGI (24 KEPALA LINGKUNGAN) */}
-      {/* ========================================================================= */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
-          <div>
-            <div className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-800 uppercase tracking-wider">
-              <Clock className="w-4 h-4 text-emerald-700" />
-              Bagian I: Presensi Apel Pagi (24 Kepala Lingkungan)
-            </div>
-            <h2 className="text-base sm:text-lg font-black text-slate-900">
-              Daftar Kepling Hadir Apel &amp; Tidak Apel (NIHIL)
-            </h2>
-          </div>
 
-          <div className="text-xs font-bold text-slate-600 flex flex-wrap items-center gap-2 sm:gap-3">
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-black">
-              ✓ Hadir: {keplingHadirApel.length}
-            </span>
-            {keplingIzinSakitDinas.length > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-black">
-                🟡 Izin/Sakit/DL: {keplingIzinSakitDinas.length}
-              </span>
-            )}
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black">
-              ✕ Tidak Apel: {keplingTidakApel.length} (NIHIL)
-            </span>
-          </div>
-        </div>
-
-        <div className={`grid gap-4 ${keplingIzinSakitDinas.length > 0 ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
-          {/* Kolom Hadir Apel */}
-          <div className="bg-emerald-50/60 rounded-2xl p-4 border border-emerald-200">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <h3 className="text-xs font-black uppercase tracking-wider text-emerald-950">
-                  Daftar Kepling Hadir Apel ({keplingHadirApel.length})
-                </h3>
-              </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-200/80 text-emerald-900">
-                Presensi Masuk
-              </span>
-            </div>
-
-            {keplingHadirApel.length > 0 ? (
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {keplingHadirApel.map((item, idx) => (
-                  <div
-                    key={item.kepling.id}
-                    className="bg-white p-2.5 rounded-xl border border-emerald-100 flex items-center justify-between gap-2 shadow-3xs"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-900 truncate">
-                          {item.kepling.lingkungan}
-                        </div>
-                        <div className="text-[11px] text-slate-600 truncate">
-                          {item.kepling.nama}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-                        <Clock className="w-3 h-3 text-emerald-600" />
-                        {item.absen?.jam || 'Hadir'}
-                      </span>
-                      {item.absen?.lokasiGps && (
-                        <div className="text-[9px] text-slate-500 flex items-center justify-end gap-0.5 mt-0.5">
-                          <MapPin className="w-2.5 h-2.5 text-emerald-600" />
-                          GPS Terverifikasi
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-6 text-center text-xs font-bold text-emerald-800 bg-white/60 rounded-xl border border-emerald-100">
-                Belum ada data presensi hadir apel tercatat pada tanggal ini.
-              </div>
-            )}
-          </div>
-
-          {/* Kolom Izin / Sakit / Dinas Luar (Hanya jika ada) */}
-          {keplingIzinSakitDinas.length > 0 && (
-            <div className="bg-amber-50/70 rounded-2xl p-4 border border-amber-200">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-amber-950">
-                    Izin / Sakit / Dinas Luar ({keplingIzinSakitDinas.length})
-                  </h3>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-200 text-amber-900">
-                  Tercatat Disertai Alasan
-                </span>
-              </div>
-
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {keplingIzinSakitDinas.map((item, idx) => (
-                  <div
-                    key={item.kepling.id}
-                    className="bg-white p-2.5 rounded-xl border border-amber-200 flex items-center justify-between gap-2 shadow-3xs"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-900 truncate">
-                          {item.kepling.lingkungan}
-                        </div>
-                        <div className="text-[11px] text-slate-600 truncate">
-                          {item.kepling.nama}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-900 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200">
-                        <Clock className="w-3 h-3 text-amber-600" />
-                        {item.absen?.status || 'Izin'}
-                      </span>
-                      {item.absen?.catatan && (
-                        <div
-                          className="text-[9px] text-slate-600 italic mt-0.5 max-w-[130px] truncate"
-                          title={item.absen.catatan}
-                        >
-                          {item.absen.catatan}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Kolom Tidak Hadir Apel (NIHIL) */}
-          <div className="bg-rose-50/60 rounded-2xl p-4 border border-rose-200">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                <h3 className="text-xs font-black uppercase tracking-wider text-rose-950">
-                  Daftar Kepling Tidak Apel / Belum Hadir ({keplingTidakApel.length})
-                </h3>
-              </div>
-              <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-rose-200 text-rose-900">
-                STATUS: NIHIL
-              </span>
-            </div>
-
-            {keplingTidakApel.length > 0 ? (
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {keplingTidakApel.map((item, idx) => (
-                  <div
-                    key={item.kepling.id}
-                    className="bg-white p-2.5 rounded-xl border border-rose-100 flex items-center justify-between gap-2 shadow-3xs"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-5 h-5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-black flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-900 truncate">
-                          {item.kepling.lingkungan}
-                        </div>
-                        <div className="text-[11px] text-slate-600 truncate">
-                          {item.kepling.nama}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-800 bg-rose-100 px-2 py-0.5 rounded-lg border border-rose-200">
-                        <AlertTriangle className="w-3 h-3 text-rose-600" />
-                        {item.absen?.status && String(item.absen.status).toLowerCase() !== 'hadir'
-                          ? String(item.absen.status).toUpperCase()
-                          : 'NIHIL'}
-                      </span>
-                      {item.absen?.catatan && (
-                        <div className="text-[9px] text-slate-500 italic mt-0.5 max-w-[120px] truncate">
-                          {item.absen.catatan}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-6 text-center text-xs font-bold text-emerald-800 bg-white/60 rounded-xl border border-emerald-100">
-                🎉 Luar biasa! Seluruh 24 Kepala Lingkungan hadir apel pagi lengkap.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* ========================================================================= */}
       {/* BAGIAN II: RANGKUMAN DETAIL 24 KEPALA LINGKUNGAN */}
@@ -1671,28 +1167,6 @@ export const RangkumanLaporanKelurahan: React.FC<RangkumanLaporanKelurahanProps>
 
                   {/* Status Badges & Quick Action */}
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Badge Apel */}
-                    {item.isApelHadir ? (
-                      <span
-                        className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200"
-                        title={item.absen?.catatan || 'Hadir Tepat Waktu'}
-                      >
-                        <Clock className="w-3 h-3 text-emerald-600" />
-                        Apel: Hadir ({item.absen?.jam || '07:35 WIB'})
-                      </span>
-                    ) : item.isApelIzinSakitDinas ? (
-                      <span
-                        className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300"
-                        title={item.absen?.catatan || ''}
-                      >
-                        <Clock className="w-3 h-3 text-amber-700" />
-                        Apel: {item.absen?.status || 'Izin'}{item.absen?.catatan ? ` [${item.absen.catatan}]` : ''}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-lg bg-rose-100 text-rose-800 border border-rose-200">
-                        Apel: NIHIL
-                      </span>
-                    )}
 
                     {/* Badge Status Laporan */}
                     {item.isMelapor ? (

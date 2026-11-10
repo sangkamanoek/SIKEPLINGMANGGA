@@ -4,6 +4,7 @@ import { cleanFirestoreData } from './firestoreService';
 import { getLocalTransaksiPkk, KEUANGAN_COLLECTION } from './pkkKeuanganService';
 import { getLocalPkkKegiatanList, PKK_KEGIATAN_COLLECTION } from './pkkKegiatanService';
 import { getLocalDasaWismaList, PKK_DASA_WISMA_COLLECTION } from './pkkDasaWismaService';
+
 import { safeGetLocalStorage } from './safeStorage';
 import { PkkBuku1Anggota, PkkBuku4Notulen, PkkBuku5Inventaris } from './pkkBukuService';
 
@@ -16,6 +17,7 @@ export const syncPkkDeviceDataToLiveFirestore = async (
     pkkKeuangan: { synced: 0, total: 0 },
     pkkKegiatan: { synced: 0, total: 0 },
     pkkDasaWisma: { synced: 0, total: 0 },
+
     buku1: { synced: 0, total: 0 },
     buku4: { synced: 0, total: 0 },
     buku5: { synced: 0, total: 0 },
@@ -49,6 +51,8 @@ export const syncPkkDeviceDataToLiveFirestore = async (
       await setDoc(doc(db, PKK_DASA_WISMA_COLLECTION, item.id), cleanFirestoreData(item), { merge: true });
       stats.pkkDasaWisma.synced++;
     }
+
+
 
     // Buku 1, 4, 5
     onProgress('Menyinkronkan Buku Administrasi...');
@@ -94,7 +98,7 @@ export const getPkkDeviceDataSnapshot = async () => {
   return {
     pkkKeuangan: getLocalTransaksiPkk(),
     pkkKegiatan: getLocalPkkKegiatanList(),
-    dawis: getLocalDasaWismaList(),
+
     buku1: safeGetLocalStorage<PkkBuku1Anggota[]>('sikepling_pkk_buku_1_v1', []),
     buku4: safeGetLocalStorage<PkkBuku4Notulen[]>('sikepling_pkk_buku_4_v1', []),
     buku5: safeGetLocalStorage<PkkBuku5Inventaris[]>('sikepling_pkk_buku_5_v1', []),

@@ -39,9 +39,7 @@ import {
   subscribePkkKegiatan,
   POKJA_LABELS,
 } from '../lib/pkkKegiatanService';
-import {
-  subscribeDasaWisma,
-} from '../lib/pkkDasaWismaService';
+
 import {
   syncPkkDeviceDataToLiveFirestore,
   getPkkDeviceDataSnapshot,
@@ -49,7 +47,7 @@ import {
 
 interface PkkHubDashboardProps {
   currentUser: UserAccount;
-  onNavigateTab: (tab: 'keuangan_pkk' | 'kegiatan_pkk' | 'dasa_wisma' | 'posyandu_pkk') => void;
+  onNavigateTab: (tab: 'keuangan_pkk' | 'kegiatan_pkk' | 'posyandu_pkk') => void;
   onOpenUpdateModal?: () => void;
 }
 
@@ -68,7 +66,6 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
 }) => {
   const [transaksiList, setTransaksiList] = useState<any[]>([]);
   const [kegiatanList, setKegiatanList] = useState<any[]>([]);
-  const [dawisList, setDawisList] = useState<any[]>([]);
   const [activePokjaInfo, setActivePokjaInfo] = useState<'I' | 'II' | 'III' | 'IV'>('I');
 
   const [isPkkSyncModalOpen, setIsPkkSyncModalOpen] = useState(false);
@@ -106,11 +103,9 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
   useEffect(() => {
     const unsub1 = subscribePkkKeuangan((items) => setTransaksiList(items));
     const unsub2 = subscribePkkKegiatan((items) => setKegiatanList(items));
-    const unsub3 = subscribeDasaWisma((items) => setDawisList(items));
     return () => {
       unsub1();
       unsub2();
-      unsub3();
     };
   }, []);
 
@@ -126,20 +121,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
     return { totalPenerimaan, totalPengeluaran, saldoKas };
   }, [transaksiList]);
 
-  // Dawis Stats
-  const dawisStats = useMemo(() => {
-    let totalKk = 0;
-    let totalJiwa = 0;
-    let totalBalita = 0;
-    let totalLansia = 0;
-    dawisList.forEach((d) => {
-      totalKk += d.jumlahKk || 0;
-      totalJiwa += d.jumlahJiwa || 0;
-      totalBalita += d.jumlahBalita || 0;
-      totalLansia += d.jumlahLansia || 0;
-    });
-    return { totalKk, totalJiwa, totalBalita, totalLansia, totalKelompok: dawisList.length };
-  }, [dawisList]);
+
 
   // Determine user title badge
   const userRoleLabel = useMemo(() => {
@@ -180,7 +162,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
               <span className="text-amber-300">{currentUser.nama}</span>
             </h1>
             <p className="text-xs sm:text-sm text-tosca-100 max-w-2xl leading-relaxed">
-              SI-MANGGA • Sistem Informasi & Administrasi Kelurahan Mangga. Mengelola Buku Kas Umum, Laporan 4 Pokja, Pendataan Dasa Wisma, dan Integrasi Posyandu di 24 Lingkungan.
+              SI-MANGGA • Sistem Informasi & Administrasi Kelurahan Mangga. Mengelola Buku Kas Umum, Laporan 4 Pokja, dan Integrasi Posyandu di 24 Lingkungan.
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <span className="px-2.5 py-0.5 rounded-lg bg-tosca-900/60 border border-tosca-500/40 text-[11px] font-bold text-tosca-200">
@@ -311,33 +293,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
           </div>
         </div>
 
-        {/* Module 3: Dasa Wisma */}
-        <div
-          onClick={() => onNavigateTab('dasa_wisma')}
-          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-pkk-teal shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
-        >
-          <div className="absolute top-0 right-0 w-24 h-24 bg-pkk-light/30 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
-          <div>
-            <div className="w-12 h-12 rounded-xl bg-pkk-light text-pkk-teal flex items-center justify-center mb-4 group-hover:bg-pkk-teal group-hover:text-white transition-colors">
-              <Users className="w-6 h-6" />
-            </div>
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="text-base font-bold text-slate-900 group-hover:text-pkk-teal transition-colors">
-                Data Dasa Wisma
-              </h2>
-              <span className="text-[10px] font-black text-pkk-teal bg-pkk-light px-2 py-0.5 rounded-full border border-pkk-teal/20">
-                {dawisStats.totalKelompok} Dasa Wisma
-              </span>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed mb-4">
-              Database kelompok Dasa Wisma binaan PKK di 24 lingkungan. Rekap data keluarga, ibu hamil, balita, lansia, jamban sehat, dan pekarangan toga.
-            </p>
-          </div>
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-pkk-teal group-hover:translate-x-1 transition-transform">
-            <span>Buka Data Dasa Wisma</span>
-            <ChevronRight className="w-4 h-4" />
-          </div>
-        </div>
+
 
         {/* Module 4: Laporan Posyandu (Pokja IV) */}
         <div
@@ -715,7 +671,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
               <div className="p-3.5 bg-tosca-50 border border-tosca-100 text-tosca-900 rounded-xl space-y-1.5 leading-relaxed">
                 <p className="font-bold">🌸 Penyelarasan Data PKK ke Cloud Firestore</p>
                 <p>
-                  Fitur ini menyinkronkan seluruh pencatatan administrasi PKK (Keuangan, Kegiatan 4 Pokja, Dasa Wisma, Buku 1 Anggota, Buku 4 Notulen, Buku 5 Inventaris, dan Laporan Posyandu) dari perangkat Anda ke Database Live Cloud.
+                  Fitur ini menyinkronkan seluruh pencatatan administrasi PKK (Keuangan, Kegiatan 4 Pokja, Buku 1 Anggota, Buku 4 Notulen, Buku 5 Inventaris, dan Laporan Posyandu) dari perangkat Anda ke Database Live Cloud.
                 </p>
               </div>
 
@@ -750,10 +706,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                       <span className="text-[10px] font-bold text-slate-400 uppercase">PKK Kegiatan</span>
                       <span className="text-base font-black text-slate-800">{pkkDeviceStats.pkkKegiatan.length} <span className="text-[10px] font-medium text-slate-500">item</span></span>
                     </div>
-                    <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">Dasa Wisma</span>
-                      <span className="text-base font-black text-slate-800">{pkkDeviceStats.dawis.length} <span className="text-[10px] font-medium text-slate-500">kelompok</span></span>
-                    </div>
+
                     <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl flex flex-col justify-center">
                       <span className="text-[10px] font-bold text-slate-400 uppercase">Buku I Anggota</span>
                       <span className="text-base font-black text-slate-800">{pkkDeviceStats.buku1.length} <span className="text-[10px] font-medium text-slate-500">orang</span></span>
@@ -810,7 +763,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                         `${res.message}\n\n` +
                         `• PKK Keuangan: ${res.stats.pkkKeuangan.synced}/${res.stats.pkkKeuangan.total} berhasil\n` +
                         `• PKK Kegiatan: ${res.stats.pkkKegiatan.synced}/${res.stats.pkkKegiatan.total} berhasil\n` +
-                        `• Dasa Wisma: ${res.stats.pkkDasaWisma.synced}/${res.stats.pkkDasaWisma.total} berhasil\n` +
+
                         `• Buku I Anggota: ${res.stats.buku1.synced}/${res.stats.buku1.total} berhasil\n` +
                         `• Buku IV Notulen: ${res.stats.buku4.synced}/${res.stats.buku4.total} berhasil\n` +
                         `• Buku V Inventaris: ${res.stats.buku5.synced}/${res.stats.buku5.total} berhasil\n` +

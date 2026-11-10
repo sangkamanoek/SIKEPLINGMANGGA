@@ -212,7 +212,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
 
       <div>
         <label className="block text-slate-800 font-bold mb-1">
-          Nama Warga (Kepala Keluarga / Warga) <span className="text-rose-600">*</span>:
+          Nama Warga <span className="text-rose-600">*</span>:
         </label>
         <input
           type="text"

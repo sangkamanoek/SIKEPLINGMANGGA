@@ -110,7 +110,6 @@ import { SpptPbbItem } from '../data/pbbSampleData';
 
 export type LeaderboardSortCriterion =
   | 'KOMPOSIT'
-  | 'APEL'
   | 'KEGIATAN'
   | 'PERLINSOS'
   | 'PBB'
@@ -591,9 +590,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     });
   }, [reports, period, now]);
 
-  // 2. Filter Apel Pagi records strictly by selected period
-
-
+  // 2. (Removed Attendance logic)
   // 3. Filter Event Attendance by selected period
   const filteredEventAttendanceByPeriod = useMemo(() => {
     return (eventAttendanceList || []).filter((e) => {
@@ -738,8 +735,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   }, [effectiveKunjunganList, period, isCumulativePeriod, now]);
 
   // Aggregasi untuk Seluruh 24 Kepling (7 Kriteria Kinerja Terpadu)
-  const filteredAttendanceByPeriod = [];
-  const distinctApelDatesInPeriod = [];
+
 
   const keplingSummaryList = useMemo(() => {
     // Dynamic Poskamling target based on period:
@@ -901,8 +897,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         // Skor Komposit
         compositeScore,
         compositeScoreDecimal,
-        apelPercentage: 100,
-        totalApelHadir: 0,
+
         score: compositeScore,
         isPerlinsosOverridden: effective.isPerlinsosOverridden,
         isOverridden: effective.isOverridden,
@@ -916,8 +911,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     filteredReportsByPeriod,
     reportedStatsMap,
     targetsMap,
-    filteredAttendanceByPeriod,
-    distinctApelDatesInPeriod,
     filteredEventAttendanceByPeriod,
     filteredCustomEventsByPeriod,
     filteredKunjunganByPeriod,
@@ -930,10 +923,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   // Sorted leaderboard - Mendukung Pengurutan Komposit 7 Kriteria & Kriteria Spesifik
   const sortedLeaderboard = useMemo(() => {
     return [...keplingSummaryList].sort((a, b) => {
-      if (leaderboardSort === 'APEL') {
-        if (b.apelPercentage !== a.apelPercentage) return b.apelPercentage - a.apelPercentage;
-        if (b.totalApelHadir !== a.totalApelHadir) return b.totalApelHadir - a.totalApelHadir;
-      } else if (leaderboardSort === 'KEGIATAN') {
+      if (leaderboardSort === 'KEGIATAN') {
         if (b.kegiatanPercentage !== a.kegiatanPercentage) return b.kegiatanPercentage - a.kegiatanPercentage;
         if (b.kegiatanHadir !== a.kegiatanHadir) return b.kegiatanHadir - a.kegiatanHadir;
       } else if (leaderboardSort === 'PERLINSOS') {
@@ -1055,7 +1045,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     let totalBpjs = 0;
     let totalTargetBpjs = 0;
     let totalKunjunganSum = 0;
-    let totalApelHadir = 0;
     let totalReports = filteredReportsByPeriod.length;
 
     keplingSummaryList.forEach((item) => {
@@ -1066,7 +1055,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       totalBpjs += item.bpjs;
       totalTargetBpjs += item.targetBpjs;
       totalKunjunganSum += item.totalKunjungan;
-      totalApelHadir += item.totalApelHadir;
     });
 
     const allTimeKunjunganCount = effectiveKunjunganList.length;
@@ -1089,11 +1077,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         ? Math.round((totalKunjungan / totalTargetPerlinsos) * 100)
         : 0;
 
-    const totalApelSessions = distinctApelDatesInPeriod.length > 0 ? distinctApelDatesInPeriod.length : 1;
-    const totalExpectedApel = totalApelSessions * 24;
-    const apelRatePercentage =
-      totalExpectedApel > 0 ? Math.min(100, Math.round((totalApelHadir / totalExpectedApel) * 100)) : 100;
-
     return {
       totalPbb,
       totalPerlinsos,
@@ -1105,9 +1088,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       bpjsPercentage,
       totalKunjungan,
       kunjunganPercentage,
-      totalApelHadir,
-      totalApelSessions,
-      apelRatePercentage,
       totalReports,
       activeKeplingCount,
       kepatuhanRate,
@@ -1115,7 +1095,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   }, [
     filteredReportsByPeriod,
     keplingSummaryList,
-    distinctApelDatesInPeriod,
     effectiveKunjunganList,
     filteredKunjunganByPeriod,
     isCumulativePeriod,
@@ -1471,14 +1450,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       }`}
                     >
                       {myPerformanceData.isBottom5
-                        ? 'Akumulasi skor kinerja bulanan Anda berada di 5 peringkat terbawah dari 24 Kepala Lingkungan. Sangat disarankan untuk segera meningkatkan kehadiran apel pagi, percepatan realisasi PBB, pemutakhiran data perlinsos, serta patroli ronda poskamling warga.'
+                        ? 'Akumulasi skor kinerja bulanan Anda berada di 5 peringkat terbawah dari 24 Kepala Lingkungan. Sangat disarankan untuk segera meningkatkan percepatan realisasi PBB, pemutakhiran data perlinsos, serta patroli ronda poskamling warga.'
                         : myPerformanceData.rank === 1
                         ? 'Selamat! Anda memimpin peringkat kinerja tertinggi se-Kelurahan Mangga pada periode ini. Pertahankan keteladanan dalam kedisiplinan dan pelayanan masyarakat.'
                         : myPerformanceData.rank <= 3
                         ? 'Luar biasa! Anda berada di podium 3 besar Kepala Lingkungan terbaik se-Kelurahan Mangga pada periode ini.'
                         : myPerformanceData.rank <= 10
                         ? 'Kinerja Anda sangat baik dan berada di zona 10 besar keaktifan lingkungan se-Kelurahan Mangga.'
-                        : 'Kinerja Anda dalam kategori cukup. Tingkatkan keaktifan apel dan penyelesaian target untuk mencapai zona 10 besar.'}
+                        : 'Kinerja Anda dalam kategori cukup. Tingkatkan keaktifan dan penyelesaian target untuk mencapai zona 10 besar.'}
                     </p>
                   </div>
                 </div>
@@ -1522,7 +1501,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               {/* 7 Indikator Breakdown Mini Bar untuk Kepling */}
               {myPerformanceData.item && (
                 <div
-                  className={`mt-4 pt-3 border-t grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-[10px] ${
+                  className={`mt-4 pt-3 border-t grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-[10px] ${
                     myPerformanceData.isBottom5
                       ? 'border-red-400/40'
                       : myPerformanceData.rank === 1
@@ -1530,10 +1509,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       : 'border-white/10'
                   }`}
                 >
-                  <div className="bg-black/20 p-2 rounded-xl text-center">
-                    <span className="block opacity-80 font-bold">🌅 Apel</span>
-                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.apelPercentage}%</strong>
-                  </div>
                   <div className="bg-black/20 p-2 rounded-xl text-center">
                     <span className="block opacity-80 font-bold">👥 Kegiatan</span>
                     <strong className="text-xs block mt-0.5">{myPerformanceData.item.kegiatanPercentage}%</strong>
@@ -2219,8 +2194,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       className={`text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                         leaderboardSort === 'KOMPOSIT'
                           ? 'bg-amber-100 text-amber-950 border-amber-300 ring-1 ring-amber-200'
-                          : leaderboardSort === 'APEL'
-                          ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
                           : leaderboardSort === 'KEGIATAN'
                           ? 'bg-indigo-100 text-indigo-950 border-indigo-300'
                           : leaderboardSort === 'PERLINSOS'
@@ -2234,11 +2207,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                           : 'bg-purple-100 text-purple-900 border-purple-300'
                       }`}
                     >
-                      {leaderboardSort === 'KOMPOSIT' && '⭐ 7 Kriteria Terpadu (Skor Komposit)'}
-                      {leaderboardSort === 'APEL' && '🌅 Kehadiran Apel Pagi (15%)'}
-                      {leaderboardSort === 'KEGIATAN' && '👥 Kehadiran Kegiatan (15%)'}
-                      {leaderboardSort === 'PERLINSOS' && '📋 Capaian Perlinsos (20%)'}
-                      {leaderboardSort === 'PBB' && '💰 Realisasi PBB (20%)'}
+                      {leaderboardSort === 'KOMPOSIT' && '⭐ 6 Kriteria Terpadu (Skor Komposit)'}
+                      {leaderboardSort === 'KEGIATAN' && '👥 Kehadiran Kegiatan (20%)'}
+                      {leaderboardSort === 'PERLINSOS' && '📋 Capaian Perlinsos (25%)'}
+                      {leaderboardSort === 'PBB' && '💰 Realisasi PBB (25%)'}
                       {leaderboardSort === 'BPJS' && '🛡️ BPJS Ketenagakerjaan (10%)'}
                       {leaderboardSort === 'KUNJUNGAN' && '🏠 Kunjungan Harian (10%)'}
                       {leaderboardSort === 'POSKAMLING' && '🔦 Poskamling / Siskamling (10%)'}
@@ -2250,7 +2222,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">
-                    Peringkat resmi terpadu untuk periode <strong>{getPeriodLabel(period, now)}</strong> dihitung dari <strong>7 Kriteria Kinerja</strong> (Apel 15%, Kegiatan 15%, Perlinsos 20%, PBB 20%, BPJS TK 10%, Kunjungan 10%, Poskamling 10%). 
+                    Peringkat resmi terpadu untuk periode <strong>{getPeriodLabel(period, now)}</strong> dihitung dari <strong>6 Kriteria Kinerja</strong> (Kegiatan 20%, Perlinsos 25%, PBB 25%, BPJS TK 10%, Kunjungan 10%, Poskamling 10%). 
                     {!isCumulativePeriod ? (
                       <span className="text-emerald-700 font-semibold block mt-0.5">
                         ⚡ Mode Bulanan Aktif: Akumulasi poin direset otomatis dari 0 pada tanggal 1 bulan berjalan (hanya menghitung transaksi & keaktifan bulan ini). Evaluasi total kumulatif setahun penuh dapat dilihat melalui filter "Tahun 2026".
@@ -2309,21 +2281,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   }`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>7 Kriteria Terpadu (Default)</span>
+                  <span>6 Kriteria Terpadu (Default)</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setLeaderboardSort('APEL')}
-                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
-                    leaderboardSort === 'APEL'
-                      ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-300 scale-102'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  <Sun className="w-3.5 h-3.5" />
-                  <span>Apel Pagi (15%)</span>
-                </button>
+
 
                 <button
                   type="button"
@@ -2335,7 +2296,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   }`}
                 >
                   <CalendarCheck className="w-3.5 h-3.5" />
-                  <span>Kegiatan (15%)</span>
+                  <span>Kegiatan (20%)</span>
                 </button>
 
                 <button
@@ -2348,7 +2309,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   }`}
                 >
                   <FileCheck2 className="w-3.5 h-3.5" />
-                  <span>Perlinsos (20%)</span>
+                  <span>Perlinsos (25%)</span>
                 </button>
 
                 {isPbbAllowed && (
@@ -2362,7 +2323,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     }`}
                   >
                     <CreditCard className="w-3.5 h-3.5" />
-                    <span>Realisasi PBB (20%)</span>
+                    <span>Realisasi PBB (25%)</span>
                   </button>
                 )}
 
@@ -2437,8 +2398,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
                   <div className="mt-3 pt-2.5 border-t border-slate-200 grid grid-cols-2 gap-1.5 text-[10px] text-left">
                     <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
-                      <span className="text-slate-400 block font-medium">🌅 Apel</span>
-                      <strong className="text-emerald-700">{sortedLeaderboard[1].apelPercentage}%</strong> ({sortedLeaderboard[1].totalApelHadir} Hari)
+
                     </div>
                     <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
                       <span className="text-slate-400 block font-medium">👥 Kegiatan</span>
@@ -2496,8 +2456,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
                   <div className="mt-3.5 pt-3 border-t border-amber-200 grid grid-cols-2 gap-1.5 text-[10px] text-left">
                     <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
-                      <span className="text-amber-800 block font-medium">🌅 Apel</span>
-                      <strong className="text-emerald-700 font-bold">{sortedLeaderboard[0].apelPercentage}%</strong> ({sortedLeaderboard[0].totalApelHadir} Hari)
+
                     </div>
                     <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
                       <span className="text-amber-800 block font-medium">👥 Kegiatan</span>
@@ -2555,8 +2514,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
                   <div className="mt-3 pt-2.5 border-t border-amber-200 grid grid-cols-2 gap-1.5 text-[10px] text-left">
                     <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
-                      <span className="text-slate-400 block font-medium">🌅 Apel</span>
-                      <strong className="text-emerald-700">{sortedLeaderboard[2].apelPercentage}%</strong> ({sortedLeaderboard[2].totalApelHadir} Hari)
+
                     </div>
                     <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
                       <span className="text-slate-400 block font-medium">👥 Kegiatan</span>
@@ -2597,11 +2555,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 <div className="col-span-1 text-center bg-amber-100/70 text-amber-950 py-1 rounded-md font-black">
                   Skor IKKT
                 </div>
-                <div className="col-span-1 text-center">🌅 Apel (15%)</div>
-                <div className="col-span-1 text-center">👥 Giat (15%)</div>
-                <div className="col-span-1 text-center">📋 Perlinsos (20%)</div>
+
+                <div className="col-span-1 text-center">👥 Giat (20%)</div>
+                <div className="col-span-1 text-center">📋 Perlinsos (25%)</div>
                 {isPbbAllowed && (
-                  <div className="col-span-1 text-center">💰 PBB (20%)</div>
+                  <div className="col-span-1 text-center">💰 PBB (25%)</div>
                 )}
                 <div className="col-span-1 text-center">🛡️ BPJS (10%)</div>
                 <div className="col-span-1 text-center">🏠 Kunjungan (10%)</div>
@@ -2730,26 +2688,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       </span>
                     </div>
 
-                    {/* 1. Apel Pagi */}
-                    <div className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg">
-                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">🌅 Apel Pagi (15%)</div>
-                      <span
-                        className={`inline-block font-black px-1.5 py-0.5 rounded text-[11px] ${
-                          item.apelPercentage >= 90
-                            ? 'text-emerald-700 bg-emerald-50'
-                            : item.apelPercentage >= 70
-                            ? 'text-blue-700 bg-blue-50'
-                            : 'text-amber-700 bg-amber-50'
-                        }`}
-                      >
-                        {item.apelPercentage}%
-                      </span>
-                      <span className="text-[10px] text-slate-400 block">{item.totalApelHadir} Hari</span>
-                    </div>
+
 
                     {/* 2. Kegiatan Khusus */}
                     <div className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg">
-                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">👥 Kegiatan (15%)</div>
+                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">👥 Kegiatan (20%)</div>
                       <span
                         className={`inline-block font-black px-1.5 py-0.5 rounded text-[11px] ${
                           item.kegiatanPercentage >= 90
@@ -2770,7 +2713,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors"
                       title="Klik untuk membuka Kunjungan Warga (Perlinsos)"
                     >
-                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">📋 Perlinsos (20%)</div>
+                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">📋 Perlinsos (25%)</div>
                       <span
                         className={`inline-block font-black px-1.5 py-0.5 rounded text-[11px] ${
                           item.perlinsosPercentage >= 100
@@ -2794,7 +2737,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                         className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-emerald-50 transition-colors"
                         title="Klik untuk membuka Rekapitulasi SPPT PBB"
                       >
-                        <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">💰 PBB (20%)</div>
+                        <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">💰 PBB (25%)</div>
                         <span className="inline-block font-black text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded text-[11px]">
                           {item.pbbPercentage}%
                         </span>

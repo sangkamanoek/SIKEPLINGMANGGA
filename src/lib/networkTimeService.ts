@@ -4,16 +4,6 @@
  * are locked to authentic network server time, preventing device clock tampering.
  */
 
-export interface WibTimeStatus {
-  formattedTime: string;
-  isWorkDay: boolean; // Monday - Friday
-  isWithinWindow: boolean; // 07:30 - 08:30 WIB on Monday - Friday
-  isTooEarly: boolean; // Before 07:30 WIB
-  isLate: boolean; // After 08:30 WIB
-  statusLabel: string;
-  isNetworkVerified: boolean;
-}
-
 export interface ClockTamperStatus {
   isDeviated: boolean;
   diffMinutes: number;
@@ -244,69 +234,6 @@ export function checkClockTamperStatus(): ClockTamperStatus {
   };
 }
 
-/**
- * Evaluate Apel Pagi compliance strictly against Network Time
- * Window: Senin s/d Jumat (07:30 - 08:30 WIB)
- */
-export function checkNetworkApelTimeStatus(): WibTimeStatus {
-  const { totalMin, dayOfWeek, formattedTime } = getWibDetails();
-
-  // Jadwal Resmi: 07:30 - 08:30 WIB
-  const startMin = 7 * 60 + 30; // 450 min
-  const endMin = 8 * 60 + 30;   // 510 min
-
-  const isWorkDay = dayOfWeek >= 1 && dayOfWeek <= 5; // Senin - Jumat
-  const isWithinWindow = isWorkDay && totalMin >= startMin && totalMin <= endMin;
-  const isLate = isWorkDay && totalMin > endMin;
-  const isTooEarly = isWorkDay && totalMin < startMin;
-
-  if (!isWorkDay) {
-    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    return {
-      formattedTime,
-      isWorkDay: false,
-      isWithinWindow: false,
-      isTooEarly: false,
-      isLate: false,
-      isNetworkVerified: isSyncedWithNetwork,
-      statusLabel: `Libur Akhir Pekan (${dayNames[dayOfWeek]}) • Apel Pagi Hanya Senin s/d Jumat`,
-    };
-  }
-
-  if (isTooEarly) {
-    return {
-      formattedTime,
-      isWorkDay: true,
-      isWithinWindow: false,
-      isTooEarly: true,
-      isLate: false,
-      isNetworkVerified: isSyncedWithNetwork,
-      statusLabel: 'Belum Jam Apel (Jadwal Resmi 07.30 - 08.30 WIB)',
-    };
-  }
-
-  if (isLate) {
-    return {
-      formattedTime,
-      isWorkDay: true,
-      isWithinWindow: false,
-      isTooEarly: false,
-      isLate: true,
-      isNetworkVerified: isSyncedWithNetwork,
-      statusLabel: 'Akses Presensi Ditutup (Lewat Pukul 08.30 WIB) • Otomatis Tidak Mengikuti Apel',
-    };
-  }
-
-  return {
-    formattedTime,
-    isWorkDay: true,
-    isWithinWindow: true,
-    isTooEarly: false,
-    isLate: false,
-    isNetworkVerified: isSyncedWithNetwork,
-    statusLabel: 'Jadwal Presensi Apel Sedang Berlangsung (07.30 - 08.30 WIB)',
-  };
-}
 
 // Start auto-sync on load
 if (typeof window !== 'undefined') {

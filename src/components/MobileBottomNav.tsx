@@ -33,7 +33,6 @@ export type AppTabType =
   | 'realisasi_pembangunan'
   | 'keuangan_pkk'
   | 'kegiatan_pkk'
-  | 'dasa_wisma'
   | 'posyandu_pkk'
   | 'surat_kedinasan'
   | 'buku_pkk'
@@ -131,20 +130,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               </button>
             </div>
   
-            {/* Tab 4: Dasa Wisma */}
-            <button
-              type="button"
-              onClick={() => onSelectTab('dasa_wisma')}
-              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-                activeTab === 'dasa_wisma' ? 'text-white font-black' : 'text-white/60 hover:text-white'
-              }`}
-            >
-              <div className="relative">
-                <Users className={`w-5 h-5 ${activeTab === 'dasa_wisma' ? 'stroke-[3]' : 'stroke-[1.8]'}`} />
-                {renderBadge('dasa_wisma')}
-              </div>
-              <span className="text-[10px] mt-0.5 tracking-tight font-bold">Dasa Wisma</span>
-            </button>
+
           </nav>
         </aside>
       );
