@@ -26,11 +26,13 @@ import {
   RefreshCw,
   Database,
   Trash2,
+  Baby,
+  BookOpen,
 } from 'lucide-react';
 import { saveReportToFirestore } from '../lib/firestoreService';
 import { fetchAllReports } from '../lib/reportsApi';
 import { optimizeAndCleanBrowserMemory } from '../lib/safeStorage';
-import { UserAccount, LaporanHarianItem, AbsenApelItem } from '../types';
+import { UserAccount, LaporanHarianItem, AbsenApelItem, isPkkRole } from '../types';
 import { DeadlineNotifAlert } from './DeadlineNotifAlert';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { SpptPbbItem } from '../data/pbbSampleData';
@@ -405,6 +407,103 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
 
   // Define menu items for UIX filtering strictly tailored per role
   const menuItems = useMemo(() => {
+    const isPkk = isPkkRole(activeAccount.role);
+
+    // Dedicated Role Tim Penggerak PKK (Pusat Kendali Mandiri TP-PKK)
+    if (isPkk) {
+      return [
+        {
+          id: 'kegiatan_pkk',
+          title: 'Laporan & Dokumentasi Kegiatan PKK',
+          desc: 'Pencatatan dan dokumentasi foto kegiatan Pokja I, II, III, IV, Gotong Royong, PHBS, dan PKK Lingkungan.',
+          category: 'laporan',
+          icon: FileText,
+          iconBg: 'bg-teal-50 text-teal-700',
+          badge: 'GIAT POKJA',
+          badgeColor: 'bg-teal-100 text-teal-900',
+          bgGradient: 'bg-gradient-to-r from-teal-950 via-emerald-950 to-slate-900 text-white border-teal-600/60',
+          action: () => onNavigate('kegiatan_pkk'),
+        },
+        {
+          id: 'keuangan_pkk',
+          title: 'Buku Kas Umum (BKU) & Keuangan PKK',
+          desc: 'Kelola kas masuk, kas keluar BKU, bukti alokasi dana, kuitansi transaksi, dan rekapitulasi keuangan TP PKK.',
+          category: 'capaian',
+          icon: Wallet,
+          iconBg: 'bg-emerald-50 text-emerald-700',
+          badge: 'KAS BKU',
+          badgeColor: 'bg-emerald-100 text-emerald-900',
+          action: () => onNavigate('keuangan_pkk'),
+        },
+        {
+          id: 'dasa_wisma',
+          title: 'Kelompok Dasa Wisma 24 Lingkungan',
+          desc: 'Rekapitulasi kelompok 10-20 rumah tangga Dasa Wisma, jumlah KK/jiwa, balita, lansia, jamban, & fasilitas warga.',
+          category: 'laporan',
+          icon: Users,
+          iconBg: 'bg-teal-50 text-teal-700',
+          badge: 'DASA WISMA',
+          badgeColor: 'bg-teal-100 text-teal-800',
+          action: () => onNavigate('dasa_wisma'),
+        },
+        {
+          id: 'posyandu_pkk',
+          title: 'Laporan Posyandu & Kesehatan Pokja IV',
+          desc: 'Dokumentasi penimbangan balita, skrining lansia, pemberian vitamin A, PMT, dan pencegahan stunting.',
+          category: 'laporan',
+          icon: Baby,
+          iconBg: 'bg-rose-50 text-rose-700',
+          badge: 'POKJA IV POSYANDU',
+          badgeColor: 'bg-rose-100 text-rose-800',
+          action: () => onNavigate('posyandu_pkk'),
+        },
+        {
+          id: 'buku_pkk',
+          title: '6 Buku Wajib Administrasi PKK',
+          desc: 'Buku 1 Data Anggota, Buku 4 Notulen Rapat, Buku 5 Inventaris Aset, dan buku register wajib administrasi PKK.',
+          category: 'laporan',
+          icon: BookOpen,
+          iconBg: 'bg-teal-50 text-teal-700',
+          badge: 'BUKU I-VI',
+          badgeColor: 'bg-teal-100 text-teal-800',
+          action: () => onNavigate('buku_pkk'),
+        },
+        {
+          id: 'realisasi_pembangunan',
+          title: 'Monitoring Realisasi Pembangunan Wilayah',
+          desc: 'Pantau kondisi fisik sarana prasarana, fasilitas publik, perbaikan jalan, drainase, dan lampu jalan 24 lingkungan.',
+          category: 'laporan',
+          icon: Wrench,
+          iconBg: 'bg-indigo-50 text-indigo-700',
+          badge: 'SARPRAS WILAYAH',
+          badgeColor: 'bg-indigo-100 text-indigo-900',
+          action: () => onNavigate('realisasi_pembangunan'),
+        },
+        {
+          id: 'daftar_tugas_khusus',
+          title: 'Daftar Tugas Khusus & Petunjuk Giat',
+          desc: 'Lihat daftar instruksi penugasan khusus dan dokumentasikan kegiatan tindak lanjut di lapangan.',
+          category: 'laporan',
+          icon: Award,
+          iconBg: 'bg-amber-50 text-amber-700',
+          badge: 'PENUGASAN',
+          badgeColor: 'bg-amber-100 text-amber-900',
+          action: () => onNavigate('daftar_tugas_khusus'),
+        },
+        {
+          id: 'monitoring',
+          title: 'Monitoring Laporan & Kegiatan Wilayah',
+          desc: 'Pantau rekapitulasi keaktifan laporan kegiatan harian dan gotong royong 24 Lingkungan Kelurahan Mangga.',
+          category: 'capaian',
+          icon: ShieldCheck,
+          iconBg: 'bg-emerald-50 text-emerald-700',
+          badge: 'MONITORING',
+          badgeColor: 'bg-emerald-100 text-emerald-800',
+          action: () => onNavigate('monitoring'),
+        },
+      ];
+    }
+
     if (isBapenda) {
       return [
         {
@@ -911,7 +1010,11 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           {/* Pilar 2 */}
           <div 
             onClick={() => {
-              window.dispatchEvent(new CustomEvent('switch-to-pkk-role'));
+              if (isPkkRole(activeAccount.role)) {
+                onNavigate('kegiatan_pkk');
+              } else {
+                onNavigate('monitoring');
+              }
             }}
             className="p-3.5 bg-slate-50/80 hover:bg-teal-50/60 border border-slate-200/90 hover:border-teal-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
           >

@@ -346,12 +346,63 @@ export default function App() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
+  // Strict role-based route access lists
+  const PKK_RESTRICTED_TABS: AppTabType[] = useMemo(() => [
+    'form',
+    'capaian',
+    'rekap_pbb',
+    'agenda',
+    'kunjungan',
+    'surat_kedinasan',
+    'capaian_admin',
+    'dashboard_kasi',
+  ], []);
+
+  const KELURAHAN_RESTRICTED_TABS: AppTabType[] = useMemo(() => [
+    'keuangan_pkk',
+    'kegiatan_pkk',
+    'dasa_wisma',
+    'posyandu_pkk',
+    'buku_pkk',
+  ], []);
+
   const handleTabChange = useCallback((tab: AppTabType) => {
+    if (activeAccount && activeAccount.role !== 'super_admin') {
+      const isPkk = isPkkRole(activeAccount.role);
+      if (isPkk && PKK_RESTRICTED_TABS.includes(tab)) {
+        showToast('Akses Dibatasi: Halaman ini khusus untuk Aparatur Kelurahan.', 'info');
+        setActiveTab('hub');
+        safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
+        return;
+      }
+      if (!isPkk && KELURAHAN_RESTRICTED_TABS.includes(tab)) {
+        showToast('Akses Dibatasi: Halaman ini khusus untuk Pengurus TP-PKK.', 'info');
+        setActiveTab('hub');
+        safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
+        return;
+      }
+    }
     setActiveTab(tab);
     markFeatureAsSeen(tab);
     safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [markFeatureAsSeen]);
+  }, [activeAccount, markFeatureAsSeen, PKK_RESTRICTED_TABS, KELURAHAN_RESTRICTED_TABS, showToast]);
+
+  // Reactive Route Guard Effect on Account or Tab change
+  useEffect(() => {
+    if (!activeAccount || activeAccount.role === 'super_admin') return;
+    const isPkk = isPkkRole(activeAccount.role);
+
+    if (isPkk && PKK_RESTRICTED_TABS.includes(activeTab)) {
+      showToast('Akses Dibatasi: Dialihkan ke Pusat Menu PKK.', 'info');
+      setActiveTab('hub');
+      safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
+    } else if (!isPkk && KELURAHAN_RESTRICTED_TABS.includes(activeTab)) {
+      showToast('Akses Dibatasi: Dialihkan ke Pusat Menu Kelurahan.', 'info');
+      setActiveTab('hub');
+      safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
+    }
+  }, [activeAccount, activeTab, PKK_RESTRICTED_TABS, KELURAHAN_RESTRICTED_TABS, showToast]);
 
   const handleAccountSelect = useCallback((acc: UserAccount) => {
     const effective = getEffectiveProfile(acc);
@@ -362,10 +413,8 @@ export default function App() {
     } catch {}
     setIsAccountModalOpen(false);
 
-    // If changing to PKK role, direct to hub
-    if (isPkkRole(acc.role)) {
-      handleTabChange('hub');
-    }
+    // Direct to hub on role switch
+    handleTabChange('hub');
   }, [handleTabChange]);
 
   const handleLoginSuccess = (account: UserAccount, remember: boolean) => {
