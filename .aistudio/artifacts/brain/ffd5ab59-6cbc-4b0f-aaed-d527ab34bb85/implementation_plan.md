@@ -1,82 +1,55 @@
-# Perbaikan & Optimasi Fitur Surat Kedinasan (Firestore & Role Partitioning)
+# Rencana Implementasi: Pemulihan Permanen 37 Anggota PKK Asli
 
-Investigasi mendalam dan perbaikan komprehensif pada modul **Surat Kedinasan** (baik untuk akun Kelurahan/Superadmin maupun PKK), mengatasi masalah data yang tidak tertampil akibat penyaringan string yang rapuh, penandaan kategori yang kurang eksplisit, dan query Firestore `orderBy` yang mengesampingkan dokumen tanpa field tertentu.
-
-## User Review & Critical Decisions
-
-> [!IMPORTANT] Pilihan Desain & Hasil Klarifikasi Pengguna
-> - **Penandaan Kategori Eksplisit (`kategori: 'KELURAHAN' | 'PKK'`)**: Setiap dokumen surat yang disimpan ke Firestore, Server API, dan IndexedDB akan menyertakan atribut `kategori` secara eksplisit, serta mencatat `dibuatOlehRole` dan `dibuatOlehNama`.
-> - **Tampilan Berdasarkan Peran Akun Aktif**: Tampilan modul Surat Kedinasan disesuaikan dengan peran aktif pengguna (`currentUser.role`), memastikan akun PKK melihat arsip Surat PKK dan akun Kelurahan/Superadmin melihat arsip Surat Kelurahan secara konsisten tanpa kehilangan data.
+Berdasarkan konfirmasi pengguna, seluruh 37 data anggota PKK asli yang telah diinput sebelumnya di Firestore akan dipulihkan secara penuh dan dijadikan data baku permanen (*permanent baseline*) di dalam sistem agar tidak dapat tertimpa lagi oleh data *placeholder*.
 
 ---
 
-## 1. Overview & Core Concept
-
-- **Problem Statement**: Pengguna melaporkan data Surat Kedinasan yang sudah di-input tidak muncul di layar. Investigasi menunjukkan bahwa penyebab utamanya adalah:
-  1. *Fragile Filter*: Penyaringan data sebelumnya mengandalkan pencarian kata kunci string `"pkk"` pada nomor/asal surat, sehingga surat PKK atau Kelurahan dengan nomor resmi (contoh: `005/SK/X/2026`) yang tidak memuat string `"pkk"` menjadi tersembunyi.
-  2. *Missing Metadata Fields*: Input dari Buku 2 PKK (`PkkBukuAdministrasiView.tsx`) tidak mengisi field `dibuatOlehRole` dan `kategori`.
-  3. *Firestore Query Boundary*: Query Firestore `orderBy('tanggalSurat')` mengeksklusi dokumen jika field `tanggalSurat` kosong atau formatted secara berbeda.
-- **Solusi**: 
-  1. Menambahkan penandaan kategori `kategori: 'KELURAHAN' | 'PKK'` dan `dibuatOlehRole` pada setiap operasi pembuatan & pembaruan surat (`saveSuratItem`).
-  2. Memperbaiki query real-time Firestore di `suratService.ts` tanpa batasan `orderBy` yang kaku, serta melakukan pengurutan (*sorting*) aman di sisi JavaScript.
-  3. Memperbarui logika penyaringan di `SuratKedinasanView.tsx` dan `PkkBukuAdministrasiView.tsx` agar menggunakan atribut `kategori` dan `dibuatOlehRole` secara konsisten.
+## 1. Analisis & Verifikasi Sumber Data
+- Telah diekstraksi sebanyak **37 dokumen data anggota asli** dari Firestore collection `pkk_buku_1_anggota`.
+- Seluruh data memuat identitas lengkap:
+  - **Nama & Jabatan** (Ketua TP-PKK Kelurahan, Sekretaris, Bendahara Hj. Mariana, Ketua Pokja I s/d IV, serta Ketua PKK Lingkungan I, III, IV, VI, VIII, IX, X, XI, XII, XV, XVII, XIX, XXI, dan anggota pokja).
+  - **Alamat, Tempat/Tanggal Lahir, Pendidikan, Status Pernikahan, dan Pasfoto Resmi**.
+- File cadangan lengkap tersimpan di `/tmp/pkk_37_members_backup.json` (1.1 MB).
 
 ---
 
-## 2. User Experience & Visual Design
+## 2. Langkah-Langkah Implementasi
 
-- **Tampilan Tabel & Form Surat Kedinasan Kelurahan**:
-  - Menampilkan daftar Surat Masuk, Surat Keluar, Surat Keputusan, dan Undangan Resmi khusus Kelurahan secara rapi.
-  - Penanda badge kategori warna emerald untuk Kelurahan dan indigo untuk PKK.
-- **Tampilan Buku 2 Agenda Surat PKK**:
-  - Menampilkan seluruh agenda Surat Masuk dan Surat Keluar PKK tanpa ada dokumen yang tersembunyi.
-  - Pengunggahan berkas lampiran PDF/gambar (hingga 50MB via Server API dan IndexedDB, serta penyimpanan metadata di Firestore).
+### Langkah 1: Pembuatan Berkas Baseline Permanen (`src/data/pkkDefaultAnggota.ts`)
+- Memetakan ke-37 data anggota asli ke dalam modul `src/data/pkkDefaultAnggota.ts`.
+- Menyertakan data lengkap terstruktur sesuai antarmuka `PkkBuku1Anggota`.
+- Menjadikan data ini sebagai sumber awal resmi saat aplikasi diinisialisasi pertama kali atau saat cache perangkat dikosongkan.
+
+### Langkah 2: Pembaruan Layanan Buku Administrasi PKK (`src/lib/pkkBukuService.ts`)
+- Mengganti array `DEFAULT_BUKU1_ITEMS` lama (yang sebelumnya men-generate nama acak 24 lingkungan) dengan 37 data anggota asli yang permanen.
+- Memperbarui sinkronisasi `subscribeBuku1`:
+  - Jika `localStorage` kosong atau berisi data usang, utamakan 37 data asli dari `pkkDefaultAnggota.ts`.
+  - Jika Firestore memiliki data, merge cerdas memastikan tidak ada nama asli yang terhapus.
+  - Memastikan pasfoto dan identitas asli selalu dirender dengan presisi di Buku I dan KTA PKK.
+
+### Langkah 3: Sinkronisasi Nama Resmi Ketua PKK Lingkungan (`src/data/keplingList.ts`)
+- Memperbarui `DEFAULT_PKK_LINGKUNGAN_NAMES` agar mencantumkan nama-nama Ketua PKK Lingkungan asli yang telah diinput:
+  - Lingkungan I: Ny. Anggi Prisilya Br. Sembiring
+  - Lingkungan III: Ny. Dewi Artati
+  - Lingkungan IV: Ny. Leonila Br Ginting
+  - Lingkungan VI: Ny. Ponianti
+  - Lingkungan VIII: Ny. Sri Nuraisyah
+  - Lingkungan X: Ny. Suriati Emma Maria Br Sipayung
+  - Lingkungan XI: Ny. Rohinsa Br. Lumbangaol
+  - Lingkungan XII: Ny. Rosita
+  - Lingkungan XVII: Ny. Ziah Ananda Putri
+  - Lingkungan XIX: Ny. Nurlinda
+  - Lingkungan XXI: Ny. Fitrianni Tanjung
+- Menjaga profil akun login `pkk_lingkungan_*` agar tersinkron otomatis dengan Buku I.
+
+### Langkah 4: Endpoint Sinkronisasi Server (`server.ts` & Fallback)
+- Menyimpan cadangan data 37 anggota PKK ke `data/pkk_buku_1_anggota.json` di sisi server agar persisten di seluruh restart container.
+- Menambahkan route API `/api/pkk/buku1` untuk pembacaan dan penyimpanan server-side.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
-
-- **Decision 1: Penggunaan Tag Kategori Eksplisit (`kategori`)**:
-  - *Pendekatan*: Menambahkan field `kategori` (`'KELURAHAN'` atau `'PKK'`) pada interface `SuratKedinasanItem` dan selalu mengisi field ini saat pengisian form.
-  - *Alasan*: Menghilangkan ketergantungan pada pencarian substring string `"pkk"` yang sering gagal jika nomor atau asal surat menggunakan format standar kedinasan.
-- **Decision 2: Optimasi Real-Time Sync Firestore**:
-  - *Pendekatan*: Mengambil seluruh dokumen koleksi `surat_kedinasan` dari Firestore tanpa `orderBy` yang kaku di query Firestore SDK, kemudian menggabungkan (*smart merge*) dengan IndexedDB & Server API dan melakukan sorting aman berdasarkan `tanggalSurat` atau `createdAt`.
-  - *Alasan*: Mencegah dokumen baru atau dokumen lama tanpa field `tanggalSurat` hilang dari snapshot Firestore.
-
----
-
-## 4. Technical Architecture & Data Strategy
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        DATA PERSISTENCE LAYER                          │
-│                                                                        │
-│   ┌───────────────────┐     ┌───────────────────┐     ┌─────────────┐  │
-│   │ Cloud Firestore   │ ◄──►│ Server REST API   │ ◄──►│ IndexedDB & │  │
-│   │ (surat_kedinasan) │     │ (/api/surat)      │     │ LocalStorage│  │
-│   └─────────┬─────────┘     └─────────┬─────────┘     └──────┬──────┘  │
-└─────────────┼─────────────────────────┼──────────────────────┼─────────┘
-              │                         │                      │
-              ▼                         ▼                      ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                       SURAT SERVICE (smartMerge)                       │
-│  - Memeriksa kategori ('KELURAHAN' | 'PKK')                            │
-│  - Menjaga lampiran berkas PDF/Gambar (fileUrl, fileName)              │
-│  - Mempublikasikan update ke UI via subscribeSurat & BroadcastChannel  │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                          FRONTEND UI VIEWS                             │
-│  ┌──────────────────────────────┐    ┌──────────────────────────────┐  │
-│  │ SuratKedinasanView.tsx       │    │ PkkBukuAdministrasiView.tsx  │  │
-│  │ (Modul Kedinasan Kelurahan)  │    │ (Buku 2 Agenda Surat PKK)    │  │
-│  └──────────────────────────────┘    └──────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-- **Perubahan Berkas Kunci**:
-  1. `src/types.ts`: Memperbarui `SuratKedinasanItem` dengan `kategori?: 'KELURAHAN' | 'PKK'`.
-  2. `src/lib/suratService.ts`: Memperbarui `subscribeSurat`, `smartMergeSurat`, dan `saveSuratItem` agar menangani tag `kategori` dan Firestore query tanpa kegagalan `orderBy`.
-  3. `src/components/SuratKedinasanView.tsx`: Menggunakan `kategori` untuk pemisahan data dan menyertakan metadata peran saat pembuatan surat.
-  4. `src/components/PkkBukuAdministrasiView.tsx`: Menyertakan `kategori: 'PKK'`, `dibuatOlehRole`, dan `dibuatOlehNama` saat membuat Surat Masuk/Keluar Buku 2 PKK.
+## 3. Rencana Pengujian & Verifikasi
+1. **Verifikasi Kompilasi & Linting**: Jalankan `compile_applet` dan `lint_applet` untuk memastikan tidak ada kesalahan TypeScript.
+2. **Verifikasi Tampilan Buku I Administrasi PKK**: Memastikan ke-37 data tampil lengkap di tabel buku anggota beserta pasfoto dan tombol cetak kartu.
+3. **Verifikasi Cetak KTA Digital PKK**: Menguji fungsi cetak kartu anggota untuk beberapa pengurus dan ketua lingkungan.
+4. **Verifikasi Uji Muat Ulang (*Reload Test*)**: Memastikan setelah browser di-refresh atau cache dibersihkan, data 37 anggota asli tetap muncul dan tidak berubah.

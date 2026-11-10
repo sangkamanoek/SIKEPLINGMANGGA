@@ -441,6 +441,32 @@ const saveStoredPkkKeuangan = (items: any[]) => {
 
 let pkkKeuanganCache = loadStoredPkkKeuangan();
 
+// PKK Buku 1 Anggota Data File (Daftar 37 Anggota PKK Kelurahan Mangga)
+const PKK_BUKU1_FILE = path.join(DATA_DIR, 'pkk_buku_1_anggota.json');
+
+const loadStoredPkkBuku1 = (): any[] => {
+  try {
+    if (fs.existsSync(PKK_BUKU1_FILE)) {
+      const content = fs.readFileSync(PKK_BUKU1_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (err) {
+    console.error('Error reading pkk buku 1 file:', err);
+  }
+  return [];
+};
+
+const saveStoredPkkBuku1 = (items: any[]) => {
+  try {
+    fs.writeFileSync(PKK_BUKU1_FILE, JSON.stringify(items, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving pkk buku 1 file:', err);
+  }
+};
+
+let pkkBuku1Cache = loadStoredPkkBuku1();
+
 // Arsip Surat Kedinasan Data File
 const SURAT_FILE = path.join(DATA_DIR, 'surat.json');
 
@@ -1035,6 +1061,77 @@ app.delete('/api/pkk/keuangan/:id', (req, res) => {
     return res.json({ success: true, count: pkkKeuanganCache.length, message: `Transaksi PKK ${id} dihapus` });
   } catch (err: any) {
     console.error('Error deleting pkk keuangan:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// =========================================================================
+// PKK BUKU 1 ANGGOTA (37 ANGGOTA TETAP TP-PKK) CRUD ENDPOINTS
+// =========================================================================
+
+app.get('/api/pkk/buku1', (_req, res) => {
+  return res.json({
+    success: true,
+    count: pkkBuku1Cache.length,
+    data: pkkBuku1Cache,
+  });
+});
+
+app.post('/api/pkk/buku1', (req, res) => {
+  try {
+    const rawBody = req.body;
+    const items = rawBody?.items || (Array.isArray(rawBody) ? rawBody : null);
+    const item = rawBody?.item || (!items && rawBody?.nama ? rawBody : null);
+
+    // Batch save
+    if (Array.isArray(items)) {
+      for (const it of items) {
+        if (!it || !it.id) continue;
+        const idx = pkkBuku1Cache.findIndex((k) => k.id === it.id);
+        if (idx >= 0) {
+          pkkBuku1Cache[idx] = { ...pkkBuku1Cache[idx], ...it, updatedAt: new Date().toISOString() };
+        } else {
+          pkkBuku1Cache.push({ ...it, updatedAt: new Date().toISOString() });
+        }
+      }
+      saveStoredPkkBuku1(pkkBuku1Cache);
+      return res.json({ success: true, count: pkkBuku1Cache.length, data: pkkBuku1Cache });
+    }
+
+    if (!item) {
+      return res.status(400).json({ success: false, message: 'Data anggota PKK tidak lengkap' });
+    }
+
+    if (!item.id) {
+      item.id = 'b1_' + Date.now();
+    }
+    if (!item.createdAt) {
+      item.createdAt = new Date().toISOString();
+    }
+
+    const idx = pkkBuku1Cache.findIndex((k) => k.id === item.id);
+    if (idx >= 0) {
+      pkkBuku1Cache[idx] = { ...pkkBuku1Cache[idx], ...item, updatedAt: new Date().toISOString() };
+    } else {
+      pkkBuku1Cache.unshift({ ...item, updatedAt: new Date().toISOString() });
+    }
+
+    saveStoredPkkBuku1(pkkBuku1Cache);
+    return res.json({ success: true, data: item, count: pkkBuku1Cache.length });
+  } catch (err: any) {
+    console.error('Error saving pkk buku 1:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/pkk/buku1/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    pkkBuku1Cache = pkkBuku1Cache.filter((k) => k.id !== id);
+    saveStoredPkkBuku1(pkkBuku1Cache);
+    return res.json({ success: true, count: pkkBuku1Cache.length, message: `Anggota PKK ${id} dihapus` });
+  } catch (err: any) {
+    console.error('Error deleting pkk buku 1:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });

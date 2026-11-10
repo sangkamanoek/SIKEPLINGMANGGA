@@ -16,20 +16,22 @@ import {
   ROMAN_NUMERALS,
   syncBuku1ToPkkProfiles,
 } from '../data/keplingList';
+import { PKK_DEFAULT_ANGGOTA_LIST } from '../data/pkkDefaultAnggota';
 
 export interface PkkBuku1Anggota {
   id: string;
-  nik: string;
+  nik?: string;
+  noRegistrasi?: string;
   nama: string;
   jabatan: string;
   jenisKelamin: 'L' | 'P';
-  tempatLahir: string;
-  tanggalLahir: string;
+  tempatLahir?: string;
+  tanggalLahir?: string;
   statusPerkawinan?: 'Kawin' | 'Belum Kawin' | 'Janda/Duda' | string;
   statusPernikahan?: string;
-  alamat: string;
-  pendidikan: string;
-  pekerjaan: string;
+  alamat?: string;
+  pendidikan?: string;
+  pekerjaan?: string;
   keterangan?: string;
   pasphotoUrl?: string;
   createdAt: string;
@@ -76,65 +78,18 @@ const BUKU1_COL = 'pkk_buku_1_anggota';
 const BUKU1_KEY = 'sikepling_pkk_buku_1_v1';
 const BUKU1_CHAN = 'sikepling_buku_1_chan';
 
-const DEFAULT_BUKU1_ITEMS: PkkBuku1Anggota[] = [
-  {
-    id: 'anggota_pkk_ketua',
-    nik: '12711020010001',
-    nama: 'Ny. Fransiska Fery Arapenta Tarigan',
-    jabatan: 'Ketua Tim Penggerak PKK Kelurahan',
-    jenisKelamin: 'P',
-    tempatLahir: 'Medan',
-    tanggalLahir: '1985-05-12',
-    statusPerkawinan: 'Kawin',
-    statusPernikahan: 'Kawin',
-    alamat: 'Jl. Tembakau Raya No. 35 A, Kelurahan Mangga',
-    pendidikan: 'S-1',
-    pekerjaan: 'Ibu Rumah Tangga / Ketua Tim Penggerak PKK',
-    keterangan: 'Ketua Tim Penggerak PKK Kelurahan Mangga Periode Aktif',
-    createdAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'anggota_pkk_sekretaris',
-    nik: '12711020010002',
-    nama: 'Nur Aisyah Dewi, A.Md',
-    jabatan: 'Sekretaris Tim Penggerak PKK Kelurahan',
-    jenisKelamin: 'P',
-    tempatLahir: 'Medan',
-    tanggalLahir: '1990-08-20',
-    statusPerkawinan: 'Kawin',
-    statusPernikahan: 'Kawin',
-    alamat: 'Jl. Tembakau Raya No. 35 A, Kelurahan Mangga',
-    pendidikan: 'D-3',
-    pekerjaan: 'Sekretaris Tim Penggerak PKK Kelurahan Mangga',
-    keterangan: 'Sekretaris Tim Penggerak PKK Kelurahan Mangga Periode Aktif',
-    createdAt: '2026-01-01T00:00:00.000Z',
-  },
-  ...Array.from({ length: 24 }, (_, i) => {
-    const nomor = i + 1;
-    const roman = ROMAN_NUMERALS[i];
-    const pad = String(nomor).padStart(2, '0');
-    return {
-      id: `anggota_pkk_lingkungan_${nomor}`,
-      nik: `127110200100${pad}`,
-      nama: DEFAULT_PKK_LINGKUNGAN_NAMES[i] || `Ketua PKK Lingkungan ${roman}`,
-      jabatan: `Ketua Tim Penggerak PKK Lingkungan ${roman}`,
-      jenisKelamin: 'P' as const,
-      tempatLahir: 'Medan',
-      tanggalLahir: '1988-01-01',
-      statusPerkawinan: 'Kawin',
-      statusPernikahan: 'Kawin',
-      alamat: `Lingkungan ${roman}, Kelurahan Mangga`,
-      pendidikan: 'SMA / S-1',
-      pekerjaan: 'Ibu Rumah Tangga / Ketua TP PKK Lingkungan',
-      keterangan: `Ketua TP PKK Lingkungan ${roman}`,
-      createdAt: `2026-01-01T00:00:${pad}.000Z`,
-    };
-  }),
-];
+// 37 Data Anggota PKK Asli & Permanen dari Firestore
+export const DEFAULT_BUKU1_ITEMS: PkkBuku1Anggota[] = PKK_DEFAULT_ANGGOTA_LIST;
 
 export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => {
   const stored = safeGetLocalStorage<PkkBuku1Anggota[]>(BUKU1_KEY, DEFAULT_BUKU1_ITEMS);
-  const effectiveStored = Array.isArray(stored) && stored.length > 0 ? stored : DEFAULT_BUKU1_ITEMS;
+  // Pastikan data tersimpan tidak menggunakan format placeholder lama
+  const hasPlaceholder = Array.isArray(stored) && stored.some(x => x.id && x.id.startsWith('anggota_pkk_lingkungan_') && !x.pasphotoUrl);
+  const effectiveStored = (Array.isArray(stored) && stored.length >= 25 && !hasPlaceholder)
+    ? stored
+    : DEFAULT_BUKU1_ITEMS;
+  
+  safeSetLocalStorage(BUKU1_KEY, JSON.stringify(effectiveStored));
   syncBuku1ToPkkProfiles(effectiveStored);
   onUpdate(effectiveStored);
 
@@ -194,6 +149,14 @@ export const saveBuku1Item = async (item: PkkBuku1Anggota) => {
     }
   } catch (e) {}
   try {
+    fetch('/api/pkk/buku1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item: payload }),
+    }).catch(() => {});
+  } catch {}
+
+  try {
     if (db) {
       // Non-blocking Firestore save with 3.5s timeout guard so UI never hangs on slow cellular connections
       const savePromise = setDoc(doc(db, BUKU1_COL, item.id), cleanFirestoreData(payload));
@@ -211,6 +174,11 @@ export const deleteBuku1Item = async (id: string) => {
   const current = safeGetLocalStorage<PkkBuku1Anggota[]>(BUKU1_KEY, []);
   const updated = current.filter((x) => x.id !== id);
   safeSetLocalStorage(BUKU1_KEY, JSON.stringify(updated));
+  try {
+    fetch(`/api/pkk/buku1/${id}`, {
+      method: 'DELETE',
+    }).catch(() => {});
+  } catch {}
   try {
     if (db) {
       await deleteDoc(doc(db, BUKU1_COL, id));

@@ -219,30 +219,30 @@ export const KEPLING_ACCOUNTS: UserAccount[] = Array.from({ length: 24 }, (_, i)
 });
 
 export const DEFAULT_PKK_LINGKUNGAN_NAMES: string[] = [
-  'Ny. Juan Prananta Purba',
-  'Ny. Zulkarnaen Tarigan',
-  'Ny. Benny Irwansyah Sembiring',
-  'Ny. Andi Lopiga Sembiring',
-  'Ny. Eduard Ergunanta Tarigan',
-  'Ny. Nella Diva Filola Bangun',
-  'Ny. Salsalina Br Bangun',
-  'Ny. Reni Septiana',
-  'Ny. Teruna Irawan',
-  'Ny. Dina Novri Maulita',
-  'Ny. Zulaiha Lubis',
-  'Ny. Diki Alimsar',
-  'Ny. Anton Perwira Bangun',
-  'Ny. Dessy Novianti Lubis',
-  'Ny. M. Rizky Dwilianto Sembiring',
-  'Ny. Leo Said Eden Ginting',
-  'Ny. Roy Rinaldi Tambunan',
-  'Ny. Yuda Prabowo',
-  'Ny. Frimonta Sebayang',
-  'Ny. Maradu Tua',
-  'Ny. Muhammad Shiddiq',
-  'Ny. Dicky Ardian Depari',
-  'Ny. Hasanuddin Sitepu',
-  'Ny. Daniel Dianta Tarigan',
+  'Anggi Prisilya Br. Sembiring', // Lingkungan I
+  'Ny. Zulkarnaen Tarigan', // Lingkungan II
+  'Dewi artati', // Lingkungan III
+  'Leonila Br Ginting', // Lingkungan IV
+  'Ny. Eduard Ergunanta Tarigan', // Lingkungan V
+  'Ponianti', // Lingkungan VI
+  'Ny. Salsalina Br Bangun', // Lingkungan VII
+  'Sri nuraisyah', // Lingkungan VIII
+  'Irmaini', // Lingkungan IX
+  'Suriati Emma Maria Br Sipayung', // Lingkungan X
+  'Rohinsa Br. Lumbangaol', // Lingkungan XI
+  'Rosita', // Lingkungan XII
+  'Ny. Anton Perwira Bangun', // Lingkungan XIII
+  'Ny. Dessy Novianti Lubis', // Lingkungan XIV
+  'Juliani Barus', // Lingkungan XV
+  'Ny. Leo Said Eden Ginting', // Lingkungan XVI
+  'Ziah Ananda Putri', // Lingkungan XVII
+  'Ny. Yuda Prabowo', // Lingkungan XVIII
+  'Nurlinda', // Lingkungan XIX
+  'Ny. Maradu Tua', // Lingkungan XX
+  'Fitrianni Tanjung', // Lingkungan XXI
+  'Ny. Dicky Ardian Depari', // Lingkungan XXII
+  'Ny. Hasanuddin Sitepu', // Lingkungan XXIII
+  'Ny. Daniel Dianta Tarigan', // Lingkungan XXIV
 ];
 
 export const KETUA_PKK_LINGKUNGAN_ACCOUNTS: UserAccount[] = Array.from({ length: 24 }, (_, i) => {

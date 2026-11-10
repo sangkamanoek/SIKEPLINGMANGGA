@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana implementasi perbaikan dan optimasi fitur Surat Kedinasan (Firestore & Role Partitioning) untuk mengatasi data yang tidak tertampil di superadmin maupun PKK.",
-  "updatedAt":  "2026-11-07T19:31:34.003205803Z",
+  "summary":  "Rencana implementasi pemulihan permanen 37 data anggota PKK asli dari database Firestore ke dalam kode dan sistem aplikasi SI-MANGGA agar tidak pernah tertimpa lagi oleh data mock/placeholder.",
+  "updatedAt":  "2026-11-10T02:22:27.296487018Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
