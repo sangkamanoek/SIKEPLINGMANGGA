@@ -49,6 +49,8 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
   // Dedicated PKK Navigation Menu Items (Matching Official TP-PKK Structure)
   const pkkMenuItems: MenuItemConfig[] = [
     { id: 'hub', label: 'Pusat Menu PKK', icon: Compass },
+    { id: 'monitoring', label: 'Monitoring Laporan', icon: ShieldCheck, badge: 'MONITORING', badgeVariant: 'mint' },
+    { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'FISIK', badgeVariant: 'mint' },
     { id: 'kegiatan_pkk', label: 'Kegiatan PKK', icon: FileText, badge: 'POKJA', badgeVariant: 'mint' },
     { id: 'keuangan_pkk', label: 'Keuangan PKK', icon: Wallet, badge: 'BKU', badgeVariant: 'mint' },
     { id: 'dasa_wisma', label: 'Dasa Wisma', icon: Users, badge: '24 LINGK.', badgeVariant: 'mint' },
@@ -60,15 +62,15 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
   // Standard Kelurahan & Kepling Navigation Menu Items
   const standardMenuItems: MenuItemConfig[] = [
     { id: 'hub', label: 'Pusat Menu', icon: Compass },
-    ...(!isKepling && !isPkk ? [{ id: 'agenda' as AppTabType, label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' as const }] : []),
-    ...(!isKepling ? [{ id: 'monitoring' as AppTabType, label: 'Monitoring', icon: ShieldCheck }] : []),
+    { id: 'monitoring', label: 'Monitoring Laporan', icon: ShieldCheck, badge: 'MONITORING', badgeVariant: 'mint' },
+    { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
+    { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
     { id: 'capaian', label: 'Capaian Target', icon: Trophy },
-    { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' as const },
+    { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
     { id: 'form', label: 'Input Laporan', icon: FileText },
     { id: 'kunjungan', label: 'Kunjungan Warga', icon: Users },
     { id: 'database_keluarga', label: 'Data Keluarga', icon: Building2 },
     { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
-    { id: 'realisasi_pembangunan', label: 'Monitoring & Realisasi Pembangunan Wilayah', icon: Wrench },
   ];
 
 

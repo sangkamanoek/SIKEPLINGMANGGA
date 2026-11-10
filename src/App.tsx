@@ -462,13 +462,11 @@ export default function App() {
   // Strict Role Partitioning / Access Guard
   useEffect(() => {
     if (isPkk) {
-      const allowedPkkTabs = ['hub', 'kegiatan_pkk', 'keuangan_pkk', 'dasa_wisma', 'posyandu_pkk', 'buku_pkk', 'surat_kedinasan', 'daftar_tugas_khusus'];
+      const allowedPkkTabs = [
+        'hub', 'kegiatan_pkk', 'keuangan_pkk', 'dasa_wisma', 'posyandu_pkk',
+        'buku_pkk', 'surat_kedinasan', 'daftar_tugas_khusus', 'monitoring', 'realisasi_pembangunan'
+      ];
       if (!allowedPkkTabs.includes(activeTab)) {
-        setActiveTab('hub');
-      }
-    } else if (activeAccount?.role === 'kepling') {
-      const restrictedForKepling = ['monitoring', 'surat_kedinasan'];
-      if (restrictedForKepling.includes(activeTab)) {
         setActiveTab('hub');
       }
     }

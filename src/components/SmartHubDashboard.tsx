@@ -606,6 +606,30 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
 
     // Default: Super Admin or Kepling
     return [
+      {
+        id: 'monitoring',
+        title: 'Monitoring Laporan 24 Lingkungan',
+        desc: 'Pantau status pengiriman laporan harian, rekapitulasi kehadiran, dan kegiatan kebersihan/trantib 24 Lingkungan real-time.',
+        category: 'laporan',
+        icon: ShieldCheck,
+        iconBg: 'bg-teal-50 text-teal-700',
+        badge: 'MONITORING REALTIME',
+        badgeColor: 'bg-teal-100 text-teal-900',
+        bgGradient: 'bg-gradient-to-r from-teal-950 via-emerald-950 to-slate-900 text-white border-teal-600/60',
+        action: () => onNavigate('monitoring'),
+      },
+      {
+        id: 'realisasi_pembangunan',
+        title: 'Monitoring & Realisasi Pembangunan Wilayah',
+        desc: 'Pusat data realisasi fisik infrastruktur, Musrenbang, perbaikan jalan, drainase parit, LPJU, dan Bedah Rumah RTLH.',
+        category: 'laporan',
+        icon: Wrench,
+        iconBg: 'bg-rose-50 text-rose-700',
+        badge: 'SARPRAS & INFRASTRUKTUR',
+        badgeColor: 'bg-rose-100 text-rose-900',
+        bgGradient: 'bg-gradient-to-r from-rose-950 via-purple-950 to-slate-900 text-white border-rose-600/60',
+        action: () => onNavigate('realisasi_pembangunan'),
+      },
       // 1. GIAT HARIAN (DAILY ACTIVITIES)
       ...(isKepling
         ? [
@@ -618,7 +642,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
               iconBg: 'bg-emerald-50 text-emerald-600',
               badge: 'UTAMA',
               badgeColor: 'bg-red-100 text-red-800',
-              bgGradient: 'bg-gradient-to-r from-emerald-950 to-slate-900 text-white border-emerald-600/60',
               action: () => onNavigate('form'),
             },
           ]
