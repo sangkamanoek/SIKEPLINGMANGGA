@@ -356,6 +356,9 @@ export default function App() {
     'surat_kedinasan',
     'capaian_admin',
     'dashboard_kasi',
+    'monitoring',
+    'realisasi_pembangunan',
+    'riwayat',
   ], []);
 
   const KELURAHAN_RESTRICTED_TABS: AppTabType[] = useMemo(() => [

@@ -49,14 +49,30 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
   // Dedicated PKK Navigation Menu Items (Matching Official TP-PKK Structure)
   const pkkMenuItems: MenuItemConfig[] = [
     { id: 'hub', label: 'Pusat Menu PKK', icon: Compass },
-    { id: 'monitoring', label: 'Monitoring Laporan', icon: ShieldCheck, badge: 'MONITORING', badgeVariant: 'mint' },
-    { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'FISIK', badgeVariant: 'mint' },
     { id: 'kegiatan_pkk', label: 'Kegiatan PKK', icon: FileText, badge: 'POKJA', badgeVariant: 'mint' },
     { id: 'keuangan_pkk', label: 'Keuangan PKK', icon: Wallet, badge: 'BKU', badgeVariant: 'mint' },
     { id: 'dasa_wisma', label: 'Dasa Wisma', icon: Users, badge: '24 LINGK.', badgeVariant: 'mint' },
     { id: 'posyandu_pkk', label: 'Laporan Posyandu', icon: Baby, badge: 'POKJA IV', badgeVariant: 'rose' },
     { id: 'buku_pkk', label: '6 Buku Wajib PKK', icon: BookOpen, badge: 'BUKU I-VI', badgeVariant: 'mint' },
     { id: 'daftar_tugas_khusus', label: 'Daftar Tugas Khusus', icon: Award, badge: 'TUGAS', badgeVariant: 'mint' },
+  ];
+
+  // Dedicated Superadmin Navigation Menu Items (Access to All Kelurahan & PKK Features)
+  const superAdminMenuItems: MenuItemConfig[] = [
+    { id: 'hub', label: 'Pusat Eksekutif', icon: Compass },
+    { id: 'monitoring', label: 'Monitoring Laporan', icon: ShieldCheck, badge: 'MONITORING', badgeVariant: 'mint' },
+    { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
+    { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
+    { id: 'capaian_admin', label: 'Capaian Target', icon: Trophy, badge: 'TARGET', badgeVariant: 'mint' },
+    { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
+    { id: 'surat_kedinasan', label: 'Surat Kedinasan', icon: Mail, badge: 'SURAT', badgeVariant: 'mint' },
+    { id: 'kegiatan_pkk', label: 'Kegiatan PKK', icon: FileText, badge: 'PKK', badgeVariant: 'mint' },
+    { id: 'keuangan_pkk', label: 'Keuangan PKK', icon: Wallet, badge: 'BKU PKK', badgeVariant: 'mint' },
+    { id: 'dasa_wisma', label: 'Dasa Wisma', icon: Users, badge: 'DAWIS', badgeVariant: 'mint' },
+    { id: 'posyandu_pkk', label: 'Laporan Posyandu', icon: Baby, badge: 'POSYANDU', badgeVariant: 'rose' },
+    { id: 'buku_pkk', label: '6 Buku Wajib PKK', icon: BookOpen, badge: 'BUKU PKK', badgeVariant: 'mint' },
+    { id: 'kunjungan', label: 'Kunjungan Warga', icon: Users },
+    { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
   ];
 
   // Standard Kelurahan & Kepling Navigation Menu Items
@@ -72,8 +88,8 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
   ];
 
-
-  const menuItems = isPkk ? pkkMenuItems : standardMenuItems;
+  const isSuperAdmin = activeAccount?.role === 'super_admin';
+  const menuItems = isSuperAdmin ? superAdminMenuItems : isPkk ? pkkMenuItems : standardMenuItems;
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
