@@ -87,6 +87,9 @@ const PkkKegiatanView = React.lazy(() =>
 const PkkPosyanduView = React.lazy(() =>
   import('./components/PkkPosyanduView').then((m) => ({ default: m.PkkPosyanduView }))
 );
+const PkkDasaWismaView = React.lazy(() =>
+  import('./components/PkkDasaWismaView').then((m) => ({ default: m.PkkDasaWismaView }))
+);
 const LaporanKeuanganPkkView = React.lazy(() =>
   import('./components/LaporanKeuanganPkkView').then((m) => ({ default: m.LaporanKeuanganPkkView }))
 );
@@ -295,8 +298,6 @@ export default function App() {
     'surat_kedinasan',
     'capaian_admin',
     'dashboard_kasi',
-    'monitoring',
-    'realisasi_pembangunan',
     'riwayat',
   ], []);
 
@@ -304,6 +305,7 @@ export default function App() {
     'keuangan_pkk',
     'kegiatan_pkk',
     'posyandu_pkk',
+    'dasa_wisma',
     'buku_pkk',
   ], []);
 
@@ -675,6 +677,12 @@ export default function App() {
 
         {activeTab === 'posyandu_pkk' && (
           <PkkPosyanduView
+            currentUser={activeAccount}
+            onShowToast={showToast}
+          />
+        )}
+        {activeTab === 'dasa_wisma' && (
+          <PkkDasaWismaView
             currentUser={activeAccount}
             onShowToast={showToast}
           />

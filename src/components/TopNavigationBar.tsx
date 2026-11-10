@@ -54,6 +54,8 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'dasa_wisma', label: 'Dasa Wisma', icon: Users, badge: '24 LINGK.', badgeVariant: 'mint' },
     { id: 'posyandu_pkk', label: 'Laporan Posyandu', icon: Baby, badge: 'POKJA IV', badgeVariant: 'rose' },
     { id: 'buku_pkk', label: '6 Buku Wajib PKK', icon: BookOpen, badge: 'BUKU I-VI', badgeVariant: 'mint' },
+    { id: 'monitoring', label: 'Monitoring Laporan', icon: ShieldCheck, badge: 'LAPORAN', badgeVariant: 'mint' },
+    { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
     { id: 'daftar_tugas_khusus', label: 'Daftar Tugas Khusus', icon: Award, badge: 'TUGAS', badgeVariant: 'mint' },
   ];
 

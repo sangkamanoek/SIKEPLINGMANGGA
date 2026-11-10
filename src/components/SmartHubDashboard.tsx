@@ -434,6 +434,17 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         action: () => onNavigate('posyandu_pkk'),
       },
       {
+        id: 'dasa_wisma',
+        title: 'Rekapitulasi Dasa Wisma 24 Lingkungan',
+        desc: 'Pencatatan kelompok Dasa Wisma, identitas ketua, binaan KK, ibu hamil, balita, lansia, & jamban sehat terpisah per-lingkungan.',
+        category: 'laporan',
+        icon: Users,
+        iconBg: 'bg-emerald-50 text-emerald-700',
+        badge: 'DASA WISMA',
+        badgeColor: 'bg-emerald-100 text-emerald-900',
+        action: () => onNavigate('dasa_wisma'),
+      },
+      {
         id: 'buku_pkk',
         title: '6 Buku Wajib Administrasi PKK',
         desc: 'Buku 1 Data Anggota, Buku 4 Notulen Rapat, Buku 5 Inventaris Aset, dan buku register wajib administrasi PKK.',
@@ -843,7 +854,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 font-medium max-w-2xl">
               SI-MANGGA • Sistem Informasi & Administrasi Kelurahan Mangga. 
-              {isKepling && ` Melayani warga di Lingkungan ${activeAccount.lingkungan}, Kec. Medan Tuntungan.`}
+              {isKepling && ` Melayani warga di ${activeAccount.lingkungan ? (activeAccount.lingkungan.startsWith('Lingkungan') ? activeAccount.lingkungan : `Lingkungan ${activeAccount.lingkungan}`) : 'wilayah tugas'}, Kec. Medan Tuntungan.`}
               {isAdmin && " Dashboard Eksekutif Super Admin. Kelola seluruh 24 lingkungan secara real-time."}
               {isKasi && " Dashboard Kasi Sektoral. Evaluasi, verifikasi, dan pantau capaian kinerja bidang Anda."}
             </p>

@@ -26,8 +26,10 @@ import {
   Database,
   Smartphone,
   X,
+  Wrench,
 } from 'lucide-react';
 import { UserAccount } from '../types';
+import { AppTabType } from './MobileBottomNav';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { AgendaKelurahanBanner } from './AgendaKelurahanBanner';
 import {
@@ -39,6 +41,7 @@ import {
   subscribePkkKegiatan,
   POKJA_LABELS,
 } from '../lib/pkkKegiatanService';
+import { getLocalDasaWismaList } from '../lib/pkkDasaWismaService';
 
 import {
   syncPkkDeviceDataToLiveFirestore,
@@ -47,7 +50,7 @@ import {
 
 interface PkkHubDashboardProps {
   currentUser: UserAccount;
-  onNavigateTab: (tab: 'keuangan_pkk' | 'kegiatan_pkk' | 'posyandu_pkk') => void;
+  onNavigateTab: (tab: AppTabType) => void;
   onOpenUpdateModal?: () => void;
 }
 
@@ -235,8 +238,8 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
 
       <AgendaKelurahanBanner activeAccount={currentUser} />
 
-      {/* 3 Main Action Modules (Segregated specifically for PKK) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      {/* Main Action Modules (Segregated specifically for PKK) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {/* Module 1: Buku Kas Umum (BKU) */}
         <div
           onClick={() => onNavigateTab('keuangan_pkk')}
@@ -293,7 +296,33 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
           </div>
         </div>
 
-
+        {/* Module 3: Rekapitulasi Dasa Wisma */}
+        <div
+          onClick={() => onNavigateTab('dasa_wisma')}
+          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-emerald-600 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
+          <div>
+            <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center mb-4 group-hover:bg-emerald-700 group-hover:text-white transition-colors">
+              <Users className="w-6 h-6" />
+            </div>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base font-bold text-slate-900 group-hover:text-emerald-800 transition-colors">
+                Dasa Wisma 24 Lingkungan
+              </h2>
+              <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                24 Lingkungan
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              Pencatatan kelompok Dasa Wisma, identitas ketua, jumlah KK binaan, ibu hamil, balita, dan jamban sehat terpisah per lingkungan.
+            </p>
+          </div>
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-700 group-hover:translate-x-1 transition-transform">
+            <span>Buka Dasa Wisma</span>
+            <ChevronRight className="w-4 h-4" />
+          </div>
+        </div>
 
         {/* Module 4: Laporan Posyandu (Pokja IV) */}
         <div
@@ -319,6 +348,90 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
           </div>
           <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-rose-700 group-hover:translate-x-1 transition-transform">
             <span>Buka Laporan Posyandu</span>
+            <ChevronRight className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Module 5: 6 Buku Wajib Administrasi PKK */}
+        <div
+          onClick={() => onNavigateTab('buku_pkk')}
+          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-indigo-500 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
+          <div>
+            <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-800 flex items-center justify-center mb-4 group-hover:bg-indigo-700 group-hover:text-white transition-colors">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base font-bold text-slate-900 group-hover:text-indigo-800 transition-colors">
+                6 Buku Wajib PKK
+              </h2>
+              <span className="text-[10px] font-black text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                Buku I - VI
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              Administrasi wajib: Susunan Pengurus, Data Anggota, Agenda Surat, Notulen Rapat, Keuangan Kas, dan Inventaris Barang.
+            </p>
+          </div>
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-indigo-700 group-hover:translate-x-1 transition-transform">
+            <span>Buka 6 Buku Wajib</span>
+            <ChevronRight className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Module 6: Monitoring Laporan Kelurahan */}
+        <div
+          onClick={() => onNavigateTab('monitoring')}
+          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-teal-600 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-teal-50 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
+          <div>
+            <div className="w-12 h-12 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center mb-4 group-hover:bg-teal-700 group-hover:text-white transition-colors">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base font-bold text-slate-900 group-hover:text-teal-800 transition-colors">
+                Monitoring Laporan
+              </h2>
+              <span className="text-[10px] font-black text-teal-800 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+                Kelurahan
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              Pantau laporan harian kegiatan kerja 24 kepala lingkungan, dokumentasi foto lapangan, dan rekapitulasi kelurahan.
+            </p>
+          </div>
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-teal-700 group-hover:translate-x-1 transition-transform">
+            <span>Lihat Monitoring Laporan</span>
+            <ChevronRight className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Module 7: Realisasi Pembangunan */}
+        <div
+          onClick={() => onNavigateTab('realisasi_pembangunan')}
+          className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-amber-500 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
+          <div>
+            <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mb-4 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+              <Wrench className="w-6 h-6" />
+            </div>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base font-bold text-slate-900 group-hover:text-amber-800 transition-colors">
+                Realisasi Pembangunan
+              </h2>
+              <span className="text-[10px] font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                Fisik
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              Dokumentasi komparasi progres fisik sarana dan prasarana kelurahan (0%, 50%, 100%) di 24 lingkungan.
+            </p>
+          </div>
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-700 group-hover:translate-x-1 transition-transform">
+            <span>Buka Pembangunan Fisik</span>
             <ChevronRight className="w-4 h-4" />
           </div>
         </div>

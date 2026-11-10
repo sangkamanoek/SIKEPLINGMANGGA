@@ -154,6 +154,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
   const [taskDeadline, setTaskDeadline] = useState(todayIso);
   const [taskError, setTaskError] = useState('');
   const [taskSuccess, setTaskSuccess] = useState('');
+  const [copiedWa, setCopiedWa] = useState<boolean>(false);
 
   useEffect(() => {
     // 1. Initial cached values

@@ -616,7 +616,17 @@ export interface PkkDasaWismaItem {
   namaKelompok: string;
   lingkunganNomor: number;
   namaKetua: string;
-  jumlahAnggota: number;
+  teleponKetua?: string;
+  rtRw?: string;
+  jumlahAnggota?: number;
+  jumlahKk?: number;
+  jumlahJiwa?: number;
+  jumlahIbuHamil?: number;
+  jumlahBalita?: number;
+  jumlahLansia?: number;
+  jumlahJambanSehat?: number;
+  kegiatanUtama?: string;
+  catatan?: string;
   createdAt: string;
   updatedAt?: string;
 }

@@ -89,7 +89,6 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
     : DEFAULT_BUKU1_ITEMS;
   
   safeSetLocalStorage(BUKU1_KEY, JSON.stringify(effectiveStored));
-  syncBuku1ToPkkProfiles(effectiveStored);
   onUpdate(effectiveStored);
 
   let unsub: Unsubscribe | undefined;
@@ -108,7 +107,6 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
         });
         items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         safeSetLocalStorage(BUKU1_KEY, JSON.stringify(items));
-        syncBuku1ToPkkProfiles(items);
         onUpdate(items);
       });
     }
@@ -120,7 +118,6 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
       bc = new BroadcastChannel(BUKU1_CHAN);
       bc.onmessage = (e) => {
         if (e.data && e.data.items) {
-          syncBuku1ToPkkProfiles(e.data.items);
           onUpdate(e.data.items);
         }
       };
@@ -139,7 +136,6 @@ export const saveBuku1Item = async (item: PkkBuku1Anggota) => {
   const idx = current.findIndex((x) => x.id === item.id);
   const updated = idx >= 0 ? current.map((x) => (x.id === item.id ? payload : x)) : [payload, ...current];
   safeSetLocalStorage(BUKU1_KEY, JSON.stringify(updated));
-  syncBuku1ToPkkProfiles(updated);
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(BUKU1_CHAN);
