@@ -10,49 +10,105 @@ import {
 import { HeaderBanner } from './components/HeaderBanner';
 import { MobileBottomNav, AppTabType } from './components/MobileBottomNav';
 import { SmartHubDashboard } from './components/SmartHubDashboard';
-import { FormLaporan } from './components/FormLaporan';
-import { MonitoringSuperAdmin } from './components/MonitoringSuperAdmin';
-import { RiwayatLaporan } from './components/RiwayatLaporan';
-import { RekapPbbView } from './components/RekapPbbView';
-import { DashboardCapaianKepling } from './components/DashboardCapaianKepling';
-import { RekapAbsensiSuperAdmin } from './components/RekapAbsensiSuperAdmin';
-import { SuratKedinasanView } from './components/SuratKedinasanView';
-import { DatabaseKeluargaView } from './components/DatabaseKeluargaView';
-import { RealisasiPembangunanView } from './components/RealisasiPembangunanView';
-import { DaftarTugasKhususView } from './components/DaftarTugasKhususView';
-import { AgendaKelurahanView } from './components/AgendaKelurahanView';
+import { LoginPage } from './components/LoginPage';
+import { TopNavigationBar } from './components/TopNavigationBar';
+import { KeplingAlertBanner } from './components/KeplingAlertBanner';
+import { AppUpdateToastBanner } from './components/AppUpdateToastBanner';
+import { ComponentLoader } from './components/ComponentLoader';
 
-import { AbsenKegiatanKhusus } from './components/AbsenKegiatanKhusus';
-import { useFeatureNotifications } from './hooks/useFeatureNotifications';
-import { KunjunganHarianView } from './components/KunjunganHarianView';
-import { DashboardPbbKasi } from './components/DashboardPbbKasi';
-import { DashboardPerlinsosKasi } from './components/DashboardPerlinsosKasi';
-import { DashboardTrantibumKasi } from './components/DashboardTrantibumKasi';
-import { PkkHubDashboard } from './components/PkkHubDashboard';
-import { PkkBukuAdministrasiView } from './components/PkkBukuAdministrasiView';
-import { PkkKegiatanView } from './components/PkkKegiatanView';
-import { PkkDasaWismaView } from './components/PkkDasaWismaView';
-import { PkkPosyanduView } from './components/PkkPosyanduView';
-import { LaporanKeuanganPkkView } from './components/LaporanKeuanganPkkView';
-
+// Modals - Eager for fast user interaction
 import { AccountSelectorModal } from './components/AccountSelectorModal';
 import { AbsenApelModal } from './components/AbsenApelModal';
 import { UbahPasswordModal } from './components/UbahPasswordModal';
 import { EditProfileModal } from './components/EditProfileModal';
-import { PanduanPPTModal } from './components/PanduanPPTModal';
 import { AppUpdateModal } from './components/AppUpdateModal';
 import { PWAInstallModal } from './components/PWAInstallModal';
-import { AppUpdateToastBanner } from './components/AppUpdateToastBanner';
-import { LoginPage } from './components/LoginPage';
-import { TopNavigationBar } from './components/TopNavigationBar';
-import { SyncVerificationModal } from './components/SyncVerificationModal';
-import { KeplingAlertBanner } from './components/KeplingAlertBanner';
 import { NotifikasiSoundSettingsModal } from './components/NotifikasiSoundSettingsModal';
+
+// Heavy Modals - Lazy loaded
+const PanduanPPTModal = React.lazy(() =>
+  import('./components/PanduanPPTModal').then((m) => ({ default: m.PanduanPPTModal }))
+);
+const SyncVerificationModal = React.lazy(() =>
+  import('./components/SyncVerificationModal').then((m) => ({ default: m.SyncVerificationModal }))
+);
+const DetailLaporanModal = React.lazy(() =>
+  import('./components/DetailLaporanModal').then((m) => ({ default: m.DetailLaporanModal }))
+);
+
+// Heavy Views & Modules - Lazy loaded for lightning-fast initial page paint
+const FormLaporan = React.lazy(() =>
+  import('./components/FormLaporan').then((m) => ({ default: m.FormLaporan }))
+);
+const MonitoringSuperAdmin = React.lazy(() =>
+  import('./components/MonitoringSuperAdmin').then((m) => ({ default: m.MonitoringSuperAdmin }))
+);
+const RiwayatLaporan = React.lazy(() =>
+  import('./components/RiwayatLaporan').then((m) => ({ default: m.RiwayatLaporan }))
+);
+const RekapPbbView = React.lazy(() =>
+  import('./components/RekapPbbView').then((m) => ({ default: m.RekapPbbView }))
+);
+const DashboardCapaianKepling = React.lazy(() =>
+  import('./components/DashboardCapaianKepling').then((m) => ({ default: m.DashboardCapaianKepling }))
+);
+const RekapAbsensiSuperAdmin = React.lazy(() =>
+  import('./components/RekapAbsensiSuperAdmin').then((m) => ({ default: m.RekapAbsensiSuperAdmin }))
+);
+const SuratKedinasanView = React.lazy(() =>
+  import('./components/SuratKedinasanView').then((m) => ({ default: m.SuratKedinasanView }))
+);
+const DatabaseKeluargaView = React.lazy(() =>
+  import('./components/DatabaseKeluargaView').then((m) => ({ default: m.DatabaseKeluargaView }))
+);
+const RealisasiPembangunanView = React.lazy(() =>
+  import('./components/RealisasiPembangunanView').then((m) => ({ default: m.RealisasiPembangunanView }))
+);
+const DaftarTugasKhususView = React.lazy(() =>
+  import('./components/DaftarTugasKhususView').then((m) => ({ default: m.DaftarTugasKhususView }))
+);
+const AgendaKelurahanView = React.lazy(() =>
+  import('./components/AgendaKelurahanView').then((m) => ({ default: m.AgendaKelurahanView }))
+);
+const AbsenKegiatanKhusus = React.lazy(() =>
+  import('./components/AbsenKegiatanKhusus').then((m) => ({ default: m.AbsenKegiatanKhusus }))
+);
+const KunjunganHarianView = React.lazy(() =>
+  import('./components/KunjunganHarianView').then((m) => ({ default: m.KunjunganHarianView }))
+);
+const DashboardPbbKasi = React.lazy(() =>
+  import('./components/DashboardPbbKasi').then((m) => ({ default: m.DashboardPbbKasi }))
+);
+const DashboardPerlinsosKasi = React.lazy(() =>
+  import('./components/DashboardPerlinsosKasi').then((m) => ({ default: m.DashboardPerlinsosKasi }))
+);
+const DashboardTrantibumKasi = React.lazy(() =>
+  import('./components/DashboardTrantibumKasi').then((m) => ({ default: m.DashboardTrantibumKasi }))
+);
+const PkkHubDashboard = React.lazy(() =>
+  import('./components/PkkHubDashboard').then((m) => ({ default: m.PkkHubDashboard }))
+);
+const PkkBukuAdministrasiView = React.lazy(() =>
+  import('./components/PkkBukuAdministrasiView').then((m) => ({ default: m.PkkBukuAdministrasiView }))
+);
+const PkkKegiatanView = React.lazy(() =>
+  import('./components/PkkKegiatanView').then((m) => ({ default: m.PkkKegiatanView }))
+);
+const PkkDasaWismaView = React.lazy(() =>
+  import('./components/PkkDasaWismaView').then((m) => ({ default: m.PkkDasaWismaView }))
+);
+const PkkPosyanduView = React.lazy(() =>
+  import('./components/PkkPosyanduView').then((m) => ({ default: m.PkkPosyanduView }))
+);
+const LaporanKeuanganPkkView = React.lazy(() =>
+  import('./components/LaporanKeuanganPkkView').then((m) => ({ default: m.LaporanKeuanganPkkView }))
+);
+
+import { useFeatureNotifications } from './hooks/useFeatureNotifications';
 import { useAgendaTugasRealtimeAlert } from './hooks/useAgendaTugasRealtimeAlert';
 
 import { getDefaultTargetsCapaianMap } from './data/targetsData';
 import { fetchAllReports, saveReportToServer, subscribeReportsFromFirestore, deleteReportFromServer } from './lib/reportsApi';
-import { DetailLaporanModal } from './components/DetailLaporanModal';
 import { subscribeKunjungan, KunjunganWargaData } from './lib/kunjunganService';
 import { getTodayLocalIso } from './lib/formatter';
 import { safeGetLocalStorage, safeSetLocalStorage } from './lib/safeStorage';
@@ -472,7 +528,8 @@ export default function App() {
 
       {/* Main View Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-4">
-        {/* TAB 1: SmartHub Dashboard */}
+        <React.Suspense fallback={<ComponentLoader label="Memuat modul tampilan..." />}>
+          {/* TAB 1: SmartHub Dashboard */}
         {activeTab === 'hub' && (
           isPkk ? (
             <PkkHubDashboard
@@ -715,6 +772,7 @@ export default function App() {
             onShowToast={showToast}
           />
         )}
+        </React.Suspense>
       </main>
 
       {/* Mobile Bottom Navigation */}
@@ -761,10 +819,14 @@ export default function App() {
         }}
       />
 
-      <PanduanPPTModal
-        isOpen={isPPTModalOpen}
-        onClose={() => setIsPPTModalOpen(false)}
-      />
+      {isPPTModalOpen && (
+        <React.Suspense fallback={null}>
+          <PanduanPPTModal
+            isOpen={isPPTModalOpen}
+            onClose={() => setIsPPTModalOpen(false)}
+          />
+        </React.Suspense>
+      )}
 
       <AppUpdateModal
         isOpen={isAppUpdateOpen}
@@ -776,17 +838,21 @@ export default function App() {
         onClose={() => setIsInstallModalOpen(false)}
       />
 
-      <SyncVerificationModal
-        isOpen={isSyncVerificationOpen}
-        onClose={() => setIsSyncVerificationOpen(false)}
-        localReports={reports}
-        currentUser={activeAccount}
-        onSyncComplete={(updated) => {
-          setReports(updated);
-          safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(updated));
-        }}
-        showToast={showToast}
-      />
+      {isSyncVerificationOpen && (
+        <React.Suspense fallback={null}>
+          <SyncVerificationModal
+            isOpen={isSyncVerificationOpen}
+            onClose={() => setIsSyncVerificationOpen(false)}
+            localReports={reports}
+            currentUser={activeAccount}
+            onSyncComplete={(updated) => {
+              setReports(updated);
+              safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(updated));
+            }}
+            showToast={showToast}
+          />
+        </React.Suspense>
+      )}
 
       <NotifikasiSoundSettingsModal
         isOpen={isNotifSoundModalOpen}
@@ -794,20 +860,24 @@ export default function App() {
         currentUser={activeAccount}
       />
 
-      <DetailLaporanModal
-        item={selectedReportForModal}
-        isOpen={isDetailModalOpen}
-        onClose={() => {
-          setIsDetailModalOpen(false);
-          setSelectedReportForModal(null);
-        }}
-        sheetMeta={null}
-        hasGoogleAuth={false}
-        isAdmin={activeAccount?.role === 'super_admin' || activeAccount?.role === 'sekretaris'}
-        attendanceList={effectiveAttendanceList}
-        onUpdateReport={handleUpdateReport}
-        onDeleteReport={activeAccount?.role === 'super_admin' ? handleDeleteReport : undefined}
-      />
+      {isDetailModalOpen && (
+        <React.Suspense fallback={null}>
+          <DetailLaporanModal
+            item={selectedReportForModal}
+            isOpen={isDetailModalOpen}
+            onClose={() => {
+              setIsDetailModalOpen(false);
+              setSelectedReportForModal(null);
+            }}
+            sheetMeta={null}
+            hasGoogleAuth={false}
+            isAdmin={activeAccount?.role === 'super_admin' || activeAccount?.role === 'sekretaris'}
+            attendanceList={effectiveAttendanceList}
+            onUpdateReport={handleUpdateReport}
+            onDeleteReport={activeAccount?.role === 'super_admin' ? handleDeleteReport : undefined}
+          />
+        </React.Suspense>
+      )}
 
       {/* Floating Toast Notification */}
       {toast && (

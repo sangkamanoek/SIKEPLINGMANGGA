@@ -46,7 +46,12 @@ import { parsePbbCsv } from '../utils/pbbParser';
 import { UserAccount } from '../types';
 import { DuplicateCheckBadge } from './DuplicateCheckBadge';
 import { checkNopDuplicate } from '../lib/duplicateCheckService';
-import { PbbTrendCharts } from './PbbTrendCharts';
+import { ComponentLoader } from './ComponentLoader';
+
+// Lazy load heavy chart view (which pulls in all Recharts components)
+const PbbTrendCharts = React.lazy(() =>
+  import('./PbbTrendCharts').then((m) => ({ default: m.PbbTrendCharts }))
+);
 import {
   ResponsiveContainer,
   BarChart,
@@ -2498,16 +2503,18 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
       {/* SUB-TAB: GRAFIK & TREN REALISASI */}
       {activeSubTab === 'grafik_tren' && (
-        <PbbTrendCharts
-          selectedYear={selectedYear}
-          selectedLingkungan={selectedLingkungan}
-          onSelectLingkungan={setSelectedLingkungan}
-          spptList={spptList}
-          summaryByLingkungan={summaryByLingkungan}
-          kelurahanTotals={kelurahanTotals}
-          isKepling={isKepling}
-          keplingLingkunganNum={keplingLingkunganNum}
-        />
+        <React.Suspense fallback={<ComponentLoader label="Memuat grafik tren & komparasi PBB-P2..." minHeight="min-h-[350px]" />}>
+          <PbbTrendCharts
+            selectedYear={selectedYear}
+            selectedLingkungan={selectedLingkungan}
+            onSelectLingkungan={setSelectedLingkungan}
+            spptList={spptList}
+            summaryByLingkungan={summaryByLingkungan}
+            kelurahanTotals={kelurahanTotals}
+            isKepling={isKepling}
+            keplingLingkunganNum={keplingLingkunganNum}
+          />
+        </React.Suspense>
       )}
 
       {/* SUB-TAB 2: DETAIL SPPT PER WP */}

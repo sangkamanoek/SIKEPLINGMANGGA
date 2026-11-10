@@ -52,8 +52,15 @@ import {
   subscribeTargetsFromFirestore,
 } from '../lib/targetsApi';
 import { ModalEditTargetCapaian } from './ModalEditTargetCapaian';
-import { GrafikTrenBulanan } from './GrafikTrenBulanan';
-import { GrafikTrenMingguan } from './GrafikTrenMingguan';
+import { ComponentLoader } from './ComponentLoader';
+
+// Lazy load heavy chart components that import Recharts
+const GrafikTrenBulanan = React.lazy(() =>
+  import('./GrafikTrenBulanan').then((m) => ({ default: m.GrafikTrenBulanan }))
+);
+const GrafikTrenMingguan = React.lazy(() =>
+  import('./GrafikTrenMingguan').then((m) => ({ default: m.GrafikTrenMingguan }))
+);
 import { isReportMatchingKepling, getReportIsoDate, isKunjunganMatchingKepling, getLingkunganIndex } from '../lib/formatter';
 import {
   getLocalKunjunganList,
@@ -1934,23 +1941,24 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </div>
           )}
 
-          {/* Grafik Garis Tren Mingguan Selama Satu Bulan Terakhir (Recharts) */}
-          <GrafikTrenMingguan
-            reports={reports}
-            activeAccount={activeAccount}
-            mode="kepling"
-            attendanceList={attendanceList}
-            kunjunganList={kunjunganList}
-            title={`Tren Capaian & Konsistensi Kinerja Mingguan (${activeAccount.lingkungan})`}
-          />
+          {/* Grafik Garis Tren Mingguan & Bulanan (Lazy Loaded Recharts) */}
+          <React.Suspense fallback={<ComponentLoader label="Memuat grafik tren kinerja..." minHeight="min-h-[220px]" />}>
+            <GrafikTrenMingguan
+              reports={reports}
+              activeAccount={activeAccount}
+              mode="kepling"
+              attendanceList={attendanceList}
+              kunjunganList={kunjunganList}
+              title={`Tren Capaian & Konsistensi Kinerja Mingguan (${activeAccount.lingkungan})`}
+            />
 
-          {/* Grafik Batang Tren Laporan Bulanan (Recharts) */}
-          <GrafikTrenBulanan
-            reports={reports}
-            activeAccount={activeAccount}
-            mode="kepling"
-            title={`Tren Jumlah Laporan Selesai per Bulan (${activeAccount.lingkungan})`}
-          />
+            <GrafikTrenBulanan
+              reports={reports}
+              activeAccount={activeAccount}
+              mode="kepling"
+              title={`Tren Jumlah Laporan Selesai per Bulan (${activeAccount.lingkungan})`}
+            />
+          </React.Suspense>
 
           {/* Riwayat Capaian Harian Kepling Terbaru */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm">
@@ -2239,22 +2247,23 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </div>
           </div>
 
-          {/* Grafik Garis Tren Mingguan Seluruh Lingkungan / Per Kepling (Recharts) */}
-          <GrafikTrenMingguan
-            reports={reports}
-            activeAccount={activeAccount}
-            mode="super_admin"
-            attendanceList={attendanceList}
-            kunjunganList={kunjunganList}
-            title="Tren & Konsistensi Capaian Mingguan Se-Kelurahan Mangga"
-          />
+          {/* Grafik Garis Tren Mingguan & Bulanan (Lazy Loaded Recharts) */}
+          <React.Suspense fallback={<ComponentLoader label="Memuat grafik tren kelurahan..." minHeight="min-h-[220px]" />}>
+            <GrafikTrenMingguan
+              reports={reports}
+              activeAccount={activeAccount}
+              mode="super_admin"
+              attendanceList={attendanceList}
+              kunjunganList={kunjunganList}
+              title="Tren & Konsistensi Capaian Mingguan Se-Kelurahan Mangga"
+            />
 
-          {/* Grafik Batang Tren Laporan Bulanan Seluruh Lingkungan (Recharts) */}
-          <GrafikTrenBulanan
-            reports={reports}
-            activeAccount={activeAccount}
-            mode="super_admin"
-          />
+            <GrafikTrenBulanan
+              reports={reports}
+              activeAccount={activeAccount}
+              mode="super_admin"
+            />
+          </React.Suspense>
 
           {/* Leaderboard & Ranking Section - 7 Kriteria Terpadu */}
           <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-7 shadow-sm">
