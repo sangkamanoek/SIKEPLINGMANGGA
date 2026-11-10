@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana implementasi pemulihan permanen 37 data anggota PKK asli dari database Firestore ke dalam kode dan sistem aplikasi SI-MANGGA agar tidak pernah tertimpa lagi oleh data mock/placeholder.",
-  "updatedAt":  "2026-11-10T02:22:27.296487018Z",
+  "summary":  "Rencana implementasi percepatan pemuatan data kunjungan warga (0-detik) melalui cache server lokal dan IndexedDB, serta penyajian badge akumulatif 235 data kunjungan lengkap dengan tombol pintas periode.",
+  "updatedAt":  "2026-11-10T02:54:21.655312828Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

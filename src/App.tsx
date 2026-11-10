@@ -109,7 +109,7 @@ import { useAgendaTugasRealtimeAlert } from './hooks/useAgendaTugasRealtimeAlert
 
 import { getDefaultTargetsCapaianMap } from './data/targetsData';
 import { fetchAllReports, saveReportToServer, subscribeReportsFromFirestore, deleteReportFromServer } from './lib/reportsApi';
-import { subscribeKunjungan, KunjunganWargaData } from './lib/kunjunganService';
+import { subscribeKunjungan, getLocalKunjunganList, KunjunganWargaData } from './lib/kunjunganService';
 import { getTodayLocalIso } from './lib/formatter';
 import { safeGetLocalStorage, safeSetLocalStorage } from './lib/safeStorage';
 import { subscribeAttendance, loadAllAttendance } from './lib/attendanceApi';
@@ -162,7 +162,7 @@ export default function App() {
   const [reports, setReports] = useState<LaporanHarianItem[]>(() => {
     return safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_LOCAL_KEY, []);
   });
-  const [kunjunganList, setKunjunganList] = useState<KunjunganWargaData[]>([]);
+  const [kunjunganList, setKunjunganList] = useState<KunjunganWargaData[]>(() => getLocalKunjunganList());
   const [attendanceList, setAttendanceList] = useState<AbsenApelItem[]>(() => loadAllAttendance());
   const [presensiSubTab, setPresensiSubTab] = useState<'apel' | 'khusus'>('apel');
   const [selectedAbsensiDate, setSelectedAbsensiDate] = useState<string>(() => getTodayLocalIso());

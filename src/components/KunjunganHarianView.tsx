@@ -594,6 +594,55 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         )}
       </div>
 
+      {/* 1.5 ACCUMULATIVE VISITS STATUS BANNER */}
+      <div className="bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-emerald-800/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-black tracking-wide border border-emerald-400/30 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              DATABASE KUNJUNGAN AKTIF
+            </span>
+            <span className="text-xs text-slate-300 font-medium">
+              Total Tercatat: <strong className="text-amber-300 font-black text-sm">{visits.length} Kunjungan Warga</strong>
+            </span>
+          </div>
+          <div className="text-xs text-slate-200">
+            {activePeriod === 'HARI_INI' ? (
+              filteredVisits.length > 0 ? (
+                <span>Menampilkan <strong className="text-emerald-300">{filteredVisits.length} kunjungan</strong> yang tercatat hari ini ({formatTanggalIndonesia(selectedDate || getTodayLocalIso())}).</span>
+              ) : (
+                <span>Belum ada kunjungan yang diinput untuk hari ini ({formatTanggalIndonesia(selectedDate || getTodayLocalIso())}). Tersimpan <strong className="text-amber-300 font-bold">{visits.length} riwayat kunjungan</strong> pada periode sebelumnya.</span>
+              )
+            ) : (
+              <span>Menampilkan <strong className="text-emerald-300">{filteredVisits.length} kunjungan</strong> dari total {visits.length} kunjungan tersimpan (Filter: {activePeriod === 'SEMUA' ? 'Semua Riwayat' : activePeriod}).</span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {activePeriod === 'HARI_INI' && visits.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setActivePeriod('SEMUA')}
+              className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] transition-all cursor-pointer"
+            >
+              <Eye className="w-4 h-4 text-slate-950" />
+              <span>Lihat Seluruh {visits.length} Kunjungan (Semua Periode)</span>
+            </button>
+          )}
+          {activePeriod !== 'HARI_INI' && (
+            <button
+              type="button"
+              onClick={() => setActivePeriod('HARI_INI')}
+              className="px-3.5 py-2 bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 border border-emerald-500/30 transition-all cursor-pointer"
+            >
+              <Calendar className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Kembali ke Hari Ini</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* 2. TENGAH: FILTER TOOLBAR & ACTION BAR (Exact matching screenshot 2) */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3.5">
         {/* Row 1: Filter Periode Pills */}
@@ -948,12 +997,30 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       {/* 3. DAFTAR KUNJUNGAN: TABEL ATAU KARTU */}
       <div id="print-area-kunjungan" ref={printAreaRef} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {filteredVisits.length === 0 ? (
-          <div className="p-12 text-center space-y-3">
+          <div className="p-10 text-center space-y-3.5">
             <Users className="w-12 h-12 text-slate-300 mx-auto" />
-            <h3 className="text-sm font-bold text-slate-700">Belum ada data kunjungan warga</h3>
-            <p className="text-xs text-slate-500">
-              Gunakan form di atas untuk mencatat sambang warga atau sesuaikan kriteria filter.
+            <h3 className="text-sm font-bold text-slate-800">
+              {activePeriod === 'HARI_INI'
+                ? `Belum Ada Kunjungan Warga yang Diinput Hari Ini (${formatTanggalIndonesia(selectedDate || getTodayLocalIso())})`
+                : 'Belum ada data kunjungan warga sesuai kriteria filter'}
+            </h3>
+            <p className="text-xs text-slate-500 max-w-lg mx-auto leading-relaxed">
+              {activePeriod === 'HARI_INI' && visits.length > 0
+                ? `Tersimpan total ${visits.length} riwayat kunjungan pada database (periode bulan September–Oktober). Anda dapat melihat seluruh riwayat kunjungan warga sebelumnya dengan mengklik tombol di bawah ini:`
+                : 'Gunakan form di atas untuk mencatat sambang warga baru atau sesuaikan kriteria pencarian & filter periode.'}
             </p>
+            {activePeriod === 'HARI_INI' && visits.length > 0 && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setActivePeriod('SEMUA')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  <Eye className="w-4 h-4 text-emerald-200" />
+                  <span>Tampilkan Seluruh {visits.length} Riwayat Kunjungan Warga</span>
+                </button>
+              </div>
+            )}
           </div>
         ) : viewMode === 'table' ? (
           <div className="overflow-x-auto">

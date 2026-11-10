@@ -11,6 +11,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
+import { getVisitsFromIndexedDB, saveVisitsToIndexedDB } from './indexedDbStorage';
 
 export const KUNJUNGAN_COLLECTION = 'kunjungan_warga';
 export const KUNJUNGAN_STORAGE_KEY = 'sikepling_kunjungan_warga_v2';
@@ -143,9 +144,42 @@ export const deleteKunjunganWargaFromFirestore = async (id: string): Promise<voi
 };
 
 export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => void): (() => void) => {
-  // Initial local emit
-  cb(getLocalKunjunganList());
+  // 1. Initial local emit (0ms)
+  const initialLocal = getLocalKunjunganList();
+  cb(initialLocal);
 
+  // 2. Fast IndexedDB restore (10ms)
+  getVisitsFromIndexedDB()
+    .then((idb) => {
+      if (Array.isArray(idb) && idb.length > initialLocal.length) {
+        const deletedSet = new Set(getDeletedKunjunganIds());
+        const cleaned = idb.filter((x) => x && x.id && !deletedSet.has(x.id));
+        setLocalKunjunganList(cleaned);
+        cb(cleaned);
+      }
+    })
+    .catch(() => {});
+
+  // 3. Fast Server Cache fetch (30-50ms)
+  fetch('/api/kunjungan')
+    .then((res) => res.json())
+    .then((resData) => {
+      if (resData && resData.success && Array.isArray(resData.data) && resData.data.length > 0) {
+        const deletedSet = new Set(getDeletedKunjunganIds());
+        const serverItems: KunjunganWargaData[] = resData.data.filter(
+          (x: any) => x && x.id && !deletedSet.has(x.id)
+        );
+        const current = getLocalKunjunganList();
+        if (serverItems.length >= current.length) {
+          setLocalKunjunganList(serverItems);
+          saveVisitsToIndexedDB(serverItems).catch(() => {});
+          cb(serverItems);
+        }
+      }
+    })
+    .catch(() => {});
+
+  // 4. Realtime Firestore Sync
   let unsub: Unsubscribe | null = null;
   try {
     if (db) {
@@ -172,6 +206,7 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
               (b.createdAt || '').localeCompare(a.createdAt || '')
             );
             setLocalKunjunganList(merged);
+            saveVisitsToIndexedDB(merged).catch(() => {});
             cb(merged);
           }
         },
