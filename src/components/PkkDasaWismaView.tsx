@@ -23,22 +23,18 @@ import {
   Activity,
   Home,
   CheckSquare,
-  Database,
   UserPlus,
-  ListChecks,
-  UserCheck,
   ChevronDown,
   ChevronUp,
   Calculator,
 } from 'lucide-react';
-import { UserAccount, KelompokDasaWisma, KkAnggotaDasaWisma, DataKeluarga } from '../types';
+import { UserAccount, KelompokDasaWisma, KkAnggotaDasaWisma } from '../types';
 import {
   subscribeDasaWisma,
   saveDasaWisma,
   deleteDasaWisma,
   exportDasaWismaToExcel,
 } from '../lib/pkkDasaWismaService';
-import { subscribeDataKeluarga } from '../lib/dataKeluargaService';
 import { KopSuratPkk } from './KopSuratPkk';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument } from '../utils/printHelper';
@@ -126,7 +122,6 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
     (typeof currentUser?.nomorLingkungan === 'number' && currentUser.nomorLingkungan >= 1);
 
   const [dawisList, setDawisList] = useState<KelompokDasaWisma[]>([]);
-  const [allKeluargaList, setAllKeluargaList] = useState<DataKeluarga[]>([]);
   const [filterLingkungan, setFilterLingkungan] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'daftar' | 'asisten_ai'>('daftar');
@@ -144,9 +139,6 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
 
   // Anggota Kepala Keluarga (KK) State
   const [formDaftarKk, setFormDaftarKk] = useState<KkAnggotaDasaWisma[]>([]);
-  const [isKkPickerOpen, setIsKkPickerOpen] = useState<boolean>(false);
-  const [kkPickerSearch, setKkPickerSearch] = useState<string>('');
-  const [selectedKkIds, setSelectedKkIds] = useState<Set<string>>(new Set());
   const [isManualKkOpen, setIsManualKkOpen] = useState<boolean>(false);
   const [manualKkNama, setManualKkNama] = useState<string>('');
   const [manualKkNomor, setManualKkNomor] = useState<string>('');
@@ -215,12 +207,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
     const unsubDawis = subscribeDasaWisma((items) => {
       setDawisList(items);
     });
-    const unsubKeluarga = subscribeDataKeluarga((items) => {
-      setAllKeluargaList(items);
-    });
     return () => {
       unsubDawis();
-      unsubKeluarga();
     };
   }, []);
 
@@ -286,130 +274,9 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
     });
   }, [dawisList, filterLingkungan, searchQuery]);
 
-  const availableFamiliesInLingkungan = useMemo(() => {
-    return allKeluargaList.filter((k) => k.lingkunganNomor === formLingkunganNomor);
-  }, [allKeluargaList, formLingkunganNomor]);
-
-  const filteredFamiliesInPicker = useMemo(() => {
-    if (!kkPickerSearch.trim()) return availableFamiliesInLingkungan;
-    const q = kkPickerSearch.toLowerCase();
-    return availableFamiliesInLingkungan.filter((k) => {
-      const matchNama = (k.namaKepalaKeluarga || '').toLowerCase().includes(q);
-      const matchKk = (k.nomorKk || '').includes(q);
-      const matchNik = (k.nikKepalaKeluarga || '').includes(q);
-      const matchJalan = (k.namaJalan || '').toLowerCase().includes(q);
-      const matchAlamat = (k.alamatLengkap || '').toLowerCase().includes(q);
-      return matchNama || matchKk || matchNik || matchJalan || matchAlamat;
-    });
-  }, [availableFamiliesInLingkungan, kkPickerSearch]);
-
   const updateDaftarKk = (newList: KkAnggotaDasaWisma[]) => {
     setFormDaftarKk(newList);
     setFormJumlahKk(String(newList.length));
-  };
-
-  const handleOpenKkPicker = () => {
-    const existingIds = new Set(formDaftarKk.map((k) => k.id));
-    setSelectedKkIds(existingIds);
-    setKkPickerSearch('');
-    setIsKkPickerOpen(true);
-  };
-
-  const handleToggleKkInPicker = (kkId: string) => {
-    setSelectedKkIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(kkId)) next.delete(kkId);
-      else next.add(kkId);
-      return next;
-    });
-  };
-
-  const handleSelectAllKkInPicker = (families: DataKeluarga[]) => {
-    const allSelected = families.every((f) => selectedKkIds.has(f.id));
-    setSelectedKkIds((prev) => {
-      const next = new Set(prev);
-      if (allSelected) {
-        families.forEach((f) => next.delete(f.id));
-      } else {
-        families.forEach((f) => next.add(f.id));
-      }
-      return next;
-    });
-  };
-
-  const handleApplyKkPicker = () => {
-    const availableKeluarga = allKeluargaList.filter(
-      (k) => k.lingkunganNomor === formLingkunganNomor
-    );
-
-    // Keep existing manual entries
-    const manualEntries = formDaftarKk.filter(
-      (k) => k.sumberData === 'MANUAL' && !selectedKkIds.has(k.id)
-    );
-
-    const newFromDb: KkAnggotaDasaWisma[] = availableKeluarga
-      .filter((k) => selectedKkIds.has(k.id))
-      .map((k) => ({
-        id: k.id,
-        namaKepalaKeluarga: k.namaKepalaKeluarga,
-        nomorKk: k.nomorKk,
-        nik: k.nikKepalaKeluarga,
-        alamat: k.namaJalan ? `${k.namaJalan} ${k.nomorRumah || ''}`.trim() : k.alamatLengkap,
-        jumlahJiwa: k.jumlahAnggotaKeluarga,
-        jumlahLakiLaki: k.jumlahLakiLaki,
-        jumlahPerempuan: k.jumlahPerempuan,
-        jumlahBalita: k.jumlahBalita,
-        jumlahLansia: k.jumlahLansia,
-        sumberData: 'DATABASE_KELUARGA',
-      }));
-
-    const merged = [...manualEntries, ...newFromDb];
-    updateDaftarKk(merged);
-    setIsKkPickerOpen(false);
-
-    // Auto calculate demography from selected families
-    if (merged.length > 0) {
-      let tJiwa = 0;
-      let tL = 0;
-      let tP = 0;
-      let tBalita = 0;
-      let tLansia = 0;
-      let tJamban = 0;
-
-      merged.forEach((kk) => {
-        const dbEntry = availableKeluarga.find((k) => k.id === kk.id);
-        if (dbEntry) {
-          tJiwa += Number(dbEntry.jumlahAnggotaKeluarga) || 0;
-          tL += Number(dbEntry.jumlahLakiLaki) || 0;
-          tP += Number(dbEntry.jumlahPerempuan) || 0;
-          tBalita += Number(dbEntry.jumlahBalita) || 0;
-          tLansia += Number(dbEntry.jumlahLansia) || 0;
-          if (dbEntry.jambanKeluarga && !dbEntry.jambanKeluarga.includes('Tidak Memiliki')) {
-            tJamban++;
-          }
-        } else {
-          tJiwa += Number(kk.jumlahJiwa) || 0;
-          tL += Number(kk.jumlahLakiLaki) || 0;
-          tP += Number(kk.jumlahPerempuan) || 0;
-          tBalita += Number(kk.jumlahBalita) || 0;
-          tLansia += Number(kk.jumlahLansia) || 0;
-        }
-      });
-
-      if (tJiwa > 0) {
-        setFormJumlahJiwa(String(tJiwa));
-        setFormLakiLaki(String(tL));
-        setFormPerempuan(String(tP));
-        setFormJumlahBalita(String(tBalita));
-        setFormJumlahLansia(String(tLansia));
-        if (tJamban > 0) setFormJambanSehat(String(tJamban));
-      }
-    }
-
-    showAlert(
-      `✓ ${merged.length} Kepala Keluarga diterapkan! Jumlah KK (${merged.length}) & demografi terisi otomatis.`,
-      'success'
-    );
   };
 
   const handleAddManualKk = (e?: React.FormEvent) => {
@@ -465,43 +332,18 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
       return;
     }
 
-    const availableKeluarga = allKeluargaList.filter(
-      (k) => k.lingkunganNomor === formLingkunganNomor
-    );
-
     let totalJiwa = 0;
     let totalL = 0;
     let totalP = 0;
     let totalBalita = 0;
     let totalLansia = 0;
-    let jambanCount = 0;
-    let countFromDb = 0;
 
     formDaftarKk.forEach((kk) => {
-      const dbEntry = availableKeluarga.find(
-        (k) =>
-          k.id === kk.id ||
-          (kk.nomorKk && k.nomorKk === kk.nomorKk) ||
-          k.namaKepalaKeluarga.toLowerCase() === kk.namaKepalaKeluarga.toLowerCase()
-      );
-
-      if (dbEntry) {
-        countFromDb++;
-        totalJiwa += Number(dbEntry.jumlahAnggotaKeluarga) || 0;
-        totalL += Number(dbEntry.jumlahLakiLaki) || 0;
-        totalP += Number(dbEntry.jumlahPerempuan) || 0;
-        totalBalita += Number(dbEntry.jumlahBalita) || 0;
-        totalLansia += Number(dbEntry.jumlahLansia) || 0;
-        if (dbEntry.jambanKeluarga && !dbEntry.jambanKeluarga.includes('Tidak Memiliki')) {
-          jambanCount++;
-        }
-      } else {
-        totalJiwa += Number(kk.jumlahJiwa) || 0;
-        totalL += Number(kk.jumlahLakiLaki) || 0;
-        totalP += Number(kk.jumlahPerempuan) || 0;
-        totalBalita += Number(kk.jumlahBalita) || 0;
-        totalLansia += Number(kk.jumlahLansia) || 0;
-      }
+      totalJiwa += Number(kk.jumlahJiwa) || 0;
+      totalL += Number(kk.jumlahLakiLaki) || 0;
+      totalP += Number(kk.jumlahPerempuan) || 0;
+      totalBalita += Number(kk.jumlahBalita) || 0;
+      totalLansia += Number(kk.jumlahLansia) || 0;
     });
 
     setFormJumlahJiwa(String(totalJiwa));
@@ -509,10 +351,9 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
     setFormPerempuan(String(totalP));
     setFormJumlahBalita(String(totalBalita));
     setFormJumlahLansia(String(totalLansia));
-    if (jambanCount > 0) setFormJambanSehat(String(jambanCount));
 
     showAlert(
-      `✨ Demografi berhasil dihitung otomatis dari ${formDaftarKk.length} KK (${countFromDb} terhubung ke Database Keluarga)!`,
+      `✨ Demografi berhasil dihitung otomatis dari ${formDaftarKk.length} Kepala Keluarga!`,
       'success'
     );
   };
@@ -1639,20 +1480,11 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={handleOpenKkPicker}
+                        onClick={() => setIsManualKkOpen(!isManualKkOpen)}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pkk-teal text-white hover:bg-tosca-700 text-xs font-bold shadow-sm transition-all cursor-pointer"
                       >
-                        <Database className="w-3.5 h-3.5" />
-                        <span>Pilih dari Database Lk. {formLingkunganNomor}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsManualKkOpen(!isManualKkOpen)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all cursor-pointer"
-                      >
-                        <UserPlus className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{isManualKkOpen ? 'Tutup Input' : '+ Tambah Manual'}</span>
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>{isManualKkOpen ? 'Tutup Input' : '+ Tambah Kepala Keluarga'}</span>
                       </button>
 
                       {formDaftarKk.length > 0 && (
@@ -1778,7 +1610,7 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
                         Belum ada Kepala Keluarga yang dimasukkan ke kelompok ini.
                       </p>
                       <p className="text-[11px] text-slate-400">
-                        Klik tombol <span className="font-bold text-pkk-teal">&ldquo;Pilih dari Database Lk. {formLingkunganNomor}&rdquo;</span> atau <span className="font-bold text-slate-700">&ldquo;+ Tambah Manual&rdquo;</span> di atas untuk mendaftarkan anggota Dasa Wisma.
+                        Klik tombol <span className="font-bold text-pkk-teal">&ldquo;+ Tambah Kepala Keluarga&rdquo;</span> di atas untuk mendaftarkan anggota Dasa Wisma.
                       </p>
                     </div>
                   ) : (
@@ -2026,186 +1858,7 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({ currentUser,
         </div>
       )}
 
-      {/* Modal Pemilih KK dari Database Keluarga */}
-      {isKkPickerOpen && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-pkk-light flex items-center justify-center text-pkk-teal">
-                  <Database className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-slate-900 leading-tight">
-                    Pilih Kepala Keluarga dari Database
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                    Lingkungan {formLingkunganNomor} · {availableFamiliesInLingkungan.length} Kepala Keluarga Terdaftar di Database
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsKkPickerOpen(false)}
-                className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            {/* Search & Bulk Select Toolbar */}
-            <div className="p-4 border-b border-slate-100 space-y-3 bg-white shrink-0">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={kkPickerSearch}
-                  onChange={(e) => setKkPickerSearch(e.target.value)}
-                  placeholder="Cari nama Kepala Keluarga, NIK, No. KK, atau jalan/gang..."
-                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-tosca-500/20 focus:border-tosca-500 font-medium"
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-700 text-xs">
-                    {filteredFamiliesInPicker.length} KK ditemukan
-                  </span>
-                  <span className="text-slate-300">·</span>
-                  <span className="text-[11px] font-bold text-pkk-teal bg-pkk-light px-2 py-0.5 rounded-full">
-                    {selectedKkIds.size} Dipilih
-                  </span>
-                </div>
-
-                {filteredFamiliesInPicker.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => handleSelectAllKkInPicker(filteredFamiliesInPicker)}
-                    className="text-xs font-bold text-pkk-teal hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <ListChecks className="w-3.5 h-3.5" />
-                    <span>
-                      {filteredFamiliesInPicker.every((f) => selectedKkIds.has(f.id))
-                        ? 'Batal Pilih Semua'
-                        : 'Pilih Semua Hasil'}
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* List of Families */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-              {availableFamiliesInLingkungan.length === 0 ? (
-                <div className="p-8 text-center space-y-2">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-                    <Database className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800">
-                    Belum Ada Data Keluarga di Lingkungan {formLingkunganNomor}
-                  </h4>
-                  <p className="text-xs text-slate-500 max-w-md mx-auto">
-                    Database Data Keluarga untuk Lingkungan {formLingkunganNomor} masih kosong. Anda dapat menambahkan data keluarga terlebih dahulu pada menu Database Data Keluarga atau gunakan opsi <strong>&ldquo;+ Tambah Manual&rdquo;</strong>.
-                  </p>
-                </div>
-              ) : filteredFamiliesInPicker.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-xs font-medium">
-                  Tidak ditemukan Kepala Keluarga dengan kata kunci &ldquo;{kkPickerSearch}&rdquo;.
-                </div>
-              ) : (
-                filteredFamiliesInPicker.map((fam) => {
-                  const isChecked = selectedKkIds.has(fam.id);
-                  return (
-                    <div
-                      key={fam.id}
-                      onClick={() => handleToggleKkInPicker(fam.id)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
-                        isChecked
-                          ? 'bg-tosca-50/60 border-tosca-300 ring-1 ring-tosca-400/30'
-                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {}} // handled by parent div onClick
-                        className="mt-0.5 rounded border-slate-300 text-pkk-teal focus:ring-pkk-teal cursor-pointer"
-                      />
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className="text-xs font-black text-slate-900 truncate">
-                            {fam.namaKepalaKeluarga}
-                          </h4>
-                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md shrink-0">
-                            {fam.jumlahAnggotaKeluarga || 0} Jiwa
-                          </span>
-                        </div>
-
-                        <div className="text-[10px] text-slate-500 space-y-0.5 mt-0.5">
-                          <p className="truncate">
-                            No. KK: {fam.nomorKk || '-'} · NIK: {fam.nikKepalaKeluarga || '-'}
-                          </p>
-                          <p className="text-slate-400 truncate">
-                            {fam.namaJalan ? `${fam.namaJalan} ${fam.nomorRumah || ''}`.trim() : fam.alamatLengkap}
-                          </p>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[9px] font-semibold text-slate-500">
-                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
-                            L: {fam.jumlahLakiLaki || 0} · P: {fam.jumlahPerempuan || 0}
-                          </span>
-                          {fam.jumlahBalita > 0 && (
-                            <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
-                              {fam.jumlahBalita} Balita
-                            </span>
-                          )}
-                          {fam.jumlahLansia > 0 && (
-                            <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">
-                              {fam.jumlahLansia} Lansia
-                            </span>
-                          )}
-                          {fam.jambanKeluarga && (
-                            <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded truncate max-w-[200px]">
-                              {fam.jambanKeluarga}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
-              <span className="text-xs text-slate-500">
-                <strong className="text-slate-800 font-bold">{selectedKkIds.size}</strong> KK dipilih
-              </span>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsKkPickerOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  onClick={handleApplyKkPicker}
-                  className="px-5 py-2 text-xs font-bold text-white bg-pkk-teal hover:bg-tosca-700 rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <UserCheck className="w-3.5 h-3.5" />
-                  <span>Terapkan ({selectedKkIds.size} KK)</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* HIDDEN SINGLE DASA WISMA PRINT SHEET */}
       <div className="hidden">
