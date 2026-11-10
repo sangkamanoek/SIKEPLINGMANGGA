@@ -1,5 +1,4 @@
 import { saveReportToFirestore } from './firestoreService';
-import { saveDataKeluargaToFirestore } from './dataKeluargaService';
 
 export function initBackgroundAutoSync(): () => void {
   if (typeof window === 'undefined') return () => {};

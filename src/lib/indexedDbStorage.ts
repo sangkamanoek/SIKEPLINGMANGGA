@@ -1,10 +1,9 @@
-import { LaporanHarianItem, DataKeluarga, SuratKedinasanItem, PosyanduReport } from '../types';
+import { LaporanHarianItem, SuratKedinasanItem, PosyanduReport } from '../types';
 import { SpptPbbItem } from '../data/pbbSampleData';
 
 const DB_NAME = 'sikepling_offline_db';
-const DB_VERSION = 6; // Incremented version to add posyandu_store
+const DB_VERSION = 6;
 const STORE_REPORTS = 'reports_store';
-const STORE_KELUARGA = 'family_store';
 const STORE_PBB = 'pbb_store';
 const STORE_VISITS = 'visits_store';
 const STORE_HISTORY = 'history_store';
@@ -23,9 +22,6 @@ function openDatabase(): Promise<IDBDatabase> {
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_REPORTS)) {
         db.createObjectStore(STORE_REPORTS, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_KELUARGA)) {
-        db.createObjectStore(STORE_KELUARGA, { keyPath: 'id' });
       }
       if (!db.objectStoreNames.contains(STORE_PBB)) {
         db.createObjectStore(STORE_PBB, { keyPath: 'id' });
@@ -49,62 +45,12 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-/**
- * Save all family data to IndexedDB
- */
-export async function saveKeluargaToIndexedDB(data: DataKeluarga[]): Promise<boolean> {
-  if (!Array.isArray(data)) return false;
-  try {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_KELUARGA, 'readwrite');
-      const store = tx.objectStore(STORE_KELUARGA);
-
-      store.clear();
-      if (data.length > 0) {
-        data.forEach((item) => {
-          if (item && item.id) {
-            store.put(item);
-          }
-        });
-      }
-
-      tx.oncomplete = () => resolve(true);
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
-    });
-  } catch (err) {
-    console.warn('[IndexedDB] Error saving keluarga data:', err);
-    return false;
-  }
+export async function saveKeluargaToIndexedDB(_data: any[]): Promise<boolean> {
+  return true;
 }
 
-/**
- * Read all family data from IndexedDB
- */
-export async function getKeluargaFromIndexedDB(): Promise<DataKeluarga[] | null> {
-  try {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_KELUARGA, 'readonly');
-      const store = tx.objectStore(STORE_KELUARGA);
-      const request = store.getAll();
-
-      request.onsuccess = () => {
-        const result = request.result;
-        if (Array.isArray(result) && result.length > 0) {
-          resolve(result as DataKeluarga[]);
-        } else {
-          resolve(null);
-        }
-      };
-
-      request.onerror = () => reject(request.error);
-    });
-  } catch (err) {
-    console.warn('[IndexedDB] Error getting keluarga data:', err);
-    return null;
-  }
+export async function getKeluargaFromIndexedDB(): Promise<any[] | null> {
+  return null;
 }
 
 /**

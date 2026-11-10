@@ -25,7 +25,7 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react';
-import { UserAccount, DataKeluarga } from '../types';
+import { UserAccount } from '../types';
 import { SpptPbbItem } from '../data/pbbSampleData';
 import {
   runFullDuplicateAudit,
@@ -38,15 +38,14 @@ import {
   LiveUniversalSearchResult,
 } from '../lib/duplicateCheckService';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
-import { autoCleanDuplicateDataKeluarga } from '../lib/dataKeluargaService';
 
 interface PengecekanDuplikasiViewProps {
   currentUser: UserAccount;
-  dataKeluarga: DataKeluarga[];
+  dataKeluarga?: any[];
   spptList: SpptPbbItem[];
   onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
-  onOpenKkDetail?: (kk: DataKeluarga) => void;
-  onOpenEditKk?: (kk: DataKeluarga) => void;
+  onOpenKkDetail?: (kk: any) => void;
+  onOpenEditKk?: (kk: any) => void;
   onOpenEditSppt?: (sppt: SpptPbbItem) => void;
 }
 
@@ -164,12 +163,10 @@ export const PengecekanDuplikasiView: React.FC<PengecekanDuplikasiViewProps> = (
   const executeAutoClean = async () => {
     setIsCleaning(true);
     try {
-      const res = await autoCleanDuplicateDataKeluarga();
       setConfirmCleanModal(false);
-      if (onShowToast) onShowToast(res.message, res.deletedCount > 0 ? 'success' : 'info');
+      if (onShowToast) onShowToast('Database Data Keluarga sudah dinonaktifkan.', 'info');
     } catch (err: any) {
       console.error(err);
-      if (onShowToast) onShowToast('Gagal membersihkan duplikasi: ' + err.message, 'error');
     } finally {
       setIsCleaning(false);
     }

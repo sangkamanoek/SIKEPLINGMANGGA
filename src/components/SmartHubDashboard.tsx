@@ -366,15 +366,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           } catch {}
           return { num: count, label: `${count} Tugas` };
         }
-        case 'database_keluarga': {
-          let count = 0;
-          try {
-            const raw = localStorage.getItem('sikepling_data_keluarga_v1');
-            if (raw) count = JSON.parse(raw).length;
-          } catch {}
-          if (count === 0) count = 429;
-          return { num: count, label: `${count} Data KK` };
-        }
+
         case 'pbb_lingkungan':
         case 'rekap_pbb': {
           const count = pbbSummary.totalCount || spptList.length || 1240;
@@ -517,17 +509,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           badgeColor: 'bg-indigo-100 text-indigo-900',
           action: () => onNavigate('realisasi_pembangunan'),
         },
-        {
-          id: 'database_keluarga',
-          title: 'Database Data Keluarga (KK Rentan / DTKS)',
-          desc: 'Pusat data terpadu kependudukan, desil kesejahteraan 1-5, bansos PKH, BPNT, dan sanitasi keluarga.',
-          category: 'laporan',
-          icon: Users,
-          iconBg: 'bg-blue-50 text-blue-700',
-          badge: 'DATA PERLINSOS',
-          badgeColor: 'bg-blue-100 text-blue-900',
-          action: () => onNavigate('database_keluarga'),
-        },
+
         {
           id: 'kunjungan',
           title: 'Kunjungan Harian Warga & Posyandu',
@@ -696,18 +678,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       },
 
 
-      // 2. DATA & LAYANAN (DATA & SERVICES)
-      {
-        id: 'database_keluarga',
-        title: 'Database Data Keluarga (KK)',
-        desc: 'Pusat data terpadu kependudukan, anggota keluarga (NIK), tingkat kesejahteraan (Desil 1–5), bansos PKH Medan Makmur, dan sanitasi.',
-        category: 'laporan',
-        icon: Users,
-        iconBg: 'bg-blue-50 text-blue-700',
-        badge: 'DATA KELUARGA',
-        badgeColor: 'bg-blue-100 text-blue-900',
-        action: () => onNavigate('database_keluarga'),
-      },
+
       ...(isPbbAllowed
         ? [
             {

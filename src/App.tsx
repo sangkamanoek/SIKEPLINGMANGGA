@@ -58,9 +58,6 @@ const RekapAbsensiSuperAdmin = React.lazy(() =>
 const SuratKedinasanView = React.lazy(() =>
   import('./components/SuratKedinasanView').then((m) => ({ default: m.SuratKedinasanView }))
 );
-const DatabaseKeluargaView = React.lazy(() =>
-  import('./components/DatabaseKeluargaView').then((m) => ({ default: m.DatabaseKeluargaView }))
-);
 const RealisasiPembangunanView = React.lazy(() =>
   import('./components/RealisasiPembangunanView').then((m) => ({ default: m.RealisasiPembangunanView }))
 );
@@ -612,7 +609,6 @@ export default function App() {
             onNavigateToForm={() => handleTabChange('form')}
             onOpenRekapPbb={() => handleTabChange('rekap_pbb')}
             onNavigateToKunjungan={() => handleTabChange('kunjungan')}
-            onNavigateToDatabaseKeluarga={() => handleTabChange('database_keluarga')}
             onNavigateToPresensi={() => handleTabChange('kegiatan_khusus')}
             attendanceList={effectiveAttendanceList}
             kunjunganList={kunjunganList}
@@ -622,14 +618,6 @@ export default function App() {
         {/* TAB 7: Surat Kedinasan */}
         {activeTab === 'surat_kedinasan' && (
           <SuratKedinasanView
-            currentUser={activeAccount}
-            onShowToast={showToast}
-          />
-        )}
-
-        {/* TAB 8: Database Keluarga */}
-        {activeTab === 'database_keluarga' && (
-          <DatabaseKeluargaView
             currentUser={activeAccount}
             onShowToast={showToast}
           />
@@ -728,7 +716,6 @@ export default function App() {
               reports={reports}
               targetsMap={targetsMap}
               currentUser={activeAccount}
-              onOpenDatabaseKeluarga={() => handleTabChange('database_keluarga')}
               onOpenKunjunganWarga={() => handleTabChange('kunjungan')}
             />
           ) : (

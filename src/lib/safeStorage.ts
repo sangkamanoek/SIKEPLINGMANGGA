@@ -6,7 +6,6 @@
 
 import {
   saveReportsToIndexedDB,
-  saveKeluargaToIndexedDB,
   savePbbToIndexedDB,
   saveVisitsToIndexedDB,
   saveHistoryToIndexedDB,
@@ -19,7 +18,6 @@ const memoryFallbackStorage = new Map<string, string>();
 const MAX_MEMORY_CACHE_ENTRY_BYTES = 150_000; // 150KB per entry max for in-memory string cache
 
 let idbSaveTimeout: any = null;
-let idbKkSaveTimeout: any = null;
 let idPbbSaveTimeout: any = null;
 let idbVisitsTimeout: any = null;
 let idbHistoryTimeout: any = null;
@@ -124,18 +122,6 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
       }, 300);
     }
 
-    if (key.includes('keluarga') || key.includes('family')) {
-      if (idbKkSaveTimeout) clearTimeout(idbKkSaveTimeout);
-      idbKkSaveTimeout = setTimeout(() => {
-        try {
-          const parsed = JSON.parse(value);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            saveKeluargaToIndexedDB(parsed).catch(() => {});
-          }
-        } catch {}
-      }, 500);
-    }
-
     if (key.includes('pbb') || key.includes('sppt')) {
       if (idPbbSaveTimeout) clearTimeout(idPbbSaveTimeout);
       idPbbSaveTimeout = setTimeout(() => {
@@ -214,6 +200,7 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
         localStorage.removeItem('cleaned_reports_v2_kepling21');
         localStorage.removeItem('google_cached_access_token');
         localStorage.removeItem('sikepling_bottom5_monthly_kepling_ids');
+        localStorage.removeItem('sikepling_data_keluarga_v1');
 
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
@@ -232,8 +219,6 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
           // Asynchronously persist full data with photos to IndexedDB first
           if (key.includes('laporan') || key.includes('reports')) {
             saveReportsToIndexedDB(parsed).catch(() => {});
-          } else if (key.includes('keluarga') || key.includes('family')) {
-            saveKeluargaToIndexedDB(parsed).catch(() => {});
           } else if (key.includes('pbb') || key.includes('sppt')) {
             savePbbToIndexedDB(parsed).catch(() => {});
           } else if (key.includes('kunjungan') || key.includes('visit')) {
@@ -319,6 +304,10 @@ export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedAppro
 
   try {
     memoryFallbackStorage.clear();
+    // Always purge obsolete heavy data_keluarga local cache if present
+    try {
+      localStorage.removeItem('sikepling_data_keluarga_v1');
+    } catch {}
 
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -338,7 +327,6 @@ export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedAppro
         k === 'sikepling_surat_kedinasan_v1' ||
         k === 'sikepling_attendance_list_v1' ||
         k === 'sikepling_kunjungan_warga_v1' ||
-        k === 'sikepling_data_keluarga_v1' ||
         k === 'sikepling_pkk_buku_1_v1' ||
         k === 'sikepling_pkk_buku_4_v1' ||
         k === 'sikepling_pkk_buku_5_v1' ||

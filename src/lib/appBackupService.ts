@@ -1,7 +1,6 @@
 import { db } from './firebase';
 import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
 import { fetchReportsFromFirestore, saveReportToFirestore, saveSyncAuditLog } from './firestoreService';
-import { fetchAllDataKeluarga, getLocalDataKeluarga, saveDataKeluargaToFirestore } from './dataKeluargaService';
 import { fetchPbbSpptFromFirestore, DEFAULT_PBB_YEAR, getLocalSpptForYear, savePbbSpptToFirestore } from './pbbService';
 import { fetchPkkKeuanganFromServer, fetchPkkKegiatanFromServer, saveTransaksiPkk } from './pkkKeuanganService';
 import { fetchSuratFromServer, getLocalSuratList, saveSuratItem } from './suratService';
@@ -62,9 +61,8 @@ export async function createFullApplicationBackup(googleAccessToken?: string): P
   const timestampFormatted = '3 Oktober 2026 Pukul 23.00 WIB';
 
   // 1. Gather all collections
-  const [reports, keluargaList, pbbList, pkkKeuangan, pkkKegiatan, suratList] = await Promise.all([
+  const [reports, pbbList, pkkKeuangan, pkkKegiatan, suratList] = await Promise.all([
     fetchReportsFromFirestore().catch(() => []),
-    fetchAllDataKeluarga().catch(() => []),
     fetchPbbSpptFromFirestore(DEFAULT_PBB_YEAR).catch(() => []),
     fetchPkkKeuanganFromServer().catch(() => []),
     fetchPkkKegiatanFromServer().catch(() => []),
@@ -79,7 +77,7 @@ export async function createFullApplicationBackup(googleAccessToken?: string): P
     kelurahan: 'Kelurahan Mangga',
     summary: {
       totalLaporan: reports.length,
-      totalDataKeluarga: keluargaList.length,
+      totalDataKeluarga: 0,
       totalPbbRecords: pbbList.length,
       totalSurat: suratList.length,
       totalPkkKeuangan: pkkKeuangan.length,
@@ -87,7 +85,7 @@ export async function createFullApplicationBackup(googleAccessToken?: string): P
     },
     data: {
       laporanHarian: reports,
-      databaseKeluarga: keluargaList,
+      databaseKeluarga: [],
       pbbSppt2026: pbbList,
       pkkKeuangan,
       pkkKegiatan,
@@ -203,7 +201,7 @@ export async function getSuperAdminDeviceDataSnapshot(): Promise<DeviceBackupPay
   ]);
 
   const reports = dbReports || [];
-  const family = dbKeluarga || getLocalDataKeluarga() || [];
+  const family: any[] = [];
 
   let pbb = dbPbb || [];
   if (pbb.length === 0) {
@@ -417,16 +415,15 @@ export async function syncSuperAdminDeviceDataToLiveFirestore(
       onProgress?.('Perangkat ini mendeteksi 0 data lokal. Sistem otomatis mengambil (Pull) data dari Cloud Firestore...');
       try {
         const cloudReports = await fetchReportsFromFirestore();
-        const cloudFamily = await fetchAllDataKeluarga();
-        if ((cloudReports && cloudReports.length > 0) || (cloudFamily && cloudFamily.length > 0)) {
-          onProgress?.(`Berhasil menarik ${cloudReports?.length || 0} laporan dan ${cloudFamily?.length || 0} data keluarga dari Cloud!`);
+        if (cloudReports && cloudReports.length > 0) {
+          onProgress?.(`Berhasil menarik ${cloudReports.length} laporan dari Cloud!`);
           return {
             success: true,
-            message: `Aman! Karena perangkat ini kosong, sistem secara otomatis menarik ${cloudReports?.length || 0} laporan dan ${cloudFamily?.length || 0} data keluarga dari Cloud Firestore (Tidak ada data yang tertimpa).`,
+            message: `Aman! Karena perangkat ini kosong, sistem secara otomatis menarik ${cloudReports.length} laporan dari Cloud Firestore (Tidak ada data yang tertimpa).`,
             stats: {
               ...stats,
-              reports: { total: cloudReports?.length || 0, synced: cloudReports?.length || 0 },
-              family: { total: cloudFamily?.length || 0, synced: cloudFamily?.length || 0 },
+              reports: { total: cloudReports.length, synced: cloudReports.length },
+              family: { total: 0, synced: 0 },
             },
           };
         }
@@ -448,16 +445,7 @@ export async function syncSuperAdminDeviceDataToLiveFirestore(
     }
 
     // 2. Sync Data Keluarga
-    stats.family.total = family.length;
-    if (family.length > 0) {
-      onProgress?.(`Menyinkronkan ${family.length} Data Keluarga ke Firestore...`);
-      for (const item of family) {
-        if (item && item.id) {
-          const ok = await saveDataKeluargaToFirestore(item).catch(() => false);
-          if (ok) stats.family.synced++;
-        }
-      }
-    }
+    stats.family.total = 0;
 
     // 3. Sync PBB SPPT
     stats.pbb.total = pbb.length;

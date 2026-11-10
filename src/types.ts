@@ -530,154 +530,6 @@ export interface RuasJalanLingkungan {
   createdByName?: string;
 }
 
-// ==========================================
-// DATABASE DATA KELUARGA (FAMILY DATABASE)
-// ==========================================
-
-export type HubunganKeluargaType =
-  | 'Kepala Keluarga'
-  | 'Istri'
-  | 'Anak'
-  | 'Orang Tua'
-  | 'Mertua'
-  | 'Famili Lain'
-  | 'Lainnya';
-
-export type StatusPerkawinanType = 'Belum Kawin' | 'Kawin' | 'Cerai Hidup' | 'Cerai Mati';
-
-export type AgamaType = 'Islam' | 'Kristen Protestan' | 'Katolik' | 'Hindu' | 'Buddha' | 'Konghucu';
-
-export type StatusBpjsKesehatanType =
-  | 'PBI-JK (Bansos APBD/APBN)'
-  | 'Mandiri (Bayar Sendiri)'
-  | 'PPU (Pekerja Penerima Upah)'
-  | 'Belum Memiliki BPJS';
-
-export interface AnggotaKeluarga {
-  id: string; // e.g. "ang_1271010101230001_1"
-  nik: string; // NIK 16 digit
-  nama: string;
-  hubunganKeluarga: HubunganKeluargaType;
-  jenisKelamin: 'L' | 'P';
-  tempatLahir?: string;
-  tanggalLahir?: string; // YYYY-MM-DD
-  usia: number;
-  agama: AgamaType | string;
-  pendidikanTerakhir: string; // 'SD', 'SMP', 'SMA/SMK', 'D3', 'S1', 'S2', 'Belum Sekolah', dll.
-  pekerjaan: string;
-  statusPerkawinan: StatusPerkawinanType;
-  // Kepemilikan Dokumen Adminduk
-  memilikiKtpIkd: boolean; // KTP-el / IKD Aktif
-  memilikiAktaKelahiran: boolean;
-  memilikiKia?: boolean; // Kartu Identitas Anak (<17 th)
-  // Jaminan Sosial Kesehatan & Ketenagakerjaan
-  statusBpjsKesehatan: StatusBpjsKesehatanType;
-  terdaftarBpjsKetenagakerjaan?: boolean;
-  catatanKhusus?: string; // e.g. Disabilitas, Penyakit Kronis, Hamil
-}
-
-export interface DataKeluarga {
-  id: string; // unique ID: e.g. "kk_1271010_1234567890123456"
-  nomorKk: string; // Nomor Kartu Keluarga (16 digit)
-  nikKepalaKeluarga: string; // NIK Kepala Keluarga (16 digit)
-  namaKepalaKeluarga: string;
-  telepon?: string; // Kontak WA / Telp
-
-  // Wilayah Administratif
-  lingkunganId: string; // "kepling_1" ... "kepling_24"
-  lingkunganNomor: number; // 1 - 24
-  lingkunganNama: string; // "Lingkungan I" ... "Lingkungan XXIV"
-  namaJalan: string; // e.g. "Jl. Bunga Raya Gg. Melati"
-  nomorRumah?: string; // e.g. "No. 14A"
-  agama?: AgamaType | string; // e.g. "Islam", "Kristen Protestan", dll.
-  alamatLengkap: string;
-  statusDomisili: 'KK Kelurahan Mangga (KTP/KK Setempat)' | 'Bukan KK Mangga (Domisili Luar/Kontrak)' | string;
-  kewarganegaraan?: 'WNI' | 'WNA' | string;
-  negaraAsalWna?: string;
-  titikKoordinat?: {
-    lat: number;
-    lng: number;
-  };
-
-  // Demografi Keluarga
-  jumlahAnggotaKeluarga: number;
-  jumlahLakiLaki: number;
-  jumlahPerempuan: number;
-  jumlahBalita: number; // 0-5 tahun
-  jumlahUsiaSekolah: number; // 6-18 tahun
-  jumlahUsiaProduktif: number; // 19-59 tahun
-  jumlahLansia: number; // 60+ tahun
-  pekerjaanUtamaKepalaKeluarga?: string;
-  penghasilanRataRata?: string; // e.g. '< 1 Juta', '1 - 2.5 Juta', '2.5 - 5 Juta', '> 5 Juta'
-
-  // Anggota Keluarga Terdaftar
-  anggotaKeluarga: AnggotaKeluarga[];
-
-  // Tingkat Kesejahteraan & Bantuan Sosial (Data Utama)
-  desilKesejahteraan:
-    | 'Desil 1 (Sangat Miskin)'
-    | 'Desil 2 (Miskin)'
-    | 'Desil 3 (Hampir Miskin)'
-    | 'Desil 4 (Rentan Miskin)'
-    | 'Desil 5 (Menengah Bawah)'
-    | 'Desil 6-10 (Mampu / Non-Desil)'
-    | string;
-  penerimaBansos: boolean;
-  bantuanDiterima: string[]; // ['PKH Medan Makmur', 'PKH Nasional', 'BPNT / Sembako', 'BLT / DBH', 'PBI-JK (BPJS Gratis)', 'Bedah Rumah / RTLH', 'PIP / Beasiswa', 'Lainnya']
-  kategoriRentan?: string[]; // ['Lansia Tunggal', 'Penyandang Disabilitas', 'Balita Pantau Stunting', 'Ibu Hamil KEK / Resti', 'Keluarga Rentan']
-
-  // Sanitasi & Kesehatan Lingkungan Keluarga
-  jambanKeluarga:
-    | 'Jamban Sendiri (Leher Angsa / Septik SNI)'
-    | 'Jamban Bersama / Komunal'
-    | 'Jamban Cemplung / Plengsengan'
-    | 'Tidak Memiliki Jamban (BABS)'
-    | string;
-  tempatAkhirTinja: 'Tangki Septik / SPALD' | 'Saluran Terbuka / Parit' | 'Lubang Tanah / Lainnya' | string;
-  sumberAirMinum:
-    | 'PDAM / Air Perpipaan'
-    | 'Depot Isi Ulang'
-    | 'Air Kemasan Bermerek'
-    | 'Sumur Bor Terlindungi'
-    | 'Sumur Gali'
-    | 'Mata Air / Air Hujan'
-    | string;
-  sumberAirBersih: 'PDAM Tirtanadi' | 'Sumur Bor Listrik' | 'Sumur Gali' | 'Sungai / Lainnya' | string;
-  pembuanganSampahRumah:
-    | 'Diangkut Petugas / WRS'
-    | 'Bank Sampah / Daur Ulang'
-    | 'Dibakar / Ditimbun Mandiri'
-    | 'Dibuang Sembarangan'
-    | string;
-  statusStuntingRentan:
-    | 'Bebas Risiko Stunting'
-    | 'Ada Balita / Baduta Berisiko Stunting'
-    | 'Ada Ibu Hamil KEK / Resti'
-    | string;
-
-  // Kondisi Tempat Tinggal / Rumah
-  statusKepemilikanRumah?: 'Milik Sendiri' | 'Sewa / Kontrak' | 'Menumpang / Bebas Sewa' | 'Rumah Dinas' | string;
-  dayaListrik?: 'PLN 450 VA' | 'PLN 900 VA' | 'PLN 1300 VA' | 'PLN 2200 VA+' | 'Tanpa Listrik' | string;
-  memilikiUsahaRumah?: boolean;
-  namaUsahaRumah?: string;
-
-  // Integrasi PBB & WRS
-  nopPbb?: string;
-  statusPbb?: StatusPbb;
-  statusWrs?: StatusWrs;
-
-  // Kaitan dengan Peta Titik Bangunan WebGIS
-  housePointId?: string; // id TitikRumahBangunan if connected
-
-  // Metadata
-  fotoKkUrl?: string;
-  fotoRumahUrl?: string;
-  catatan?: string;
-  createdAt: string;
-  updatedAt?: string;
-  createdByName?: string;
-}
-
 // =========================================================================
 // LAPORAN KEUANGAN TIM PENGGERAK PKK KELURAHAN MANGGA
 // =========================================================================
@@ -738,7 +590,7 @@ export interface LaporanKegiatanPkk {
 }
 
 export interface KkAnggotaDasaWisma {
-  id: string; // unique ID or KK ID from database
+  id: string; // unique ID
   namaKepalaKeluarga: string;
   nomorKk?: string;
   nik?: string;
@@ -748,7 +600,7 @@ export interface KkAnggotaDasaWisma {
   jumlahPerempuan?: number;
   jumlahBalita?: number;
   jumlahLansia?: number;
-  sumberData?: 'DATABASE_KELUARGA' | 'MANUAL';
+  sumberData?: 'MANUAL';
 }
 
 export interface KelompokDasaWisma {

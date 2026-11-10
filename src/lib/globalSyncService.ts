@@ -18,9 +18,6 @@ import {
   SURAT_STORAGE_KEY 
 } from './suratService';
 import { 
-  fetchAllDataKeluarga 
-} from './dataKeluargaService';
-import { 
   MONITORING_INFRA_COLLECTION, 
   MONITORING_INFRA_STORAGE_KEY 
 } from './monitoringInfrastrukturService';
@@ -90,11 +87,6 @@ export const pullAllDataFromFirestore = async (
     const surat: any[] = [];
     suratSnap.forEach(d => surat.push({ ...d.data(), id: d.id }));
     safeSetLocalStorage('sikepling_surat_kedinasan_v1', JSON.stringify(surat));
-
-    // 6. Data Keluarga
-    onProgress('Mengambil Database Keluarga...');
-    const keluarga = await fetchAllDataKeluarga();
-    safeSetLocalStorage('sikepling_data_keluarga_v1', JSON.stringify(keluarga));
 
     // 7. Laporan Harian (Kepling)
     onProgress('Mengambil Seluruh Laporan Kinerja Kepling...');

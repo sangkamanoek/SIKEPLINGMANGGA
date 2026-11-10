@@ -1,5 +1,7 @@
-import { DataKeluarga, AnggotaKeluarga } from '../types';
 import { SpptPbbItem } from '../data/pbbSampleData';
+
+export type DataKeluarga = any;
+export type AnggotaKeluarga = any;
 
 // --- Normalization Helpers ---
 

@@ -30,7 +30,6 @@ export type AppTabType =
   | 'dashboard_kasi'
   | 'kegiatan_khusus'
   | 'rekap_pbb'
-  | 'database_keluarga'
   | 'realisasi_pembangunan'
   | 'keuangan_pkk'
   | 'kegiatan_pkk'
@@ -212,17 +211,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               </button>
             </div>
 
-            <button
-              id="btn-mobile-nav-keluarga-pem"
-              type="button"
-              onClick={() => onSelectTab('database_keluarga')}
-              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-                activeTab === 'database_keluarga' ? 'text-blue-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Users className={`w-5 h-5 ${activeTab === 'database_keluarga' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-              <span className="text-[10px] mt-0.5 tracking-tight">Keluarga</span>
-            </button>
+
 
             <button
               id="btn-mobile-nav-riwayat-pem"

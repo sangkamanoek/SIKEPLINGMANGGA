@@ -36,7 +36,6 @@ interface DashboardPerlinsosKasiProps {
   currentUser: UserAccount;
   onSelectKeplingRiwayat?: (namaKepling: string) => void;
   onOpenKunjunganWarga?: () => void;
-  onOpenDatabaseKeluarga?: () => void;
 }
 
 type PeriodFilter = 'all' | 'today' | '7days' | 'month';
@@ -48,7 +47,6 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
   currentUser,
   onSelectKeplingRiwayat,
   onOpenKunjunganWarga,
-  onOpenDatabaseKeluarga,
 }) => {
   const [subView, setSubView] = useState<SubView>('perlinsos');
   const [period, setPeriod] = useState<PeriodFilter>('all');
@@ -362,18 +360,6 @@ export const DashboardPerlinsosKasi: React.FC<DashboardPerlinsosKasiProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {onOpenDatabaseKeluarga && (
-              <button
-                type="button"
-                onClick={onOpenDatabaseKeluarga}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer border border-amber-300"
-                title="Buka Database Master Data Keluarga (KK)"
-              >
-                <Users className="w-4 h-4 text-slate-950" />
-                <span>Database Data Keluarga</span>
-              </button>
-            )}
-
             {onOpenKunjunganWarga && (
               <button
                 type="button"

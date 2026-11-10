@@ -69,7 +69,6 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
     { id: 'form', label: 'Input Laporan', icon: FileText },
     { id: 'kunjungan', label: 'Kunjungan Warga', icon: Users },
-    { id: 'database_keluarga', label: 'Data Keluarga', icon: Building2 },
     { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
   ];
 
