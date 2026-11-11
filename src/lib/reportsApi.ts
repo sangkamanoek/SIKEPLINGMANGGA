@@ -132,6 +132,25 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
 };
 
 /**
+ * Fetch a single full report by ID (strictly online from Server Buffer)
+ */
+export const fetchReportById = async (id: string): Promise<LaporanHarianItem | null> => {
+  if (!id) return null;
+  try {
+    const res = await fetch(`/api/reports/${encodeURIComponent(id)}`, {
+      cache: 'no-store',
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json?.data || null;
+    }
+  } catch (err) {
+    console.warn('[Online API] Error reading /api/reports/:id', err);
+  }
+  return null;
+};
+
+/**
  * Seed initial reports - disabled for 100% clean production operation
  */
 export const seedInitialReports = async (): Promise<LaporanHarianItem[]> => {

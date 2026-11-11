@@ -122,7 +122,17 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
       list.forEach((item) => {
         if (item && item.id) {
           const existing = map.get(item.id);
-          map.set(item.id, existing ? { ...item, ...existing } : item);
+          if (existing) {
+            // Smart merge: favor the one with more photos or valid URLs
+            const hasPhotos = (it: any) => it.dokumentasiFoto && Array.isArray(it.dokumentasiFoto) && it.dokumentasiFoto.some((f: any) => f.url);
+            if (!hasPhotos(item) && hasPhotos(existing)) {
+               map.set(item.id, { ...item, ...existing });
+            } else {
+               map.set(item.id, { ...existing, ...item });
+            }
+          } else {
+            map.set(item.id, item);
+          }
         }
       });
     }

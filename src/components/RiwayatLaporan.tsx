@@ -23,6 +23,7 @@ import {
   UserCheck,
   ChevronLeft,
   ChevronRight,
+  Camera,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, UserAccount, KinerjaHarian } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
@@ -1317,12 +1318,19 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                           className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shrink-0 cursor-pointer hover:border-emerald-500 hover:scale-105 transition-all relative group shadow-2xs"
                           title={`${foto.name || `Foto ${idx + 1}`} - Klik untuk lihat foto jelas & penuh`}
                         >
-                          <img
-                            src={foto.url}
-                            alt={foto.name || `Foto ${idx + 1}`}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
+                          {foto.url ? (
+                            <img
+                              src={foto.url}
+                              alt={foto.name || `Foto ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-[8px] text-slate-400 font-bold p-1 text-center leading-tight">
+                              <Camera className="w-3 h-3 mb-0.5" />
+                              <span>Lihat<br/>Foto</span>
+                            </div>
+                          )}
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <Eye className="w-3.5 h-3.5 text-white drop-shadow" />
                           </div>

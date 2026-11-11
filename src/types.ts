@@ -618,15 +618,40 @@ export interface PkkDasaWismaItem {
   namaKetua: string;
   teleponKetua?: string;
   rtRw?: string;
-  jumlahAnggota?: number;
+  jumlahAnggota?: number; // Total members in the Dasa Wisma group (usually women)
+  
+  // Basic Statistics
+  jumlahRumah?: number;
   jumlahKk?: number;
   jumlahJiwa?: number;
+  jumlahJiwaLaki?: number;
+  jumlahJiwaPerempuan?: number;
+  
+  // Health & Demographic Statistics
   jumlahIbuHamil?: number;
+  jumlahIbuMenyusui?: number;
   jumlahBalita?: number;
+  jumlahBalitaLaki?: number;
+  jumlahBalitaPerempuan?: number;
   jumlahLansia?: number;
+  
+  // Family Planning & Literacy
+  jumlahPus?: number; // Pasangan Usia Subur
+  jumlahWus?: number; // Wanita Usia Subur
+  jumlahButaAksara?: number;
+  jumlahBerkebutuhanKhusus?: number;
+
+  // Environment & Sanitation
   jumlahJambanSehat?: number;
+  jumlahSpal?: number; // Saluran Pembuangan Air Limbah
+  jumlahTempatSampah?: number;
+  jumlahPekaranganManfaat?: number; // AKU HATINYA PKK
+
+  // Other details
+  jumlahIndustriRumah?: number;
   kegiatanUtama?: string;
   catatan?: string;
+  
   createdAt: string;
   updatedAt?: string;
 }

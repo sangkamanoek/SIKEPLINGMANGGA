@@ -30,6 +30,7 @@ import {
 } from '../lib/pkkDasaWismaService';
 import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
 import { KopSuratPkk } from './KopSuratPkk';
+import { VirtualList } from './VirtualList';
 
 interface PkkDasaWismaViewProps {
   currentUser: UserAccount;
@@ -72,10 +73,33 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
   const [formRtRw, setFormRtRw] = useState('');
   const [formJumlahKk, setFormJumlahKk] = useState<string>('10');
   const [formJumlahJiwa, setFormJumlahJiwa] = useState<string>('35');
+  const [formJumlahJiwaLaki, setFormJumlahJiwaLaki] = useState<string>('17');
+  const [formJumlahJiwaPerempuan, setFormJumlahJiwaPerempuan] = useState<string>('18');
+  const [formJumlahRumah, setFormJumlahRumah] = useState<string>('10');
+  
   const [formJumlahBumil, setFormJumlahBumil] = useState<string>('0');
+  const [formJumlahBusui, setFormJumlahBusui] = useState<string>('0');
   const [formJumlahBalita, setFormJumlahBalita] = useState<string>('2');
   const [formJumlahLansia, setFormJumlahLansia] = useState<string>('3');
+  
+  const [formJumlahPus, setFormJumlahPus] = useState<string>('0');
+  const [formJumlahWus, setFormJumlahWus] = useState<string>('0');
+  const [formJumlahButaAksara, setFormJumlahButaAksara] = useState<string>('0');
+  const [formJumlahBerkebutuhanKhusus, setFormJumlahBerkebutuhanKhusus] = useState<string>('0');
+  
   const [formJumlahJamban, setFormJumlahJamban] = useState<string>('10');
+  const [formJumlahSpal, setFormJumlahSpal] = useState<string>('10');
+  const [formJumlahSampah, setFormJumlahTempatSampah] = useState<string>('10');
+  const [formJumlahPekarangan, setFormJumlahPekarangan] = useState<string>('0');
+  const [formJumlahIndustri, setFormJumlahIndustri] = useState<string>('0');
+
+  // Auto-calculate Total Jiwa
+  useEffect(() => {
+    const l = Number(formJumlahJiwaLaki) || 0;
+    const p = Number(formJumlahJiwaPerempuan) || 0;
+    setFormJumlahJiwa(String(l + p));
+  }, [formJumlahJiwaLaki, formJumlahJiwaPerempuan]);
+
   const [formKegiatanUtama, setFormKegiatanUtama] = useState('');
   const [formCatatan, setFormCatatan] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -112,28 +136,61 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
   const kpiStats = useMemo(() => {
     let totalKk = 0;
     let totalJiwa = 0;
+    let totalJiwaLaki = 0;
+    let totalJiwaPerempuan = 0;
     let totalBumil = 0;
+    let totalBusui = 0;
     let totalBalita = 0;
     let totalLansia = 0;
+    let totalPus = 0;
+    let totalWus = 0;
+    let totalButaAksara = 0;
+    let totalBerkebutuhanKhusus = 0;
     let totalJamban = 0;
+    let totalSpal = 0;
+    let totalSampah = 0;
+    let totalPekarangan = 0;
+    let totalIndustri = 0;
 
     filteredItems.forEach((it) => {
       totalKk += Number(it.jumlahKk) || 0;
       totalJiwa += Number(it.jumlahJiwa) || 0;
+      totalJiwaLaki += Number(it.jumlahJiwaLaki) || 0;
+      totalJiwaPerempuan += Number(it.jumlahJiwaPerempuan) || 0;
       totalBumil += Number(it.jumlahIbuHamil) || 0;
+      totalBusui += Number(it.jumlahIbuMenyusui) || 0;
       totalBalita += Number(it.jumlahBalita) || 0;
       totalLansia += Number(it.jumlahLansia) || 0;
+      totalPus += Number(it.jumlahPus) || 0;
+      totalWus += Number(it.jumlahWus) || 0;
+      totalButaAksara += Number(it.jumlahButaAksara) || 0;
+      totalBerkebutuhanKhusus += Number(it.jumlahBerkebutuhanKhusus) || 0;
       totalJamban += Number(it.jumlahJambanSehat) || 0;
+      totalSpal += Number(it.jumlahSpal) || 0;
+      totalSampah += Number(it.jumlahTempatSampah) || 0;
+      totalPekarangan += Number(it.jumlahPekaranganManfaat) || 0;
+      totalIndustri += Number(it.jumlahIndustriRumah) || 0;
     });
 
     return {
       totalKelompok: filteredItems.length,
       totalKk,
       totalJiwa,
+      totalJiwaLaki,
+      totalJiwaPerempuan,
       totalBumil,
+      totalBusui,
       totalBalita,
       totalLansia,
+      totalPus,
+      totalWus,
+      totalButaAksara,
+      totalBerkebutuhanKhusus,
       totalJamban,
+      totalSpal,
+      totalSampah,
+      totalPekarangan,
+      totalIndustri,
     };
   }, [filteredItems]);
 
@@ -151,10 +208,22 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
     setFormRtRw('');
     setFormJumlahKk('10');
     setFormJumlahJiwa('35');
+    setFormJumlahJiwaLaki('17');
+    setFormJumlahJiwaPerempuan('18');
+    setFormJumlahRumah('10');
     setFormJumlahBumil('0');
+    setFormJumlahBusui('0');
     setFormJumlahBalita('2');
     setFormJumlahLansia('3');
+    setFormJumlahPus('5');
+    setFormJumlahWus('8');
+    setFormJumlahButaAksara('0');
+    setFormJumlahBerkebutuhanKhusus('0');
     setFormJumlahJamban('10');
+    setFormJumlahSpal('10');
+    setFormJumlahTempatSampah('10');
+    setFormJumlahPekarangan('5');
+    setFormJumlahIndustri('0');
     setFormKegiatanUtama('Pemeriksaan jentik berkala, Posyandu, & pemilahan sampah');
     setFormCatatan('');
     setIsModalOpen(true);
@@ -168,12 +237,24 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
     setFormNamaKetua(it.namaKetua || '');
     setFormTelepon(it.teleponKetua || '');
     setFormRtRw(it.rtRw || '');
-    setFormJumlahKk(String(it.jumlahKk ?? 10));
-    setFormJumlahJiwa(String(it.jumlahJiwa ?? 35));
+    setFormJumlahKk(String(it.jumlahKk ?? 0));
+    setFormJumlahJiwa(String(it.jumlahJiwa ?? 0));
+    setFormJumlahJiwaLaki(String(it.jumlahJiwaLaki ?? 0));
+    setFormJumlahJiwaPerempuan(String(it.jumlahJiwaPerempuan ?? 0));
+    setFormJumlahRumah(String(it.jumlahRumah ?? 0));
     setFormJumlahBumil(String(it.jumlahIbuHamil ?? 0));
+    setFormJumlahBusui(String(it.jumlahIbuMenyusui ?? 0));
     setFormJumlahBalita(String(it.jumlahBalita ?? 0));
     setFormJumlahLansia(String(it.jumlahLansia ?? 0));
+    setFormJumlahPus(String(it.jumlahPus ?? 0));
+    setFormJumlahWus(String(it.jumlahWus ?? 0));
+    setFormJumlahButaAksara(String(it.jumlahButaAksara ?? 0));
+    setFormJumlahBerkebutuhanKhusus(String(it.jumlahBerkebutuhanKhusus ?? 0));
     setFormJumlahJamban(String(it.jumlahJambanSehat ?? 0));
+    setFormJumlahSpal(String(it.jumlahSpal ?? 0));
+    setFormJumlahTempatSampah(String(it.jumlahTempatSampah ?? 0));
+    setFormJumlahPekarangan(String(it.jumlahPekaranganManfaat ?? 0));
+    setFormJumlahIndustri(String(it.jumlahIndustriRumah ?? 0));
     setFormKegiatanUtama(it.kegiatanUtama || '');
     setFormCatatan(it.catatan || '');
     setIsModalOpen(true);
@@ -202,12 +283,24 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
         teleponKetua: formTelepon.trim() || undefined,
         rtRw: formRtRw.trim() || undefined,
         jumlahAnggota: Number(formJumlahKk) || 10,
+        jumlahRumah: Number(formJumlahRumah) || 0,
         jumlahKk: Number(formJumlahKk) || 0,
         jumlahJiwa: Number(formJumlahJiwa) || 0,
+        jumlahJiwaLaki: Number(formJumlahJiwaLaki) || 0,
+        jumlahJiwaPerempuan: Number(formJumlahJiwaPerempuan) || 0,
         jumlahIbuHamil: Number(formJumlahBumil) || 0,
+        jumlahIbuMenyusui: Number(formJumlahBusui) || 0,
         jumlahBalita: Number(formJumlahBalita) || 0,
         jumlahLansia: Number(formJumlahLansia) || 0,
+        jumlahPus: Number(formJumlahPus) || 0,
+        jumlahWus: Number(formJumlahWus) || 0,
+        jumlahButaAksara: Number(formJumlahButaAksara) || 0,
+        jumlahBerkebutuhanKhusus: Number(formJumlahBerkebutuhanKhusus) || 0,
         jumlahJambanSehat: Number(formJumlahJamban) || 0,
+        jumlahSpal: Number(formJumlahSpal) || 0,
+        jumlahTempatSampah: Number(formJumlahSampah) || 0,
+        jumlahPekaranganManfaat: Number(formJumlahPekarangan) || 0,
+        jumlahIndustriRumah: Number(formJumlahIndustri) || 0,
         kegiatanUtama: formKegiatanUtama.trim() || undefined,
         catatan: formCatatan.trim() || undefined,
         createdAt: editingItem?.createdAt || now,
@@ -419,7 +512,7 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
         </div>
       </div>
 
-      {/* Dasa Wisma Cards List */}
+      {/* Dasa Wisma Cards List (Optimized with Virtual Windowing for Anti-OOM) */}
       {filteredItems.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3">
           <div className="w-14 h-14 bg-teal-50 text-teal-700 rounded-full flex items-center justify-center mx-auto">
@@ -443,11 +536,14 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredItems.map((item) => (
+        <VirtualList
+          items={filteredItems}
+          itemHeight={320}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          renderItem={(item) => (
             <div
               key={item.id}
-              className="bg-white rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md transition-all p-5 flex flex-col justify-between relative overflow-hidden group"
+              className="bg-white rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md transition-all p-5 flex flex-col justify-between relative overflow-hidden group h-full mb-4"
             >
               <div className="absolute top-0 right-0 w-20 h-20 bg-teal-50 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
 
@@ -467,7 +563,7 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
                 {/* Ketua Info */}
                 <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-3 space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Ketua Kelompok:</span>
+                    <span className="text-slate-500 font-medium">Ketua:</span>
                     <span className="font-bold text-slate-900">{item.namaKetua}</span>
                   </div>
                   {item.teleponKetua && (
@@ -487,35 +583,41 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
                   )}
                 </div>
 
-                {/* Metrics Grid */}
+                {/* Main Stats Grid */}
                 <div className="grid grid-cols-3 gap-2 text-center text-xs mb-3">
                   <div className="bg-emerald-50/60 p-2 rounded-xl border border-emerald-100">
-                    <p className="text-[10px] text-emerald-800 font-bold">KK Binaan</p>
+                    <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-tighter">KK</p>
                     <p className="text-sm font-black text-emerald-950 mt-0.5">{item.jumlahKk || 0}</p>
                   </div>
                   <div className="bg-blue-50/60 p-2 rounded-xl border border-blue-100">
-                    <p className="text-[10px] text-blue-800 font-bold">Jiwa</p>
+                    <p className="text-[10px] text-blue-800 font-bold uppercase tracking-tighter">Jiwa</p>
                     <p className="text-sm font-black text-blue-950 mt-0.5">{item.jumlahJiwa || 0}</p>
                   </div>
                   <div className="bg-amber-50/60 p-2 rounded-xl border border-amber-100">
-                    <p className="text-[10px] text-amber-800 font-bold">Balita</p>
+                    <p className="text-[10px] text-amber-800 font-bold uppercase tracking-tighter">Balita</p>
                     <p className="text-sm font-black text-amber-950 mt-0.5">{item.jumlahBalita || 0}</p>
                   </div>
                 </div>
 
+                {/* Sub Stats Row */}
                 <div className="grid grid-cols-2 gap-2 text-center text-xs mb-3">
                   <div className="bg-rose-50/60 p-1.5 rounded-xl border border-rose-100 flex items-center justify-between px-3">
-                    <span className="text-[10px] text-rose-800 font-bold">Ibu Hamil:</span>
+                    <span className="text-[10px] text-rose-800 font-bold uppercase">Bumil:</span>
                     <span className="text-xs font-black text-rose-950">{item.jumlahIbuHamil || 0}</span>
                   </div>
-                  <div className="bg-teal-50/60 p-1.5 rounded-xl border border-teal-100 flex items-center justify-between px-3">
-                    <span className="text-[10px] text-teal-800 font-bold">Jamban Sehat:</span>
-                    <span className="text-xs font-black text-teal-950">{item.jumlahJambanSehat || 0}</span>
+                  <div className="bg-indigo-50/60 p-1.5 rounded-xl border border-indigo-100 flex items-center justify-between px-3">
+                    <span className="text-[10px] text-indigo-800 font-bold uppercase">Busui:</span>
+                    <span className="text-xs font-black text-indigo-950">{item.jumlahIbuMenyusui || 0}</span>
                   </div>
+                </div>
+                
+                <div className="flex items-center justify-between px-2 text-[10px] text-slate-500 mb-2">
+                  <span className="flex items-center gap-1"><Home className="w-2.5 h-2.5" /> Rumah: <strong>{item.jumlahRumah || 0}</strong></span>
+                  <span className="flex items-center gap-1"><CheckCircle2 className="w-2.5 h-2.5" /> Jamban: <strong>{item.jumlahJambanSehat || 0}</strong></span>
                 </div>
 
                 {item.kegiatanUtama && (
-                  <p className="text-[11px] text-slate-600 line-clamp-2 mb-2 italic">
+                  <p className="text-[11px] text-slate-600 line-clamp-1 mb-2 italic">
                     "{item.kegiatanUtama}"
                   </p>
                 )}
@@ -546,8 +648,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        />
       )}
 
       {/* Modal Form Tambah / Edit Dasa Wisma */}
@@ -664,85 +766,104 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
                 </div>
               </div>
 
-              {/* Indikator Numerik */}
-              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
-                <p className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                  <Info className="w-3.5 h-3.5 text-teal-600" />
-                  <span>Statistik Binaan Warga (Standar Dasa Wisma)</span>
-                </p>
+              {/* Indikator Numerik Terpadu (Sesuai Standar PKK) */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5 mb-3">
+                    <Info className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Statistik Dasar Keluarga & Jiwa</span>
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Jumlah Rumah</label>
+                      <input type="number" min="0" value={formJumlahRumah} onChange={(e) => setFormJumlahRumah(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Jumlah KK</label>
+                      <input type="number" min="0" value={formJumlahKk} onChange={(e) => setFormJumlahKk(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Total Jiwa (L+P)</label>
+                      <input type="number" readOnly value={formJumlahJiwa} className="w-full px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-xl text-xs font-black text-emerald-800" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Laki-laki</label>
+                      <input type="number" min="0" value={formJumlahJiwaLaki} onChange={(e) => setFormJumlahJiwaLaki(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Perempuan</label>
+                      <input type="number" min="0" value={formJumlahJiwaPerempuan} onChange={(e) => setFormJumlahJiwaPerempuan(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                  </div>
+                </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Jumlah KK
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formJumlahKk}
-                      onChange={(e) => setFormJumlahKk(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
-                    />
+                <div className="pt-3 border-t border-slate-200">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-600 mb-3">Prioritas Kesehatan & Lansia</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Ibu Hamil</label>
+                      <input type="number" min="0" value={formJumlahBumil} onChange={(e) => setFormJumlahBumil(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Ibu Menyusui</label>
+                      <input type="number" min="0" value={formJumlahBusui} onChange={(e) => setFormJumlahBusui(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Balita</label>
+                      <input type="number" min="0" value={formJumlahBalita} onChange={(e) => setFormJumlahBalita(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Lansia</label>
+                      <input type="number" min="0" value={formJumlahLansia} onChange={(e) => setFormJumlahLansia(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Jumlah Jiwa
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formJumlahJiwa}
-                      onChange={(e) => setFormJumlahJiwa(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
-                    />
+                </div>
+
+                <div className="pt-3 border-t border-slate-200">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-600 mb-3">Keluarga Berencana & Literasi</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">PUS (Pasangan)</label>
+                      <input type="number" min="0" value={formJumlahPus} onChange={(e) => setFormJumlahPus(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">WUS (Wanita)</label>
+                      <input type="number" min="0" value={formJumlahWus} onChange={(e) => setFormJumlahWus(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Buta Aksara</label>
+                      <input type="number" min="0" value={formJumlahButaAksara} onChange={(e) => setFormJumlahButaAksara(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Disabilitas</label>
+                      <input type="number" min="0" value={formJumlahBerkebutuhanKhusus} onChange={(e) => setFormJumlahBerkebutuhanKhusus(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Ibu Hamil
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formJumlahBumil}
-                      onChange={(e) => setFormJumlahBumil(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Anak Balita
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formJumlahBalita}
-                      onChange={(e) => setFormJumlahBalita(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Warga Lansia
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formJumlahLansia}
-                      onChange={(e) => setFormJumlahLansia(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Jamban Sehat
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formJumlahJamban}
-                      onChange={(e) => setFormJumlahJamban(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
-                    />
+                </div>
+
+                <div className="pt-3 border-t border-slate-200">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-600 mb-3">Kesehatan Lingkungan (Sanitasi)</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Jamban Sehat</label>
+                      <input type="number" min="0" value={formJumlahJamban} onChange={(e) => setFormJumlahJamban(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">SPAL Terpadu</label>
+                      <input type="number" min="0" value={formJumlahSpal} onChange={(e) => setFormJumlahSpal(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Tempat Sampah</label>
+                      <input type="number" min="0" value={formJumlahSampah} onChange={(e) => setFormJumlahTempatSampah(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Pekarangan Aktif</label>
+                      <input type="number" min="0" value={formJumlahPekarangan} onChange={(e) => setFormJumlahPekarangan(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Industri Rumah</label>
+                      <input type="number" min="0" value={formJumlahIndustri} onChange={(e) => setFormJumlahIndustri(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -818,41 +939,68 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
             </p>
           </div>
 
-          <table className="w-full text-[10px] border-collapse border-2 border-black text-black">
+          <table className="w-full text-[7px] border-collapse border border-black text-black leading-tight">
             <thead>
               <tr className="bg-slate-100">
-                <th className="border border-black p-2 font-black uppercase text-center w-[40px]">No</th>
-                <th className="border border-black p-2 font-black uppercase text-left">Nama Kelompok</th>
-                <th className="border border-black p-2 font-black uppercase text-left">Nama Ketua</th>
-                <th className="border border-black p-2 font-black uppercase text-center w-[80px]">RT / RW</th>
-                <th className="border border-black p-2 font-black uppercase text-center w-[50px]">KK</th>
-                <th className="border border-black p-2 font-black uppercase text-center w-[50px]">Jiwa</th>
-                <th className="border border-black p-2 font-black uppercase text-center w-[40px]">Bml</th>
-                <th className="border border-black p-2 font-black uppercase text-center w-[40px]">Blt</th>
-                <th className="border border-black p-2 font-black uppercase text-center w-[40px]">Lns</th>
-                <th className="border border-black p-2 font-black uppercase text-center w-[40px]">Jbn</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[20px]">No</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-left">Nama Kelompok</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-left">Ketua</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[40px]">RT/RW</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[20px]">Rmh</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[20px]">KK</th>
+                <th colSpan={3} className="border border-black p-0.5 font-black uppercase text-center">Jumlah Jiwa</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Bml</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Bsi</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Blt</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Lns</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">PUS</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">WUS</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">BA</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Dis</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Jbn</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">SPL</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Smp</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Pkr</th>
+                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Ind</th>
+              </tr>
+              <tr className="bg-slate-100">
+                <th className="border border-black p-0.5 font-black uppercase text-center w-[20px]">L</th>
+                <th className="border border-black p-0.5 font-black uppercase text-center w-[20px]">P</th>
+                <th className="border border-black p-0.5 font-black uppercase text-center w-[20px]">T</th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="border border-black p-8 text-center italic text-slate-400">
+                  <td colSpan={22} className="border border-black p-8 text-center italic text-slate-400">
                     Belum ada data Kelompok Dasa Wisma untuk wilayah ini.
                   </td>
                 </tr>
               ) : (
                 filteredItems.map((item, idx) => (
                   <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="border border-black p-2 text-center font-bold">{idx + 1}</td>
-                    <td className="border border-black p-2 font-bold uppercase">{item.namaKelompok}</td>
-                    <td className="border border-black p-2">{item.namaKetua}</td>
-                    <td className="border border-black p-2 text-center">{item.rtRw || '-'}</td>
-                    <td className="border border-black p-2 text-center font-bold">{item.jumlahKk}</td>
-                    <td className="border border-black p-2 text-center">{item.jumlahJiwa}</td>
-                    <td className="border border-black p-2 text-center">{item.jumlahIbuHamil}</td>
-                    <td className="border border-black p-2 text-center">{item.jumlahBalita}</td>
-                    <td className="border border-black p-2 text-center">{item.jumlahLansia}</td>
-                    <td className="border border-black p-2 text-center font-bold text-emerald-900">{item.jumlahJambanSehat}</td>
+                    <td className="border border-black p-0.5 text-center">{idx + 1}</td>
+                    <td className="border border-black p-0.5 font-bold uppercase">{item.namaKelompok}</td>
+                    <td className="border border-black p-0.5">{item.namaKetua}</td>
+                    <td className="border border-black p-0.5 text-center">{item.rtRw || '-'}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahRumah}</td>
+                    <td className="border border-black p-0.5 text-center font-bold">{item.jumlahKk}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahJiwaLaki}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahJiwaPerempuan}</td>
+                    <td className="border border-black p-0.5 text-center font-bold">{item.jumlahJiwa}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahIbuHamil}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahIbuMenyusui}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahBalita}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahLansia}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahPus}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahWus}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahButaAksara}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahBerkebutuhanKhusus}</td>
+                    <td className="border border-black p-0.5 text-center font-bold">{item.jumlahJambanSehat}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahSpal}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahTempatSampah}</td>
+                    <td className="border border-black p-0.5 text-center font-bold text-emerald-900">{item.jumlahPekaranganManfaat}</td>
+                    <td className="border border-black p-0.5 text-center">{item.jumlahIndustriRumah}</td>
                   </tr>
                 ))
               )}
@@ -860,13 +1008,25 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
             {filteredItems.length > 0 && (
               <tfoot className="bg-slate-50 font-black">
                 <tr>
-                  <td colSpan={4} className="border border-black p-2 text-right">TOTAL KESELURUHAN:</td>
-                  <td className="border border-black p-2 text-center underline">{kpiStats.totalKk}</td>
-                  <td className="border border-black p-2 text-center underline">{kpiStats.totalJiwa}</td>
-                  <td className="border border-black p-2 text-center underline">{kpiStats.totalBumil}</td>
-                  <td className="border border-black p-2 text-center underline">{kpiStats.totalBalita}</td>
-                  <td className="border border-black p-2 text-center underline">{kpiStats.totalLansia}</td>
-                  <td className="border border-black p-2 text-center underline">{kpiStats.totalJamban}</td>
+                  <td colSpan={4} className="border border-black p-0.5 text-right">TOTAL:</td>
+                  <td className="border border-black p-0.5 text-center">{filteredItems.reduce((acc, it) => acc + (it.jumlahRumah || 0), 0)}</td>
+                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalKk}</td>
+                  <td className="border border-black p-0.5 text-center">{kpiStats.totalJiwaLaki}</td>
+                  <td className="border border-black p-0.5 text-center">{kpiStats.totalJiwaPerempuan}</td>
+                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalJiwa}</td>
+                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalBumil}</td>
+                  <td className="border border-black p-0.5 text-center">{kpiStats.totalBusui}</td>
+                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalBalita}</td>
+                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalLansia}</td>
+                  <td className="border border-black p-0.5 text-center">{kpiStats.totalPus}</td>
+                  <td className="border border-black p-0.5 text-center">{kpiStats.totalWus}</td>
+                  <td className="border border-black p-0.5 text-center">{kpiStats.totalButaAksara}</td>
+                  <td className="border border-black p-0.5 text-center">{kpiStats.totalBerkebutuhanKhusus}</td>
+                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalJamban}</td>
+                  <td className="border border-black p-0.5 text-center">{kpiStats.totalSpal}</td>
+                  <td className="border border-black p-0.5 text-center">{kpiStats.totalSampah}</td>
+                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalPekarangan}</td>
+                  <td className="border border-black p-0.5 text-center">{kpiStats.totalIndustri}</td>
                 </tr>
               </tfoot>
             )}

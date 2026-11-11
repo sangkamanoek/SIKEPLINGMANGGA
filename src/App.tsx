@@ -381,9 +381,23 @@ export default function App() {
   const [selectedReportForModal, setSelectedReportForModal] = useState<LaporanHarianItem | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
 
-  const handleSelectReport = (report: LaporanHarianItem) => {
+  const handleSelectReport = async (report: LaporanHarianItem) => {
     setSelectedReportForModal(report);
     setIsDetailModalOpen(true);
+
+    // If report has photos but they are missing URLs (due to light mode), fetch full version
+    const needsFullFetch = report.jumlahDokumentasi > 0 && 
+                           (!report.dokumentasiFoto || report.dokumentasiFoto.length === 0 || report.dokumentasiFoto.every(f => !f.url));
+    
+    if (needsFullFetch && report.id) {
+      const { fetchReportById } = await import('./lib/reportsApi');
+      const full = await fetchReportById(report.id);
+      if (full && full.dokumentasiFoto && full.dokumentasiFoto.length > 0) {
+        setSelectedReportForModal(full);
+        // Also update the local list if it was a valid merge
+        setReports(prev => prev.map(r => r.id === full.id ? { ...r, ...full } : r));
+      }
+    }
   };
 
   const handleUpdateReport = async (updatedItem: LaporanHarianItem) => {
@@ -452,7 +466,7 @@ export default function App() {
   useEffect(() => {
     if (isPkk) {
       const allowedPkkTabs = [
-        'hub', 'kegiatan_pkk', 'keuangan_pkk', 'posyandu_pkk',
+        'hub', 'kegiatan_pkk', 'keuangan_pkk', 'posyandu_pkk', 'dasa_wisma',
         'buku_pkk', 'surat_kedinasan', 'daftar_tugas_khusus', 'monitoring', 'realisasi_pembangunan'
       ];
       if (!allowedPkkTabs.includes(activeTab)) {

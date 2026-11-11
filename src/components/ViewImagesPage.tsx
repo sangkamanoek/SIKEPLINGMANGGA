@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchAllReports } from '../lib/reportsApi';
 import { LaporanHarianItem } from '../types';
 import { Download, ArrowLeft } from 'lucide-react';
+import { getDirectImageUrl } from '../lib/formatter';
 
 export default function ViewImagesPage({ reportId }: { reportId: string }) {
   const [report, setReport] = useState<LaporanHarianItem | null>(null);
@@ -109,7 +110,7 @@ export default function ViewImagesPage({ reportId }: { reportId: string }) {
                 <div key={foto.id || index} className="bg-gray-50 rounded-xl overflow-hidden border border-gray-200 shadow-sm flex flex-col justify-between">
                   <div className="aspect-square bg-gray-200 relative group overflow-hidden">
                     <img 
-                      src={foto.url} 
+                      src={getDirectImageUrl(foto.url)} 
                       alt={foto.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       loading="lazy"

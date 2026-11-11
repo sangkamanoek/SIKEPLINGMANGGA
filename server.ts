@@ -1331,14 +1331,14 @@ app.get('/api/reports', (req, res) => {
       return {
         ...rest,
         jumlahDokumentasi: r.jumlahDokumentasi || dokumentasiFoto?.length || 0,
-        // Keep photo metadata without heavy base64 strings
+        // Strip heavy base64 strings in light mode to prevent OOM
         dokumentasiFoto: Array.isArray(dokumentasiFoto)
           ? dokumentasiFoto.map((f: any) => ({
               id: f.id,
               name: f.name,
               timestamp: f.timestamp,
               kategori: f.kategori,
-              url: f.url,
+              url: (f.url && f.url.length > 500) ? "" : f.url, // Remove large base64, keep small URLs/links
             }))
           : [],
       };
@@ -1347,6 +1347,16 @@ app.get('/api/reports', (req, res) => {
   }
 
   res.json({ success: true, count: activeReports.length, data: activeReports });
+});
+
+// GET single full report by ID (always returns full photos)
+app.get('/api/reports/:id', (req, res) => {
+  const { id } = req.params;
+  const report = reportsCache.find((r) => r.id === id);
+  if (!report) {
+    return res.status(404).json({ success: false, message: 'Laporan tidak ditemukan' });
+  }
+  res.json({ success: true, data: report });
 });
 
 // GET all deleted report IDs (Tombstones)

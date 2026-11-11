@@ -259,3 +259,32 @@ export const isKunjunganOnDate = (item: KunjunganWargaData | any, dateIsoOrDispl
   return false;
 };
 
+export const getDirectImageUrl = (url?: string): string => {
+  if (!url) return '';
+  if (typeof url !== 'string') return '';
+
+  // Google Drive logic
+  if (url.includes('drive.google.com')) {
+    let fileId = '';
+    const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (idMatch) {
+      fileId = idMatch[1];
+    } else {
+      const paramMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (paramMatch) {
+        fileId = paramMatch[1];
+      }
+    }
+    if (fileId) {
+      // Direct link via lh3 (preferred for speed) or export=view
+      return `https://lh3.googleusercontent.com/u/0/d/${fileId}`;
+    }
+  }
+
+  // Handle some other common cases if needed
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+
+  return url;
+};

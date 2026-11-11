@@ -41,6 +41,7 @@ import {
   formatReportToText,
   isReportMatchingKepling,
   extractNomorLingkungan,
+  getDirectImageUrl,
 } from '../lib/formatter';
 
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
@@ -1286,7 +1287,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                 {kunj.fotoDokumentasi ? (
                                   <div className="w-6 h-6 mx-auto rounded overflow-hidden border border-slate-300">
                                     <img
-                                      src={kunj.fotoDokumentasi}
+                                      src={getDirectImageUrl(kunj.fotoDokumentasi)}
                                       alt={kunj.namaWarga}
                                       crossOrigin="anonymous"
                                       className="w-full h-full object-cover"
@@ -1355,7 +1356,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                   >
                                     <div className="w-full h-[120px] rounded-md overflow-hidden bg-slate-50 flex items-center justify-center p-0.5 border border-slate-200">
                                       <img
-                                        src={foto.url}
+                                        src={getDirectImageUrl(foto.url)}
                                         alt={getProperFotoLabel(foto, idx)}
                                         crossOrigin="anonymous"
                                         className="w-full h-full object-cover object-center"
@@ -1437,7 +1438,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                               >
                                 <div className="w-full h-[180px] rounded-md overflow-hidden bg-slate-100 flex items-center justify-center p-1">
                                   <img
-                                    src={foto.url}
+                                    src={getDirectImageUrl(foto.url)}
                                     alt={getProperFotoLabel(foto, idx)}
                                     crossOrigin="anonymous"
                                     className="w-full h-full object-cover object-center"
@@ -1530,7 +1531,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                           onClick={() => handleOpenPhotoPreview(foto.url, foto.name || `Foto ${idx + 1}`)}
                         >
                           <img
-                            src={foto.url}
+                            src={getDirectImageUrl(foto.url)}
                             alt={foto.name}
                             className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700"
                             loading="lazy"
@@ -2499,7 +2500,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                 title="Lihat Foto Kunjungan"
                               >
                                 <img
-                                  src={kunj.fotoDokumentasi}
+                                  src={getDirectImageUrl(kunj.fotoDokumentasi)}
                                   alt={kunj.namaWarga}
                                   crossOrigin="anonymous"
                                   className="w-full h-full object-cover"
@@ -2592,7 +2593,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                       {/* Image Thumbnail */}
                       <div className="aspect-video w-full rounded-lg overflow-hidden bg-slate-100 relative group border border-slate-100 flex items-center justify-center">
                         <img
-                          src={foto.url}
+                          src={getDirectImageUrl(foto.url)}
                           alt={foto.name}
                           className="w-full h-full object-contain"
                         />
@@ -3119,7 +3120,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                 }}
                               >
                                 <img
-                                  src={foto.url}
+                                  src={getDirectImageUrl(foto.url)}
                                   alt={getProperFotoLabel(foto, idx)}
                                   crossOrigin="anonymous"
                                   style={{
@@ -3320,7 +3321,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                             }}
                           >
                             <img
-                              src={foto.url}
+                              src={getDirectImageUrl(foto.url)}
                               alt={getProperFotoLabel(foto, idx)}
                               crossOrigin="anonymous"
                               style={{
@@ -3512,7 +3513,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
               {/* High-Clarity Image Container */}
               <div className="w-full h-full flex items-center justify-center overflow-auto p-2">
                 <img
-                  src={previewPhoto.url}
+                  src={getDirectImageUrl(previewPhoto.url)}
                   alt={previewPhoto.name}
                   style={{
                     transform: `scale(${photoZoom}) rotate(${photoRotation}deg)`,
