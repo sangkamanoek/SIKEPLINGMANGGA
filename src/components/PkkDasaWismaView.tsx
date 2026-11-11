@@ -29,6 +29,7 @@ import {
   getLocalDasaWismaList,
 } from '../lib/pkkDasaWismaService';
 import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
+import { KopSuratPkk } from './KopSuratPkk';
 
 interface PkkDasaWismaViewProps {
   currentUser: UserAccount;
@@ -307,6 +308,16 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
             >
               {copiedWa ? <Check className="w-4 h-4 text-white" /> : <Share2 className="w-4 h-4" />}
               <span>{copiedWa ? 'Tersalin!' : 'Bagikan WA'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer border border-slate-600"
+              title="Cetak laporan lengkap dengan Kop Surat"
+            >
+              <Building className="w-4 h-4" />
+              <span>Cetak</span>
             </button>
 
             <button
@@ -785,6 +796,87 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
           </div>
         </div>
       )}
+      {/* Hidden Printable Section */}
+      <div className="hidden print:block print:w-full print:p-0">
+        <style>{`
+          @media print {
+            @page { margin: 15mm 15mm 15mm 20mm; }
+            body * { visibility: hidden; }
+            #printable-report, #printable-report * { visibility: visible; }
+            #printable-report { position: absolute; left: 0; top: 0; width: 100%; }
+          }
+        `}</style>
+        <div id="printable-report" className="p-8">
+          <KopSuratPkk />
+          <div className="mt-8 mb-6 text-center space-y-1">
+            <h2 className="text-2xl font-black text-black underline">REKAPITULASI DATA KELOMPOK DASA WISMA</h2>
+            <p className="text-sm font-bold text-black uppercase">
+              WILAYAH: {selectedLingkungan === 'all' ? 'SELURUH 24 LINGKUNGAN' : `LINGKUNGAN ${selectedLingkungan}`}
+            </p>
+            <p className="text-xs text-slate-700 italic">
+              Dicetak pada: {new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })} pukul {new Date().toLocaleTimeString('id-ID')} WIB
+            </p>
+          </div>
+
+          <table className="w-full text-[10px] border-collapse border-2 border-black text-black">
+            <thead>
+              <tr className="bg-slate-100">
+                <th className="border border-black p-2 font-black uppercase text-center w-[40px]">No</th>
+                <th className="border border-black p-2 font-black uppercase text-left">Nama Kelompok</th>
+                <th className="border border-black p-2 font-black uppercase text-left">Nama Ketua</th>
+                <th className="border border-black p-2 font-black uppercase text-center w-[80px]">RT / RW</th>
+                <th className="border border-black p-2 font-black uppercase text-center w-[50px]">KK</th>
+                <th className="border border-black p-2 font-black uppercase text-center w-[50px]">Jiwa</th>
+                <th className="border border-black p-2 font-black uppercase text-center w-[40px]">Bml</th>
+                <th className="border border-black p-2 font-black uppercase text-center w-[40px]">Blt</th>
+                <th className="border border-black p-2 font-black uppercase text-center w-[40px]">Lns</th>
+                <th className="border border-black p-2 font-black uppercase text-center w-[40px]">Jbn</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredItems.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="border border-black p-8 text-center italic text-slate-400">
+                    Belum ada data Kelompok Dasa Wisma untuk wilayah ini.
+                  </td>
+                </tr>
+              ) : (
+                filteredItems.map((item, idx) => (
+                  <tr key={item.id} className="hover:bg-slate-50">
+                    <td className="border border-black p-2 text-center font-bold">{idx + 1}</td>
+                    <td className="border border-black p-2 font-bold uppercase">{item.namaKelompok}</td>
+                    <td className="border border-black p-2">{item.namaKetua}</td>
+                    <td className="border border-black p-2 text-center">{item.rtRw || '-'}</td>
+                    <td className="border border-black p-2 text-center font-bold">{item.jumlahKk}</td>
+                    <td className="border border-black p-2 text-center">{item.jumlahJiwa}</td>
+                    <td className="border border-black p-2 text-center">{item.jumlahIbuHamil}</td>
+                    <td className="border border-black p-2 text-center">{item.jumlahBalita}</td>
+                    <td className="border border-black p-2 text-center">{item.jumlahLansia}</td>
+                    <td className="border border-black p-2 text-center font-bold text-emerald-900">{item.jumlahJambanSehat}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            {filteredItems.length > 0 && (
+              <tfoot className="bg-slate-50 font-black">
+                <tr>
+                  <td colSpan={4} className="border border-black p-2 text-right">TOTAL KESELURUHAN:</td>
+                  <td className="border border-black p-2 text-center underline">{kpiStats.totalKk}</td>
+                  <td className="border border-black p-2 text-center underline">{kpiStats.totalJiwa}</td>
+                  <td className="border border-black p-2 text-center underline">{kpiStats.totalBumil}</td>
+                  <td className="border border-black p-2 text-center underline">{kpiStats.totalBalita}</td>
+                  <td className="border border-black p-2 text-center underline">{kpiStats.totalLansia}</td>
+                  <td className="border border-black p-2 text-center underline">{kpiStats.totalJamban}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+
+          <div className="mt-8 text-[10px] text-slate-500 italic text-right print:block">
+            Sistem Informasi Pelaporan Kepling & PKK Kelurahan Mangga (SIKEPLING)
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

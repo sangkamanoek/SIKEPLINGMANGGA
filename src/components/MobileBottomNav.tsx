@@ -113,6 +113,21 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               <span className="text-[10px] mt-0.5 tracking-tight font-bold">Kegiatan</span>
             </button>
   
+            {/* Tab 3: Dasa Wisma */}
+            <button
+              type="button"
+              onClick={() => onSelectTab('dasa_wisma')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+                activeTab === 'dasa_wisma' ? 'text-white font-black' : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <div className="relative">
+                <Users className={`w-5 h-5 ${activeTab === 'dasa_wisma' ? 'stroke-[3]' : 'stroke-[1.8]'}`} />
+                {renderBadge('dasa_wisma')}
+              </div>
+              <span className="text-[10px] mt-0.5 tracking-tight font-bold">DasaWisma</span>
+            </button>
+
             {/* Center Action Button: Keuangan PKK (BKU) */}
             <div className="flex-1 flex justify-center -mt-6">
               <button
@@ -130,6 +145,21 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 <span className="sr-only">Kas PKK</span>
               </button>
             </div>
+
+            {/* Tab 4: Posyandu PKK */}
+            <button
+              type="button"
+              onClick={() => onSelectTab('posyandu_pkk')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+                activeTab === 'posyandu_pkk' ? 'text-white font-black' : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <div className="relative">
+                <Flower2 className={`w-5 h-5 ${activeTab === 'posyandu_pkk' ? 'stroke-[3]' : 'stroke-[1.8]'}`} />
+                {renderBadge('posyandu_pkk')}
+              </div>
+              <span className="text-[10px] mt-0.5 tracking-tight font-bold">Posyandu</span>
+            </button>
   
 
           </nav>

@@ -138,13 +138,20 @@ export function consolidateDailyReport(
   const incomingPhotos: FotoDokumentasi[] = incoming.dokumentasiFoto || [];
 
   const photoMap = new Map<string, FotoDokumentasi>();
+  photoMap.forEach((p, k) => {
+    // If we already have a photo with this key, but it has an empty URL, we might want to keep it as a placeholder
+    // or wait for incoming to replace it.
+  });
+
   existingPhotos.forEach((p) => {
-    const key = p.url || p.id || p.name || `photo_${Math.random()}`;
+    const key = p.id || p.name || p.url || `photo_${Math.random()}`;
     photoMap.set(key, p);
   });
   incomingPhotos.forEach((p) => {
-    const key = p.url || p.id || p.name || `photo_${Math.random()}`;
-    if (!photoMap.has(key)) {
+    const key = p.id || p.name || `photo_${Math.random()}`; // Prioritize ID for matching
+    const existingP = photoMap.get(key);
+    // If we have an existing photo, only replace it if it has an empty URL and the incoming one has a valid URL
+    if (!existingP || (!existingP.url && p.url)) {
       photoMap.set(key, p);
     }
   });

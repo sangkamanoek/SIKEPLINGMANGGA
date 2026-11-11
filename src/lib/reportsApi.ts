@@ -85,7 +85,18 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
       if (Array.isArray(serverReports)) {
         serverReports.forEach((r: LaporanHarianItem) => {
           if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
-            map.set(r.id, r);
+            const existing = map.get(r.id);
+            if (existing) {
+              // Merge: favor existing if it has more photos or better URLs
+              const merged = { ...r, ...existing };
+              // Simple heuristic: if existing has photos and incoming doesn't, keep existing photos
+              if (existing.dokumentasiFoto && existing.dokumentasiFoto.length > 0 && (!r.dokumentasiFoto || r.dokumentasiFoto.length === 0)) {
+                merged.dokumentasiFoto = existing.dokumentasiFoto;
+              }
+              map.set(r.id, merged);
+            } else {
+              map.set(r.id, r);
+            }
           }
         });
       }

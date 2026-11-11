@@ -1338,7 +1338,7 @@ app.get('/api/reports', (req, res) => {
               name: f.name,
               timestamp: f.timestamp,
               kategori: f.kategori,
-              url: f.url && f.url.length > 500 ? '' : f.url,
+              url: f.url,
             }))
           : [],
       };
