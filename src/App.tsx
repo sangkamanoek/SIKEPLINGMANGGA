@@ -234,11 +234,12 @@ export default function App() {
       }
     }).catch(() => {});
 
-    // Use real-time subscription for reports with non-blocking IndexedDB persistence
+    // Use real-time subscription for reports with non-blocking IndexedDB and LocalStorage persistence
     const unsub = subscribeReportsFromFirestore((fetched) => {
       if (Array.isArray(fetched)) {
         const unified = consolidateAllReports(fetched);
         setReports(unified);
+        safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(unified));
         saveReportsToIndexedDB(unified).catch(() => {});
       }
     });

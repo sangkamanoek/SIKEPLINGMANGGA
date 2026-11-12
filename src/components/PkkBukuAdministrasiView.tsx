@@ -33,6 +33,7 @@ import {
   PkkBuku1Anggota,
   PkkBuku4Notulen,
   PkkBuku5Inventaris,
+  DEFAULT_BUKU1_ITEMS,
   subscribeBuku1,
   saveBuku1Item,
   deleteBuku1Item,
@@ -44,8 +45,9 @@ import {
   deleteBuku5Item,
 } from '../lib/pkkBukuService';
 import { subscribeSurat, saveSuratItem, deleteSuratItem } from '../lib/suratService';
-import { subscribePkkKeuangan, saveTransaksiPkk, deleteTransaksiPkk } from '../lib/pkkKeuanganService';
-import { subscribePkkKegiatan, savePkkKegiatan, deletePkkKegiatan } from '../lib/pkkKegiatanService';
+import { subscribePkkKeuangan, getLocalTransaksiPkk, saveTransaksiPkk, deleteTransaksiPkk } from '../lib/pkkKeuanganService';
+import { subscribePkkKegiatan, getLocalPkkKegiatanList, savePkkKegiatan, deletePkkKegiatan } from '../lib/pkkKegiatanService';
+import { safeGetLocalStorage } from '../lib/safeStorage';
 import { formatTanggalIndonesia, getTodayLocalIso } from '../lib/formatter';
 import { compressImageFile } from '../lib/imageCompressor';
 
@@ -70,13 +72,19 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
   const [activeBook, setActiveBuku] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Core Lists from Services
-  const [buku1List, setBuku1List] = useState<PkkBuku1Anggota[]>([]);
-  const [suratList, setSuratList] = useState<SuratKedinasanItem[]>([]);
-  const [keuanganList, setKeuanganList] = useState<any[]>([]);
-  const [buku4List, setBuku4List] = useState<PkkBuku4Notulen[]>([]);
-  const [buku5List, setBuku5List] = useState<PkkBuku5Inventaris[]>([]);
-  const [kegiatanList, setKegiatanList] = useState<any[]>([]);
+  // Core Lists from Services (Hydrated from local phone cache immediately for 0ms startup)
+  const [buku1List, setBuku1List] = useState<PkkBuku1Anggota[]>(() => {
+    const stored = safeGetLocalStorage<PkkBuku1Anggota[]>('sikepling_pkk_buku_1_v1', DEFAULT_BUKU1_ITEMS);
+    return Array.isArray(stored) && stored.length > 0 ? stored : DEFAULT_BUKU1_ITEMS;
+  });
+  const [suratList, setSuratList] = useState<SuratKedinasanItem[]>(() => {
+    const all = safeGetLocalStorage<SuratKedinasanItem[]>('sikepling_surat_kedinasan_v1', []);
+    return all.filter(s => s.kategori === 'PKK' || isPkkRole(s.dibuatOlehRole || ''));
+  });
+  const [keuanganList, setKeuanganList] = useState<any[]>(() => getLocalTransaksiPkk());
+  const [buku4List, setBuku4List] = useState<PkkBuku4Notulen[]>(() => safeGetLocalStorage('sikepling_pkk_buku_4_v1', []));
+  const [buku5List, setBuku5List] = useState<PkkBuku5Inventaris[]>(() => safeGetLocalStorage('sikepling_pkk_buku_5_v1', []));
+  const [kegiatanList, setKegiatanList] = useState<any[]>(() => getLocalPkkKegiatanList());
 
   // Modals / Form States
   const [isFormOpen, setIsFormOpen] = useState(false);

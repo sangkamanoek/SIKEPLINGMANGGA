@@ -2,13 +2,16 @@ import { LaporanHarianItem, SuratKedinasanItem, PosyanduReport } from '../types'
 import { SpptPbbItem } from '../data/pbbSampleData';
 
 const DB_NAME = 'sikepling_offline_db';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 const STORE_REPORTS = 'reports_store';
 const STORE_PBB = 'pbb_store';
 const STORE_VISITS = 'visits_store';
 const STORE_HISTORY = 'history_store';
 const STORE_SURAT = 'surat_store';
 const STORE_POSYANDU = 'posyandu_store';
+const STORE_PKK_DASA_WISMA = 'pkk_dasa_wisma_store';
+const STORE_PKK_KEUANGAN = 'pkk_keuangan_store';
+const STORE_PKK_KEGIATAN = 'pkk_kegiatan_store';
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -37,6 +40,15 @@ function openDatabase(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_POSYANDU)) {
         db.createObjectStore(STORE_POSYANDU, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_PKK_DASA_WISMA)) {
+        db.createObjectStore(STORE_PKK_DASA_WISMA, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_PKK_KEUANGAN)) {
+        db.createObjectStore(STORE_PKK_KEUANGAN, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_PKK_KEGIATAN)) {
+        db.createObjectStore(STORE_PKK_KEGIATAN, { keyPath: 'id' });
       }
     };
 

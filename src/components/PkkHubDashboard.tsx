@@ -34,9 +34,11 @@ import {
   subscribePkkKeuangan,
   formatRupiah,
   POS_ANGGARAN_LABELS,
+  getLocalTransaksiPkk,
 } from '../lib/pkkKeuanganService';
 import {
   subscribePkkKegiatan,
+  getLocalPkkKegiatanList,
   POKJA_LABELS,
 } from '../lib/pkkKegiatanService';
 import { getLocalDasaWismaList } from '../lib/pkkDasaWismaService';
@@ -65,8 +67,8 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
   onNavigateTab,
   onOpenUpdateModal,
 }) => {
-  const [transaksiList, setTransaksiList] = useState<any[]>([]);
-  const [kegiatanList, setKegiatanList] = useState<any[]>([]);
+  const [transaksiList, setTransaksiList] = useState<any[]>(() => getLocalTransaksiPkk());
+  const [kegiatanList, setKegiatanList] = useState<any[]>(() => getLocalPkkKegiatanList());
   const [activePokjaInfo, setActivePokjaInfo] = useState<'I' | 'II' | 'III' | 'IV'>('I');
 
   const [isPkkSyncModalOpen, setIsPkkSyncModalOpen] = useState(false);

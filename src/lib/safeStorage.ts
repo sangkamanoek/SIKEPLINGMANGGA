@@ -62,12 +62,6 @@ export function safeGetLocalStorage<T>(key: string, defaultValue: T): T {
     if (raw === null || raw === undefined) {
       return defaultValue;
     }
-    // Safety Guard: If raw string is oversized (> 250KB), do NOT parse it synchronously
-    // to prevent freezing and V8 heap exhaustion on low-spec laptops
-    if (raw.length > 250_000) {
-      try { localStorage.removeItem(key); } catch {}
-      return defaultValue;
-    }
     return JSON.parse(raw);
   } catch (err) {
     console.warn(`[safeStorage] Failed parsing localStorage key "${key}":`, err);
@@ -190,14 +184,33 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
       }, 500);
     }
 
-    // Defensive: If payload exceeds 250KB, DO NOT store full payload in localStorage
-    // to prevent browser thread lockup and QuotaExceededError crashes.
-    // Full data is already safely persisted to IndexedDB above.
+    // Optimized Storage Strategy for Mobile:
+    // If payload contains heavy media strings (e.g. photos/base64), strip heavy media
+    // for ultra-fast 0ms synchronous LocalStorage hydration, while preserving full raw data in IndexedDB.
     if (isHeavyData) {
-      return true;
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          const lightweight = parsed.map(stripHeavyMediaFromItem);
+          const compressed = JSON.stringify(lightweight);
+          localStorage.setItem(key, compressed);
+          return true;
+        }
+      } catch {}
     }
 
-    localStorage.setItem(key, value);
+    try {
+      localStorage.setItem(key, value);
+    } catch (setErr) {
+      // If direct saving fails due to quota limit, strip heavy media as fallback
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        const lightweight = parsed.map(stripHeavyMediaFromItem);
+        localStorage.setItem(key, JSON.stringify(lightweight));
+      } else {
+        throw setErr;
+      }
+    }
     return true;
   } catch (error: any) {
     const isQuotaError =
