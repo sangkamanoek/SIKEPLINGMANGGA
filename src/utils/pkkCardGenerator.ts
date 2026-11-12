@@ -31,7 +31,7 @@ export const generateSinglePkkCardHtml = (item: any, options?: { regNo?: string;
   const provinsiFormatted = (options?.provinsi || item.provinsi || 'SUMATERA UTARA').toUpperCase();
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-    `KTA-PKK|${regNo}|${namaFormatted}|${jabatanFormatted}|KELURAHAN_${kelurahanFormatted}`
+    `KTA-PKK|${namaFormatted}|${jabatanFormatted}|KELURAHAN_${kelurahanFormatted}`
   )}`;
 
   return `
@@ -202,12 +202,6 @@ export const generateSinglePkkCardHtml = (item: any, options?: { regNo?: string;
           text-transform: uppercase;
           box-sizing: border-box;
         ">
-          <div style="display: flex; align-items: baseline; margin-bottom: 0.25mm;">
-            <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">NIK</div>
-            <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>
-            <div style="flex: 1; min-width: 0; font-weight: 900; color: #000000; padding-left: 1.2mm; word-break: break-all;">${regNo}</div>
-          </div>
-
           <div style="display: flex; align-items: baseline; margin-bottom: 0.25mm;">
             <div style="width: 21mm; flex-shrink: 0; text-align: right; color: #000000; font-weight: 800; padding-right: 1.2mm; opacity: 0.7;">NAMA</div>
             <div style="width: 1.2mm; flex-shrink: 0; text-align: center; color: #000000; font-weight: 900; opacity: 0.5;">:</div>

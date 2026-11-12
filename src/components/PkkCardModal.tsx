@@ -26,7 +26,6 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
   const [customKecamatan, setCustomKecamatan] = useState(member?.kecamatan || 'MEDAN TUNTUNGAN');
   const [customKota, setCustomKota] = useState(member?.kota || 'KOTA MEDAN');
   const [customProvinsi, setCustomProvinsi] = useState(member?.provinsi || 'SUMATERA UTARA');
-  const [customRegNo, setCustomRegNo] = useState(member?.nik || '');
 
   const [showBack, setShowBack] = useState(false);
 
@@ -34,7 +33,7 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
 
   const photoUrl = member.pasphotoUrl || PKK_LOGO_BASE64;
 
-  const regNo = customRegNo || member?.noRegistrasi || '-';
+  const regNo = member?.noRegistrasi || '-';
   const namaFormatted = (member.nama || 'NUR AINI, S.Pd.').toUpperCase();
   const jabatanFormatted = (member.jabatan || 'ANGGOTA TP PKK KELURAHAN').toUpperCase();
   const ttlFormatted = `${(member.tempatLahir || 'MEDAN').toUpperCase()}, ${formatDateToIndonesianFull(member.tanggalLahir || '16-04-1991').toUpperCase()}`;
@@ -46,7 +45,7 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
   const provinsiFormatted = customProvinsi.toUpperCase();
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-    `KTA-PKK|${regNo}|${namaFormatted}|${jabatanFormatted}|KELURAHAN_${kelurahanFormatted}`
+    `KTA-PKK|${namaFormatted}|${jabatanFormatted}|KELURAHAN_${kelurahanFormatted}`
   )}`;
 
   const handlePrintSingle = () => {
@@ -224,18 +223,8 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
 
         {showSettings && (
           <div className="bg-sky-900 text-white p-4 space-y-3 text-xs border-b border-sky-800 animate-in fade-in duration-200">
-            <p className="font-extrabold text-sky-200">Sesuaikan Atribut Wilayah & Registrasi pada Kartu (KTA):</p>
+            <p className="font-extrabold text-sky-200">Sesuaikan Atribut Wilayah pada Kartu (KTA):</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
-                <label className="block text-[10px] font-bold text-sky-300 mb-1 uppercase">NIK Anggota</label>
-                <input
-                  type="text"
-                  value={customRegNo}
-                  onChange={(e) => setCustomRegNo(e.target.value)}
-                  className="w-full bg-sky-950 border border-sky-700 rounded-xl px-3 py-1.5 text-white font-bold focus:outline-none focus:ring-2 focus:ring-sky-400"
-                  placeholder="Masukkan 16 Digit NIK"
-                />
-              </div>
               <div>
                 <label className="block text-[10px] font-bold text-sky-300 mb-1 uppercase">Kelurahan / Desa</label>
                 <input
@@ -375,12 +364,6 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
 
                   {/* Center Details List - TEXT BLACK AS REQUESTED */}
                   <div className="flex-1 min-w-0 pr-[54px] sm:pr-[68px] font-black text-[6.5px] sm:text-[8.5px] leading-[1.25] text-black uppercase">
-                    <div className="flex items-baseline mb-[1px]">
-                      <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">NIK</div>
-                      <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>
-                      <div className="flex-1 min-w-0 font-black text-black pl-1.5 break-all">{regNo}</div>
-                    </div>
-
                     <div className="flex items-baseline mb-[1px]">
                       <div className="w-[74px] sm:w-[94px] shrink-0 text-right text-black pr-1.5 opacity-70">NAMA</div>
                       <div className="w-[6px] shrink-0 text-center font-black text-black opacity-50">:</div>

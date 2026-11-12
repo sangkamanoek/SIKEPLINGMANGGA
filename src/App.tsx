@@ -273,7 +273,7 @@ export default function App() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
-  // Strict role-based route access lists
+  // Strict role-based route access lists (Pure separation between Kelurahan and PKK)
   const PKK_RESTRICTED_TABS: AppTabType[] = useMemo(() => [
     'form',
     'capaian',
@@ -284,6 +284,9 @@ export default function App() {
     'capaian_admin',
     'dashboard_kasi',
     'riwayat',
+    'monitoring',
+    'realisasi_pembangunan',
+    'daftar_tugas_khusus',
   ], []);
 
   const KELURAHAN_RESTRICTED_TABS: AppTabType[] = useMemo(() => [
@@ -451,8 +454,7 @@ export default function App() {
   useEffect(() => {
     if (isPkk) {
       const allowedPkkTabs = [
-        'hub', 'kegiatan_pkk', 'keuangan_pkk', 'posyandu_pkk', 'dasa_wisma',
-        'buku_pkk', 'surat_kedinasan', 'daftar_tugas_khusus', 'monitoring', 'realisasi_pembangunan'
+        'hub', 'kegiatan_pkk', 'keuangan_pkk', 'posyandu_pkk', 'dasa_wisma', 'buku_pkk'
       ];
       if (!allowedPkkTabs.includes(activeTab)) {
         setActiveTab('hub');
