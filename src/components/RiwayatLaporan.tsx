@@ -1303,7 +1303,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                 </p>
               )}
 
-              {/* Lampiran Foto Dokumentasi Lapangan (Tampil Rapi & Jelas) */}
+              {/* Lampiran Foto Dokumentasi Lapangan (Tampil Cepat, Ringan & Anti-Freezing) */}
               {item.dokumentasiFoto && item.dokumentasiFoto.length > 0 && (
                 <div className="pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
@@ -1311,38 +1311,42 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                       <span>📷 {item.dokumentasiFoto.length} Foto:</span>
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {item.dokumentasiFoto.slice(0, 6).map((foto, idx) => (
-                        <div
-                          key={foto.id || idx}
-                          onClick={() => onSelectReport(item)}
-                          className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shrink-0 cursor-pointer hover:border-emerald-500 hover:scale-105 transition-all relative group shadow-2xs"
-                          title={`${foto.name || `Foto ${idx + 1}`} - Klik untuk lihat foto jelas & penuh`}
-                        >
-                          {foto.url ? (
-                            <img
-                              src={foto.url}
-                              alt={foto.name || `Foto ${idx + 1}`}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-[8px] text-slate-400 font-bold p-1 text-center leading-tight">
-                              <Camera className="w-3 h-3 mb-0.5" />
-                              <span>Lihat<br/>Foto</span>
+                      {item.dokumentasiFoto.slice(0, 3).map((foto, idx) => {
+                        const hasCompactUrl = Boolean(foto.url && (foto.url.startsWith('http') || foto.url.length < 350000));
+                        return (
+                          <div
+                            key={foto.id || idx}
+                            onClick={() => onSelectReport(item)}
+                            className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shrink-0 cursor-pointer hover:border-emerald-500 hover:scale-105 transition-all relative group shadow-2xs"
+                            title={`${foto.name || `Foto ${idx + 1}`} - Klik untuk lihat foto penuh`}
+                          >
+                            {hasCompactUrl ? (
+                              <img
+                                src={foto.url}
+                                alt={foto.name || `Foto ${idx + 1}`}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-[8px] text-slate-500 font-bold p-1 text-center leading-tight">
+                                <Camera className="w-3.5 h-3.5 mb-0.5 text-emerald-600" />
+                                <span>Foto {idx + 1}</span>
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Eye className="w-3.5 h-3.5 text-white drop-shadow" />
                             </div>
-                          )}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Eye className="w-3.5 h-3.5 text-white drop-shadow" />
                           </div>
-                        </div>
-                      ))}
-                      {item.dokumentasiFoto.length > 6 && (
+                        );
+                      })}
+                      {item.dokumentasiFoto.length > 3 && (
                         <div
                           onClick={() => onSelectReport(item)}
                           className="w-12 h-12 rounded-lg border border-dashed border-emerald-300 bg-emerald-50 text-emerald-800 font-bold text-[10px] flex items-center justify-center shrink-0 cursor-pointer hover:bg-emerald-100 transition-colors"
                           title="Lihat seluruh sisa foto lainnya"
                         >
-                          +{item.dokumentasiFoto.length - 6}
+                          +{item.dokumentasiFoto.length - 3}
                         </div>
                       )}
                     </div>

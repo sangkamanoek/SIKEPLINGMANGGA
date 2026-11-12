@@ -646,6 +646,8 @@ export interface PkkDasaWismaItem {
   jumlahSpal?: number; // Saluran Pembuangan Air Limbah
   jumlahTempatSampah?: number;
   jumlahPekaranganManfaat?: number; // AKU HATINYA PKK
+  sumberAirBersih?: string; // PDAM, Sumur, dll.
+  kriteriaRumah?: 'Sehat' | 'Kurang Sehat' | string;
 
   // Other details
   jumlahIndustriRumah?: number;

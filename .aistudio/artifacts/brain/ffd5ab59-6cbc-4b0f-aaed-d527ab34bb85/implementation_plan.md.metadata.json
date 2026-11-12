@@ -1,6 +1,0 @@
-{
-  "summary":  "Rencana implementasi percepatan pemuatan data kunjungan warga (0-detik) melalui cache server lokal dan IndexedDB, serta penyajian badge akumulatif 235 data kunjungan lengkap dengan tombol pintas periode.",
-  "updatedAt":  "2026-11-10T02:54:21.655312828Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

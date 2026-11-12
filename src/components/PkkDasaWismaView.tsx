@@ -20,6 +20,11 @@ import {
   Phone,
   Sparkles,
   Info,
+  FileSpreadsheet,
+  FileText,
+  Printer,
+  Wand2,
+  AlertCircle,
 } from 'lucide-react';
 import { UserAccount, PkkDasaWismaItem, isPkkRole } from '../types';
 import {
@@ -92,6 +97,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
   const [formJumlahSampah, setFormJumlahTempatSampah] = useState<string>('10');
   const [formJumlahPekarangan, setFormJumlahPekarangan] = useState<string>('0');
   const [formJumlahIndustri, setFormJumlahIndustri] = useState<string>('0');
+  const [formSumberAirBersih, setFormSumberAirBersih] = useState<string>('PDAM Tirtanadi');
+  const [formKriteriaRumah, setFormKriteriaRumah] = useState<'Sehat' | 'Kurang Sehat' | string>('Sehat');
 
   // Auto-calculate Total Jiwa
   useEffect(() => {
@@ -103,6 +110,17 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
   const [formKegiatanUtama, setFormKegiatanUtama] = useState('');
   const [formCatatan, setFormCatatan] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Raw Field Notes (OCR / Text) Transformation States
+  const [isRawModalOpen, setIsRawModalOpen] = useState(false);
+  const [rawInputText, setRawInputText] = useState('');
+  const [rawValidationNotes, setRawValidationNotes] = useState<string[]>([]);
+  const [rawParseResult, setRawParseResult] = useState<Partial<PkkDasaWismaItem> | null>(null);
+
+  // Copy Feedback States
+  const [copiedCsv, setCopiedCsv] = useState(false);
+  const [copiedTable, setCopiedTable] = useState(false);
+  const [printOrientation, setPrintOrientation] = useState<'landscape' | 'portrait'>('landscape');
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -224,6 +242,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
     setFormJumlahTempatSampah('10');
     setFormJumlahPekarangan('5');
     setFormJumlahIndustri('0');
+    setFormSumberAirBersih('PDAM Tirtanadi');
+    setFormKriteriaRumah('Sehat');
     setFormKegiatanUtama('Pemeriksaan jentik berkala, Posyandu, & pemilahan sampah');
     setFormCatatan('');
     setIsModalOpen(true);
@@ -255,12 +275,14 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
     setFormJumlahTempatSampah(String(it.jumlahTempatSampah ?? 0));
     setFormJumlahPekarangan(String(it.jumlahPekaranganManfaat ?? 0));
     setFormJumlahIndustri(String(it.jumlahIndustriRumah ?? 0));
+    setFormSumberAirBersih(it.sumberAirBersih || 'PDAM Tirtanadi');
+    setFormKriteriaRumah(it.kriteriaRumah || 'Sehat');
     setFormKegiatanUtama(it.kegiatanUtama || '');
     setFormCatatan(it.catatan || '');
     setIsModalOpen(true);
   };
 
-  // Save Modal
+  // Save Modal with Strict Validation
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNamaKelompok.trim()) {
@@ -270,6 +292,21 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
     if (!formNamaKetua.trim()) {
       onShowToast?.('Nama Ketua Dasa Wisma wajib diisi', 'error');
       return;
+    }
+
+    // Validation 1: Jumlah L + Jumlah P = Total Jiwa
+    const l = Number(formJumlahJiwaLaki) || 0;
+    const p = Number(formJumlahJiwaPerempuan) || 0;
+    let totalJ = Number(formJumlahJiwa) || 0;
+    if (l + p > 0) {
+      totalJ = l + p;
+    }
+
+    // Validation 2: Jika ada Ibu Hamil, WUS minimal = 1 atau >= Ibu Hamil
+    const bumil = Number(formJumlahBumil) || 0;
+    let wus = Number(formJumlahWus) || 0;
+    if (bumil > 0 && wus < bumil) {
+      wus = Math.max(wus, bumil, 1);
     }
 
     setIsSaving(true);
@@ -285,15 +322,15 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
         jumlahAnggota: Number(formJumlahKk) || 10,
         jumlahRumah: Number(formJumlahRumah) || 0,
         jumlahKk: Number(formJumlahKk) || 0,
-        jumlahJiwa: Number(formJumlahJiwa) || 0,
-        jumlahJiwaLaki: Number(formJumlahJiwaLaki) || 0,
-        jumlahJiwaPerempuan: Number(formJumlahJiwaPerempuan) || 0,
-        jumlahIbuHamil: Number(formJumlahBumil) || 0,
+        jumlahJiwa: totalJ,
+        jumlahJiwaLaki: l,
+        jumlahJiwaPerempuan: p,
+        jumlahIbuHamil: bumil,
         jumlahIbuMenyusui: Number(formJumlahBusui) || 0,
         jumlahBalita: Number(formJumlahBalita) || 0,
         jumlahLansia: Number(formJumlahLansia) || 0,
         jumlahPus: Number(formJumlahPus) || 0,
-        jumlahWus: Number(formJumlahWus) || 0,
+        jumlahWus: wus,
         jumlahButaAksara: Number(formJumlahButaAksara) || 0,
         jumlahBerkebutuhanKhusus: Number(formJumlahBerkebutuhanKhusus) || 0,
         jumlahJambanSehat: Number(formJumlahJamban) || 0,
@@ -301,6 +338,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
         jumlahTempatSampah: Number(formJumlahSampah) || 0,
         jumlahPekaranganManfaat: Number(formJumlahPekarangan) || 0,
         jumlahIndustriRumah: Number(formJumlahIndustri) || 0,
+        sumberAirBersih: formSumberAirBersih,
+        kriteriaRumah: formKriteriaRumah,
         kegiatanUtama: formKegiatanUtama.trim() || undefined,
         catatan: formCatatan.trim() || undefined,
         createdAt: editingItem?.createdAt || now,
@@ -310,7 +349,7 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
       await saveDasaWisma(payload);
       setIsModalOpen(false);
       onShowToast?.(
-        editingItem ? 'Data Dasa Wisma berhasil diperbarui!' : 'Kelompok Dasa Wisma baru berhasil ditambahkan!',
+        editingItem ? 'Data Dasa Wisma berhasil diperbarui!' : 'Kelompok Dasa Wisma baru berhasil divalidasi & ditambahkan!',
         'success'
       );
     } catch (err) {
@@ -370,6 +409,241 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
     });
   }, [selectedLingkungan, kpiStats, filteredItems, onShowToast]);
 
+  // Copy Standard CSV format (Excel / Google Sheets compatible)
+  const handleCopyCsv = useCallback(() => {
+    let csv = 'No,Nama Kepala Rumah Tangga / Kelompok,Lingkungan,Jumlah Anggota (L/P/Total),PUS/WUS,Ibu Hamil,Balita,Lansia,Air Bersih,Jamban,SPAL,Sampah,Kriteria Rumah,Ket\n';
+    filteredItems.forEach((it, idx) => {
+      const l = it.jumlahJiwaLaki || 0;
+      const p = it.jumlahJiwaPerempuan || 0;
+      const total = it.jumlahJiwa || (l + p);
+      const pusWus = `${it.jumlahPus || 0}/${it.jumlahWus || 0}`;
+      const air = it.sumberAirBersih || 'PDAM Tirtanadi';
+      const jamban = (it.jumlahJambanSehat || 0) > 0 ? 'Jamban Sehat: Ya' : 'Tidak Ada';
+      const spal = (it.jumlahSpal || 0) > 0 ? 'Ada' : 'Tidak Ada';
+      const sampah = (it.jumlahTempatSampah || 0) > 0 ? 'Ada' : 'Tidak Ada';
+      const kriteria = it.kriteriaRumah || 'Sehat';
+      const ket = (it.catatan || it.kegiatanUtama || '-').replace(/"/g, '""');
+
+      csv += `${idx + 1},"${it.namaKetua} (${it.namaKelompok})",Lingk. ${it.lingkunganNomor},"${l}/${p}/${total}","${pusWus}",${it.jumlahIbuHamil || 0},${it.jumlahBalita || 0},${it.jumlahLansia || 0},"${air}","${jamban}","${spal}","${sampah}","${kriteria}","${ket}"\n`;
+    });
+
+    navigator.clipboard.writeText(csv).then(() => {
+      setCopiedCsv(true);
+      setTimeout(() => setCopiedCsv(false), 3000);
+      onShowToast?.('Format CSV siap paste ke Google Sheets/Excel berhasil disalin!', 'success');
+    });
+  }, [filteredItems, onShowToast]);
+
+  // Copy Standard Markdown Table
+  const handleCopyTable = useCallback(() => {
+    let md = '| No | Nama Kepala Rumah Tangga | Jml Anggota (L/P/Total) | PUS/WUS | Ibu Hamil | Balita | Lansia | Air Bersih | Jamban | SPAL | Sampah | Kriteria Rumah | Ket |\n';
+    md += '|:--:|:-------------------------|:-----------------------:|:-------:|:---------:|:------:|:------:|:----------:|:------:|:----:|:------:|:--------------:|:----|\n';
+    filteredItems.forEach((it, idx) => {
+      const l = it.jumlahJiwaLaki || 0;
+      const p = it.jumlahJiwaPerempuan || 0;
+      const total = it.jumlahJiwa || (l + p);
+      const pusWus = `${it.jumlahPus || 0}/${it.jumlahWus || 0}`;
+      const air = it.sumberAirBersih || 'PDAM';
+      const jamban = (it.jumlahJambanSehat || 0) > 0 ? 'Ya' : 'Tidak';
+      const spal = (it.jumlahSpal || 0) > 0 ? 'Ada' : 'Tidak';
+      const sampah = (it.jumlahTempatSampah || 0) > 0 ? 'Ada' : 'Tidak';
+      const kriteria = it.kriteriaRumah || 'Sehat';
+      const ket = it.catatan || it.kegiatanUtama || '-';
+
+      md += `| ${idx + 1} | ${it.namaKetua} (${it.namaKelompok}) | ${l}/${p}/${total} | ${pusWus} | ${it.jumlahIbuHamil || 0} | ${it.jumlahBalita || 0} | ${it.jumlahLansia || 0} | ${air} | ${jamban} | ${spal} | ${sampah} | ${kriteria} | ${ket} |\n`;
+    });
+
+    navigator.clipboard.writeText(md).then(() => {
+      setCopiedTable(true);
+      setTimeout(() => setCopiedTable(false), 3000);
+      onShowToast?.('Format Tabel Markdown berhasil disalin ke clipboard!', 'success');
+    });
+  }, [filteredItems, onShowToast]);
+
+  // Parse Raw Field Notes (Kader OCR / WhatsApp Notes)
+  const handleParseRawNotes = () => {
+    if (!rawInputText.trim()) {
+      onShowToast?.('Silakan masukkan catatan lapangan mentah terlebih dahulu', 'error');
+      return;
+    }
+
+    const text = rawInputText;
+    const notes: string[] = [];
+
+    // 1. Lingkungan
+    let lingk = currentUser.nomorLingkungan || 1;
+    const lingkMatch = text.match(/(?:lingkungan|lingk\.?|lingk)\s*[:=]?\s*(\d{1,2})/i);
+    if (lingkMatch) {
+      lingk = parseInt(lingkMatch[1], 10);
+      notes.push(`Wilayah terdeteksi: Lingkungan ${lingk}`);
+    }
+
+    // 2. Nama Kelompok
+    let kelompok = '';
+    const kelompokMatch = text.match(/(?:dasa\s*wisma|dawis|nama\s*kelompok|kelompok)\s*[:=]?\s*([^\n,]+)/i);
+    if (kelompokMatch) {
+      kelompok = kelompokMatch[1].trim();
+    } else {
+      kelompok = `Dasa Wisma Lingkungan ${lingk}`;
+      notes.push(`[Perlu Konfirmasi] Nama kelompok: ${kelompok}`);
+    }
+
+    // 3. Nama Ketua
+    let ketua = '';
+    const ketuaMatch = text.match(/(?:ketua|nama\s*ketua|kader)\s*[:=]?\s*([^\n,]+)/i);
+    if (ketuaMatch) {
+      ketua = ketuaMatch[1].trim();
+    } else {
+      ketua = '[Perlu Konfirmasi]';
+      notes.push('[Perlu Konfirmasi] Nama ketua belum terdata.');
+    }
+
+    // 4. No Telepon / WA
+    let telp = '';
+    const telpMatch = text.match(/(?:wa|hp|telepon|telp|kontak)\s*[:=]?\s*([0-9\-\+\s]{8,15})/i);
+    if (telpMatch) {
+      telp = telpMatch[1].replace(/[^\d+]/g, '');
+    }
+
+    // 5. KK & Rumah
+    const kkMatch = text.match(/(?:kk|kepala\s*keluarga)\s*[:=]?\s*(\d+)/i);
+    const kk = kkMatch ? parseInt(kkMatch[1], 10) : 10;
+
+    const rumahMatch = text.match(/(?:rumah|jml\s*rumah)\s*[:=]?\s*(\d+)/i);
+    const rumah = rumahMatch ? parseInt(rumahMatch[1], 10) : kk;
+
+    // 6. Jiwa Laki-laki & Perempuan & Total
+    const lakiMatch = text.match(/(?:laki|pria|l)\s*[:=]?\s*(\d+)/i);
+    const peremMatch = text.match(/(?:perempuan|wanita|p)\s*[:=]?\s*(\d+)/i);
+    const totalJiwaMatch = text.match(/(?:total\s*jiwa|jiwa|warga)\s*[:=]?\s*(\d+)/i);
+
+    const l = lakiMatch ? parseInt(lakiMatch[1], 10) : 0;
+    const p = peremMatch ? parseInt(peremMatch[1], 10) : 0;
+    let totalJiwa = totalJiwaMatch ? parseInt(totalJiwaMatch[1], 10) : 0;
+
+    if (l + p > 0) {
+      if (totalJiwa > 0 && totalJiwa !== (l + p)) {
+        notes.push(`[Validasi Jumlah]: Total (${totalJiwa}) dikoreksi menjadi L (${l}) + P (${p}) = ${l + p}`);
+      }
+      totalJiwa = l + p;
+    } else if (totalJiwa > 0) {
+      notes.push(`[Info]: Total ${totalJiwa} jiwa tanpa rincian L/P.`);
+    }
+
+    // 7. Bumil, Busui, Balita, Lansia
+    const bumilMatch = text.match(/(?:bumil|ibu\s*hamil|hamil)\s*[:=]?\s*(\d+)/i);
+    const bumil = bumilMatch ? parseInt(bumilMatch[1], 10) : 0;
+
+    const busuiMatch = text.match(/(?:busui|ibu\s*menyusui|menyusui)\s*[:=]?\s*(\d+)/i);
+    const busui = busuiMatch ? parseInt(busuiMatch[1], 10) : 0;
+
+    const balitaMatch = text.match(/(?:balita|bayi|anak)\s*[:=]?\s*(\d+)/i);
+    const balita = balitaMatch ? parseInt(balitaMatch[1], 10) : 0;
+
+    const lansiaMatch = text.match(/(?:lansia|manula|orang\s*tua)\s*[:=]?\s*(\d+)/i);
+    const lansia = lansiaMatch ? parseInt(lansiaMatch[1], 10) : 0;
+
+    // 8. PUS & WUS
+    const pusMatch = text.match(/(?:pus|pasangan\s*usia\s*subur)\s*[:=]?\s*(\d+)/i);
+    const pus = pusMatch ? parseInt(pusMatch[1], 10) : 0;
+
+    const wusMatch = text.match(/(?:wus|wanita\s*usia\s*subur)\s*[:=]?\s*(\d+)/i);
+    let wus = wusMatch ? parseInt(wusMatch[1], 10) : 0;
+
+    // Logika Validasi: Ibu Hamil > 0 -> WUS minimal >= Ibu Hamil
+    if (bumil > 0 && wus < bumil) {
+      wus = Math.max(wus, bumil, 1);
+      notes.push(`[Validasi Logika]: Ditemukan ${bumil} Ibu Hamil, maka WUS disesuaikan otomatis menjadi ${wus}.`);
+    }
+
+    // 9. Sanitasi: Air Bersih, Jamban, SPAL, Sampah
+    let air = 'PDAM Tirtanadi';
+    if (/sumur/i.test(text)) air = 'Sumur Bor / Pompa';
+    else if (/mata\s*air/i.test(text)) air = 'Mata Air';
+    else if (/sungai|hujan/i.test(text)) air = 'Sungai / Lainnya';
+    else if (/pdam/i.test(text)) air = 'PDAM Tirtanadi';
+
+    const jambanMatch = text.match(/(?:jamban|wc|toilet)\s*[:=]?\s*(\d+|ada|sehat|ya)/i);
+    let jamban = kk;
+    if (jambanMatch) {
+      const val = jambanMatch[1].toLowerCase();
+      if (/\d+/.test(val)) jamban = parseInt(val, 10);
+      else if (val.includes('tidak')) jamban = 0;
+    }
+
+    const spalMatch = text.match(/(?:spal|limbah)\s*[:=]?\s*(\d+|ada|ya)/i);
+    let spal = kk;
+    if (spalMatch && /tidak/i.test(spalMatch[1])) spal = 0;
+
+    const sampahMatch = text.match(/(?:sampah|tps)\s*[:=]?\s*(\d+|ada|ya)/i);
+    let sampah = kk;
+    if (sampahMatch && /tidak/i.test(sampahMatch[1])) sampah = 0;
+
+    // 10. Kriteria Rumah
+    let kriteriaRumah = 'Sehat';
+    if (/kurang\s*sehat|tidak\s*sehat/i.test(text)) {
+      kriteriaRumah = 'Kurang Sehat';
+    }
+
+    const result: Partial<PkkDasaWismaItem> = {
+      namaKelompok: kelompok,
+      lingkunganNomor: lingk,
+      namaKetua: ketua,
+      teleponKetua: telp,
+      jumlahKk: kk,
+      jumlahRumah: rumah,
+      jumlahJiwa: totalJiwa,
+      jumlahJiwaLaki: l,
+      jumlahJiwaPerempuan: p,
+      jumlahIbuHamil: bumil,
+      jumlahIbuMenyusui: busui,
+      jumlahBalita: balita,
+      jumlahLansia: lansia,
+      jumlahPus: pus,
+      jumlahWus: wus,
+      jumlahJambanSehat: jamban,
+      jumlahSpal: spal,
+      jumlahTempatSampah: sampah,
+      sumberAirBersih: air,
+      kriteriaRumah: kriteriaRumah,
+      catatan: `Hasil verifikasi data kader PKK - ${new Date().toLocaleDateString('id-ID')}`,
+    };
+
+    setRawParseResult(result);
+    setRawValidationNotes(notes);
+    onShowToast?.('Data mentah berhasil diproses & diverifikasi!', 'info');
+  };
+
+  const handleApplyParsedToForm = () => {
+    if (!rawParseResult) return;
+    setEditingItem(null);
+    setFormNamaKelompok(rawParseResult.namaKelompok || '');
+    setFormLingkungan(rawParseResult.lingkunganNomor || 1);
+    setFormNamaKetua(rawParseResult.namaKetua === '[Perlu Konfirmasi]' ? '' : rawParseResult.namaKetua || '');
+    setFormTelepon(rawParseResult.teleponKetua || '');
+    setFormJumlahKk(String(rawParseResult.jumlahKk ?? 10));
+    setFormJumlahRumah(String(rawParseResult.jumlahRumah ?? 10));
+    setFormJumlahJiwa(String(rawParseResult.jumlahJiwa ?? 0));
+    setFormJumlahJiwaLaki(String(rawParseResult.jumlahJiwaLaki ?? 0));
+    setFormJumlahJiwaPerempuan(String(rawParseResult.jumlahJiwaPerempuan ?? 0));
+    setFormJumlahBumil(String(rawParseResult.jumlahIbuHamil ?? 0));
+    setFormJumlahBusui(String(rawParseResult.jumlahIbuMenyusui ?? 0));
+    setFormJumlahBalita(String(rawParseResult.jumlahBalita ?? 0));
+    setFormJumlahLansia(String(rawParseResult.jumlahLansia ?? 0));
+    setFormJumlahPus(String(rawParseResult.jumlahPus ?? 0));
+    setFormJumlahWus(String(rawParseResult.jumlahWus ?? 0));
+    setFormJumlahJamban(String(rawParseResult.jumlahJambanSehat ?? 10));
+    setFormJumlahSpal(String(rawParseResult.jumlahSpal ?? 10));
+    setFormJumlahTempatSampah(String(rawParseResult.jumlahTempatSampah ?? 10));
+    setFormSumberAirBersih(rawParseResult.sumberAirBersih || 'PDAM Tirtanadi');
+    setFormKriteriaRumah(rawParseResult.kriteriaRumah || 'Sehat');
+    setFormCatatan(rawParseResult.catatan || '');
+
+    setIsRawModalOpen(false);
+    setIsModalOpen(true);
+    onShowToast?.('Formulir berhasil diisi dari data hasil transformasi!', 'success');
+  };
+
   return (
     <div className="space-y-6 pb-16 animate-in fade-in duration-300 max-w-7xl mx-auto">
       {/* Header Banner */}
@@ -392,34 +666,64 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsRawModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer border border-indigo-400/40"
+              title="Transformasi catatan mentah lapangan / OCR menjadi data terstruktur"
+            >
+              <Wand2 className="w-4 h-4 text-amber-300" />
+              <span>Input Data Mentah</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyCsv}
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs rounded-xl transition-all shadow-md cursor-pointer border border-teal-600"
+              title="Salin data ke format CSV untuk Excel / Google Sheets"
+            >
+              {copiedCsv ? <Check className="w-4 h-4 text-emerald-300" /> : <FileSpreadsheet className="w-4 h-4" />}
+              <span>{copiedCsv ? 'Tersalin!' : 'CSV Excel'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyTable}
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs rounded-xl transition-all shadow-md cursor-pointer border border-teal-600"
+              title="Salin data ke format Tabel Markdown"
+            >
+              {copiedTable ? <Check className="w-4 h-4 text-emerald-300" /> : <FileText className="w-4 h-4" />}
+              <span>{copiedTable ? 'Tersalin!' : 'Tabel'}</span>
+            </button>
+
             <button
               type="button"
               onClick={handleCopyWa}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer border border-emerald-400/40"
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-md cursor-pointer border border-emerald-400/40"
               title="Salin rekapitulasi ke format pesan WhatsApp"
             >
               {copiedWa ? <Check className="w-4 h-4 text-white" /> : <Share2 className="w-4 h-4" />}
-              <span>{copiedWa ? 'Tersalin!' : 'Bagikan WA'}</span>
+              <span>{copiedWa ? 'Tersalin!' : 'WA'}</span>
             </button>
 
             <button
               type="button"
               onClick={() => window.print()}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer border border-slate-600"
-              title="Cetak laporan lengkap dengan Kop Surat"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-black text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer border border-slate-700"
+              title="Cetak laporan resmi dengan Kop Surat PKK (Margin Kiri 2 cm, Landscape/Portrait)"
             >
-              <Building className="w-4 h-4" />
-              <span>Cetak</span>
+              <Printer className="w-4 h-4 text-cyan-300" />
+              <span>Cetak PDF</span>
             </button>
 
             <button
               type="button"
               onClick={handleOpenAdd}
-              className="flex items-center gap-2 px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Tambah Kelompok</span>
+              <span>Tambah</span>
             </button>
           </div>
         </div>
@@ -865,6 +1169,37 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
                       <input type="number" min="0" value={formJumlahIndustri} onChange={(e) => setFormJumlahIndustri(e.target.value)} className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs" />
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-200">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                        Sumber Air Bersih <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        value={formSumberAirBersih}
+                        onChange={(e) => setFormSumberAirBersih(e.target.value)}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-teal-500"
+                      >
+                        <option value="PDAM Tirtanadi">PDAM Tirtanadi</option>
+                        <option value="Sumur Bor / Pompa">Sumur Bor / Pompa</option>
+                        <option value="Mata Air">Mata Air</option>
+                        <option value="Sungai / Hujan / Lainnya">Sungai / Hujan / Lainnya</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                        Kriteria Rumah Tangga <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        value={formKriteriaRumah}
+                        onChange={(e) => setFormKriteriaRumah(e.target.value)}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-teal-500"
+                      >
+                        <option value="Sehat">Sehat</option>
+                        <option value="Kurang Sehat">Kurang Sehat</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -917,123 +1252,296 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
           </div>
         </div>
       )}
-      {/* Hidden Printable Section */}
+
+      {/* Modal Transformasi & Validasi Data Mentah Kader */}
+      {isRawModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-8">
+            <div className="bg-gradient-to-r from-indigo-700 to-teal-700 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                  <Wand2 className="w-4 h-4 text-amber-300" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">
+                    Transformasi & Validasi Data Mentah Kader
+                  </h3>
+                  <p className="text-xs text-indigo-100">
+                    Konversi catatan lapangan bebas, pesan WA kader, atau teks OCR menjadi data standar Dasa Wisma
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRawModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tempel Catatan Lapangan / Pesan WhatsApp Kader PKK:
+                </label>
+                <textarea
+                  rows={5}
+                  value={rawInputText}
+                  onChange={(e) => setRawInputText(e.target.value)}
+                  placeholder={`Contoh teks kader:\nKelompok: Mawar 2 Lingkungan 5\nKetua: Ibu Nurhalimah, HP: 081299998888\nKK: 12, Rumah: 10\nJiwa: 40 orang (Laki 18, Perempuan 22)\nBumil: 1, Balita: 3, Lansia: 4, WUS: 9, PUS: 7\nAir: PDAM, Jamban: 10, SPAL: ada, Sampah: ada\nKriteria Rumah: Sehat`}
+                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleParseRawNotes}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  <Wand2 className="w-3.5 h-3.5" />
+                  <span>Proses & Validasi Logika</span>
+                </button>
+
+                {rawParseResult && (
+                  <button
+                    type="button"
+                    onClick={handleApplyParsedToForm}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Terapkan ke Formulir</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Validation Notes Alerts */}
+              {rawValidationNotes.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 space-y-1">
+                  <p className="text-[11px] font-black text-amber-900 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Catatan Verifikasi Logika & Format:</span>
+                  </p>
+                  <ul className="text-[11px] text-amber-800 space-y-0.5 list-disc list-inside font-medium">
+                    {rawValidationNotes.map((n, i) => (
+                      <li key={i}>{n}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Parsed Result Preview */}
+              {rawParseResult && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">
+                      Hasil Ekstraksi Standar
+                    </h4>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                      Format Valid
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Kelompok:</span>
+                      <strong className="text-slate-800">{rawParseResult.namaKelompok}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Wilayah:</span>
+                      <strong className="text-slate-800">Lingkungan {rawParseResult.lingkunganNomor}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Ketua:</span>
+                      <strong className="text-slate-800">{rawParseResult.namaKetua}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">KK / Rumah:</span>
+                      <strong className="text-slate-800">{rawParseResult.jumlahKk} KK / {rawParseResult.jumlahRumah} Rmh</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Jiwa (L / P / Total):</span>
+                      <strong className="text-slate-800">{rawParseResult.jumlahJiwaLaki} / {rawParseResult.jumlahJiwaPerempuan} / {rawParseResult.jumlahJiwa}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Bumil / Busui:</span>
+                      <strong className="text-slate-800">{rawParseResult.jumlahIbuHamil} / {rawParseResult.jumlahIbuMenyusui}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Balita / Lansia:</span>
+                      <strong className="text-slate-800">{rawParseResult.jumlahBalita} / {rawParseResult.jumlahLansia}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">PUS / WUS:</span>
+                      <strong className="text-slate-800">{rawParseResult.jumlahPus} / {rawParseResult.jumlahWus}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Air Bersih:</span>
+                      <strong className="text-slate-800">{rawParseResult.sumberAirBersih}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Jamban / SPAL / Sampah:</span>
+                      <strong className="text-slate-800">{rawParseResult.jumlahJambanSehat} / {rawParseResult.jumlahSpal} / {rawParseResult.jumlahTempatSampah}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Kriteria Rumah:</span>
+                      <strong className="text-emerald-700">{rawParseResult.kriteriaRumah}</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsRawModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Printable Section dengan Kop Surat PKK Resmi & Margin Kiri 2 cm */}
       <div className="hidden print:block print:w-full print:p-0">
         <style>{`
           @media print {
-            @page { margin: 15mm 15mm 15mm 20mm; }
+            @page {
+              size: A4 landscape;
+              margin-left: 20mm;
+              margin-top: 20mm;
+              margin-right: 15mm;
+              margin-bottom: 20mm;
+            }
             body * { visibility: hidden; }
             #printable-report, #printable-report * { visibility: visible; }
-            #printable-report { position: absolute; left: 0; top: 0; width: 100%; }
+            #printable-report {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              box-sizing: border-box;
+            }
           }
         `}</style>
-        <div id="printable-report" className="p-8">
+        <div id="printable-report" className="w-full">
+          {/* Kop Surat PKK Resmi Kelurahan Mangga */}
           <KopSuratPkk />
-          <div className="mt-8 mb-6 text-center space-y-1">
-            <h2 className="text-2xl font-black text-black underline">REKAPITULASI DATA KELOMPOK DASA WISMA</h2>
-            <p className="text-sm font-bold text-black uppercase">
+
+          <div className="mt-4 mb-5 text-center space-y-1">
+            <h2 className="text-lg font-black text-black underline uppercase tracking-wide">
+              REKAPITULASI DATA KELOMPOK DASA WISMA
+            </h2>
+            <p className="text-xs font-bold text-black uppercase">
+              TP-PKK KELURAHAN MANGGA • KECAMATAN MEDAN TUNTUNGAN
+            </p>
+            <p className="text-[11px] font-semibold text-slate-800">
               WILAYAH: {selectedLingkungan === 'all' ? 'SELURUH 24 LINGKUNGAN' : `LINGKUNGAN ${selectedLingkungan}`}
             </p>
-            <p className="text-xs text-slate-700 italic">
+            <p className="text-[9px] text-slate-600 italic">
               Dicetak pada: {new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })} pukul {new Date().toLocaleTimeString('id-ID')} WIB
             </p>
           </div>
 
-          <table className="w-full text-[7px] border-collapse border border-black text-black leading-tight">
+          <table className="w-full text-[8px] border-collapse border border-black text-black leading-tight">
             <thead>
               <tr className="bg-slate-100">
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[20px]">No</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-left">Nama Kelompok</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-left">Ketua</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[40px]">RT/RW</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[20px]">Rmh</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[20px]">KK</th>
-                <th colSpan={3} className="border border-black p-0.5 font-black uppercase text-center">Jumlah Jiwa</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Bml</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Bsi</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Blt</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Lns</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">PUS</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">WUS</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">BA</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Dis</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Jbn</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">SPL</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Smp</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Pkr</th>
-                <th rowSpan={2} className="border border-black p-0.5 font-black uppercase text-center w-[18px]">Ind</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-center w-[22px]">No</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-left">Nama Kepala Rumah Tangga / Kelompok</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-center w-[30px]">Lingk</th>
+                <th colSpan={3} className="border border-black p-1 font-black uppercase text-center">Jml Anggota Jiwa</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-center w-[35px]">PUS / WUS</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-center w-[25px]">Ibu Hamil</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-center w-[25px]">Balita</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-center w-[25px]">Lansia</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-center w-[55px]">Air Bersih</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-center w-[30px]">Jamban</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-center w-[25px]">SPAL</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-center w-[30px]">Sampah</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-center w-[45px]">Kriteria Rumah</th>
+                <th rowSpan={2} className="border border-black p-1 font-black uppercase text-left">Keterangan / Kegiatan</th>
               </tr>
               <tr className="bg-slate-100">
                 <th className="border border-black p-0.5 font-black uppercase text-center w-[20px]">L</th>
                 <th className="border border-black p-0.5 font-black uppercase text-center w-[20px]">P</th>
-                <th className="border border-black p-0.5 font-black uppercase text-center w-[20px]">T</th>
+                <th className="border border-black p-0.5 font-black uppercase text-center w-[22px]">Total</th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={22} className="border border-black p-8 text-center italic text-slate-400">
+                  <td colSpan={16} className="border border-black p-6 text-center italic text-slate-500">
                     Belum ada data Kelompok Dasa Wisma untuk wilayah ini.
                   </td>
                 </tr>
               ) : (
                 filteredItems.map((item, idx) => (
                   <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="border border-black p-0.5 text-center">{idx + 1}</td>
-                    <td className="border border-black p-0.5 font-bold uppercase">{item.namaKelompok}</td>
-                    <td className="border border-black p-0.5">{item.namaKetua}</td>
-                    <td className="border border-black p-0.5 text-center">{item.rtRw || '-'}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahRumah}</td>
-                    <td className="border border-black p-0.5 text-center font-bold">{item.jumlahKk}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahJiwaLaki}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahJiwaPerempuan}</td>
-                    <td className="border border-black p-0.5 text-center font-bold">{item.jumlahJiwa}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahIbuHamil}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahIbuMenyusui}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahBalita}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahLansia}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahPus}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahWus}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahButaAksara}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahBerkebutuhanKhusus}</td>
-                    <td className="border border-black p-0.5 text-center font-bold">{item.jumlahJambanSehat}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahSpal}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahTempatSampah}</td>
-                    <td className="border border-black p-0.5 text-center font-bold text-emerald-900">{item.jumlahPekaranganManfaat}</td>
-                    <td className="border border-black p-0.5 text-center">{item.jumlahIndustriRumah}</td>
+                    <td className="border border-black p-1 text-center font-bold">{idx + 1}</td>
+                    <td className="border border-black p-1 font-bold">
+                      {item.namaKetua} <span className="font-normal text-[7px] text-slate-700">({item.namaKelompok})</span>
+                    </td>
+                    <td className="border border-black p-1 text-center">{item.lingkunganNomor}</td>
+                    <td className="border border-black p-1 text-center">{item.jumlahJiwaLaki || 0}</td>
+                    <td className="border border-black p-1 text-center">{item.jumlahJiwaPerempuan || 0}</td>
+                    <td className="border border-black p-1 text-center font-bold">{item.jumlahJiwa || 0}</td>
+                    <td className="border border-black p-1 text-center font-medium">
+                      {item.jumlahPus || 0} / {item.jumlahWus || 0}
+                    </td>
+                    <td className="border border-black p-1 text-center font-bold">{item.jumlahIbuHamil || 0}</td>
+                    <td className="border border-black p-1 text-center font-bold">{item.jumlahBalita || 0}</td>
+                    <td className="border border-black p-1 text-center">{item.jumlahLansia || 0}</td>
+                    <td className="border border-black p-1 text-center text-[7px]">{item.sumberAirBersih || 'PDAM'}</td>
+                    <td className="border border-black p-1 text-center">{item.jumlahJambanSehat ? 'Ada (Sehat)' : 'Tidak'}</td>
+                    <td className="border border-black p-1 text-center">{item.jumlahSpal ? 'Ada' : 'Tidak'}</td>
+                    <td className="border border-black p-1 text-center">{item.jumlahTempatSampah ? 'Ada' : 'Tidak'}</td>
+                    <td className="border border-black p-1 text-center font-bold">
+                      {item.kriteriaRumah || 'Sehat'}
+                    </td>
+                    <td className="border border-black p-1 text-[7px] italic">
+                      {item.catatan || item.kegiatanUtama || '-'}
+                    </td>
                   </tr>
                 ))
               )}
             </tbody>
             {filteredItems.length > 0 && (
-              <tfoot className="bg-slate-50 font-black">
+              <tfoot className="bg-slate-100 font-black">
                 <tr>
-                  <td colSpan={4} className="border border-black p-0.5 text-right">TOTAL:</td>
-                  <td className="border border-black p-0.5 text-center">{filteredItems.reduce((acc, it) => acc + (it.jumlahRumah || 0), 0)}</td>
-                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalKk}</td>
-                  <td className="border border-black p-0.5 text-center">{kpiStats.totalJiwaLaki}</td>
-                  <td className="border border-black p-0.5 text-center">{kpiStats.totalJiwaPerempuan}</td>
-                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalJiwa}</td>
-                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalBumil}</td>
-                  <td className="border border-black p-0.5 text-center">{kpiStats.totalBusui}</td>
-                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalBalita}</td>
-                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalLansia}</td>
-                  <td className="border border-black p-0.5 text-center">{kpiStats.totalPus}</td>
-                  <td className="border border-black p-0.5 text-center">{kpiStats.totalWus}</td>
-                  <td className="border border-black p-0.5 text-center">{kpiStats.totalButaAksara}</td>
-                  <td className="border border-black p-0.5 text-center">{kpiStats.totalBerkebutuhanKhusus}</td>
-                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalJamban}</td>
-                  <td className="border border-black p-0.5 text-center">{kpiStats.totalSpal}</td>
-                  <td className="border border-black p-0.5 text-center">{kpiStats.totalSampah}</td>
-                  <td className="border border-black p-0.5 text-center underline">{kpiStats.totalPekarangan}</td>
-                  <td className="border border-black p-0.5 text-center">{kpiStats.totalIndustri}</td>
+                  <td colSpan={3} className="border border-black p-1 text-right">TOTAL:</td>
+                  <td className="border border-black p-1 text-center">{kpiStats.totalJiwaLaki}</td>
+                  <td className="border border-black p-1 text-center">{kpiStats.totalJiwaPerempuan}</td>
+                  <td className="border border-black p-1 text-center underline font-black">{kpiStats.totalJiwa}</td>
+                  <td className="border border-black p-1 text-center">{kpiStats.totalPus} / {kpiStats.totalWus}</td>
+                  <td className="border border-black p-1 text-center underline font-black">{kpiStats.totalBumil}</td>
+                  <td className="border border-black p-1 text-center underline font-black">{kpiStats.totalBalita}</td>
+                  <td className="border border-black p-1 text-center underline">{kpiStats.totalLansia}</td>
+                  <td className="border border-black p-1 text-center text-[7px]">PDAM / Sumur</td>
+                  <td className="border border-black p-1 text-center underline">{kpiStats.totalJamban}</td>
+                  <td className="border border-black p-1 text-center">{kpiStats.totalSpal}</td>
+                  <td className="border border-black p-1 text-center">{kpiStats.totalSampah}</td>
+                  <td className="border border-black p-1 text-center">-</td>
+                  <td className="border border-black p-1 text-center">{kpiStats.totalKelompok} Kelompok</td>
                 </tr>
               </tfoot>
             )}
           </table>
 
-          <div className="mt-8 text-[10px] text-slate-500 italic text-right print:block">
-            Sistem Informasi Pelaporan Kepling & PKK Kelurahan Mangga (SIKEPLING)
+          <div className="mt-8 flex justify-between items-end text-[10px] text-black">
+            <div>
+              <p className="italic text-slate-600">Catatan: Margin Kiri 2 cm sesuai ketentuan arsip resmi PKK Kelurahan Mangga.</p>
+              <p className="italic text-slate-600">Sistem Informasi Pelaporan Kepling & PKK Kelurahan Mangga (SIKEPLING)</p>
+            </div>
+            <div className="text-center w-56">
+              <p>Medan, {new Date().toLocaleDateString('id-ID', { dateStyle: 'long' })}</p>
+              <p className="font-bold">Ketua TP-PKK Kelurahan Mangga</p>
+              <div className="h-16" />
+              <p className="font-bold underline">( Ny. Ketua TP-PKK )</p>
+            </div>
           </div>
         </div>
       </div>

@@ -118,6 +118,32 @@
           window.deferredPrompt = e;
           window.dispatchEvent(new CustomEvent('pwa-prompt-available'));
         });
+
+        // 3. Defensive startup memory hygiene: Purge legacy oversized localStorage keys (>250KB)
+        // that cause Chrome heap exhaustion and out-of-memory errors on laptops
+        try {
+          if (typeof localStorage !== 'undefined') {
+            for (var i = localStorage.length - 1; i >= 0; i--) {
+              var k = localStorage.key(i);
+              if (!k) continue;
+              var kLower = k.toLowerCase();
+              if (
+                kLower.indexOf('account') !== -1 ||
+                kLower.indexOf('auth') !== -1 ||
+                kLower.indexOf('profile') !== -1 ||
+                kLower.indexOf('password') !== -1 ||
+                kLower.indexOf('active_tab') !== -1 ||
+                kLower.indexOf('theme') !== -1
+              ) {
+                continue;
+              }
+              var val = localStorage.getItem(k);
+              if (val && val.length > 250000) {
+                localStorage.removeItem(k);
+              }
+            }
+          }
+        } catch (storageErr) {}
       })();
     </script>
     <meta charset="UTF-8" />

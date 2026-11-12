@@ -234,26 +234,22 @@ export default function App() {
       }
     }).catch(() => {});
 
-    // Use real-time subscription for reports with automatic IndexedDB + LocalStorage sync
+    // Use real-time subscription for reports with non-blocking IndexedDB persistence
     const unsub = subscribeReportsFromFirestore((fetched) => {
       if (Array.isArray(fetched)) {
         const unified = consolidateAllReports(fetched);
         setReports(unified);
-        safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(unified));
         saveReportsToIndexedDB(unified).catch(() => {});
       }
     });
 
-    // Use real-time subscription for kunjungan with automatic IndexedDB sync
+    // Use real-time subscription for kunjungan with non-blocking IndexedDB persistence
     const unsubKunjungan = subscribeKunjungan((fetched) => {
       if (Array.isArray(fetched)) {
         setKunjunganList(fetched);
         saveVisitsToIndexedDB(fetched).catch(() => {});
-        safeSetLocalStorage('sikepling_kunjungan_warga_v1', JSON.stringify(fetched));
       }
     });
-
-
 
     // Use real-time subscription for targets
     const unsubTargets = subscribeTargetsFromFirestore((map) => {
@@ -262,21 +258,10 @@ export default function App() {
       }
     });
     
-    // Delay initial full pull by 5 seconds so mobile initial render is completely instant & smooth
-    const initialSyncTimeout = setTimeout(() => {
-      import('./lib/syncManager').then(m => m.runSilentBackgroundSync()).catch(console.error);
-    }, 5000);
-
-    const syncInterval = setInterval(() => {
-      import('./lib/syncManager').then(m => m.runSilentBackgroundSync()).catch(console.error);
-    }, 600000); // 10 minutes
-    
     return () => {
-      clearTimeout(initialSyncTimeout);
       unsub();
       unsubKunjungan();
       unsubTargets();
-      clearInterval(syncInterval);
     };
   }, []);
 

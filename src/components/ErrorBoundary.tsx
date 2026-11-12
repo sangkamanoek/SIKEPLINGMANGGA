@@ -28,6 +28,20 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
+  private handleClearAndReload = () => {
+    try {
+      const keysToKeep = ['sikepling_active_account_id', 'sikepling_active_tab_v2'];
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && !keysToKeep.includes(k) && !k.includes('account') && !k.includes('password')) {
+          localStorage.removeItem(k);
+        }
+      }
+      sessionStorage.clear();
+    } catch {}
+    window.location.reload();
+  };
+
   private handleReset = () => {
     try {
       // Clear possible corrupted transient state but preserve auth if possible
@@ -61,19 +75,28 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={this.handleReload}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer shadow-lg shadow-emerald-900/30"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer shadow-md"
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>Muat Ulang Halaman</span>
+                <span>Muat Ulang</span>
+              </button>
+              <button
+                type="button"
+                onClick={this.handleClearAndReload}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-colors cursor-pointer shadow-md"
+                title="Bersihkan sisa memori cache dan segarkan halaman"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Bersihkan Cache & Buka</span>
               </button>
               <button
                 type="button"
                 onClick={this.handleReset}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-xs transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-xs transition-colors cursor-pointer"
               >
                 <Home className="w-4 h-4" />
                 <span>Beranda</span>

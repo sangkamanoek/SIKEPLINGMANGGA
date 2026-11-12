@@ -114,6 +114,7 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
   const collectionsToWatch = ['reports', 'laporan_harian', 'SIKEPLINGMANGGA'];
   const collectionsData: Record<string, any[]> = {};
   const unsubs: (() => void)[] = [];
+  let debounceTimer: any = null;
 
   const emitMerged = () => {
     const map = new Map<string, any>();
@@ -144,6 +145,13 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
     cb(merged);
   };
 
+  const triggerDebouncedEmit = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      emitMerged();
+    }, 120);
+  };
+
   try {
     for (const colName of collectionsToWatch) {
       try {
@@ -159,12 +167,12 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
               }
             });
             collectionsData[colName] = items;
-            emitMerged();
+            triggerDebouncedEmit();
           },
           (err) => {
             console.warn(`subscribeReportsFromFirestore (${colName}) error:`, err);
             collectionsData[colName] = [];
-            emitMerged();
+            triggerDebouncedEmit();
           }
         );
         unsubs.push(unsub);
@@ -174,6 +182,7 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
     }
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       unsubs.forEach((u) => u());
     };
   } catch (e) {

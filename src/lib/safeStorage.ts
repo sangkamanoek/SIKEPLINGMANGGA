@@ -62,6 +62,12 @@ export function safeGetLocalStorage<T>(key: string, defaultValue: T): T {
     if (raw === null || raw === undefined) {
       return defaultValue;
     }
+    // Safety Guard: If raw string is oversized (> 250KB), do NOT parse it synchronously
+    // to prevent freezing and V8 heap exhaustion on low-spec laptops
+    if (raw.length > 250_000) {
+      try { localStorage.removeItem(key); } catch {}
+      return defaultValue;
+    }
     return JSON.parse(raw);
   } catch (err) {
     console.warn(`[safeStorage] Failed parsing localStorage key "${key}":`, err);
@@ -110,6 +116,8 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
     }
 
     // Persist heavy entities to IndexedDB in background with debouncing
+    const isHeavyData = value.length > 250_000;
+
     if (key.includes('laporan') || key.includes('reports')) {
       if (idbSaveTimeout) clearTimeout(idbSaveTimeout);
       idbSaveTimeout = setTimeout(() => {
@@ -180,6 +188,13 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
           }
         } catch {}
       }, 500);
+    }
+
+    // Defensive: If payload exceeds 250KB, DO NOT store full payload in localStorage
+    // to prevent browser thread lockup and QuotaExceededError crashes.
+    // Full data is already safely persisted to IndexedDB above.
+    if (isHeavyData) {
+      return true;
     }
 
     localStorage.setItem(key, value);

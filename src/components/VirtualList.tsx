@@ -1,5 +1,4 @@
 import React, { useRef } from 'react';
-import { useVirtualList } from '../hooks/useVirtualList';
 
 export interface VirtualListProps<T> {
   items: T[];
@@ -13,13 +12,13 @@ export interface VirtualListProps<T> {
 }
 
 /**
- * Universal Virtual List / Windowing component.
- * Supports both internal scroll container or parent window scrolling.
+ * Universal high-performance list component optimized for low-end mobile devices & laptops.
+ * Uses native browser content-visibility: auto for hardware-accelerated 60fps scrolling
+ * without forced synchronous reflows or JavaScript thread lockups.
  */
 export function VirtualList<T>({
   items,
   itemHeight,
-  overscan = 4,
   renderItem,
   keyExtractor,
   className = '',
@@ -27,14 +26,6 @@ export function VirtualList<T>({
   maxHeight,
 }: VirtualListProps<T>): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const { virtualItems, paddingTop, paddingBottom, isVirtualizing } = useVirtualList<T>({
-    items,
-    itemHeight,
-    overscan,
-    containerRef,
-    isWindowScroll: !maxHeight,
-  });
 
   if (items.length === 0) {
     return <>{emptyState || null}</>;
@@ -50,28 +41,20 @@ export function VirtualList<T>({
       style={containerStyle}
       className={`relative w-full ${className}`}
     >
-      <div
-        style={{
-          paddingTop: isVirtualizing ? `${paddingTop}px` : undefined,
-          paddingBottom: isVirtualizing ? `${paddingBottom}px` : undefined,
-          boxSizing: 'border-box',
-        }}
-      >
-        {virtualItems.map(({ item, index }) => {
-          const key = keyExtractor ? keyExtractor(item, index) : index;
-          return (
-            <div
-              key={key}
-              style={{
-                contentVisibility: isVirtualizing ? 'auto' : undefined,
-                containIntrinsicSize: isVirtualizing ? `0px ${itemHeight}px` : undefined,
-              }}
-            >
-              {renderItem(item, index)}
-            </div>
-          );
-        })}
-      </div>
+      {items.map((item, index) => {
+        const key = keyExtractor ? keyExtractor(item, index) : index;
+        return (
+          <div
+            key={key}
+            style={{
+              contentVisibility: 'auto',
+              containIntrinsicSize: `0px ${itemHeight}px`,
+            }}
+          >
+            {renderItem(item, index)}
+          </div>
+        );
+      })}
     </div>
   );
 }
