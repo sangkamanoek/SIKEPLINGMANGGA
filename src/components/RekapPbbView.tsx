@@ -82,6 +82,7 @@ import {
   getCachedPbbOverview,
   subscribePbbSpptForLingkungan,
   KelurahanPbbOverview,
+  deduplicateSpptItems,
 } from '../lib/pbbService';
 import { RekapCapaianPbb24Lingkungan } from './RekapCapaianPbb24Lingkungan';
 
@@ -154,7 +155,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
   // Custom SPPT item list state with LocalStorage persistence & Firebase sync
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => {
-    return getLocalSpptForYear(selectedYear);
+    return deduplicateSpptItems(getLocalSpptForYear(selectedYear));
   });
   const [summaryOverview, setSummaryOverview] = useState<KelurahanPbbOverview>(() => getCachedPbbOverview(selectedYear));
   const [isSyncing, setIsSyncing] = useState<boolean>(false);

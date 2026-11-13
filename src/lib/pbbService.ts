@@ -631,16 +631,57 @@ export function stripNonDigits(val: string): string {
 }
 
 /**
- * Smart merge SPPT items: overlays updates on top of base items.
- * Uses updatedAt timestamps to ensure recent edits (such as moving lingkungan) are strictly preserved.
+ * Strictly deduplicates SPPT items by cleaned NOP so no duplicate NOPs can ever exist.
+ */
+export function deduplicateSpptItems(items: SpptPbbItem[]): SpptPbbItem[] {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const nopMap = new Map<string, SpptPbbItem>();
+
+  for (const item of items) {
+    if (!item) continue;
+    const cleanNop = item.nop ? stripNonDigits(item.nop) : '';
+    const key = cleanNop || item.id || `item_${Math.random()}`;
+
+    if (!nopMap.has(key)) {
+      nopMap.set(key, { ...item });
+    } else {
+      const existing = nopMap.get(key)!;
+      const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+      const itemTime = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
+
+      const isPaid = existing.status === 'Sudah Bayar' || item.status === 'Sudah Bayar' ? 'Sudah Bayar' : (existing.status || item.status);
+      const chosen = existingTime >= itemTime ? existing : item;
+      nopMap.set(key, {
+        ...existing,
+        ...item,
+        ...chosen,
+        status: isPaid,
+        jumlahBayar: isPaid === 'Sudah Bayar' ? (chosen.pbbTerutang || existing.pbbTerutang || item.pbbTerutang) : null,
+      });
+    }
+  }
+
+  const result = Array.from(nopMap.values());
+  result.sort((a, b) => {
+    if (a.lingkungan !== b.lingkungan) return a.lingkungan - b.lingkungan;
+    return a.no - b.no;
+  });
+  return result;
+}
+
+/**
+ * Smart merge SPPT items: overlays updates on top of base items with strict NOP deduplication.
  */
 export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbItem[], prioritizeRemote: boolean = false): SpptPbbItem[] {
-  if (!Array.isArray(updates) || updates.length === 0) return baseList;
+  const cleanBase = deduplicateSpptItems(baseList);
+  const cleanUpdates = deduplicateSpptItems(updates);
+  if (cleanUpdates.length === 0) return cleanBase;
+
   const map = new Map<string, SpptPbbItem>();
   const nopMap = new Map<string, string>(); // cleaned nop -> canonical id
 
   // 1. Fill map with base items
-  for (const item of baseList) {
+  for (const item of cleanBase) {
     if (!item || !item.id) continue;
     map.set(item.id, { ...item });
     if (item.nop) {
@@ -649,7 +690,7 @@ export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbIte
   }
 
   // 2. Overlay updates (matched by id or canonical stripped NOP)
-  for (const update of updates) {
+  for (const update of cleanUpdates) {
     if (!update || !update.id) continue;
     const cleanNop = update.nop ? stripNonDigits(update.nop) : '';
     let targetId = update.id;
@@ -662,9 +703,6 @@ export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbIte
       const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
       const updateTime = update.updatedAt ? new Date(update.updatedAt).getTime() : 0;
 
-      // Conflict resolution:
-      // If existing item was modified more recently than incoming update, KEEP existing item!
-      // Otherwise, apply update.
       if (existingTime > updateTime) {
         map.set(targetId, {
           ...update,
@@ -679,7 +717,6 @@ export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbIte
         });
       }
     } else {
-      // New record added
       const newItemPaid = update.jumlahBayar !== undefined 
         ? update.jumlahBayar 
         : (update.status === 'Sudah Bayar' ? update.pbbTerutang : null);
@@ -694,12 +731,7 @@ export function smartMergeSpptItems(baseList: SpptPbbItem[], updates: SpptPbbIte
     }
   }
 
-  const merged = Array.from(map.values());
-  merged.sort((a, b) => {
-    if (a.lingkungan !== b.lingkungan) return a.lingkungan - b.lingkungan;
-    return a.no - b.no;
-  });
-  return merged;
+  return deduplicateSpptItems(Array.from(map.values()));
 }
 
 // Cross-tab broadcast channel for immediate 0ms sync between Super Admin & Kasi Pem on same device
