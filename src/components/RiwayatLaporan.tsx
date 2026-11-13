@@ -24,10 +24,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Camera,
+  ImageOff,
+  Upload,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, UserAccount, KinerjaHarian } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
-import { isReportMatchingKepling, isReportMatchingDate, getReportIsoDate, getTodayLocalIso } from '../lib/formatter';
+import { isReportMatchingKepling, isReportMatchingDate, getReportIsoDate, getTodayLocalIso, getDirectImageUrl } from '../lib/formatter';
 import { VirtualList } from './VirtualList';
 
 interface RiwayatLaporanProps {
@@ -41,6 +43,9 @@ interface RiwayatLaporanProps {
   isAdmin?: boolean;
   activeAccount?: UserAccount;
   onDeleteReport?: (id: string) => Promise<void>;
+  restoredPhotoCount?: number;
+  onRestorePhotosToCloud?: () => Promise<void>;
+  isRestoringPhotos?: boolean;
 }
 
 export type DateFilterMode =
@@ -127,6 +132,9 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   isAdmin = false,
   activeAccount,
   onDeleteReport,
+  restoredPhotoCount = 0,
+  onRestorePhotosToCloud,
+  isRestoringPhotos = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPetugas, setSelectedPetugas] = useState(initialPetugasFilter || 'ALL');
@@ -674,13 +682,41 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
             onClick={onRefresh}
             disabled={isLoading}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-            title="Muat ulang dari Google Sheets"
+            title="Muat ulang data & foto laporan"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             <span>Segarkan Data</span>
           </button>
         </div>
       </div>
+
+      {/* Recovery Banner for Photos Restored from Server Archive */}
+      {restoredPhotoCount > 0 && onRestorePhotosToCloud && (
+        <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <Upload className="w-4 h-4" />
+            </div>
+            <div className="text-xs text-emerald-950 space-y-0.5">
+              <p className="font-bold">
+                {restoredPhotoCount} Laporan Berhasil Dipulihkan Fotonya dari Arsip Cadangan Server
+              </p>
+              <p className="text-emerald-800">
+                Foto-foto laporan lama sebelum 12 November sudah dimuat kembali ke tampilan ini. Klik tombol di samping untuk menyimpan permanen ke Cloud Firestore agar tidak hilang di perangkat lain.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={isRestoringPhotos}
+            onClick={onRestorePhotosToCloud}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 shadow-xs"
+          >
+            <Upload className={`w-4 h-4 ${isRestoringPhotos ? 'animate-pulse' : ''}`} />
+            <span>{isRestoringPhotos ? 'Menyimpan ke Cloud...' : 'Simpan Permanen ke Cloud'}</span>
+          </button>
+        </div>
+      )}
 
       {/* Multi-Criteria Search & Filter Controls */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
@@ -1312,26 +1348,39 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {item.dokumentasiFoto.slice(0, 3).map((foto, idx) => {
-                        const hasCompactUrl = Boolean(foto.url && (foto.url.startsWith('http') || foto.url.length < 350000));
+                        const directUrl = getDirectImageUrl(foto.url);
+                        const hasValidUrl = Boolean(directUrl && directUrl.trim().length > 20);
+                        const hasCompactUrl = Boolean(hasValidUrl && (directUrl.startsWith('http') || directUrl.length < 650000));
                         return (
                           <div
                             key={foto.id || idx}
                             onClick={() => onSelectReport(item)}
-                            className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shrink-0 cursor-pointer hover:border-emerald-500 hover:scale-105 transition-all relative group shadow-2xs"
-                            title={`${foto.name || `Foto ${idx + 1}`} - Klik untuk lihat foto penuh`}
+                            className={`w-12 h-12 rounded-lg overflow-hidden border shrink-0 cursor-pointer hover:border-emerald-500 hover:scale-105 transition-all relative group shadow-2xs ${
+                              hasValidUrl ? 'border-slate-200 bg-slate-100' : 'border-amber-200 bg-amber-50'
+                            }`}
+                            title={
+                              hasValidUrl
+                                ? `${foto.name || `Foto ${idx + 1}`} - Klik untuk lihat foto penuh`
+                                : `${foto.name || `Foto ${idx + 1}`} - File foto kosong di arsip`
+                            }
                           >
                             {hasCompactUrl ? (
                               <img
-                                src={foto.url}
+                                src={directUrl}
                                 alt={foto.name || `Foto ${idx + 1}`}
                                 className="w-full h-full object-cover"
                                 loading="lazy"
                                 decoding="async"
                               />
-                            ) : (
-                              <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-[8px] text-slate-500 font-bold p-1 text-center leading-tight">
+                            ) : hasValidUrl ? (
+                              <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-[8px] text-slate-600 font-bold p-1 text-center leading-tight">
                                 <Camera className="w-3.5 h-3.5 mb-0.5 text-emerald-600" />
                                 <span>Foto {idx + 1}</span>
+                              </div>
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center bg-amber-50 text-[8px] text-amber-700 font-bold p-1 text-center leading-tight">
+                                <ImageOff className="w-3.5 h-3.5 mb-0.5 text-amber-600" />
+                                <span>Kosong</span>
                               </div>
                             )}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

@@ -61,6 +61,73 @@ export function isSameKeplingAndDate(a: LaporanHarianItem, b: LaporanHarianItem)
   return false;
 }
 
+const hasValidFotoUrl = (f?: Partial<FotoDokumentasi> | null): boolean =>
+  Boolean(f && typeof f.url === 'string' && f.url.trim().length > 20);
+
+/**
+ * Merges two photo arrays deterministically while always preferring entries with valid (non-empty) URLs.
+ */
+export function mergeFotoArraysPreservingUrls(
+  existingPhotos: FotoDokumentasi[] | undefined,
+  incomingPhotos: FotoDokumentasi[] | undefined
+): FotoDokumentasi[] {
+  const existing = Array.isArray(existingPhotos) ? existingPhotos : [];
+  const incoming = Array.isArray(incomingPhotos) ? incomingPhotos : [];
+
+  if (existing.length === 0) return incoming;
+  if (incoming.length === 0) return existing;
+
+  const merged: FotoDokumentasi[] = [];
+  const usedIncomingIndices = new Set<number>();
+
+  // 1. Keep every slot from existing, enriching from incoming if incoming matches and has better metadata/URL
+  existing.forEach((ex, exIdx) => {
+    if (!ex) return;
+    let matchIdx = -1;
+    if (ex.id) {
+      matchIdx = incoming.findIndex((inc, i) => !usedIncomingIndices.has(i) && inc && inc.id === ex.id);
+    }
+    if (matchIdx === -1 && hasValidFotoUrl(ex)) {
+      matchIdx = incoming.findIndex((inc, i) => !usedIncomingIndices.has(i) && inc && inc.url === ex.url);
+    }
+    if (matchIdx === -1 && ex.name) {
+      matchIdx = incoming.findIndex(
+        (inc, i) =>
+          !usedIncomingIndices.has(i) &&
+          inc &&
+          inc.name === ex.name &&
+          (i === exIdx || existing.length === incoming.length)
+      );
+    }
+    if (matchIdx === -1 && existing.length === incoming.length && incoming[exIdx] && !usedIncomingIndices.has(exIdx)) {
+      matchIdx = exIdx;
+    }
+
+    if (matchIdx >= 0) {
+      usedIncomingIndices.add(matchIdx);
+      const inc = incoming[matchIdx];
+      const chosenUrl = hasValidFotoUrl(inc)
+        ? inc.url
+        : hasValidFotoUrl(ex)
+        ? ex.url
+        : inc.url || ex.url || '';
+      merged.push({ ...ex, ...inc, url: chosenUrl });
+    } else {
+      merged.push(ex);
+    }
+  });
+
+  // 2. Append any remaining unmatched incoming photos (deduping identical valid URLs)
+  incoming.forEach((inc, idx) => {
+    if (!inc || usedIncomingIndices.has(idx)) return;
+    if (hasValidFotoUrl(inc) && merged.some((m) => m.url === inc.url)) return;
+    if (inc.id && merged.some((m) => m.id && m.id === inc.id)) return;
+    merged.push(inc);
+  });
+
+  return merged;
+}
+
 /**
  * Consolidates multiple submissions from the same Kepling on the same date
  * into one single unified daily report item.
@@ -69,9 +136,19 @@ export function consolidateDailyReport(
   existing: LaporanHarianItem,
   incoming: LaporanHarianItem
 ): LaporanHarianItem {
-  // If the same object or identical ID
+  // If the same object or identical ID, preserve valid photo URLs from either copy
   if (existing.id === incoming.id) {
-    return { ...existing, ...incoming };
+    const mergedPhotos = mergeFotoArraysPreservingUrls(existing.dokumentasiFoto, incoming.dokumentasiFoto);
+    return {
+      ...existing,
+      ...incoming,
+      dokumentasiFoto: mergedPhotos,
+      jumlahDokumentasi: Math.max(
+        mergedPhotos.length,
+        Number(incoming.jumlahDokumentasi || 0),
+        Number(existing.jumlahDokumentasi || 0)
+      ),
+    };
   }
 
   const eKin: Partial<KinerjaHarian> = existing.kinerja || {};
@@ -133,30 +210,8 @@ export function consolidateDailyReport(
     infrastrukturPelapor: iKin.infrastrukturPelapor || eKin.infrastrukturPelapor || incoming.namaKepling || existing.namaKepling || '',
   };
 
-  // Merge Documentation Photos deduplicated by ID, URL, or name
-  const existingPhotos: FotoDokumentasi[] = existing.dokumentasiFoto || [];
-  const incomingPhotos: FotoDokumentasi[] = incoming.dokumentasiFoto || [];
-
-  const photoMap = new Map<string, FotoDokumentasi>();
-  photoMap.forEach((p, k) => {
-    // If we already have a photo with this key, but it has an empty URL, we might want to keep it as a placeholder
-    // or wait for incoming to replace it.
-  });
-
-  existingPhotos.forEach((p) => {
-    const key = p.id || p.name || p.url || `photo_${Math.random()}`;
-    photoMap.set(key, p);
-  });
-  incomingPhotos.forEach((p) => {
-    const key = p.id || p.name || `photo_${Math.random()}`; // Prioritize ID for matching
-    const existingP = photoMap.get(key);
-    // If we have an existing photo, only replace it if it has an empty URL and the incoming one has a valid URL
-    if (!existingP || (!existingP.url && p.url)) {
-      photoMap.set(key, p);
-    }
-  });
-
-  const mergedPhotos = Array.from(photoMap.values());
+  // Merge Documentation Photos deterministically while preserving valid URLs
+  const mergedPhotos = mergeFotoArraysPreservingUrls(existing.dokumentasiFoto, incoming.dokumentasiFoto);
 
   // Keep the earlier createdAt to preserve original chronological order
   const eTime = existing.createdAt ? new Date(existing.createdAt).getTime() : Date.now();

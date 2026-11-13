@@ -30,6 +30,7 @@ import {
   Database,
   CheckCircle2,
   Camera,
+  ImageOff,
   Info,
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, FotoDokumentasi, isPkkRole } from '../types';
@@ -251,10 +252,26 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
     return list;
   }, [item?.dokumentasiFoto, relevantKunjungan]);
 
+  const isRenderableFotoUrl = (url?: string): boolean => {
+    const direct = getDirectImageUrl(url);
+    return Boolean(direct && direct.trim().length > 20);
+  };
+
+  const [failedPhotoKeys, setFailedPhotoKeys] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setFailedPhotoKeys({});
+  }, [item?.id]);
+
+  const markPhotoFailed = (key: string) => {
+    setFailedPhotoKeys((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+  };
+
   // All photos array for easy lightbox flipping
   const allDokumentasi = effectivePhotos;
 
   const handleOpenPhotoPreview = (fotoUrl: string, fallbackName: string) => {
+    if (!isRenderableFotoUrl(fotoUrl)) return;
     const foundIdx = allDokumentasi.findIndex((p) => p.url === fotoUrl);
     setPreviewPhotoIndex(foundIdx !== -1 ? foundIdx : 0);
     setPreviewPhoto({ url: fotoUrl, name: fallbackName });
@@ -1299,12 +1316,21 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                     className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center shadow-xs"
                                   >
                                     <div className="w-full h-[120px] rounded-md overflow-hidden bg-slate-50 flex items-center justify-center p-0.5 border border-slate-200">
-                                      <img
-                                        src={getDirectImageUrl(foto.url)}
-                                        alt={getProperFotoLabel(foto, idx)}
-                                        crossOrigin="anonymous"
-                                        className="w-full h-full object-cover object-center"
-                                      />
+                                      {isRenderableFotoUrl(foto.url) ? (
+                                        <img
+                                          src={getDirectImageUrl(foto.url)}
+                                          alt={getProperFotoLabel(foto, idx)}
+                                          crossOrigin="anonymous"
+                                          className="w-full h-full object-cover object-center"
+                                        />
+                                      ) : (
+                                        <div className="flex flex-col items-center justify-center text-slate-400 text-center px-2">
+                                          <ImageOff className="w-5 h-5 mb-1 text-amber-500" />
+                                          <span className="text-[7pt] font-sans font-semibold text-slate-500">
+                                            File foto kosong di arsip
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                     <div
                                       className="text-[7.5pt] font-bold text-slate-800 mt-1 truncate w-full text-center font-sans"
@@ -1381,12 +1407,21 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                 className="rounded-lg border border-slate-300 p-2 bg-white flex flex-col items-center shadow-xs"
                               >
                                 <div className="w-full h-[180px] rounded-md overflow-hidden bg-slate-100 flex items-center justify-center p-1">
-                                  <img
-                                    src={getDirectImageUrl(foto.url)}
-                                    alt={getProperFotoLabel(foto, idx)}
-                                    crossOrigin="anonymous"
-                                    className="w-full h-full object-cover object-center"
-                                  />
+                                  {isRenderableFotoUrl(foto.url) ? (
+                                    <img
+                                      src={getDirectImageUrl(foto.url)}
+                                      alt={getProperFotoLabel(foto, idx)}
+                                      crossOrigin="anonymous"
+                                      className="w-full h-full object-cover object-center"
+                                    />
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center text-slate-400 text-center px-3">
+                                      <ImageOff className="w-6 h-6 mb-1 text-amber-500" />
+                                      <span className="text-[7.5pt] font-sans font-semibold text-slate-500">
+                                        File foto kosong di arsip
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                                 <div
                                   className="text-[8pt] font-bold text-slate-800 mt-1.5 truncate w-full text-center font-sans"
@@ -1468,46 +1503,73 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
-                      {group.photos.map((foto, idx) => (
-                        <div
-                          key={foto.id || idx}
-                          className="aspect-square rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-800 shadow-xl group relative cursor-pointer hover:border-emerald-500 transition-all"
-                          onClick={() => handleOpenPhotoPreview(foto.url, foto.name || `Foto ${idx + 1}`)}
-                        >
-                          <img
-                            src={getDirectImageUrl(foto.url)}
-                            alt={foto.name}
-                            className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700"
-                            loading="lazy"
-                          />
+                      {group.photos.map((foto, idx) => {
+                        const fotoKey = foto.id || `${group.key}_${idx}`;
+                        const canRender = isRenderableFotoUrl(foto.url) && !failedPhotoKeys[fotoKey];
+                        return (
+                          <div
+                            key={fotoKey}
+                            className={`aspect-square rounded-2xl overflow-hidden border-2 shadow-xl group relative transition-all ${
+                              canRender
+                                ? 'border-slate-800 bg-slate-800 cursor-pointer hover:border-emerald-500'
+                                : 'border-amber-500/30 bg-slate-800/80 cursor-default'
+                            }`}
+                            onClick={() => {
+                              if (canRender) {
+                                handleOpenPhotoPreview(foto.url, foto.name || `Foto ${idx + 1}`);
+                              }
+                            }}
+                          >
+                            {canRender ? (
+                              <>
+                                <img
+                                  src={getDirectImageUrl(foto.url)}
+                                  alt={foto.name}
+                                  className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700"
+                                  loading="lazy"
+                                  onError={() => markPhotoFailed(fotoKey)}
+                                />
 
-                          {/* Hover Overlay with Action Buttons */}
-                          <div className="absolute inset-0 bg-emerald-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-20 backdrop-blur-3xs">
-                            <div className="p-2.5 bg-white text-emerald-900 rounded-2xl shadow-2xl scale-75 group-hover:scale-100 transition-transform duration-300">
-                              <Maximize2 className="w-5 h-5" />
+                                {/* Hover Overlay with Action Buttons */}
+                                <div className="absolute inset-0 bg-emerald-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-20 backdrop-blur-3xs">
+                                  <div className="p-2.5 bg-white text-emerald-900 rounded-2xl shadow-2xl scale-75 group-hover:scale-100 transition-transform duration-300">
+                                    <Maximize2 className="w-5 h-5" />
+                                  </div>
+                                </div>
+
+                                <div className="absolute top-2 right-2 z-10">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDownloadPhoto(foto.url, foto.name || `Foto_${idx + 1}`);
+                                    }}
+                                    className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-emerald-600 transition-colors backdrop-blur-sm border border-white/10"
+                                  >
+                                    <Download className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center text-slate-300">
+                                <ImageOff className="w-7 h-7 text-amber-400 mb-1.5" />
+                                <span className="text-[10px] font-bold text-amber-300 leading-tight">
+                                  Foto tidak tersedia
+                                </span>
+                                <span className="text-[9px] text-slate-400 mt-0.5 leading-tight">
+                                  File gambar kosong di arsip
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+                              <p className="text-[10px] font-bold text-white truncate leading-none">
+                                {foto.name || `Lampiran ${idx + 1}`}
+                              </p>
                             </div>
                           </div>
-
-                          <div className="absolute top-2 right-2 z-10">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDownloadPhoto(foto.url, foto.name || `Foto_${idx + 1}`);
-                              }}
-                              className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-emerald-600 transition-colors backdrop-blur-sm border border-white/10"
-                            >
-                              <Download className="w-3 h-3" />
-                            </button>
-                          </div>
-
-                          <div className="absolute bottom-0 inset-x-0 p-3 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
-                            <p className="text-[10px] font-bold text-white truncate leading-none">
-                              {foto.name || `Lampiran ${idx + 1}`}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -2536,11 +2598,20 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                     >
                       {/* Image Thumbnail */}
                       <div className="aspect-video w-full rounded-lg overflow-hidden bg-slate-100 relative group border border-slate-100 flex items-center justify-center">
-                        <img
-                          src={getDirectImageUrl(foto.url)}
-                          alt={foto.name}
-                          className="w-full h-full object-contain"
-                        />
+                        {isRenderableFotoUrl(foto.url) ? (
+                          <img
+                            src={getDirectImageUrl(foto.url)}
+                            alt={foto.name}
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-slate-400 p-3 text-center">
+                            <ImageOff className="w-6 h-6 text-amber-500 mb-1" />
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              File foto kosong di arsip
+                            </span>
+                          </div>
+                        )}
                         {/* Delete Button (Trash Icon) */}
                         <button
                           type="button"
@@ -3063,20 +3134,26 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                   boxSizing: 'border-box',
                                 }}
                               >
-                                <img
-                                  src={getDirectImageUrl(foto.url)}
-                                  alt={getProperFotoLabel(foto, idx)}
-                                  crossOrigin="anonymous"
-                                  style={{
-                                    maxWidth: '100%',
-                                    maxHeight: '106px',
-                                    width: 'auto',
-                                    height: 'auto',
-                                    objectFit: 'contain',
-                                    display: 'block',
-                                    margin: '0 auto',
-                                  }}
-                                />
+                                {isRenderableFotoUrl(foto.url) ? (
+                                  <img
+                                    src={getDirectImageUrl(foto.url)}
+                                    alt={getProperFotoLabel(foto, idx)}
+                                    crossOrigin="anonymous"
+                                    style={{
+                                      maxWidth: '100%',
+                                      maxHeight: '106px',
+                                      width: 'auto',
+                                      height: 'auto',
+                                      objectFit: 'contain',
+                                      display: 'block',
+                                      margin: '0 auto',
+                                    }}
+                                  />
+                                ) : (
+                                  <span style={{ fontSize: '7pt', color: '#64748b', fontStyle: 'italic' }}>
+                                    (File foto kosong di arsip)
+                                  </span>
+                                )}
                               </div>
                               <div
                                 className="text-[7pt] text-slate-800 font-bold mt-1 truncate w-full text-center font-sans"
@@ -3264,18 +3341,24 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                               padding: '2px',
                             }}
                           >
-                            <img
-                              src={getDirectImageUrl(foto.url)}
-                              alt={getProperFotoLabel(foto, idx)}
-                              crossOrigin="anonymous"
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'contain',
-                                objectPosition: 'center',
-                                display: 'block',
-                              }}
-                            />
+                            {isRenderableFotoUrl(foto.url) ? (
+                              <img
+                                src={getDirectImageUrl(foto.url)}
+                                alt={getProperFotoLabel(foto, idx)}
+                                crossOrigin="anonymous"
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'contain',
+                                  objectPosition: 'center',
+                                  display: 'block',
+                                }}
+                              />
+                            ) : (
+                              <span style={{ fontSize: '7.5pt', color: '#64748b', fontStyle: 'italic' }}>
+                                (File foto kosong di arsip)
+                              </span>
+                            )}
                           </div>
                           <div
                             style={{
@@ -3456,15 +3539,22 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
               {/* High-Clarity Image Container */}
               <div className="w-full h-full flex items-center justify-center overflow-auto p-2">
-                <img
-                  src={getDirectImageUrl(previewPhoto.url)}
-                  alt={previewPhoto.name}
-                  style={{
-                    transform: `scale(${photoZoom}) rotate(${photoRotation}deg)`,
-                    transition: 'transform 0.15s ease-out',
-                  }}
-                  className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
-                />
+                {isRenderableFotoUrl(previewPhoto.url) ? (
+                  <img
+                    src={getDirectImageUrl(previewPhoto.url)}
+                    alt={previewPhoto.name}
+                    style={{
+                      transform: `scale(${photoZoom}) rotate(${photoRotation}deg)`,
+                      transition: 'transform 0.15s ease-out',
+                    }}
+                    className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-slate-300 p-6 text-center">
+                    <ImageOff className="w-10 h-10 text-amber-400 mb-2" />
+                    <p className="text-sm font-bold text-amber-300">File foto tidak tersedia di arsip</p>
+                  </div>
+                )}
               </div>
 
               {/* Next Button */}

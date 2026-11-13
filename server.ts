@@ -1349,6 +1349,32 @@ app.get('/api/reports', (req, res) => {
   res.json({ success: true, count: activeReports.length, data: activeReports });
 });
 
+// POST hydrate-photos: returns intact dokumentasiFoto arrays from server archive (data/reports.json) without touching Firestore
+app.post('/api/reports/hydrate-photos', (req, res) => {
+  try {
+    const requestedIds = Array.isArray(req.body?.ids)
+      ? new Set(req.body.ids.map((id: any) => String(id)))
+      : null;
+    const deletedSet = new Set(deletedReportsCache);
+    const result: Record<string, any[]> = {};
+
+    for (const r of reportsCache) {
+      if (!r || !r.id || deletedSet.has(r.id)) continue;
+      if (requestedIds && !requestedIds.has(String(r.id))) continue;
+      if (
+        Array.isArray(r.dokumentasiFoto) &&
+        r.dokumentasiFoto.some((f: any) => f && typeof f.url === 'string' && f.url.trim().length > 20)
+      ) {
+        result[r.id] = r.dokumentasiFoto;
+      }
+    }
+
+    return res.json({ success: true, count: Object.keys(result).length, data: result });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET single full report by ID (always returns full photos)
 app.get('/api/reports/:id', (req, res) => {
   const { id } = req.params;
@@ -1415,17 +1441,50 @@ app.post('/api/reports', (req, res) => {
         return `${a.trim()}\n• ${b.trim()}`;
       };
 
-      // Merge photos deduplicated
-      const photoMap = new Map();
-      (existing.dokumentasiFoto || []).forEach((p: any) => {
-        const k = p.url || p.id || p.name || Math.random();
-        photoMap.set(k, p);
+      // Merge photos deterministically while preserving valid (non-empty) URLs
+      const hasValidFotoUrl = (p: any) => Boolean(p && typeof p.url === 'string' && p.url.trim().length > 20);
+      const exList: any[] = Array.isArray(existing.dokumentasiFoto) ? existing.dokumentasiFoto : [];
+      const inList: any[] = Array.isArray(item.dokumentasiFoto) ? item.dokumentasiFoto : [];
+      const mergedPhotos: any[] = [];
+      const usedInIdx = new Set<number>();
+
+      exList.forEach((ex, exIdx) => {
+        if (!ex) return;
+        let matchIdx = -1;
+        if (ex.id) {
+          matchIdx = inList.findIndex((inc, i) => !usedInIdx.has(i) && inc && inc.id === ex.id);
+        }
+        if (matchIdx === -1 && hasValidFotoUrl(ex)) {
+          matchIdx = inList.findIndex((inc, i) => !usedInIdx.has(i) && inc && inc.url === ex.url);
+        }
+        if (matchIdx === -1 && ex.name) {
+          matchIdx = inList.findIndex(
+            (inc, i) => !usedInIdx.has(i) && inc && inc.name === ex.name && (i === exIdx || exList.length === inList.length)
+          );
+        }
+        if (matchIdx === -1 && exList.length === inList.length && inList[exIdx] && !usedInIdx.has(exIdx)) {
+          matchIdx = exIdx;
+        }
+        if (matchIdx >= 0) {
+          usedInIdx.add(matchIdx);
+          const inc = inList[matchIdx];
+          const chosenUrl = hasValidFotoUrl(inc)
+            ? inc.url
+            : hasValidFotoUrl(ex)
+            ? ex.url
+            : inc.url || ex.url || '';
+          mergedPhotos.push({ ...ex, ...inc, url: chosenUrl });
+        } else {
+          mergedPhotos.push(ex);
+        }
       });
-      (item.dokumentasiFoto || []).forEach((p: any) => {
-        const k = p.url || p.id || p.name || Math.random();
-        if (!photoMap.has(k)) photoMap.set(k, p);
+
+      inList.forEach((inc, idx) => {
+        if (!inc || usedInIdx.has(idx)) return;
+        if (hasValidFotoUrl(inc) && mergedPhotos.some((m) => m.url === inc.url)) return;
+        if (inc.id && mergedPhotos.some((m) => m.id && m.id === inc.id)) return;
+        mergedPhotos.push(inc);
       });
-      const mergedPhotos = Array.from(photoMap.values());
 
       reportsCache[existingIndex] = {
         ...existing,

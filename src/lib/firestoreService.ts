@@ -35,7 +35,7 @@ export interface AttendanceQREntity {
   [key: string]: any;
 }
 
-import { collection, getDocs, doc, deleteDoc, query, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, deleteDoc, query, onSnapshot } from 'firebase/firestore';
 import {
   db,
   isFirestoreQuotaCooldownActive,
@@ -43,6 +43,12 @@ import {
   markFirestoreQuotaExhausted,
 } from './firebase';
 import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
+import {
+  getSingleReportFromIndexedDB,
+  mergeMediaArrayPreservingUrls,
+  hasAnyEmptyPhotoUrl,
+} from './indexedDbStorage';
+import { mergeFotoArraysPreservingUrls } from './reportConsolidator';
 
 export const fetchReportsFromFirestore = async (): Promise<any[]> => {
   if (!db || isFirestoreQuotaCooldownActive()) return [];
@@ -86,6 +92,60 @@ export const fetchReportsFromFirestore = async (): Promise<any[]> => {
 export const saveReportToFirestore = async (item: any): Promise<boolean> => {
   if (!item || !item.id) return false;
   const cleaned = cleanFirestoreData(item);
+
+  const hasMissingUrls =
+    hasAnyEmptyPhotoUrl(cleaned.dokumentasiFoto) ||
+    ((!Array.isArray(cleaned.dokumentasiFoto) || cleaned.dokumentasiFoto.length === 0) &&
+      Number(cleaned.jumlahDokumentasi || 0) > 0);
+
+  if (hasMissingUrls) {
+    // 1. Try local IndexedDB first (zero Firestore read quota cost)
+    const idbDoc = await getSingleReportFromIndexedDB(item.id).catch(() => null);
+    if (idbDoc?.dokumentasiFoto && idbDoc.dokumentasiFoto.length > 0) {
+      if (!Array.isArray(cleaned.dokumentasiFoto) || cleaned.dokumentasiFoto.length === 0) {
+        cleaned.dokumentasiFoto = idbDoc.dokumentasiFoto;
+      } else {
+        cleaned.dokumentasiFoto = mergeMediaArrayPreservingUrls(cleaned.dokumentasiFoto, idbDoc.dokumentasiFoto);
+      }
+    }
+
+    // 2. If still incomplete, fetch existing remote doc once before merging
+    const stillMissing =
+      hasAnyEmptyPhotoUrl(cleaned.dokumentasiFoto) ||
+      ((!Array.isArray(cleaned.dokumentasiFoto) || cleaned.dokumentasiFoto.length === 0) &&
+        Number(cleaned.jumlahDokumentasi || 0) > 0);
+
+    if (stillMissing && db && !isFirestoreQuotaCooldownActive()) {
+      try {
+        const snap = await getDoc(doc(db, 'reports', item.id));
+        if (snap.exists()) {
+          const remoteFotos = snap.data()?.dokumentasiFoto;
+          if (Array.isArray(remoteFotos) && remoteFotos.length > 0) {
+            if (!Array.isArray(cleaned.dokumentasiFoto) || cleaned.dokumentasiFoto.length === 0) {
+              cleaned.dokumentasiFoto = remoteFotos;
+            } else {
+              cleaned.dokumentasiFoto = mergeMediaArrayPreservingUrls(cleaned.dokumentasiFoto, remoteFotos);
+            }
+          }
+        }
+      } catch (err) {
+        if (isQuotaExhaustedError(err)) {
+          markFirestoreQuotaExhausted(err);
+        }
+      }
+    }
+
+    // 3. Final safety guard: never overwrite existing remote photos with all-empty URLs
+    const allEmptyNow =
+      Array.isArray(cleaned.dokumentasiFoto) &&
+      cleaned.dokumentasiFoto.length > 0 &&
+      cleaned.dokumentasiFoto.every((f: any) => !f || typeof f.url !== 'string' || f.url.trim().length <= 20);
+
+    if (allEmptyNow || ((!cleaned.dokumentasiFoto || cleaned.dokumentasiFoto.length === 0) && Number(cleaned.jumlahDokumentasi || 0) > 0)) {
+      delete cleaned.dokumentasiFoto;
+    }
+  }
+
   const res = await resilientSetDoc('reports', item.id, cleaned, { merge: true });
   return res.synced || res.queued;
 };
@@ -132,21 +192,31 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
         if (item && item.id) {
           const existing = map.get(item.id);
           if (existing) {
-            const hasPhotos = (it: any) =>
-              it.dokumentasiFoto &&
-              Array.isArray(it.dokumentasiFoto) &&
-              it.dokumentasiFoto.some((f: any) => f.url);
             const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
             const itemTime = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
+            const mergedPhotos = mergeFotoArraysPreservingUrls(existing.dokumentasiFoto, item.dokumentasiFoto);
             if (existingTime > itemTime) {
-              const mergedPhotos = hasPhotos(existing)
-                ? existing.dokumentasiFoto
-                : item.dokumentasiFoto;
-              map.set(item.id, { ...item, ...existing, ...(mergedPhotos ? { dokumentasiFoto: mergedPhotos } : {}) });
-            } else if (!hasPhotos(item) && hasPhotos(existing)) {
-              map.set(item.id, { ...existing, ...item, dokumentasiFoto: existing.dokumentasiFoto });
+              map.set(item.id, {
+                ...item,
+                ...existing,
+                dokumentasiFoto: mergedPhotos,
+                jumlahDokumentasi: Math.max(
+                  mergedPhotos.length,
+                  Number(existing.jumlahDokumentasi || 0),
+                  Number(item.jumlahDokumentasi || 0)
+                ),
+              });
             } else {
-              map.set(item.id, { ...existing, ...item });
+              map.set(item.id, {
+                ...existing,
+                ...item,
+                dokumentasiFoto: mergedPhotos,
+                jumlahDokumentasi: Math.max(
+                  mergedPhotos.length,
+                  Number(item.jumlahDokumentasi || 0),
+                  Number(existing.jumlahDokumentasi || 0)
+                ),
+              });
             }
           } else {
             map.set(item.id, item);

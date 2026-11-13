@@ -1,4 +1,6 @@
-import { LaporanHarianItem } from '../types';
+import { doc, getDoc } from 'firebase/firestore';
+import { db, isFirestoreQuotaCooldownActive } from './firebase';
+import { LaporanHarianItem, FotoDokumentasi } from '../types';
 import {
   fetchReportsFromFirestore,
   saveReportToFirestore,
@@ -9,9 +11,14 @@ import {
 } from './firestoreService';
 import { purgeAllClientCache } from './purgeCache';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
-import { consolidateAllReports } from './reportConsolidator';
+import { consolidateAllReports, mergeFotoArraysPreservingUrls } from './reportConsolidator';
 
-import { getReportsFromIndexedDB, saveSingleReportToIndexedDB } from './indexedDbStorage';
+import {
+  getReportsFromIndexedDB,
+  getSingleReportFromIndexedDB,
+  saveSingleReportToIndexedDB,
+  hasAnyEmptyPhotoUrl,
+} from './indexedDbStorage';
 
 export const LOCAL_STORAGE_KEY_LAPORAN = 'kepling_local_laporan_history_v2';
 export const LOCAL_STORAGE_KEY_DELETED = 'kepling_deleted_reports_v1';
@@ -70,11 +77,11 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     }
   } catch (e) {}
 
-  const hasPhotos = (it?: LaporanHarianItem) =>
+  const hasValidPhotos = (it?: LaporanHarianItem) =>
     Boolean(
       it &&
       Array.isArray(it.dokumentasiFoto) &&
-      it.dokumentasiFoto.some((f: any) => f && f.url)
+      it.dokumentasiFoto.some((f: any) => f && typeof f.url === 'string' && f.url.trim().length > 20)
     );
 
   // 2. ALWAYS prioritize live Cloud Firestore ('reports', 'laporan_harian', 'SIKEPLINGMANGGA')
@@ -85,9 +92,13 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
       firestoreReports.forEach((r) => {
         if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
           const cached = localFallbackMap.get(r.id);
-          // Firestore always wins; only borrow cached photo URLs if Firestore doc omitted them
-          if (!hasPhotos(r) && hasPhotos(cached)) {
-            authMap.set(r.id, { ...r, dokumentasiFoto: cached!.dokumentasiFoto });
+          if (cached) {
+            const mergedFotos = mergeFotoArraysPreservingUrls(cached.dokumentasiFoto, r.dokumentasiFoto);
+            authMap.set(r.id, {
+              ...r,
+              dokumentasiFoto: mergedFotos,
+              jumlahDokumentasi: Math.max(mergedFotos.length, Number(r.jumlahDokumentasi || 0)),
+            });
           } else {
             authMap.set(r.id, r);
           }
@@ -124,8 +135,18 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
             if (!existing) {
               localFallbackMap.set(r.id, r);
             } else {
-              const merged = { ...r, ...existing };
-              if (hasPhotos(existing) && !hasPhotos(r)) {
+              const mergedFotos = mergeFotoArraysPreservingUrls(existing.dokumentasiFoto, r.dokumentasiFoto);
+              const merged = {
+                ...r,
+                ...existing,
+                dokumentasiFoto: mergedFotos,
+                jumlahDokumentasi: Math.max(
+                  mergedFotos.length,
+                  Number(r.jumlahDokumentasi || 0),
+                  Number(existing.jumlahDokumentasi || 0)
+                ),
+              };
+              if (!hasValidPhotos(merged) && hasValidPhotos(existing)) {
                 merged.dokumentasiFoto = existing.dokumentasiFoto;
               }
               localFallbackMap.set(r.id, merged);
@@ -149,23 +170,193 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
   return consolidated;
 };
 
+const isReportMissingPhotoUrls = (r: LaporanHarianItem): boolean => {
+  if (!r) return false;
+  if (Array.isArray(r.dokumentasiFoto) && hasAnyEmptyPhotoUrl(r.dokumentasiFoto)) {
+    return true;
+  }
+  if ((!Array.isArray(r.dokumentasiFoto) || r.dokumentasiFoto.length === 0) && Number(r.jumlahDokumentasi || 0) > 0) {
+    return true;
+  }
+  return false;
+};
+
+const countValidPhotoUrls = (fotos?: FotoDokumentasi[]): number => {
+  if (!Array.isArray(fotos)) return 0;
+  return fotos.filter((f) => f && typeof f.url === 'string' && f.url.trim().length > 20).length;
+};
+
 /**
- * Fetch a single full report by ID (strictly online from Server Buffer)
+ * Hydrates reports whose photo URLs are empty/stripped from IndexedDB first,
+ * then in chunked batches from server archive (/api/reports/hydrate-photos).
+ */
+export const hydrateMissingReportPhotos = async (
+  reports: LaporanHarianItem[]
+): Promise<{
+  reports: LaporanHarianItem[];
+  restoredFromServerIds: string[];
+  hydratedFromIdbCount: number;
+}> => {
+  if (!Array.isArray(reports) || reports.length === 0) {
+    return { reports: reports || [], restoredFromServerIds: [], hydratedFromIdbCount: 0 };
+  }
+
+  const targetIndices: number[] = [];
+  reports.forEach((r, idx) => {
+    if (r && r.id && isReportMissingPhotoUrls(r)) {
+      targetIndices.push(idx);
+    }
+  });
+
+  if (targetIndices.length === 0) {
+    return { reports, restoredFromServerIds: [], hydratedFromIdbCount: 0 };
+  }
+
+  const updated = [...reports];
+  let hydratedFromIdbCount = 0;
+
+  // 1. Hydrate from IndexedDB
+  try {
+    const idbList = await getReportsFromIndexedDB();
+    if (Array.isArray(idbList) && idbList.length > 0) {
+      const idbMap = new Map<string, LaporanHarianItem>();
+      idbList.forEach((r) => {
+        if (r && r.id) idbMap.set(r.id, r);
+      });
+
+      targetIndices.forEach((idx) => {
+        const rep = updated[idx];
+        const idbMatch = idbMap.get(rep.id);
+        if (!idbMatch || !Array.isArray(idbMatch.dokumentasiFoto)) return;
+
+        const beforeValid = countValidPhotoUrls(rep.dokumentasiFoto);
+        const mergedFotos = mergeFotoArraysPreservingUrls(idbMatch.dokumentasiFoto, rep.dokumentasiFoto);
+        const afterValid = countValidPhotoUrls(mergedFotos);
+        if (afterValid > beforeValid) {
+          updated[idx] = {
+            ...rep,
+            dokumentasiFoto: mergedFotos,
+            jumlahDokumentasi: Math.max(mergedFotos.length, Number(rep.jumlahDokumentasi || 0)),
+          };
+          hydratedFromIdbCount++;
+        }
+      });
+    }
+  } catch {}
+
+  // 2. Collect IDs still needing photo hydration from Server Archive (data/reports.json)
+  const stillMissingIds: string[] = [];
+  const stillMissingIndexMap = new Map<string, number>();
+  targetIndices.forEach((idx) => {
+    const rep = updated[idx];
+    if (rep && rep.id && isReportMissingPhotoUrls(rep)) {
+      stillMissingIds.push(rep.id);
+      stillMissingIndexMap.set(rep.id, idx);
+    }
+  });
+
+  const restoredFromServerIds: string[] = [];
+  if (stillMissingIds.length > 0) {
+    const BATCH_SIZE = 15;
+    for (let i = 0; i < stillMissingIds.length; i += BATCH_SIZE) {
+      const batchIds = stillMissingIds.slice(i, i + BATCH_SIZE);
+      try {
+        const res = await fetch('/api/reports/hydrate-photos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: batchIds }),
+        });
+        if (!res.ok) continue;
+        const json = await res.json();
+        const serverPhotoMap: Record<string, FotoDokumentasi[]> = json?.data || {};
+        for (const [repId, serverFotos] of Object.entries(serverPhotoMap)) {
+          const idx = stillMissingIndexMap.get(repId);
+          if (idx === undefined || !Array.isArray(serverFotos)) continue;
+          const rep = updated[idx];
+          const beforeValid = countValidPhotoUrls(rep.dokumentasiFoto);
+          const mergedFotos = mergeFotoArraysPreservingUrls(serverFotos, rep.dokumentasiFoto);
+          const afterValid = countValidPhotoUrls(mergedFotos);
+          if (afterValid > beforeValid) {
+            updated[idx] = {
+              ...rep,
+              dokumentasiFoto: mergedFotos,
+              jumlahDokumentasi: Math.max(mergedFotos.length, Number(rep.jumlahDokumentasi || 0)),
+            };
+            restoredFromServerIds.push(repId);
+          }
+        }
+      } catch {
+        // Non-blocking fallback
+      }
+    }
+  }
+
+  return { reports: updated, restoredFromServerIds, hydratedFromIdbCount };
+};
+
+/**
+ * Fetch a single full report by ID checking IndexedDB, Server Archive, and Firestore
  */
 export const fetchReportById = async (id: string): Promise<LaporanHarianItem | null> => {
   if (!id) return null;
+
+  let best: LaporanHarianItem | null = null;
+
+  const mergeBest = (candidate: LaporanHarianItem | null) => {
+    if (!candidate) return;
+    if (!best) {
+      best = candidate;
+      return;
+    }
+    const mergedFotos = mergeFotoArraysPreservingUrls(best.dokumentasiFoto, candidate.dokumentasiFoto);
+    best = {
+      ...best,
+      ...candidate,
+      dokumentasiFoto: mergedFotos,
+      jumlahDokumentasi: Math.max(
+        mergedFotos.length,
+        Number(candidate.jumlahDokumentasi || 0),
+        Number(best.jumlahDokumentasi || 0)
+      ),
+    };
+  };
+
+  try {
+    const idbDoc = await getSingleReportFromIndexedDB(id);
+    mergeBest(idbDoc);
+    if (best && !isReportMissingPhotoUrls(best)) {
+      return best;
+    }
+  } catch {}
+
   try {
     const res = await fetch(`/api/reports/${encodeURIComponent(id)}`, {
       cache: 'no-store',
     });
     if (res.ok) {
       const json = await res.json();
-      return json?.data || null;
+      if (json?.data) {
+        mergeBest(json.data as LaporanHarianItem);
+      }
     }
   } catch (err) {
     console.warn('[Online API] Error reading /api/reports/:id', err);
   }
-  return null;
+
+  if ((!best || isReportMissingPhotoUrls(best)) && db && !isFirestoreQuotaCooldownActive()) {
+    try {
+      const snap = await getDoc(doc(db, 'reports', id));
+      if (snap.exists()) {
+        mergeBest({ ...(snap.data() as any), id: snap.id } as LaporanHarianItem);
+      }
+    } catch {}
+  }
+
+  if (best && countValidPhotoUrls((best as LaporanHarianItem).dokumentasiFoto) > 0) {
+    saveSingleReportToIndexedDB(best).catch(() => {});
+  }
+
+  return best;
 };
 
 /**

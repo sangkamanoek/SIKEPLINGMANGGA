@@ -98,7 +98,13 @@ import { useFeatureNotifications } from './hooks/useFeatureNotifications';
 import { useAgendaTugasRealtimeAlert } from './hooks/useAgendaTugasRealtimeAlert';
 
 import { getDefaultTargetsCapaianMap } from './data/targetsData';
-import { fetchAllReports, saveReportToServer, subscribeReportsFromFirestore, deleteReportFromServer } from './lib/reportsApi';
+import {
+  fetchAllReports,
+  saveReportToServer,
+  subscribeReportsFromFirestore,
+  deleteReportFromServer,
+  hydrateMissingReportPhotos,
+} from './lib/reportsApi';
 import { subscribeKunjungan, getLocalKunjunganList, KunjunganWargaData } from './lib/kunjunganService';
 import { getTodayLocalIso } from './lib/formatter';
 import { safeGetLocalStorage, safeSetLocalStorage } from './lib/safeStorage';
@@ -108,12 +114,17 @@ import {
   saveReportsToIndexedDB,
   saveVisitsToIndexedDB,
 } from './lib/indexedDbStorage';
-import { subscribeTargetsFromFirestore } from './lib/firestoreService';
+import { subscribeTargetsFromFirestore, saveReportToFirestore } from './lib/firestoreService';
 import {
   clearFirestoreQuotaCooldown,
   isFirestoreQuotaCooldownActive,
 } from './lib/firebase';
-import { consolidateDailyReport, consolidateAllReports, findMatchingDailyReport } from './lib/reportConsolidator';
+import {
+  consolidateDailyReport,
+  consolidateAllReports,
+  findMatchingDailyReport,
+  mergeFotoArraysPreservingUrls,
+} from './lib/reportConsolidator';
 import { initBackgroundAutoSync } from './lib/autoSyncService';
 import {
   flushFirestoreWriteQueue,
@@ -179,6 +190,8 @@ export default function App() {
   );
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(() => getPendingSyncCount());
   const [isFlushingSync, setIsFlushingSync] = useState<boolean>(false);
+  const [restoredPhotoReportIds, setRestoredPhotoReportIds] = useState<string[]>([]);
+  const [isRestoringPhotosToCloud, setIsRestoringPhotosToCloud] = useState<boolean>(false);
 
   // Real-time audio chime & mobile vibration alert for Agenda Kelurahan & Tugas Khusus Lurah
   const { activeAlert, dismissAlert, replayAlertSound } = useAgendaTugasRealtimeAlert(activeAccount);
@@ -219,21 +232,57 @@ export default function App() {
       setActiveAccount((prev) => (prev ? getEffectiveProfile(prev) : prev));
     }).catch(() => {});
 
+    let isMounted = true;
+
+    const applyReportsAndHydrate = (rawReports: LaporanHarianItem[]) => {
+      const unified = consolidateAllReports(rawReports);
+      setReports(unified);
+      safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(unified));
+      saveReportsToIndexedDB(unified).catch(() => {});
+
+      hydrateMissingReportPhotos(unified)
+        .then(({ reports: hydrated, restoredFromServerIds, hydratedFromIdbCount }) => {
+          if (!isMounted) return;
+          if (restoredFromServerIds.length > 0 || hydratedFromIdbCount > 0) {
+            const hydratedMap = new Map<string, LaporanHarianItem>();
+            hydrated.forEach((h) => {
+              if (h && h.id) hydratedMap.set(h.id, h);
+            });
+            setReports((prev) =>
+              prev.map((r) => {
+                const match = hydratedMap.get(r.id);
+                if (!match) return r;
+                const mergedFotos = mergeFotoArraysPreservingUrls(r.dokumentasiFoto, match.dokumentasiFoto);
+                return {
+                  ...r,
+                  dokumentasiFoto: mergedFotos,
+                  jumlahDokumentasi: Math.max(mergedFotos.length, Number(r.jumlahDokumentasi || 0)),
+                };
+              })
+            );
+            saveReportsToIndexedDB(hydrated).catch(() => {});
+          }
+          if (restoredFromServerIds.length > 0) {
+            setRestoredPhotoReportIds(restoredFromServerIds);
+          }
+        })
+        .catch(() => {});
+    };
+
     // Instant offline hydration from IndexedDB on startup (0ms mobile load)
     getReportsFromIndexedDB().then((idbReports) => {
-      if (idbReports && idbReports.length > 0) {
-        setReports((prev) => {
-          const map = new Map<string, LaporanHarianItem>();
-          prev.forEach((r) => { if (r && r.id) map.set(r.id, r); });
-          idbReports.forEach((r) => {
-            if (r && r.id && !map.has(r.id)) {
-              map.set(r.id, r);
-            }
-          });
-          const merged = Array.from(map.values());
-          return consolidateAllReports(merged);
+      if (!isMounted || !idbReports || idbReports.length === 0) return;
+      setReports((prev) => {
+        const map = new Map<string, LaporanHarianItem>();
+        prev.forEach((r) => { if (r && r.id) map.set(r.id, r); });
+        idbReports.forEach((r) => {
+          if (r && r.id) {
+            const existing = map.get(r.id);
+            map.set(r.id, existing ? consolidateDailyReport(existing, r) : r);
+          }
         });
-      }
+        return consolidateAllReports(Array.from(map.values()));
+      });
     }).catch(() => {});
 
     // Hydrate visits from IndexedDB
@@ -255,12 +304,9 @@ export default function App() {
     // Use real-time subscription for reports with non-blocking IndexedDB and LocalStorage persistence
     let gotLiveReports = false;
     const unsub = subscribeReportsFromFirestore((fetched) => {
-      if (Array.isArray(fetched)) {
+      if (isMounted && Array.isArray(fetched)) {
         gotLiveReports = true;
-        const unified = consolidateAllReports(fetched);
-        setReports(unified);
-        safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(unified));
-        saveReportsToIndexedDB(unified).catch(() => {});
+        applyReportsAndHydrate(fetched);
       }
     });
 
@@ -268,11 +314,8 @@ export default function App() {
       if (!gotLiveReports && !isFirestoreQuotaCooldownActive()) {
         fetchAllReports()
           .then((fetched) => {
-            if (!gotLiveReports && Array.isArray(fetched) && fetched.length > 0) {
-              const unified = consolidateAllReports(fetched);
-              setReports(unified);
-              safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(unified));
-              saveReportsToIndexedDB(unified).catch(() => {});
+            if (isMounted && !gotLiveReports && Array.isArray(fetched) && fetched.length > 0) {
+              applyReportsAndHydrate(fetched);
             }
           })
           .catch(() => {});
@@ -310,6 +353,7 @@ export default function App() {
     window.addEventListener('sikepling-sync-queue-updated', handleQueueUpdated);
 
     return () => {
+      isMounted = false;
       cleanupAutoSync();
       window.removeEventListener('sikepling-sync-queue-updated', handleQueueUpdated);
       clearTimeout(reportsFallbackTimer);
@@ -427,18 +471,79 @@ export default function App() {
     setSelectedReportForModal(report);
     setIsDetailModalOpen(true);
 
-    // If report has photos but they are missing URLs (due to light mode), fetch full version
-    const needsFullFetch = report.jumlahDokumentasi > 0 && 
-                           (!report.dokumentasiFoto || report.dokumentasiFoto.length === 0 || report.dokumentasiFoto.every(f => !f.url));
-    
+    // If report has missing or empty photo URLs (due to light mode or archived storage), fetch full version
+    const hasEmptyFoto =
+      Array.isArray(report.dokumentasiFoto) &&
+      report.dokumentasiFoto.some((f) => !f || typeof f.url !== 'string' || f.url.trim().length <= 20);
+    const needsFullFetch =
+      (report.jumlahDokumentasi > 0 && (!report.dokumentasiFoto || report.dokumentasiFoto.length === 0)) ||
+      hasEmptyFoto;
+
     if (needsFullFetch && report.id) {
       const { fetchReportById } = await import('./lib/reportsApi');
       const full = await fetchReportById(report.id);
       if (full && full.dokumentasiFoto && full.dokumentasiFoto.length > 0) {
-        setSelectedReportForModal(full);
-        // Also update the local list if it was a valid merge
-        setReports(prev => prev.map(r => r.id === full.id ? { ...r, ...full } : r));
+        const mergedFotos = mergeFotoArraysPreservingUrls(report.dokumentasiFoto, full.dokumentasiFoto);
+        const enriched: LaporanHarianItem = {
+          ...report,
+          ...full,
+          dokumentasiFoto: mergedFotos,
+          jumlahDokumentasi: Math.max(mergedFotos.length, Number(full.jumlahDokumentasi || 0), Number(report.jumlahDokumentasi || 0)),
+        };
+        setSelectedReportForModal(enriched);
+        setReports((prev) => prev.map((r) => (r.id === enriched.id ? enriched : r)));
       }
+    }
+  };
+
+  const handleRestorePhotosToCloud = async () => {
+    if (restoredPhotoReportIds.length === 0 || isRestoringPhotosToCloud) return;
+    setIsRestoringPhotosToCloud(true);
+    let restoredCount = 0;
+    const remainingIds: string[] = [];
+
+    try {
+      const reportMap = new Map<string, LaporanHarianItem>();
+      reports.forEach((r) => { if (r && r.id) reportMap.set(r.id, r); });
+
+      for (const repId of restoredPhotoReportIds) {
+        const target = reportMap.get(repId);
+        if (!target) continue;
+        const ok = await saveReportToFirestore(target).catch(() => false);
+        if (ok) {
+          restoredCount++;
+        } else {
+          remainingIds.push(repId);
+        }
+      }
+
+      setRestoredPhotoReportIds(remainingIds);
+      if (restoredCount > 0) {
+        showToast(`Berhasil memulihkan foto pada ${restoredCount} laporan ke Cloud Firestore!`, 'success');
+      } else {
+        showToast('Belum berhasil menyinkronkan foto ke Cloud Firestore. Coba lagi saat koneksi stabil.', 'info');
+      }
+    } finally {
+      setIsRestoringPhotosToCloud(false);
+    }
+  };
+
+  const handleRefreshReports = async () => {
+    try {
+      const fetched = await fetchAllReports();
+      if (Array.isArray(fetched) && fetched.length > 0) {
+        const unified = consolidateAllReports(fetched);
+        const { reports: hydrated, restoredFromServerIds } = await hydrateMissingReportPhotos(unified);
+        setReports(hydrated);
+        safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(hydrated));
+        saveReportsToIndexedDB(hydrated).catch(() => {});
+        if (restoredFromServerIds.length > 0) {
+          setRestoredPhotoReportIds(restoredFromServerIds);
+        }
+        showToast('Riwayat laporan berhasil disegarkan.', 'success');
+      }
+    } catch {
+      showToast('Gagal menyegarkan data laporan.', 'error');
     }
   };
 
@@ -689,7 +794,7 @@ export default function App() {
           <RiwayatLaporan
             items={reports}
             isLoading={false}
-            onRefresh={() => {}}
+            onRefresh={handleRefreshReports}
             sheetMeta={null}
             onSelectReport={handleSelectReport}
             hasGoogleAuth={false}
@@ -697,6 +802,9 @@ export default function App() {
             initialPetugasFilter={activeAccount.role === 'kepling' ? activeAccount.nama : selectedRiwayatKepling}
             isAdmin={activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris'}
             onDeleteReport={activeAccount?.role === 'super_admin' ? handleDeleteReport : undefined}
+            restoredPhotoCount={restoredPhotoReportIds.length}
+            onRestorePhotosToCloud={handleRestorePhotosToCloud}
+            isRestoringPhotos={isRestoringPhotosToCloud}
           />
         )}
 

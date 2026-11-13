@@ -393,7 +393,31 @@ export async function getHistoryFromIndexedDB(): Promise<LaporanHarianItem[] | n
 }
 
 /**
- * Save all reports to IndexedDB (No 5MB quota limitation)
+ * Read single report from IndexedDB by ID
+ */
+export async function getSingleReportFromIndexedDB(id: string): Promise<LaporanHarianItem | null> {
+  if (!id) return null;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_REPORTS, 'readonly');
+      const store = tx.objectStore(STORE_REPORTS);
+      const request = store.get(id);
+
+      request.onsuccess = () => {
+        resolve((request.result as LaporanHarianItem) || null);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error getting single report:', err);
+    return null;
+  }
+}
+
+/**
+ * Save all reports to IndexedDB (No 5MB quota limitation) while preserving valid photo URLs
+ * so lightweight/stripped payloads never erase existing offline images.
  */
 export async function saveReportsToIndexedDB(reports: LaporanHarianItem[]): Promise<boolean> {
   if (!Array.isArray(reports)) return false;
@@ -403,14 +427,51 @@ export async function saveReportsToIndexedDB(reports: LaporanHarianItem[]): Prom
       const tx = db.transaction(STORE_REPORTS, 'readwrite');
       const store = tx.objectStore(STORE_REPORTS);
 
-      store.clear();
-      if (reports.length > 0) {
+      const incomingIds = new Set(reports.filter((x) => x && x.id).map((x) => x.id));
+      const keysReq = store.getAllKeys();
+
+      keysReq.onsuccess = () => {
+        const existingKeys = Array.isArray(keysReq.result) ? keysReq.result : [];
+        existingKeys.forEach((k) => {
+          if (!incomingIds.has(String(k))) {
+            store.delete(k);
+          }
+        });
+
         reports.forEach((item) => {
-          if (item && item.id) {
+          if (!item || !item.id) return;
+          const missingPhotoSlots =
+            hasAnyEmptyPhotoUrl(item.dokumentasiFoto) ||
+            ((!Array.isArray(item.dokumentasiFoto) || item.dokumentasiFoto.length === 0) &&
+              Number(item.jumlahDokumentasi || 0) > 0);
+
+          if (missingPhotoSlots) {
+            const getReq = store.get(item.id);
+            getReq.onsuccess = () => {
+              const prev = getReq.result as LaporanHarianItem | undefined;
+              let mergedFotos = mergeMediaArrayPreservingUrls(item.dokumentasiFoto, prev?.dokumentasiFoto);
+              if (
+                (!Array.isArray(mergedFotos) || mergedFotos.length === 0) &&
+                Array.isArray(prev?.dokumentasiFoto) &&
+                prev.dokumentasiFoto.some((f) => f && typeof f.url === 'string' && f.url.length > 20)
+              ) {
+                mergedFotos = prev.dokumentasiFoto;
+              }
+              store.put(
+                mergedFotos !== undefined
+                  ? {
+                      ...item,
+                      dokumentasiFoto: mergedFotos,
+                      jumlahDokumentasi: Math.max(mergedFotos.length, Number(item.jumlahDokumentasi || 0)),
+                    }
+                  : item
+              );
+            };
+          } else {
             store.put(item);
           }
         });
-      }
+      };
 
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
@@ -426,7 +487,19 @@ export async function saveReportsToIndexedDB(reports: LaporanHarianItem[]): Prom
  * Clear all reports in IndexedDB
  */
 export async function clearIndexedDBReports(): Promise<boolean> {
-  return saveReportsToIndexedDB([]);
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_REPORTS, 'readwrite');
+      tx.objectStore(STORE_REPORTS).clear();
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error clearing reports:', err);
+    return false;
+  }
 }
 
 /**
@@ -458,7 +531,7 @@ export async function getReportsFromIndexedDB(): Promise<LaporanHarianItem[] | n
 }
 
 /**
- * Save single report to IndexedDB
+ * Save single report to IndexedDB while preserving existing valid photo URLs if incoming has empty URLs
  */
 export async function saveSingleReportToIndexedDB(report: LaporanHarianItem): Promise<boolean> {
   if (!report || !report.id) return false;
@@ -467,7 +540,37 @@ export async function saveSingleReportToIndexedDB(report: LaporanHarianItem): Pr
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_REPORTS, 'readwrite');
       const store = tx.objectStore(STORE_REPORTS);
-      store.put(report);
+
+      const missingPhotoSlots =
+        hasAnyEmptyPhotoUrl(report.dokumentasiFoto) ||
+        ((!Array.isArray(report.dokumentasiFoto) || report.dokumentasiFoto.length === 0) &&
+          Number(report.jumlahDokumentasi || 0) > 0);
+
+      if (missingPhotoSlots) {
+        const getReq = store.get(report.id);
+        getReq.onsuccess = () => {
+          const prev = getReq.result as LaporanHarianItem | undefined;
+          let mergedFotos = mergeMediaArrayPreservingUrls(report.dokumentasiFoto, prev?.dokumentasiFoto);
+          if (
+            (!Array.isArray(mergedFotos) || mergedFotos.length === 0) &&
+            Array.isArray(prev?.dokumentasiFoto) &&
+            prev.dokumentasiFoto.some((f) => f && typeof f.url === 'string' && f.url.length > 20)
+          ) {
+            mergedFotos = prev.dokumentasiFoto;
+          }
+          store.put(
+            mergedFotos !== undefined
+              ? {
+                  ...report,
+                  dokumentasiFoto: mergedFotos,
+                  jumlahDokumentasi: Math.max(mergedFotos.length, Number(report.jumlahDokumentasi || 0)),
+                }
+              : report
+          );
+        };
+      } else {
+        store.put(report);
+      }
 
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
@@ -619,7 +722,7 @@ export async function deleteSuratFromIndexedDB(id: string): Promise<boolean> {
   }
 }
 
-function mergeMediaArrayPreservingUrls(
+export function mergeMediaArrayPreservingUrls(
   incomingList: FotoDokumentasi[] | undefined,
   existingList: FotoDokumentasi[] | undefined
 ): FotoDokumentasi[] | undefined {
@@ -627,15 +730,15 @@ function mergeMediaArrayPreservingUrls(
   if (!Array.isArray(existingList) || existingList.length === 0) return incomingList;
 
   return incomingList.map((inc, idx) => {
-    if (inc && typeof inc.url === 'string' && inc.url.length > 20) {
+    if (inc && typeof inc.url === 'string' && inc.url.trim().length > 20) {
       return inc;
     }
     const match =
-      (inc?.id ? existingList.find((ex) => ex && ex.id === inc.id && ex.url && ex.url.length > 20) : undefined) ||
+      (inc?.id ? existingList.find((ex) => ex && ex.id === inc.id && ex.url && ex.url.trim().length > 20) : undefined) ||
       (inc?.name
-        ? existingList.find((ex, exIdx) => ex && ex.name === inc.name && (exIdx === idx || existingList.length === incomingList.length) && ex.url && ex.url.length > 20)
+        ? existingList.find((ex, exIdx) => ex && ex.name === inc.name && (exIdx === idx || existingList.length === incomingList.length) && ex.url && ex.url.trim().length > 20)
         : undefined) ||
-      (existingList[idx] && existingList[idx].url && existingList[idx].url.length > 20 ? existingList[idx] : undefined);
+      (existingList[idx] && existingList[idx].url && existingList[idx].url.trim().length > 20 ? existingList[idx] : undefined);
 
     if (match && match.url) {
       return { ...inc, url: match.url };
@@ -644,9 +747,9 @@ function mergeMediaArrayPreservingUrls(
   });
 }
 
-function hasAnyEmptyPhotoUrl(list: FotoDokumentasi[] | undefined): boolean {
+export function hasAnyEmptyPhotoUrl(list: FotoDokumentasi[] | undefined): boolean {
   if (!Array.isArray(list) || list.length === 0) return false;
-  return list.some((f) => !f || typeof f.url !== 'string' || f.url.length <= 20);
+  return list.some((f) => !f || typeof f.url !== 'string' || f.url.trim().length <= 20);
 }
 
 /**
