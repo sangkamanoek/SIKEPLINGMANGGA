@@ -4,13 +4,20 @@ import {
   getDocs,
   getDocsFromServer,
   setDoc,
-  deleteDoc,
   onSnapshot,
   arrayUnion,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './firebase';
+import {
+  db,
+  handleFirestoreError,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+  OperationType,
+} from './firebase';
 import { cleanFirestoreData } from './firestoreService';
+import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 
 export interface TugasKhusus {
@@ -163,8 +170,13 @@ export function subscribeTugasKhususFromFirestore(callback?: (tasks: TugasKhusus
     callback(initialLocal);
   }
 
+  if (!db || isFirestoreQuotaCooldownActive()) {
+    return () => {};
+  }
+
   let isActive = true;
   let receivedServerSnapshot = false;
+  let fallbackTimer: any = null;
 
   try {
     const colRef = collection(db, TUGAS_KHUSUS_COLLECTION);
@@ -184,25 +196,39 @@ export function subscribeTugasKhususFromFirestore(callback?: (tasks: TugasKhusus
         }
       },
       (error) => {
+        if (isQuotaExhaustedError(error)) {
+          markFirestoreQuotaExhausted(error);
+          isActive = false;
+          if (fallbackTimer) clearTimeout(fallbackTimer);
+          try { unsub(); } catch {}
+          return;
+        }
         console.error('[Firestore Tugas Khusus] onSnapshot error:', error);
         try {
           handleFirestoreError(error, OperationType.LIST, TUGAS_KHUSUS_COLLECTION);
         } catch {}
-        fetchTugasKhususFromFirestore().then((items) => {
-          if (isActive && callback) callback(items);
-        });
+        if (!isFirestoreQuotaCooldownActive()) {
+          fetchTugasKhususFromFirestore().then((items) => {
+            if (isActive && callback) callback(items);
+          });
+        }
       }
     );
 
-    fetchTugasKhususFromFirestore().then((items) => {
-      if (isActive && !receivedServerSnapshot && callback) {
-        callback(items);
+    fallbackTimer = setTimeout(() => {
+      if (isActive && !receivedServerSnapshot && !isFirestoreQuotaCooldownActive()) {
+        fetchTugasKhususFromFirestore().then((items) => {
+          if (isActive && !receivedServerSnapshot && callback) {
+            callback(items);
+          }
+        });
       }
-    });
+    }, 4500);
 
     return () => {
       isActive = false;
-      unsub();
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      try { unsub(); } catch {}
     };
   } catch (error) {
     console.error('[Firestore Tugas Khusus] subscribe error:', error);
@@ -211,12 +237,14 @@ export function subscribeTugasKhususFromFirestore(callback?: (tasks: TugasKhusus
 }
 
 export async function fetchTugasSubmissionsFromFirestore(): Promise<Record<string, TugasFotoSubmissionItem>> {
+  if (!db || isFirestoreQuotaCooldownActive()) return getTugasSubmissionsLocal();
   try {
     const colRef = collection(db, TUGAS_SUBMISSIONS_COLLECTION);
     let snap;
     try {
       snap = await getDocsFromServer(colRef);
-    } catch {
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
       snap = await getDocs(colRef);
     }
     const subMap: Record<string, TugasFotoSubmissionItem> = {};
@@ -239,7 +267,11 @@ export async function fetchTugasSubmissionsFromFirestore(): Promise<Record<strin
       return subMap;
     }
   } catch (err) {
-    console.warn('[Firestore Tugas Submissions] fetch error:', err);
+    if (isQuotaExhaustedError(err)) {
+      markFirestoreQuotaExhausted(err);
+    } else {
+      console.warn('[Firestore Tugas Submissions] fetch error:', err);
+    }
   }
   return getTugasSubmissionsLocal();
 }
@@ -255,8 +287,13 @@ export function subscribeTugasKhususSubmissions(
     callback(initialLocal);
   }
 
+  if (!db || isFirestoreQuotaCooldownActive()) {
+    return () => {};
+  }
+
   let isActive = true;
   let receivedServerSnapshot = false;
+  let fallbackTimer: any = null;
 
   try {
     const colRef = collection(db, TUGAS_SUBMISSIONS_COLLECTION);
@@ -290,25 +327,39 @@ export function subscribeTugasKhususSubmissions(
         }
       },
       (error) => {
+        if (isQuotaExhaustedError(error)) {
+          markFirestoreQuotaExhausted(error);
+          isActive = false;
+          if (fallbackTimer) clearTimeout(fallbackTimer);
+          try { unsub(); } catch {}
+          return;
+        }
         console.error('[Firestore Tugas Submissions] onSnapshot error:', error);
         try {
           handleFirestoreError(error, OperationType.LIST, TUGAS_SUBMISSIONS_COLLECTION);
         } catch {}
-        fetchTugasSubmissionsFromFirestore().then((subMap) => {
-          if (isActive && callback) callback(subMap);
-        });
+        if (!isFirestoreQuotaCooldownActive()) {
+          fetchTugasSubmissionsFromFirestore().then((subMap) => {
+            if (isActive && callback) callback(subMap);
+          });
+        }
       }
     );
 
-    fetchTugasSubmissionsFromFirestore().then((subMap) => {
-      if (isActive && !receivedServerSnapshot && callback) {
-        callback(subMap);
+    fallbackTimer = setTimeout(() => {
+      if (isActive && !receivedServerSnapshot && !isFirestoreQuotaCooldownActive()) {
+        fetchTugasSubmissionsFromFirestore().then((subMap) => {
+          if (isActive && !receivedServerSnapshot && callback) {
+            callback(subMap);
+          }
+        });
       }
-    });
+    }, 4500);
 
     return () => {
       isActive = false;
-      unsub();
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      try { unsub(); } catch {}
     };
   } catch (error) {
     console.error('[Firestore Tugas Submissions] subscribe error:', error);
@@ -320,12 +371,14 @@ export function subscribeTugasKhususSubmissions(
  * Fetch all tasks from Firestore once
  */
 export async function fetchTugasKhususFromFirestore(): Promise<TugasKhusus[]> {
+  if (!db || isFirestoreQuotaCooldownActive()) return getTugasKhususList();
   try {
     const colRef = collection(db, TUGAS_KHUSUS_COLLECTION);
     let snap;
     try {
       snap = await getDocsFromServer(colRef);
-    } catch {
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
       snap = await getDocs(colRef);
     }
     const result = parseTugasDocs(snap.docs);
@@ -336,7 +389,11 @@ export async function fetchTugasKhususFromFirestore(): Promise<TugasKhusus[]> {
     }
     return getTugasKhususList();
   } catch (error) {
-    console.error('[Firestore Tugas Khusus] fetch error:', error);
+    if (isQuotaExhaustedError(error)) {
+      markFirestoreQuotaExhausted(error);
+    } else {
+      console.error('[Firestore Tugas Khusus] fetch error:', error);
+    }
     return getTugasKhususList();
   }
 }
@@ -360,19 +417,9 @@ export function addTugasKhusus(task: Omit<TugasKhusus, 'id' | 'createdAt' | 'com
   list.unshift(newTask);
   saveTugasKhususList(list);
 
-  // 2. Persist to Firestore to broadcast to all other phones & devices
-  try {
-    const docRef = doc(db, TUGAS_KHUSUS_COLLECTION, newTask.id);
-    const cleaned = cleanFirestoreData(newTask);
-    setDoc(docRef, cleaned).then(() => {
-      console.log(`[Firestore Tugas Khusus] Successfully published task ${newTask.id} (${newTask.judul})`);
-    }).catch((err) => {
-      console.error('[Firestore Tugas Khusus] Failed publishing task to Firestore:', err);
-      handleFirestoreError(err, OperationType.WRITE, TUGAS_KHUSUS_COLLECTION);
-    });
-  } catch (err) {
-    console.error('[Firestore Tugas Khusus] addTugasKhusus sync error:', err);
-  }
+  // 2. Persist to Firestore via resilient write queue
+  const cleaned = cleanFirestoreData(newTask);
+  resilientSetDoc(TUGAS_KHUSUS_COLLECTION, newTask.id, cleaned, { merge: true }).catch(() => {});
 
   return newTask;
 }
@@ -386,14 +433,7 @@ export function updateTugasKhususStatus(id: string, status: 'aktif' | 'selesai')
   const updated = list.map((t) => (t.id === id ? { ...t, status, updatedAt: now } : t));
   saveTugasKhususList(updated);
 
-  try {
-    const docRef = doc(db, TUGAS_KHUSUS_COLLECTION, id);
-    setDoc(docRef, { status, updatedAt: now }, { merge: true }).catch((err) => {
-      console.error(`[Firestore Tugas Khusus] Failed updating status for ${id}:`, err);
-    });
-  } catch (err) {
-    console.error('[Firestore Tugas Khusus] updateTugasKhususStatus error:', err);
-  }
+  resilientSetDoc(TUGAS_KHUSUS_COLLECTION, id, { status, updatedAt: now }, { merge: true }).catch(() => {});
 }
 
 /**
@@ -404,14 +444,7 @@ export function deleteTugasKhusus(id: string): void {
   const filtered = list.filter((t) => t.id !== id);
   saveTugasKhususList(filtered);
 
-  try {
-    const docRef = doc(db, TUGAS_KHUSUS_COLLECTION, id);
-    deleteDoc(docRef).catch((err) => {
-      console.error(`[Firestore Tugas Khusus] Failed deleting task ${id}:`, err);
-    });
-  } catch (err) {
-    console.error('[Firestore Tugas Khusus] deleteTugasKhusus error:', err);
-  }
+  resilientDeleteDoc(TUGAS_KHUSUS_COLLECTION, id).catch(() => {});
 }
 
 /**
@@ -435,22 +468,41 @@ export function markTugasKhususCompletedByAccount(taskId: string, accountId: str
 
   saveTugasKhususList(updatedList);
 
+  const enqueueFallback = () => {
+    const completedIds = updatedTask?.completedBy || [accountId];
+    resilientSetDoc(
+      TUGAS_KHUSUS_COLLECTION,
+      taskId,
+      { completedBy: completedIds, updatedAt: now },
+      { merge: true }
+    ).catch(() => {});
+  };
+
+  if (!db || (typeof navigator !== 'undefined' && !navigator.onLine) || isFirestoreQuotaCooldownActive()) {
+    enqueueFallback();
+    return;
+  }
+
   try {
     const docRef = doc(db, TUGAS_KHUSUS_COLLECTION, taskId);
-    setDoc(
-      docRef,
-      {
-        completedBy: arrayUnion(accountId),
-        updatedAt: now,
-      },
-      { merge: true }
-    ).then(() => {
-      console.log(`[Firestore Tugas Khusus] Account ${accountId} marked completed on task ${taskId}`);
-    }).catch((err) => {
-      console.error(`[Firestore Tugas Khusus] Failed syncing completed status for ${taskId}:`, err);
+    Promise.race([
+      setDoc(
+        docRef,
+        {
+          completedBy: arrayUnion(accountId),
+          updatedAt: now,
+        },
+        { merge: true }
+      ),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8500)),
+    ]).catch((err) => {
+      if (isQuotaExhaustedError(err)) {
+        markFirestoreQuotaExhausted(err);
+      }
+      enqueueFallback();
     });
-  } catch (err) {
-    console.error('[Firestore Tugas Khusus] markTugasKhususCompletedByAccount error:', err);
+  } catch {
+    enqueueFallback();
   }
 }
 
@@ -482,18 +534,8 @@ export async function saveTugasKhususSubmission(
     markTugasKhususCompletedByAccount(submission.taskId, submission.accountId);
   }
 
-  // 3. Persist submission to Firestore
-  try {
-    const subDocId = `${submission.taskId}_${submission.accountId || 'anonymous'}`;
-    const docRef = doc(db, TUGAS_SUBMISSIONS_COLLECTION, subDocId);
-    await setDoc(docRef, cleanFirestoreData(cleanItem), { merge: true });
-    console.log(`[Firestore Tugas Submission] Successfully uploaded submission for task ${submission.taskId}`);
-    return true;
-  } catch (err) {
-    console.error(`[Firestore Tugas Submission] Error uploading submission for ${submission.taskId}:`, err);
-    try {
-      handleFirestoreError(err, OperationType.WRITE, TUGAS_SUBMISSIONS_COLLECTION);
-    } catch {}
-    return false;
-  }
+  // 3. Persist submission to Firestore via resilient write queue
+  const subDocId = `${submission.taskId}_${submission.accountId || 'anonymous'}`;
+  const res = await resilientSetDoc(TUGAS_SUBMISSIONS_COLLECTION, subDocId, cleanFirestoreData(cleanItem), { merge: true });
+  return res.synced || res.queued;
 }

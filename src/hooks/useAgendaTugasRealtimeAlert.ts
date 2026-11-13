@@ -89,10 +89,12 @@ export function useAgendaTugasRealtimeAlert(currentUser: UserAccount | null) {
     }
   }, []);
 
+  const userId = currentUser?.id || '';
+  const userRole = currentUser?.role || '';
+
   // Listen to Agenda Kelurahan updates
   useEffect(() => {
-    if (!currentUser) return;
-    const isKepling = currentUser.role === 'kepling';
+    if (!userId) return;
 
     const handleAgendaList = (items: AgendaKelurahanItem[]) => {
       if (!Array.isArray(items)) return;
@@ -157,12 +159,11 @@ export function useAgendaTugasRealtimeAlert(currentUser: UserAccount | null) {
       if (typeof unsubAgenda === 'function') unsubAgenda();
       window.removeEventListener('agenda-data-updated', handleLocalUpdate);
     };
-  }, [currentUser, saveSeenAgendaIds]);
+  }, [userId, saveSeenAgendaIds]);
 
   // Listen to Tugas Khusus updates
   useEffect(() => {
-    if (!currentUser) return;
-    const isKepling = currentUser.role === 'kepling';
+    if (!userId) return;
 
     const handleTugasList = (tasks: TugasKhusus[]) => {
       if (!Array.isArray(tasks)) return;
@@ -185,10 +186,10 @@ export function useAgendaTugasRealtimeAlert(currentUser: UserAccount | null) {
         // Check if task targets this user or all kepling
         const matchesTarget =
           t.targetAccountId === 'ALL' ||
-          t.targetAccountId === currentUser.id ||
+          t.targetAccountId === userId ||
           t.targetRole === 'kepling' ||
           t.targetRole === 'all' ||
-          (currentUser.role === 'super_admin');
+          (userRole === 'super_admin');
 
         return matchesTarget;
       });
@@ -237,7 +238,7 @@ export function useAgendaTugasRealtimeAlert(currentUser: UserAccount | null) {
       if (typeof unsubTugas === 'function') unsubTugas();
       window.removeEventListener('sikepling_tugas_khusus_updated', handleLocalTugasEvent);
     };
-  }, [currentUser, saveSeenTugasIds]);
+  }, [userId, userRole, saveSeenTugasIds]);
 
   return {
     activeAlert,

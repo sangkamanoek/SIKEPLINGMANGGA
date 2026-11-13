@@ -1,47 +1,50 @@
-import { saveReportToFirestore } from './firestoreService';
+import { flushFirestoreWriteQueue, refreshPendingSyncCount } from './firestoreWriteQueue';
+import { isFirestoreQuotaCooldownActive } from './firebase';
 
 export function initBackgroundAutoSync(): () => void {
   if (typeof window === 'undefined') return () => {};
 
-  const handleOnline = async () => {
-    try {
-      const storedReports = localStorage.getItem('sikepling_laporan_harian_list');
-      if (storedReports) {
-        const reports = JSON.parse(storedReports);
-        if (Array.isArray(reports)) {
-          for (const rep of reports.slice(0, 5)) {
-            if (rep && rep.id) {
-              await saveReportToFirestore(rep).catch(() => {});
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('[AutoSync] Online background sync note:', err);
+  const tryFlush = () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (isFirestoreQuotaCooldownActive()) return;
+    flushFirestoreWriteQueue().catch(() => {});
+  };
+
+  // Initial refresh & flush shortly after mount so first paint isn't blocked
+  const startupTimer = setTimeout(() => {
+    refreshPendingSyncCount().then((count) => {
+      if (count > 0) tryFlush();
+    });
+  }, 2500);
+
+  const handleOnline = () => {
+    tryFlush();
+  };
+
+  const handleVisibilityChange = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      tryFlush();
     }
   };
 
   window.addEventListener('online', handleOnline);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
-  // Periodic background sync every 3 minutes to guarantee data is pushed to Firestore
-  const interval = setInterval(async () => {
-    if (navigator.onLine) {
-      try {
-        const storedReports = localStorage.getItem('sikepling_laporan_harian_list');
-        if (storedReports) {
-          const reports = JSON.parse(storedReports);
-          if (Array.isArray(reports) && reports.length > 0) {
-            await saveReportToFirestore(reports[0]).catch(() => {});
-          }
+  // Periodic background flush every 45 seconds ONLY if there are queued items
+  const interval = setInterval(() => {
+    if (typeof navigator !== 'undefined' && navigator.onLine && !isFirestoreQuotaCooldownActive()) {
+      refreshPendingSyncCount().then((count) => {
+        if (count > 0) {
+          flushFirestoreWriteQueue().catch(() => {});
         }
-      } catch (e) {
-        // silent background sync catch
-      }
+      });
     }
-  }, 180000); // 3 minutes
+  }, 45_000);
 
   return () => {
+    clearTimeout(startupTimer);
     window.removeEventListener('online', handleOnline);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
     clearInterval(interval);
   };
 }

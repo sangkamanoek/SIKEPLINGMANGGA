@@ -2,12 +2,16 @@ import {
   collection,
   doc,
   getDocs,
-  setDoc,
   deleteDoc,
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import {
+  db,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+} from './firebase';
 import { LingkunganPolygon, TitikRumahBangunan, RuasJalanLingkungan } from '../types';
 import {
   DEFAULT_LINGKUNGAN_POLYGONS,
@@ -16,6 +20,7 @@ import {
 } from '../data/defaultGeoData';
 import { safeSetLocalStorage } from './safeStorage';
 import { cleanFirestoreData } from './firestoreService';
+import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
 
 const STORAGE_KEY_POLYGONS = 'webgis_lingkungan_polygons_v1';
 const STORAGE_KEY_HOUSES = 'webgis_titik_rumah_v1';
@@ -47,26 +52,33 @@ export function saveLocalPolygons(polygons: LingkunganPolygon[]): void {
 }
 
 export async function fetchAllPolygons(): Promise<LingkunganPolygon[]> {
-  try {
-    const colRef = collection(db, COLLECTION_POLYGONS);
-    const snap = await getDocs(colRef);
-    if (!snap.empty) {
-      const list: LingkunganPolygon[] = [];
-      snap.forEach((d) => {
-        list.push(d.data() as LingkunganPolygon);
-      });
-      list.sort((a, b) => a.lingkunganNomor - b.lingkunganNomor);
-      saveLocalPolygons(list);
-      return list;
+  if (db && !isFirestoreQuotaCooldownActive()) {
+    try {
+      const colRef = collection(db, COLLECTION_POLYGONS);
+      const snap = await getDocs(colRef);
+      if (!snap.empty) {
+        const list: LingkunganPolygon[] = [];
+        snap.forEach((d) => {
+          list.push(d.data() as LingkunganPolygon);
+        });
+        list.sort((a, b) => a.lingkunganNomor - b.lingkunganNomor);
+        saveLocalPolygons(list);
+        return list;
+      }
+    } catch (e) {
+      if (isQuotaExhaustedError(e)) {
+        markFirestoreQuotaExhausted(e);
+      } else {
+        console.warn('Notice fetch polygons Firestore, using local fallback:', e);
+      }
     }
-  } catch (e) {
-    console.warn('Notice fetch polygons Firestore, using local fallback:', e);
   }
   return getLocalPolygons();
 }
 
 export async function deleteAllPolygons(): Promise<boolean> {
   saveLocalPolygons([]);
+  if (!db || isFirestoreQuotaCooldownActive()) return false;
   try {
     const colRef = collection(db, COLLECTION_POLYGONS);
     const snap = await getDocs(colRef);
@@ -74,6 +86,7 @@ export async function deleteAllPolygons(): Promise<boolean> {
     await Promise.all(deletePromises);
     return true;
   } catch (e) {
+    if (isQuotaExhaustedError(e)) markFirestoreQuotaExhausted(e);
     console.warn('Gagal menghapus polygon di Firestore:', e);
     return false;
   }
@@ -92,15 +105,10 @@ export async function savePolygonToFirestore(polygon: LingkunganPolygon): Promis
   }
   saveLocalPolygons(updated);
 
-  try {
-    const docRef = doc(db, COLLECTION_POLYGONS, polygon.id || `poly_${polygon.lingkunganId}`);
-    const cleaned = cleanFirestoreData(polygon);
-    await setDoc(docRef, cleaned, { merge: true });
-    return true;
-  } catch (e) {
-    console.warn('Gagal menyimpan polygon ke Firestore, tersimpan di lokal:', e);
-    return false;
-  }
+  const docId = polygon.id || `poly_${polygon.lingkunganId}`;
+  const cleaned = cleanFirestoreData(polygon);
+  const res = await resilientSetDoc(COLLECTION_POLYGONS, docId, cleaned, { merge: true });
+  return res.synced || res.queued;
 }
 
 // ==========================================
@@ -175,18 +183,24 @@ export async function fetchAllHouses(): Promise<TitikRumahBangunan[]> {
     console.warn('Notice fetch houses from server:', e);
   }
 
-  // 4. Fetch directly from Firebase Firestore (Cloud Source of Truth)
-  try {
-    const colRef = collection(db, COLLECTION_HOUSES);
-    const snap = await getDocs(colRef);
-    if (!snap.empty) {
-      snap.forEach((d) => {
-        const item = { ...(d.data() as TitikRumahBangunan), id: d.id };
-        if (item && item.id) map.set(item.id, item);
-      });
+  // 4. Fetch directly from Firebase Firestore (Cloud Source of Truth) if quota not in cooldown
+  if (db && !isFirestoreQuotaCooldownActive()) {
+    try {
+      const colRef = collection(db, COLLECTION_HOUSES);
+      const snap = await getDocs(colRef);
+      if (!snap.empty) {
+        snap.forEach((d) => {
+          const item = { ...(d.data() as TitikRumahBangunan), id: d.id };
+          if (item && item.id) map.set(item.id, item);
+        });
+      }
+    } catch (e) {
+      if (isQuotaExhaustedError(e)) {
+        markFirestoreQuotaExhausted(e);
+      } else {
+        console.warn('Notice fetch houses Firestore:', e);
+      }
     }
-  } catch (e) {
-    console.warn('Notice fetch houses Firestore:', e);
   }
 
   const list = Array.from(map.values());
@@ -236,16 +250,10 @@ export async function saveHouseToFirestore(house: TitikRumahBangunan): Promise<b
     console.warn('Notice saving house to server:', err);
   });
 
-  // 2. Save online to Firestore with sanitized payload (strictly strip undefined fields)
-  try {
-    const cleaned = cleanFirestoreData(house);
-    const docRef = doc(db, COLLECTION_HOUSES, house.id);
-    await setDoc(docRef, cleaned, { merge: true });
-    return true;
-  } catch (e) {
-    console.error('Gagal menyimpan titik rumah ke Firestore:', e);
-    return false;
-  }
+  // 2. Save online to Firestore with sanitized payload & retry queue
+  const cleaned = cleanFirestoreData(house);
+  const res = await resilientSetDoc(COLLECTION_HOUSES, house.id, cleaned, { merge: true });
+  return res.synced || res.queued;
 }
 
 export async function deleteHouseFromFirestore(houseId: string): Promise<boolean> {
@@ -261,15 +269,9 @@ export async function deleteHouseFromFirestore(houseId: string): Promise<boolean
     console.warn('Notice deleting house from server:', err);
   });
 
-  // 2. Delete on Firestore
-  try {
-    const docRef = doc(db, COLLECTION_HOUSES, houseId);
-    await deleteDoc(docRef);
-    return true;
-  } catch (e) {
-    console.error('Gagal menghapus rumah di Firestore:', e);
-    return false;
-  }
+  // 2. Delete on Firestore via retry queue
+  const res = await resilientDeleteDoc(COLLECTION_HOUSES, houseId);
+  return res.synced || res.queued;
 }
 
 export async function deleteBulkHousesFromFirestore(houseIds: string[]): Promise<boolean> {
@@ -360,20 +362,26 @@ export function saveLocalRoads(roads: RuasJalanLingkungan[]): void {
 }
 
 export async function fetchAllRoads(): Promise<RuasJalanLingkungan[]> {
-  try {
-    const colRef = collection(db, COLLECTION_ROADS);
-    const snap = await getDocs(colRef);
-    if (!snap.empty) {
-      const list: RuasJalanLingkungan[] = [];
-      snap.forEach((d) => {
-        list.push({ ...(d.data() as RuasJalanLingkungan), id: d.id });
-      });
-      list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      saveLocalRoads(list);
-      return list;
+  if (db && !isFirestoreQuotaCooldownActive()) {
+    try {
+      const colRef = collection(db, COLLECTION_ROADS);
+      const snap = await getDocs(colRef);
+      if (!snap.empty) {
+        const list: RuasJalanLingkungan[] = [];
+        snap.forEach((d) => {
+          list.push({ ...(d.data() as RuasJalanLingkungan), id: d.id });
+        });
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        saveLocalRoads(list);
+        return list;
+      }
+    } catch (e) {
+      if (isQuotaExhaustedError(e)) {
+        markFirestoreQuotaExhausted(e);
+      } else {
+        console.warn('Notice fetch roads Firestore, using local fallback:', e);
+      }
     }
-  } catch (e) {
-    console.warn('Notice fetch roads Firestore, using local fallback:', e);
   }
   return getLocalRoads();
 }
@@ -390,15 +398,9 @@ export async function saveRoadToFirestore(road: RuasJalanLingkungan): Promise<bo
   }
   saveLocalRoads(updated);
 
-  try {
-    const docRef = doc(db, COLLECTION_ROADS, road.id);
-    const cleaned = cleanFirestoreData(road);
-    await setDoc(docRef, cleaned, { merge: true });
-    return true;
-  } catch (e) {
-    console.warn('Gagal menyimpan ruas jalan ke Firestore:', e);
-    return false;
-  }
+  const cleaned = cleanFirestoreData(road);
+  const res = await resilientSetDoc(COLLECTION_ROADS, road.id, cleaned, { merge: true });
+  return res.synced || res.queued;
 }
 
 export async function deleteRoadFromFirestore(roadId: string): Promise<boolean> {
@@ -406,14 +408,8 @@ export async function deleteRoadFromFirestore(roadId: string): Promise<boolean> 
   const updated = current.filter((r) => r.id !== roadId);
   saveLocalRoads(updated);
 
-  try {
-    const docRef = doc(db, COLLECTION_ROADS, roadId);
-    await deleteDoc(docRef);
-    return true;
-  } catch (e) {
-    console.warn('Gagal menghapus jalan di Firestore:', e);
-    return false;
-  }
+  const res = await resilientDeleteDoc(COLLECTION_ROADS, roadId);
+  return res.synced || res.queued;
 }
 
 // ==========================================
@@ -425,6 +421,7 @@ export function subscribeWebgisData(
   onHousesUpdate: (houses: TitikRumahBangunan[]) => void,
   onRoadsUpdate: (roads: RuasJalanLingkungan[]) => void
 ): () => void {
+  if (!db || isFirestoreQuotaCooldownActive()) return () => {};
   const unsubList: Unsubscribe[] = [];
 
   let u1: Unsubscribe | null = null;
@@ -444,7 +441,8 @@ export function subscribeWebgisData(
         }
       },
       (err: any) => {
-        if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota exceeded') || err?.message?.includes('resource-exhausted')) {
+        if (isQuotaExhaustedError(err)) {
+          markFirestoreQuotaExhausted(err);
           console.warn('Firestore quota exhausted for polygons, detaching listener.');
           if (u1) { try { u1(); } catch {} }
         }
@@ -480,7 +478,8 @@ export function subscribeWebgisData(
         onHousesUpdate(list);
       },
       (err: any) => {
-        if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota exceeded') || err?.message?.includes('resource-exhausted')) {
+        if (isQuotaExhaustedError(err)) {
+          markFirestoreQuotaExhausted(err);
           console.warn('Firestore quota exhausted for houses, detaching listener.');
           if (u2) { try { u2(); } catch {} }
         }
@@ -504,7 +503,8 @@ export function subscribeWebgisData(
         }
       },
       (err: any) => {
-        if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota exceeded') || err?.message?.includes('resource-exhausted')) {
+        if (isQuotaExhaustedError(err)) {
+          markFirestoreQuotaExhausted(err);
           console.warn('Firestore quota exhausted for roads, detaching listener.');
           if (u3) { try { u3(); } catch {} }
         }

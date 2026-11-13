@@ -60,6 +60,26 @@ function formatFileSize(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+function dataUrlToBlob(dataUrl: string): Blob | null {
+  try {
+    const commaIdx = dataUrl.indexOf(',');
+    if (commaIdx === -1) return null;
+    const header = dataUrl.slice(0, commaIdx);
+    const base64 = dataUrl.slice(commaIdx + 1);
+    const mimeMatch = header.match(/data:([^;]+);/i);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mime });
+  } catch {
+    return null;
+  }
+}
+
 export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentUser, onShowToast }) => {
   const [suratList, setSuratList] = useState<SuratKedinasanItem[]>([]);
   const [filterJenis, setFilterJenis] = useState<string>('ALL');
@@ -91,6 +111,31 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
   const [formFileSize, setFormFileSize] = useState<number | undefined>(undefined);
   const [formFileType, setFormFileType] = useState<string>('');
   const [isProcessingFile, setIsProcessingFile] = useState<boolean>(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fileUrl = viewingPdfSurat?.fileUrl;
+    if (!fileUrl) {
+      setPdfBlobUrl(null);
+      return;
+    }
+    if (!fileUrl.startsWith('data:')) {
+      setPdfBlobUrl(fileUrl);
+      return;
+    }
+    const blob = dataUrlToBlob(fileUrl);
+    if (!blob) {
+      setPdfBlobUrl(fileUrl);
+      return;
+    }
+    const objUrl = URL.createObjectURL(blob);
+    setPdfBlobUrl(objUrl);
+    return () => {
+      try {
+        URL.revokeObjectURL(objUrl);
+      } catch {}
+    };
+  }, [viewingPdfSurat?.fileUrl]);
 
   useEffect(() => {
     const unsubscribe = subscribeSurat(
@@ -181,10 +226,10 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size (max 25MB for high-res PDF scans)
-    const MAX_SIZE = 25 * 1024 * 1024;
+    // Validate size (max 15MB to stay memory-safe across mobile/desktop browsers)
+    const MAX_SIZE = 15 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      onShowToast('Ukuran file maksimal adalah 25 MB!', 'error');
+      onShowToast('Ukuran file maksimal adalah 15 MB!', 'error');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -302,16 +347,34 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
       return;
     }
 
+    let tempBlobUrl: string | null = null;
     try {
+      let downloadHref = fileUrl;
+      if (fileUrl.startsWith('data:')) {
+        const blob = dataUrlToBlob(fileUrl);
+        if (blob) {
+          tempBlobUrl = URL.createObjectURL(blob);
+          downloadHref = tempBlobUrl;
+        }
+      }
       const link = document.createElement('a');
-      link.href = fileUrl;
+      link.href = downloadHref;
       link.download = item.fileName || `Arsip_Surat_${item.nomorSurat.replace(/[\/\s]/g, '_')}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       onShowToast(`Mengunduh berkas ${item.fileName || 'PDF'}...`, 'success');
-    } catch (err) {
-      window.open(fileUrl, '_blank');
+    } catch {
+      onShowToast('Gagal memulai unduhan otomatis berkas.', 'error');
+    } finally {
+      if (tempBlobUrl) {
+        const toRevoke = tempBlobUrl;
+        setTimeout(() => {
+          try {
+            URL.revokeObjectURL(toRevoke);
+          } catch {}
+        }, 10000);
+      }
     }
   };
 
@@ -770,8 +833,23 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
                       <button
                         type="button"
                         onClick={() => {
-                          const w = window.open();
-                          w?.document.write(`<iframe src="${formFileUrl}" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                          setViewingPdfSurat({
+                            id: editingSurat?.id || 'draft_preview',
+                            nomorSurat: formNomor || 'DRAFT',
+                            tanggalSurat: formTanggal,
+                            jenisSurat: formJenis,
+                            perihal: formPerihal || formFileName || 'Pratinjau Berkas Lampiran',
+                            sifat: formSifat,
+                            status: formStatus,
+                            isiRingkas: formIsi,
+                            fileUrl: formFileUrl,
+                            fileName: formFileName || 'Dokumen.pdf',
+                            fileSize: formFileSize,
+                            fileType: formFileType,
+                            dibuatOlehNama: currentUser.nama,
+                            dibuatOlehRole: currentUser.role,
+                            createdAt: new Date().toISOString(),
+                          });
                         }}
                         className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] cursor-pointer flex items-center gap-1"
                         title="Pratinjau File"
@@ -839,17 +917,17 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
                   <Download className="w-3.5 h-3.5" />
                   <span>Unduh PDF</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const w = window.open();
-                    w?.document.write(`<iframe src="${viewingPdfSurat.fileUrl}" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Tab Baru</span>
-                </button>
+                {pdfBlobUrl && (
+                  <a
+                    href={pdfBlobUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Tab Baru</span>
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={() => setViewingPdfSurat(null)}
@@ -862,7 +940,7 @@ export const SuratKedinasanView: React.FC<SuratKedinasanViewProps> = ({ currentU
 
             <div className="p-4 flex-1 bg-slate-100 flex flex-col items-center justify-center overflow-hidden">
               <iframe
-                src={viewingPdfSurat.fileUrl}
+                src={pdfBlobUrl || viewingPdfSurat.fileUrl}
                 className="w-full h-[70vh] rounded-2xl border border-slate-300 bg-white shadow-inner"
                 title={viewingPdfSurat.fileName || 'Lampiran PDF Surat'}
               />

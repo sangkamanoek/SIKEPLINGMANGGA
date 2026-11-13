@@ -4,12 +4,16 @@ import {
   doc,
   getDoc,
   getDocFromServer,
-  setDoc,
-  deleteDoc,
   getDocs,
   getDocsFromServer,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
+import {
+  db,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+} from './firebase';
 import { cleanFirestoreData } from './firestoreService';
 import { FotoDokumentasi, PosyanduReport } from '../types';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
@@ -149,10 +153,10 @@ export const fetchPosyanduReports = async (): Promise<PosyanduReport[]> => {
     if (Array.isArray(idb)) idbList = idb;
   } catch {}
 
-  if (!db) {
+  if (!db || isFirestoreQuotaCooldownActive()) {
     const merged = resolveAuthoritativePosyandu(
-      getLocalPosyanduReports(),
-      [...memoryPosyanduCache, ...idbList]
+      idbList.length > 0 ? idbList : getLocalPosyanduReports(),
+      [...idbList, ...memoryPosyanduCache, ...getLocalPosyanduReports()]
     );
     memoryPosyanduCache = merged;
     return merged;
@@ -163,7 +167,8 @@ export const fetchPosyanduReports = async (): Promise<PosyanduReport[]> => {
     let snapshot;
     try {
       snapshot = await getDocsFromServer(q);
-    } catch {
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
       snapshot = await getDocs(q);
     }
     const items = snapshot.docs.map((d) => ({
@@ -179,11 +184,15 @@ export const fetchPosyanduReports = async (): Promise<PosyanduReport[]> => {
       ]);
       memoryPosyanduCache = resolved;
       savePosyanduToIndexedDB(resolved).catch(() => {});
-      safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(resolved));
+      safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(resolved), { skipIdbMirror: true });
       return resolved;
     }
   } catch (err) {
-    console.warn('[pkkPosyanduService] fetchPosyanduReports warning:', err);
+    if (isQuotaExhaustedError(err)) {
+      markFirestoreQuotaExhausted(err);
+    } else {
+      console.warn('[pkkPosyanduService] fetchPosyanduReports warning:', err);
+    }
   }
 
   const fallback = resolveAuthoritativePosyandu(
@@ -236,13 +245,14 @@ export const fetchSinglePosyanduReport = async (
   } catch {}
 
   // 3. Query Firestore directly by Document Reference (prefer server)
-  if (db) {
+  if (db && !isFirestoreQuotaCooldownActive()) {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
       let snap;
       try {
         snap = await getDocFromServer(docRef);
-      } catch {
+      } catch (serverErr) {
+        if (isQuotaExhaustedError(serverErr)) throw serverErr;
         snap = await getDoc(docRef);
       }
       if (snap.exists()) {
@@ -254,11 +264,15 @@ export const fetchSinglePosyanduReport = async (
         ];
         await saveSinglePosyanduToIndexedDB(resolved).catch(() => {});
         const updatedList = [resolved, ...localList.filter((x) => x.id !== id)];
-        safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(updatedList));
+        safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(updatedList), { skipIdbMirror: true });
         return resolved;
       }
     } catch (e) {
-      console.warn(`[pkkPosyanduService] Failed to fetch single doc "${id}":`, e);
+      if (isQuotaExhaustedError(e)) {
+        markFirestoreQuotaExhausted(e);
+      } else {
+        console.warn(`[pkkPosyanduService] Failed to fetch single doc "${id}":`, e);
+      }
     }
   }
 
@@ -291,8 +305,9 @@ export const subscribePosyanduReports = (onUpdate: (items: PosyanduReport[]) => 
       console.warn('[pkkPosyanduService] IndexedDB hydration note:', err);
     });
 
-  if (!db) return () => {};
+  if (!db || isFirestoreQuotaCooldownActive()) return () => { isActive = false; };
 
+  let fallbackTimer: any = null;
   const q = collection(db, COLLECTION_NAME);
   const unsub = onSnapshot(
     q,
@@ -319,7 +334,7 @@ export const subscribePosyanduReports = (onUpdate: (items: PosyanduReport[]) => 
         if (isActive) {
           memoryPosyanduCache = resolved;
           savePosyanduToIndexedDB(resolved).catch(() => {});
-          safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(resolved));
+          safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(resolved), { skipIdbMirror: true });
           onUpdate(resolved);
         }
       } else if (serverItems.length > 0 && !hasLiveFirestore) {
@@ -333,27 +348,41 @@ export const subscribePosyanduReports = (onUpdate: (items: PosyanduReport[]) => 
       }
     },
     (error) => {
+      if (isQuotaExhaustedError(error)) {
+        markFirestoreQuotaExhausted(error);
+        isActive = false;
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        try { unsub(); } catch {}
+        return;
+      }
       console.warn('[pkkPosyanduService] onSnapshot listener warning:', error);
-      fetchPosyanduReports()
-        .then((items) => {
-          if (isActive) onUpdate(items);
-        })
-        .catch(() => {});
+      if (!isFirestoreQuotaCooldownActive()) {
+        fetchPosyanduReports()
+          .then((items) => {
+            if (isActive) onUpdate(items);
+          })
+          .catch(() => {});
+      }
     }
   );
 
-  fetchPosyanduReports()
-    .then((items) => {
-      if (isActive && !hasLiveFirestore && items.length > 0) {
-        hasLiveFirestore = true;
-        onUpdate(items);
-      }
-    })
-    .catch(() => {});
+  fallbackTimer = setTimeout(() => {
+    if (isActive && !hasLiveFirestore && !isFirestoreQuotaCooldownActive()) {
+      fetchPosyanduReports()
+        .then((items) => {
+          if (isActive && !hasLiveFirestore && items.length > 0) {
+            hasLiveFirestore = true;
+            onUpdate(items);
+          }
+        })
+        .catch(() => {});
+    }
+  }, 4500);
 
   return () => {
     isActive = false;
-    unsub();
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    try { unsub(); } catch {}
   };
 };
 
@@ -404,26 +433,23 @@ export const savePosyanduReport = async (item: PosyanduReport) => {
 
   memoryPosyanduCache = sortPosyanduDesc(updated);
 
-  // Persist unstripped payload to IndexedDB first, then safeSetLocalStorage
+  // Persist unstripped payload to IndexedDB first, then safeSetLocalStorage (no duplicate full IDB rewrite)
   await saveSinglePosyanduToIndexedDB(payload).catch(() => {});
-  safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(updated));
+  safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(updated), { skipIdbMirror: true });
 
-  if (db) {
-    const cleaned = cleanFirestoreData(payload);
-    // Avoid overwriting existing non-empty Firestore photos if payload still contains stripped empty-url placeholders
-    if (Array.isArray(cleaned.dokumentasiFoto) && hasMissingPosyanduPhotoUrls(payload)) {
-      const validOnly = cleaned.dokumentasiFoto.filter(
-        (f: any) => extractPhotoUrl(f).length > 20
-      );
-      if (validOnly.length === 0) {
-        delete cleaned.dokumentasiFoto;
-      } else {
-        cleaned.dokumentasiFoto = validOnly;
-      }
+  const cleaned = cleanFirestoreData(payload);
+  // Avoid overwriting existing non-empty Firestore photos if payload still contains stripped empty-url placeholders
+  if (Array.isArray(cleaned.dokumentasiFoto) && hasMissingPosyanduPhotoUrls(payload)) {
+    const validOnly = cleaned.dokumentasiFoto.filter(
+      (f: any) => extractPhotoUrl(f).length > 20
+    );
+    if (validOnly.length === 0) {
+      delete cleaned.dokumentasiFoto;
+    } else {
+      cleaned.dokumentasiFoto = validOnly;
     }
-    const docRef = doc(db, COLLECTION_NAME, item.id);
-    await setDoc(docRef, cleaned, { merge: true });
   }
+  await resilientSetDoc(COLLECTION_NAME, item.id, cleaned, { merge: true });
 };
 
 export const deletePosyanduReport = async (id: string) => {
@@ -431,10 +457,7 @@ export const deletePosyanduReport = async (id: string) => {
   const updated = current.filter((x) => x.id !== id);
   memoryPosyanduCache = memoryPosyanduCache.filter((x) => x.id !== id);
   await deletePosyanduFromIndexedDB(id).catch(() => {});
-  safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(updated));
+  safeSetLocalStorage(POSYANDU_STORAGE_KEY, JSON.stringify(updated), { skipIdbMirror: true });
 
-  if (db) {
-    const docRef = doc(db, COLLECTION_NAME, id);
-    await deleteDoc(docRef);
-  }
+  await resilientDeleteDoc(COLLECTION_NAME, id);
 };

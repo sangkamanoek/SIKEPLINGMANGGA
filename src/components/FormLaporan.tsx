@@ -210,6 +210,7 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
   const [copiedPreview, setCopiedPreview] = useState(false);
   const [showPhotoValidationModal, setShowPhotoValidationModal] = useState<boolean>(false);
   const [showKunjunganInline, setShowKunjunganInline] = useState<boolean>(false);
+  const [formErrorMsg, setFormErrorMsg] = useState<string | null>(null);
 
   const handleKunjunganSuccess = (data: KunjunganWargaData) => {
     // Sinkronisasi data kunjungan warga ke formulir kinerja harian
@@ -534,8 +535,9 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormErrorMsg(null);
     if (selectedLainnyaOptions.includes('Kegiatan Lainnya') && !kegiatanLainnyaCustomText.trim()) {
-      alert('⚠️ Jika memilih "Kegiatan Lainnya", Anda wajib mengisi keterangan rincian tentang Kegiatan Lainnya tersebut!');
+      setFormErrorMsg('Jika memilih "Kegiatan Lainnya", Anda wajib mengisi keterangan rincian tentang Kegiatan Lainnya tersebut.');
       return;
     }
     if (hasPhotoDeficit) {
@@ -1918,6 +1920,23 @@ export const FormLaporan: React.FC<FormLaporanProps> = ({
                   </span>
                 </div>
               ) : null}
+
+              {formErrorMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-900 font-bold flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{formErrorMsg}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormErrorMsg(null)}
+                    className="p-1 text-rose-600 hover:bg-rose-100 rounded-lg cursor-pointer"
+                    aria-label="Tutup peringatan"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
 
               {/* Primary Action Button */}
               <button

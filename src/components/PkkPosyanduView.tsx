@@ -126,6 +126,11 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
     currentUser.role === 'ketua_pkk_lingkungan' ? String(currentUser.nomorLingkungan) : 'ALL'
   );
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [visibleLimit, setVisibleLimit] = useState<number>(12);
+
+  useEffect(() => {
+    setVisibleLimit(12);
+  }, [filterLingkungan, searchQuery]);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -141,6 +146,7 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
   // Form State
   const defaultLkNum = currentUser.nomorLingkungan || 1;
   const [formLingkunganNomor, setFormLingkunganNomor] = useState<number>(defaultLkNum);
+  const [formNamaPetugas, setFormNamaPetugas] = useState<string>(currentUser.nama);
   const [formTanggal, setFormTanggal] = useState<string>(new Date().toISOString().split('T')[0]);
   const [formPosyanduNama, setFormPosyanduNama] = useState<string>('');
   const [formPosyanduLokasi, setFormPosyanduLokasi] = useState<string>('');
@@ -162,34 +168,15 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
   const attemptedHydrationIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    // 1. Subscribe to real-time updates
+    // 1. Subscribe to real-time updates (already hydrates from IndexedDB & local cache and handles fallback)
     const unsub = subscribePosyanduReports((items) => {
       setReports(items);
     });
 
-    // 2. Proactively fetch from server to guarantee freshest cloud sync
-    fetchPosyanduReports().then((items) => {
-      if (items && items.length > 0) {
-        setReports(items);
-      }
-    }).catch(console.warn);
-
-    // 3. Proactively ensure target posyandu_1791883394877 is verified and merged into local state
-    fetchSinglePosyanduReport('posyandu_1791883394877').then((targetDoc) => {
-      if (targetDoc) {
-        setReports((prev) => {
-          if (prev.some((x) => x.id === targetDoc.id)) return prev;
-          const merged = [targetDoc, ...prev];
-          merged.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
-          return merged;
-        });
-      }
-    }).catch(console.warn);
-
     return () => unsub();
   }, []);
 
-  // Automatically hydrate any report whose dokumentasiFoto has missing URLs (e.g. stripped local cache)
+  // Automatically hydrate any report whose dokumentasiFoto has missing URLs from IndexedDB first (then Firestore if needed)
   useEffect(() => {
     const candidates = reports.filter(
       (r) => r && r.id && hasMissingPosyanduPhotoUrls(r) && !attemptedHydrationIdsRef.current.has(r.id)
@@ -198,7 +185,7 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
 
     candidates.forEach((candidate) => {
       attemptedHydrationIdsRef.current.add(candidate.id);
-      fetchSinglePosyanduReport(candidate.id, true)
+      fetchSinglePosyanduReport(candidate.id, false)
         .then((hydrated) => {
           if (hydrated && !hasMissingPosyanduPhotoUrls(hydrated)) {
             setReports((prev) => prev.map((it) => (it.id === hydrated.id ? hydrated : it)));
@@ -207,6 +194,24 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
         .catch(() => {});
     });
   }, [reports]);
+
+  // Tutup pratinjau / lightbox / form dengan tombol Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (previewPhotoUrl) {
+        setPreviewPhotoUrl(null);
+      } else if (selectedPrintReport) {
+        setSelectedPrintReport(null);
+      } else if (isModalOpen) {
+        setIsModalOpen(false);
+      }
+    };
+    if (previewPhotoUrl || selectedPrintReport || isModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [previewPhotoUrl, selectedPrintReport, isModalOpen]);
 
   const totalWargaKumulatif = useMemo(() => {
     return (
@@ -276,6 +281,7 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
     setIsEditing(false);
     setEditingId(null);
     setFormLingkunganNomor(currentUser.nomorLingkungan || 1);
+    setFormNamaPetugas(currentUser.nama);
     setFormTanggal(new Date().toISOString().split('T')[0]);
     setFormPosyanduNama('');
     setFormPosyanduLokasi('');
@@ -304,6 +310,7 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
     setIsEditing(true);
     setEditingId(activeReport.id);
     setFormLingkunganNomor(activeReport.nomorLingkungan || 1);
+    setFormNamaPetugas(normalizePetugasNama(activeReport.namaPetugas));
     setFormTanggal(activeReport.tanggal || new Date().toISOString().split('T')[0]);
     setFormPosyanduNama(activeReport.posyanduNama || '');
     setFormPosyanduLokasi(activeReport.posyanduLokasi || '');
@@ -335,11 +342,16 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
 
       const id = isEditing && editingId ? editingId : 'posyandu_' + Date.now();
       const existingReport = reports.find((r) => r.id === id);
+      const lingkunganChanged =
+        isEditing && existingReport && Number(existingReport.nomorLingkungan) !== Number(formLingkunganNomor);
 
       const report: PosyanduReport = {
+        ...(existingReport || {}),
         id,
-        pkkLingkunganId: existingReport?.pkkLingkunganId || selectedAcc.id,
-        namaPetugas: existingReport?.namaPetugas || selectedAcc.nama,
+        pkkLingkunganId: lingkunganChanged
+          ? selectedAcc.id
+          : existingReport?.pkkLingkunganId || selectedAcc.id,
+        namaPetugas: formNamaPetugas.trim() || existingReport?.namaPetugas || selectedAcc.nama,
         lingkungan: `Lingkungan ${formLingkunganNomor}`,
         nomorLingkungan: formLingkunganNomor,
         tanggal: formTanggal,
@@ -562,7 +574,7 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
             </div>
           </div>
         ) : (
-          filteredReports.map((report) => (
+          filteredReports.slice(0, visibleLimit).map((report) => (
             <div
               key={report.id}
               className={`bg-white rounded-2xl border transition-all p-5 flex flex-col justify-between space-y-4 shadow-2xs hover:shadow-md ${
@@ -704,6 +716,8 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                                 <img
                                   src={fotoUrl}
                                   alt={foto.name || `Foto ${fIdx + 1}`}
+                                  loading="lazy"
+                                  decoding="async"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                                   onError={() => {
                                     setFailedPhotoKeys((prev) => ({ ...prev, [photoKey]: true }));
@@ -782,19 +796,62 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
         )}
       </div>
 
+      {filteredReports.length > visibleLimit && (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={() => setVisibleLimit((prev) => prev + 12)}
+            className="px-5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 font-bold text-xs cursor-pointer transition-all shadow-2xs"
+          >
+            Muat Lebih Banyak ({filteredReports.length - visibleLimit} laporan tersisa)
+          </button>
+        </div>
+      )}
+
       {/* MODAL PRATINJAU & CETAK LAPORAN POSYANDU FORMAT A4 RESMI */}
       {selectedPrintReport && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6 flex flex-col max-h-[92vh]">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedPrintReport(null);
+          }}
+          className="fixed inset-0 z-[120] bg-slate-950/85 flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
+        >
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 flex flex-col max-h-[94vh]">
             {/* Modal Top Header Bar */}
-            <div className="bg-slate-900 text-white p-4 flex flex-wrap items-center justify-between gap-3 shrink-0">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-emerald-400" />
-                <h3 className="font-black text-sm sm:text-base text-white">
-                  Pratinjau Lembar Cetak A4 Kedinasan — Laporan Posyandu
-                </h3>
+            <div className="bg-slate-900 text-white px-3.5 py-3 sm:p-4 flex flex-col gap-2.5 shrink-0 border-b border-slate-800">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <h3 className="font-black text-xs sm:text-base text-white truncate">
+                    Pratinjau Lembar Cetak A4 Kedinasan — Laporan Posyandu
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPrintReport(null)}
+                  aria-label="Tutup Pratinjau"
+                  title="Tutup Pratinjau (ESC)"
+                  className="min-w-[44px] min-h-[44px] px-3 py-2 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white border border-rose-400/70 rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-1.5 shrink-0 font-bold text-xs transition-all touch-manipulation"
+                >
+                  <X className="w-5 h-5 shrink-0" />
+                  <span className="hidden sm:inline">Tutup</span>
+                </button>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {(currentUser.role === 'super_admin' || currentUser.role === 'ketua_pkk_kelurahan' || currentUser.role === 'sekretaris_pkk' || currentUser.role === 'sekretaris' || currentUser.role === 'ketua_pokja' || currentUser.role === 'ketua_pkk_lingkungan' || currentUser.id === selectedPrintReport.pkkLingkunganId) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = selectedPrintReport;
+                      setSelectedPrintReport(null);
+                      handleOpenEdit(target);
+                    }}
+                    className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-amber-300 border border-amber-400/40 font-black text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all touch-manipulation"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    <span>Edit Laporan</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={async () => {
@@ -804,7 +861,7 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                     setIsExportingPDF(false);
                   }}
                   disabled={isExportingPDF}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all disabled:opacity-50"
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all disabled:opacity-50 touch-manipulation"
                 >
                   <Download className="w-4 h-4" />
                   <span>{isExportingPDF ? 'Proses PDF...' : 'Unduh PDF A4'}</span>
@@ -815,26 +872,19 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                     const filename = `Laporan_Posyandu_${selectedPrintReport.posyanduNama.replace(/[^a-zA-Z0-9]/g, '_')}_Lk_${selectedPrintReport.nomorLingkungan}`;
                     printOfficialDocument('lembar-cetak-posyandu-a4', filename);
                   }}
-                  className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all"
+                  className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all touch-manipulation"
                 >
                   <Printer className="w-4 h-4" />
                   <span>Cetak / Print</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedPrintReport(null)}
-                  className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
             {/* Modal Preview Body containing Official A4 Layout */}
-            <div className="p-4 sm:p-6 overflow-y-auto bg-slate-200 flex flex-col items-center">
+            <div className="p-3 sm:p-6 overflow-auto bg-slate-200 flex-1">
               <div
                 id="lembar-cetak-posyandu-a4"
-                className="bg-white text-slate-900 w-[180mm] min-w-[180mm] p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300"
+                className="bg-white text-slate-900 w-[180mm] min-w-[180mm] mx-auto p-6 font-serif text-[8.5pt] leading-tight shadow-md rounded border border-slate-300"
               >
                 {/* Kop Surat PKK Resmi */}
                 <KopSuratPkk />
@@ -1039,6 +1089,21 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                 </div>
               </div>
             </div>
+
+            {/* Modal Bottom Footer Bar */}
+            <div className="bg-slate-100 border-t border-slate-200 px-4 py-3 flex items-center justify-between gap-3 shrink-0">
+              <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
+                Klik di luar lembar atau tekan ESC untuk menutup pratinjau
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedPrintReport(null)}
+                className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 transition-colors touch-manipulation"
+              >
+                <X className="w-4 h-4" />
+                <span>Tutup Pratinjau</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1047,20 +1112,25 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
       {previewPhotoUrl && (
         <div
           onClick={() => setPreviewPhotoUrl(null)}
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-[140] bg-black/90 flex items-center justify-center p-4 cursor-pointer"
         >
-          <div className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center">
-            <button
-              type="button"
-              onClick={() => setPreviewPhotoUrl(null)}
-              className="absolute -top-12 right-0 p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors cursor-pointer"
-            >
-              <X className="w-6 h-6" />
-            </button>
+          <button
+            type="button"
+            onClick={() => setPreviewPhotoUrl(null)}
+            aria-label="Tutup Foto"
+            className="fixed top-4 right-4 z-10 min-w-[44px] min-h-[44px] px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-full shadow-xl border border-white/30 transition-colors cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs touch-manipulation"
+          >
+            <X className="w-5 h-5" />
+            <span>Tutup</span>
+          </button>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-4xl max-h-[85vh] w-full flex flex-col items-center justify-center cursor-default"
+          >
             <img
               src={previewPhotoUrl}
               alt="Foto Dokumentasi Fullscreen"
-              className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/20"
+              className="max-w-full max-h-[82vh] object-contain rounded-2xl shadow-2xl border border-white/20"
             />
           </div>
         </div>
@@ -1068,33 +1138,39 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
 
       {/* Modal Input Laporan Posyandu */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-rose-200 overflow-hidden animate-in fade-in zoom-in duration-200 my-8">
-            <div className="bg-gradient-to-r from-rose-800 to-pink-900 text-white px-6 py-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-black text-lg">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsModalOpen(false);
+          }}
+          className="fixed inset-0 z-[120] bg-slate-950/75 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+        >
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-rose-200 overflow-hidden animate-in fade-in zoom-in duration-200 my-4 sm:my-8">
+            <div className="bg-gradient-to-r from-rose-800 to-pink-900 text-white px-5 py-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="font-black text-base sm:text-lg truncate">
                   {isEditing ? 'Edit Laporan Pelayanan Posyandu' : 'Formulir Pelayanan Posyandu & Kesehatan'}
                 </h3>
-                <p className="text-xs text-rose-200">Diisi oleh Ketua PKK Lingkungan / Sekretaris (Pokja IV)</p>
+                <p className="text-xs text-rose-200 truncate">Diisi oleh Ketua PKK Lingkungan / Sekretaris (Pokja IV)</p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-rose-200 hover:text-white p-1 rounded-lg hover:bg-rose-800 cursor-pointer"
+                aria-label="Tutup Formulir"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-white bg-white/15 hover:bg-rose-600 border border-white/25 rounded-xl shrink-0 cursor-pointer transition-colors touch-manipulation"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Pilih Lingkungan:</label>
                   <select
                     value={formLingkunganNomor}
                     onChange={(e) => setFormLingkunganNomor(parseInt(e.target.value, 10))}
                     disabled={currentUser.role === 'ketua_pkk_lingkungan'}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold bg-white text-slate-800"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold bg-white text-slate-800 disabled:bg-slate-100"
                   >
                     {KETUA_PKK_LINGKUNGAN_ACCOUNTS.map((acc) => (
                       <option key={acc.id} value={acc.nomorLingkungan}>
@@ -1110,6 +1186,17 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                     value={formTanggal}
                     onChange={(e) => setFormTanggal(e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold bg-white text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Nama Petugas Pelapor:</label>
+                  <input
+                    type="text"
+                    value={formNamaPetugas}
+                    onChange={(e) => setFormNamaPetugas(e.target.value)}
+                    disabled={currentUser.role !== 'super_admin' && !isEditing}
+                    placeholder="Nama pelapor Posyandu"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold bg-white text-slate-800 disabled:bg-slate-100"
                   />
                 </div>
               </div>

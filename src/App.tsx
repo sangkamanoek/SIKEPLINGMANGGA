@@ -109,7 +109,17 @@ import {
   saveVisitsToIndexedDB,
 } from './lib/indexedDbStorage';
 import { subscribeTargetsFromFirestore } from './lib/firestoreService';
+import {
+  clearFirestoreQuotaCooldown,
+  isFirestoreQuotaCooldownActive,
+} from './lib/firebase';
 import { consolidateDailyReport, consolidateAllReports, findMatchingDailyReport } from './lib/reportConsolidator';
+import { initBackgroundAutoSync } from './lib/autoSyncService';
+import {
+  flushFirestoreWriteQueue,
+  getPendingSyncCount,
+  refreshPendingSyncCount,
+} from './lib/firestoreWriteQueue';
 
 const ACTIVE_ACCOUNT_STORAGE_KEY = 'sikepling_active_account_id';
 const ACTIVE_TAB_STORAGE_KEY = 'sikepling_active_tab_v2';
@@ -164,6 +174,11 @@ export default function App() {
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isSyncVerificationOpen, setIsSyncVerificationOpen] = useState(false);
   const [isNotifSoundModalOpen, setIsNotifSoundModalOpen] = useState(false);
+  const [quotaNoticeVisible, setQuotaNoticeVisible] = useState<boolean>(() =>
+    isFirestoreQuotaCooldownActive()
+  );
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(() => getPendingSyncCount());
+  const [isFlushingSync, setIsFlushingSync] = useState<boolean>(false);
 
   // Real-time audio chime & mobile vibration alert for Agenda Kelurahan & Tugas Khusus Lurah
   const { activeAlert, dismissAlert, replayAlertSound } = useAgendaTugasRealtimeAlert(activeAccount);
@@ -185,13 +200,16 @@ export default function App() {
         return getEffectiveProfile(base);
       });
     };
+    const handleQuotaExceeded = () => setQuotaNoticeVisible(true);
     window.addEventListener('open-account-selector-full', handleOpenFullSelector);
     window.addEventListener('open-notif-sound-modal', handleOpenNotifSound);
     window.addEventListener('sikepling_profile_updated', handleProfileUpdate);
+    window.addEventListener('firestore-quota-exceeded', handleQuotaExceeded);
     return () => {
       window.removeEventListener('open-account-selector-full', handleOpenFullSelector);
       window.removeEventListener('open-notif-sound-modal', handleOpenNotifSound);
       window.removeEventListener('sikepling_profile_updated', handleProfileUpdate);
+      window.removeEventListener('firestore-quota-exceeded', handleQuotaExceeded);
     };
   }, []);
 
@@ -246,16 +264,20 @@ export default function App() {
       }
     });
 
-    fetchAllReports()
-      .then((fetched) => {
-        if (!gotLiveReports && Array.isArray(fetched) && fetched.length > 0) {
-          const unified = consolidateAllReports(fetched);
-          setReports(unified);
-          safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(unified));
-          saveReportsToIndexedDB(unified).catch(() => {});
-        }
-      })
-      .catch(() => {});
+    const reportsFallbackTimer = setTimeout(() => {
+      if (!gotLiveReports && !isFirestoreQuotaCooldownActive()) {
+        fetchAllReports()
+          .then((fetched) => {
+            if (!gotLiveReports && Array.isArray(fetched) && fetched.length > 0) {
+              const unified = consolidateAllReports(fetched);
+              setReports(unified);
+              safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(unified));
+              saveReportsToIndexedDB(unified).catch(() => {});
+            }
+          })
+          .catch(() => {});
+      }
+    }, 5000);
 
     // Use real-time subscription for kunjungan with non-blocking IndexedDB persistence
     const unsubKunjungan = subscribeKunjungan((fetched) => {
@@ -272,7 +294,25 @@ export default function App() {
       }
     });
     
+    const cleanupAutoSync = initBackgroundAutoSync();
+    refreshPendingSyncCount()
+      .then((count) => setPendingSyncCount(count))
+      .catch(() => {});
+
+    const handleQueueUpdated = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ count?: number }>).detail;
+      if (typeof detail?.count === 'number') {
+        setPendingSyncCount(detail.count);
+      } else {
+        setPendingSyncCount(getPendingSyncCount());
+      }
+    };
+    window.addEventListener('sikepling-sync-queue-updated', handleQueueUpdated);
+
     return () => {
+      cleanupAutoSync();
+      window.removeEventListener('sikepling-sync-queue-updated', handleQueueUpdated);
+      clearTimeout(reportsFallbackTimer);
       unsub();
       unsubKunjungan();
       unsubTargets();
@@ -526,6 +566,74 @@ export default function App() {
 
       {/* Update Toast Banner */}
       <AppUpdateToastBanner onOpenUpdateModal={() => setIsAppUpdateOpen(true)} />
+
+      {/* Firestore Daily Quota Notice Banner */}
+      {quotaNoticeVisible && (
+        <div className="max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3">
+          <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-900 shadow-sm">
+            <div className="space-y-0.5">
+              <p className="font-semibold">
+                Mode Cache Lokal Aktif — Kuota Harian Firestore Tercapai
+              </p>
+              <p className="text-amber-800">
+                Batas pembacaan gratis harian database Cloud Firestore telah tercapai dan akan direset besok. Data tersimpan lokal tetap dapat dilihat & digunakan.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  clearFirestoreQuotaCooldown();
+                  window.location.reload();
+                }}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 transition-colors cursor-pointer"
+              >
+                Coba Sinkron Ulang
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuotaNoticeVisible(false)}
+                className="px-2.5 py-1.5 rounded-lg bg-amber-100 text-amber-900 font-medium hover:bg-amber-200 transition-colors cursor-pointer"
+                aria-label="Tutup pemberitahuan kuota"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Offline / Weak-Signal Sync Queue Banner */}
+      {pendingSyncCount > 0 && (
+        <div className="max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-blue-950 shadow-sm">
+            <p className="font-semibold">
+              {pendingSyncCount} perubahan tersimpan aman di perangkat dan menunggu sinkronisasi ke Cloud Firestore (sinyal lemah/offline).
+            </p>
+            <button
+              type="button"
+              disabled={isFlushingSync}
+              onClick={async () => {
+                setIsFlushingSync(true);
+                try {
+                  const res = await flushFirestoreWriteQueue();
+                  setPendingSyncCount(res.remaining);
+                  if (res.remaining === 0) {
+                    showToast('Seluruh antrean perubahan berhasil disinkronkan ke Cloud Firestore!', 'success');
+                  } else {
+                    showToast(`${res.succeeded} data tersinkron, ${res.remaining} masih menunggu koneksi stabil.`, 'info');
+                  }
+                } finally {
+                  setIsFlushingSync(false);
+                }
+              }}
+              className="px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white font-bold transition-colors cursor-pointer shrink-0"
+            >
+              {isFlushingSync ? 'Menyinkronkan...' : 'Sinkronkan Sekarang'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main View Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-4">

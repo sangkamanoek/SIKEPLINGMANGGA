@@ -1,16 +1,19 @@
 import { PkkDasaWismaItem } from '../types';
-import { db } from './firebase';
+import {
+  db,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+} from './firebase';
 import { cleanFirestoreData } from './firestoreService';
 import {
   collection,
   onSnapshot,
-  setDoc,
-  deleteDoc,
-  doc,
   getDocs,
   getDocsFromServer,
   Unsubscribe,
 } from 'firebase/firestore';
+import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 
 export const PKK_DASA_WISMA_COLLECTION = 'pkk_dasa_wisma';
@@ -109,13 +112,14 @@ export const setLocalDasaWismaList = (items: PkkDasaWismaItem[]): void => {
 };
 
 export const fetchDasaWismaFromFirestore = async (): Promise<PkkDasaWismaItem[]> => {
-  if (!db) return getLocalDasaWismaList();
+  if (!db || isFirestoreQuotaCooldownActive()) return getLocalDasaWismaList();
   try {
     const colRef = collection(db, PKK_DASA_WISMA_COLLECTION);
     let snap;
     try {
       snap = await getDocsFromServer(colRef);
-    } catch {
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
       snap = await getDocs(colRef);
     }
     const remoteItems: PkkDasaWismaItem[] = [];
@@ -130,7 +134,11 @@ export const fetchDasaWismaFromFirestore = async (): Promise<PkkDasaWismaItem[]>
     }
     return remoteItems;
   } catch (e) {
-    console.warn('Gagal fetch Dasa Wisma dari Firestore:', e);
+    if (isQuotaExhaustedError(e)) {
+      markFirestoreQuotaExhausted(e);
+    } else {
+      console.warn('Gagal fetch Dasa Wisma dari Firestore:', e);
+    }
     return getLocalDasaWismaList();
   }
 };
@@ -144,19 +152,13 @@ export const saveDasaWisma = async (item: PkkDasaWismaItem): Promise<void> => {
   if (typeof BroadcastChannel !== 'undefined') {
     try {
       const bc = new BroadcastChannel(PKK_DASA_WISMA_CHANNEL);
-      bc.postMessage({ type: 'DASA_WISMA_UPDATED', item: normalized });
+      bc.postMessage({ type: 'DASA_WISMA_UPDATED', id: normalized.id });
       bc.close();
     } catch {}
   }
 
-  if (db) {
-    try {
-      const cleaned = cleanFirestoreData(normalized);
-      await setDoc(doc(db, PKK_DASA_WISMA_COLLECTION, normalized.id), cleaned, { merge: true });
-    } catch (e) {
-      console.warn('Gagal simpan Dasa Wisma ke Firestore:', e);
-    }
-  }
+  const cleaned = cleanFirestoreData(normalized);
+  await resilientSetDoc(PKK_DASA_WISMA_COLLECTION, normalized.id, cleaned, { merge: true });
 };
 
 export const deleteDasaWisma = async (id: string): Promise<void> => {
@@ -172,13 +174,7 @@ export const deleteDasaWisma = async (id: string): Promise<void> => {
     } catch {}
   }
 
-  if (db) {
-    try {
-      await deleteDoc(doc(db, PKK_DASA_WISMA_COLLECTION, id));
-    } catch (e) {
-      console.warn('Gagal hapus Dasa Wisma di Firestore:', e);
-    }
-  }
+  await resilientDeleteDoc(PKK_DASA_WISMA_COLLECTION, id);
 };
 
 export const subscribeDasaWisma = (
@@ -201,9 +197,10 @@ export const subscribeDasaWisma = (
     } catch {}
   }
 
-  // 3. Firestore listener + explicit server fetch fallback
+  // 3. Firestore listener + delayed fallback
   let unsubFirestore: Unsubscribe | undefined;
-  if (db) {
+  let fallbackTimer: any = null;
+  if (db && !isFirestoreQuotaCooldownActive()) {
     try {
       unsubFirestore = onSnapshot(
         collection(db, PKK_DASA_WISMA_COLLECTION),
@@ -225,19 +222,31 @@ export const subscribeDasaWisma = (
           }
         },
         (err) => {
+          if (isQuotaExhaustedError(err)) {
+            markFirestoreQuotaExhausted(err);
+            isActive = false;
+            if (fallbackTimer) clearTimeout(fallbackTimer);
+            try { unsubFirestore?.(); } catch {}
+            return;
+          }
           console.warn('Firestore Dasa Wisma error, mencoba getDocs fallback:', err);
-          fetchDasaWismaFromFirestore().then((items) => {
-            if (isActive && items.length > 0) callback(items);
-          });
+          if (!isFirestoreQuotaCooldownActive()) {
+            fetchDasaWismaFromFirestore().then((items) => {
+              if (isActive && items.length > 0) callback(items);
+            });
+          }
         }
       );
 
-      // Parallel getDocsFromServer ensures cold-start / iframe environments immediately populate from Firestore
-      fetchDasaWismaFromFirestore().then((items) => {
-        if (isActive && !receivedServerSnapshot && items.length > 0) {
-          callback(items);
+      fallbackTimer = setTimeout(() => {
+        if (isActive && !receivedServerSnapshot && !isFirestoreQuotaCooldownActive()) {
+          fetchDasaWismaFromFirestore().then((items) => {
+            if (isActive && !receivedServerSnapshot && items.length > 0) {
+              callback(items);
+            }
+          });
         }
-      });
+      }, 4500);
     } catch (e) {
       console.warn('Error subscribing to Dasa Wisma:', e);
     }
@@ -245,11 +254,12 @@ export const subscribeDasaWisma = (
 
   return () => {
     isActive = false;
+    if (fallbackTimer) clearTimeout(fallbackTimer);
     if (bc) {
       bc.close();
     }
     if (unsubFirestore) {
-      unsubFirestore();
+      try { unsubFirestore(); } catch {}
     }
   };
 };

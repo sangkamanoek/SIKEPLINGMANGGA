@@ -19,6 +19,7 @@ import {
   Eye,
   Printer,
   RefreshCw,
+  Edit3,
 } from 'lucide-react';
 import { UserAccount, LaporanKegiatanPkk, PokjaPkkType, FotoDokumentasi } from '../types';
 import {
@@ -131,29 +132,38 @@ const normalizePelaporNama = (name: string): string => {
   return name;
 };
 
-export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser }) => {
+export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser, onShowToast }) => {
   const [kegiatanList, setKegiatanList] = useState<LaporanKegiatanPkk[]>([]);
   const [filterPokja, setFilterPokja] = useState<string>('ALL');
   const [filterLingkungan, setFilterLingkungan] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [visibleLimit, setVisibleLimit] = useState<number>(12);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Modals
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
+  const [editingItem, setEditingItem] = useState<LaporanKegiatanPkk | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<LaporanKegiatanPkk | null>(null);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setVisibleLimit(12);
+  }, [filterPokja, filterLingkungan, searchQuery]);
 
   // Form State
-  const [formTanggal, setFormTanggal] = useState<string>(
-    () => new Date().toISOString().split('T')[0]
-  );
-  const [formPokja, setFormPokja] = useState<PokjaPkkType>(() => {
+  const defaultPokja: PokjaPkkType = useMemo(() => {
     if (currentUser.id === 'pokja_1') return 'POKJA_I';
     if (currentUser.id === 'pokja_2') return 'POKJA_II';
     if (currentUser.id === 'pokja_3') return 'POKJA_III';
     if (currentUser.id === 'pokja_4') return 'POKJA_IV';
     if (currentUser.role === 'ketua_pkk_lingkungan') return 'PKK_LINGKUNGAN';
     return 'SEKRETARIAT';
-  });
+  }, [currentUser.id, currentUser.role]);
+
+  const [formTanggal, setFormTanggal] = useState<string>(
+    () => new Date().toISOString().split('T')[0]
+  );
+  const [formPokja, setFormPokja] = useState<PokjaPkkType>(defaultPokja);
   const [formNamaKegiatan, setFormNamaKegiatan] = useState<string>('');
   const [formKategori, setFormKategori] = useState<string>('Pola Asuh Anak & Remaja (PAAREDI)');
   const [formLokasi, setFormLokasi] = useState<string>(
@@ -165,6 +175,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
   const [formJumlahPeserta, setFormJumlahPeserta] = useState<string>('20');
   const [formUraian, setFormUraian] = useState<string>('');
   const [formTindakLanjut, setFormTindakLanjut] = useState<string>('');
+  const [formPelaporNama, setFormPelaporNama] = useState<string>(currentUser.nama);
   const [formFotos, setFormFotos] = useState<FotoDokumentasi[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [alertMsg, setAlertMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -187,7 +198,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
 
     candidates.forEach((candidate) => {
       attemptedHydrationIdsRef.current.add(candidate.id);
-      fetchSinglePkkKegiatan(candidate.id, true)
+      fetchSinglePkkKegiatan(candidate.id, false)
         .then((hydrated) => {
           if (hydrated && !hasMissingKegiatanPhotoUrls(hydrated)) {
             setKegiatanList((prev) => prev.map((it) => (it.id === hydrated.id ? hydrated : it)));
@@ -212,7 +223,49 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
 
   const showAlert = (text: string, type: 'success' | 'error' = 'success') => {
     setAlertMsg({ text, type });
+    onShowToast?.(text, type);
     setTimeout(() => setAlertMsg(null), 3500);
+  };
+
+  const handleOpenAdd = () => {
+    setEditingItem(null);
+    setFormTanggal(new Date().toISOString().split('T')[0]);
+    setFormPokja(defaultPokja);
+    setFormNamaKegiatan('');
+    setFormKategori('Pola Asuh Anak & Remaja (PAAREDI)');
+    setFormLokasi(currentUser.lingkungan || 'Kantor Kelurahan Mangga');
+    setFormLingkunganNomor(currentUser.nomorLingkungan || 0);
+    setFormJumlahPeserta('20');
+    setFormUraian('');
+    setFormTindakLanjut('');
+    setFormPelaporNama(currentUser.nama);
+    setFormFotos([]);
+    setIsFormOpen(true);
+  };
+
+  const handleOpenEdit = async (item: LaporanKegiatanPkk) => {
+    let activeItem = item;
+    if (hasMissingKegiatanPhotoUrls(item)) {
+      const hydrated = await fetchSinglePkkKegiatan(item.id, true).catch(() => null);
+      if (hydrated) {
+        activeItem = hydrated;
+        setKegiatanList((prev) => prev.map((it) => (it.id === hydrated.id ? hydrated : it)));
+      }
+    }
+    setSelectedDetail(null);
+    setEditingItem(activeItem);
+    setFormTanggal(activeItem.tanggal || new Date().toISOString().split('T')[0]);
+    setFormPokja(activeItem.pokja || 'SEKRETARIAT');
+    setFormNamaKegiatan(activeItem.namaKegiatan || '');
+    setFormKategori(activeItem.kategoriProgram || '');
+    setFormLokasi(activeItem.lokasi || '');
+    setFormLingkunganNomor(Number(activeItem.lingkunganNomor) || 0);
+    setFormJumlahPeserta(String(activeItem.jumlahPeserta ?? 0));
+    setFormUraian(activeItem.uraianHasil || '');
+    setFormTindakLanjut(activeItem.tindakLanjut || '');
+    setFormPelaporNama(normalizePelaporNama(activeItem.pelaporNama) || currentUser.nama);
+    setFormFotos(Array.isArray(activeItem.fotoDokumentasi) ? activeItem.fotoDokumentasi : []);
+    setIsFormOpen(true);
   };
 
   // Filtered Kegiatan
@@ -294,12 +347,15 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
 
     setIsSubmitting(true);
     try {
-      const newKegiatan: LaporanKegiatanPkk = {
-        id: 'pkk_act_' + Date.now(),
+      const isEditing = Boolean(editingItem);
+      const nowIso = new Date().toISOString();
+      const updatedKegiatan: LaporanKegiatanPkk = {
+        ...(editingItem || {}),
+        id: editingItem ? editingItem.id : 'pkk_act_' + Date.now(),
         tanggal: formTanggal,
         pokja: formPokja,
         namaKegiatan: formNamaKegiatan.trim(),
-        kategoriProgram: formKategori,
+        kategoriProgram: formKategori.trim() || 'Program Pokok PKK',
         lokasi: formLokasi.trim(),
         lingkunganNomor: formLingkunganNomor,
         lingkunganNama:
@@ -310,15 +366,24 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
         uraianHasil: formUraian.trim(),
         tindakLanjut: formTindakLanjut.trim(),
         fotoDokumentasi: formFotos,
-        pelaporNama: currentUser.nama,
-        pelaporRole: currentUser.role,
-        createdAt: new Date().toISOString(),
+        pelaporNama: isEditing
+          ? formPelaporNama.trim() || editingItem?.pelaporNama || currentUser.nama
+          : formPelaporNama.trim() || currentUser.nama,
+        pelaporRole: editingItem?.pelaporRole || currentUser.role,
+        createdAt: editingItem?.createdAt || nowIso,
+        updatedAt: nowIso,
       };
 
-      await savePkkKegiatan(newKegiatan);
-      showAlert('Laporan kegiatan PKK berhasil disimpan secara online!', 'success');
+      await savePkkKegiatan(updatedKegiatan);
+      showAlert(
+        isEditing
+          ? 'Laporan kegiatan PKK berhasil diperbarui ke Cloud!'
+          : 'Laporan kegiatan PKK berhasil disimpan secara online!',
+        'success'
+      );
 
       // Reset form
+      setEditingItem(null);
       setFormNamaKegiatan('');
       setFormUraian('');
       setFormTindakLanjut('');
@@ -438,7 +503,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
 
           <button
             type="button"
-            onClick={() => setIsFormOpen(true)}
+            onClick={handleOpenAdd}
             className="px-4 py-2.5 rounded-xl bg-tosca-700 hover:bg-tosca-800 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-tosca-700/20"
           >
             <Plus className="w-4 h-4" />
@@ -540,7 +605,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredList.map((item) => (
+          {filteredList.slice(0, visibleLimit).map((item) => (
             <div
               key={item.id}
               className="bg-white rounded-2xl border border-slate-200 hover:border-tosca-400 shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col justify-between"
@@ -569,6 +634,8 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                           <img
                             src={thumbUrl}
                             alt={item.namaKegiatan}
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             onError={() => setFailedPhotoKeys((prev) => ({ ...prev, [thumbKey]: true }))}
                           />
@@ -639,7 +706,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
               </div>
 
               {/* Bottom Actions */}
-              <div className="p-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between">
+              <div className="p-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedDetail(item)}
@@ -649,32 +716,60 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                   <span>Lihat Detail</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => handleDelete(item.id, item.namaKegiatan)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                  title="Hapus Laporan Kegiatan"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(item)}
+                    className="px-2 py-1 rounded-lg text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Edit Laporan Kegiatan"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(item.id, item.namaKegiatan)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                    title="Hapus Laporan Kegiatan"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
+      {filteredList.length > visibleLimit && (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={() => setVisibleLimit((prev) => prev + 12)}
+            className="px-5 py-2.5 rounded-xl bg-tosca-50 hover:bg-tosca-100 border border-tosca-200 text-tosca-900 font-bold text-xs cursor-pointer transition-all shadow-2xs"
+          >
+            Muat Lebih Banyak ({filteredList.length - visibleLimit} kegiatan tersisa)
+          </button>
+        </div>
+      )}
+
       {/* Modal Detail Kegiatan */}
       {selectedDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedDetail(null);
+          }}
+          className="fixed inset-0 z-[120] flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 animate-in fade-in"
+        >
           <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150">
-            <div className="bg-tosca-800 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Flower2 className="w-5 h-5 text-amber-300" />
-                <div>
-                  <h3 className="font-bold text-sm sm:text-base">
+            <div className="bg-tosca-800 text-white p-4 sm:p-5 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Flower2 className="w-5 h-5 text-amber-300 shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm sm:text-base truncate">
                     Rincian Kegiatan PKK
                   </h3>
-                  <p className="text-[11px] text-tosca-200 font-medium">
+                  <p className="text-[11px] text-tosca-200 font-medium truncate">
                     {POKJA_LABELS[selectedDetail.pokja]} • {selectedDetail.tanggal}
                   </p>
                 </div>
@@ -682,7 +777,8 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
               <button
                 type="button"
                 onClick={() => setSelectedDetail(null)}
-                className="p-1 text-tosca-200 hover:text-white rounded-lg hover:bg-tosca-700 cursor-pointer"
+                aria-label="Tutup Rincian"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-white bg-white/15 hover:bg-rose-600 border border-white/25 rounded-xl shrink-0 cursor-pointer transition-colors touch-manipulation"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -784,7 +880,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                         key={ft.id || idx}
                         className="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs hover:shadow-md transition-all cursor-pointer"
                         onClick={() => {
-                          if (isRenderable) window.open(fotoUrl, '_blank');
+                          if (isRenderable) setPreviewPhotoUrl(fotoUrl);
                         }}
                       >
                         <div className="h-36 w-full overflow-hidden flex items-center justify-center">
@@ -792,6 +888,8 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                             <img
                               src={fotoUrl}
                               alt={`Dokumentasi ${idx + 1}`}
+                              loading="lazy"
+                              decoding="async"
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               onError={() => setFailedPhotoKeys((prev) => ({ ...prev, [photoKey]: true }))}
                             />
@@ -819,11 +917,20 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
               </div>
             </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
               <span className="text-[11px] text-slate-500">
                 Dilaporkan oleh: <strong>{normalizePelaporNama(selectedDetail.pelaporNama)}</strong> ({selectedDetail.pelaporRole})
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEdit(selectedDetail)}
+                  className="px-3.5 py-2 bg-amber-100 hover:bg-amber-200 text-amber-950 font-black rounded-xl text-xs cursor-pointer flex items-center gap-1.5 shadow-sm transition-all border border-amber-300"
+                  title="Edit isi, wilayah, pelapor, atau foto laporan kegiatan ini"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  <span>Edit Laporan</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => downloadPdfDocument('lembar-cetak-pkk-kegiatan', `LAPORAN_PKK_${selectedDetail.namaKegiatan.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`)}
@@ -1201,21 +1308,37 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
         </div>
       )}
 
-      {/* Modal Input Kegiatan Baru */}
+      {/* Modal Input / Edit Kegiatan */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsFormOpen(false);
+              setEditingItem(null);
+            }
+          }}
+          className="fixed inset-0 z-[120] flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 animate-in fade-in"
+        >
           <div className="bg-white rounded-3xl max-w-xl w-full max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150">
-            <div className="bg-tosca-800 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Plus className="w-5 h-5 text-amber-300" />
-                <h3 className="font-bold text-sm sm:text-base">
-                  Catat Laporan Kegiatan PKK
+            <div className="bg-tosca-800 text-white p-4 sm:p-5 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                {editingItem ? (
+                  <Edit3 className="w-5 h-5 text-amber-300 shrink-0" />
+                ) : (
+                  <Plus className="w-5 h-5 text-amber-300 shrink-0" />
+                )}
+                <h3 className="font-bold text-sm sm:text-base truncate">
+                  {editingItem ? 'Edit Laporan Kegiatan PKK' : 'Catat Laporan Kegiatan PKK'}
                 </h3>
               </div>
               <button
                 type="button"
-                onClick={() => setIsFormOpen(false)}
-                className="p-1 text-tosca-200 hover:text-white rounded-lg hover:bg-tosca-700 cursor-pointer"
+                onClick={() => {
+                  setIsFormOpen(false);
+                  setEditingItem(null);
+                }}
+                aria-label="Tutup Formulir"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-white bg-white/15 hover:bg-rose-600 border border-white/25 rounded-xl shrink-0 cursor-pointer transition-colors touch-manipulation"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1248,6 +1371,37 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                     <option value="POKJA_IV">Pokja IV (Kesehatan & Posyandu)</option>
                     <option value="PKK_LINGKUNGAN">TP-PKK Lingkungan</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Wilayah / Lingkungan Pelaksana</label>
+                  <select
+                    value={formLingkunganNomor}
+                    onChange={(e) => setFormLingkunganNomor(Number(e.target.value))}
+                    disabled={currentUser.role === 'ketua_pkk_lingkungan'}
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-tosca-600 font-bold disabled:bg-slate-100"
+                  >
+                    <option value={0}>TP PKK Kelurahan Mangga (Tingkat Kelurahan)</option>
+                    {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        Lingkungan {n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Nama Pelapor</label>
+                  <input
+                    type="text"
+                    value={formPelaporNama}
+                    onChange={(e) => setFormPelaporNama(e.target.value)}
+                    disabled={currentUser.role !== 'super_admin' && !editingItem}
+                    placeholder="Nama petugas pelapor"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-tosca-600 font-semibold disabled:bg-slate-100"
+                  />
                 </div>
               </div>
 
@@ -1376,8 +1530,12 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                   <div className="space-y-3 pt-2">
                     {formFotos.map((ft, idx) => (
                       <div key={ft.id || idx} className="flex gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 shrink-0">
-                          <img src={ft.url} alt="upload" className="w-full h-full object-cover" />
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 shrink-0 bg-slate-100 flex items-center justify-center">
+                          {resolveKegiatanFotoUrl(ft) ? (
+                            <img src={resolveKegiatanFotoUrl(ft)} alt="upload" className="w-full h-full object-cover" />
+                          ) : (
+                            <ImageIcon className="w-5 h-5 text-slate-400" />
+                          )}
                         </div>
                         <div className="flex-1 space-y-1.5">
                           <div className="flex items-center justify-between">
@@ -1425,7 +1583,10 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setIsFormOpen(false)}
+                  onClick={() => {
+                    setIsFormOpen(false);
+                    setEditingItem(null);
+                  }}
                   className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 cursor-pointer"
                 >
                   Batal
@@ -1436,7 +1597,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                   className="px-5 py-2.5 rounded-xl bg-tosca-700 hover:bg-tosca-800 text-white font-bold text-xs shadow-md cursor-pointer flex items-center gap-1.5"
                 >
                   <Check className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Laporan Kegiatan'}</span>
+                  <span>{isSubmitting ? 'Menyimpan...' : editingItem ? 'Simpan Perubahan' : 'Simpan Laporan Kegiatan'}</span>
                 </button>
               </div>
             </form>
@@ -1711,6 +1872,34 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
           </div>
         </div>
       </div>
+
+      {/* In-App Fullscreen Photo Lightbox */}
+      {previewPhotoUrl && (
+        <div
+          onClick={() => setPreviewPhotoUrl(null)}
+          className="fixed inset-0 z-[140] bg-black/90 flex items-center justify-center p-4 cursor-pointer"
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewPhotoUrl(null)}
+            aria-label="Tutup Foto"
+            className="fixed top-4 right-4 z-10 min-w-[44px] min-h-[44px] px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-full shadow-xl border border-white/30 transition-colors cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs touch-manipulation"
+          >
+            <X className="w-5 h-5" />
+            <span>Tutup</span>
+          </button>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-4xl max-h-[85vh] w-full flex flex-col items-center justify-center cursor-default"
+          >
+            <img
+              src={previewPhotoUrl}
+              alt="Foto Dokumentasi Fullscreen"
+              className="max-w-full max-h-[82vh] object-contain rounded-2xl shadow-2xl border border-white/20"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

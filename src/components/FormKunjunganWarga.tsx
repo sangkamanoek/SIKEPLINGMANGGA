@@ -50,6 +50,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (editItem) {
@@ -98,16 +99,17 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
     if (!lingkungan) {
-      alert('Harap pilih lingkungan yang dikunjungi.');
+      setErrorMsg('Harap pilih lingkungan yang dikunjungi.');
       return;
     }
     if (!namaWarga.trim() || !alamat.trim()) {
-      alert('Nama Warga dan Alamat Lengkap wajib diisi.');
+      setErrorMsg('Nama Warga dan Alamat Lengkap wajib diisi.');
       return;
     }
     if (!fotoUrl) {
-      alert('Foto Dokumentasi Kunjungan Warga Wajib Dilampirkan!\nSilakan klik tombol "Ambil Foto Kamera Langsung" atau "Pilih dari Galeri HP".');
+      setErrorMsg('Foto Dokumentasi Kunjungan Warga wajib dilampirkan! Silakan ambil foto kamera atau pilih dari galeri.');
       return;
     }
 
@@ -146,7 +148,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       }, 1200);
     } catch (err: any) {
       console.error('Error saving kunjungan:', err);
-      alert('Gagal menyimpan kunjungan: ' + (err.message || err));
+      setErrorMsg('Gagal menyimpan kunjungan: ' + (err?.message || err));
       setIsSubmitting(false);
     }
   };
@@ -160,6 +162,19 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
           <p className="text-[11px] text-slate-500">Tersimpan langsung ke Database Cloud Firestore (Koleksi: kunjungan_warga)</p>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="p-3 bg-rose-50 border border-rose-300 text-rose-900 rounded-xl flex items-center justify-between gap-2 font-bold">
+          <span>{errorMsg}</span>
+          <button
+            type="button"
+            onClick={() => setErrorMsg(null)}
+            className="p-1 rounded hover:bg-rose-100 text-rose-700 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {successMsg && (
         <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl flex items-center gap-2 font-bold">

@@ -1,14 +1,18 @@
-import { db } from './firebase';
+import {
+  db,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+} from './firebase';
 import {
   collection,
-  doc,
   getDocs,
   getDocsFromServer,
-  setDoc,
-  deleteDoc,
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
+import { cleanFirestoreData } from './firestoreService';
+import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import { getVisitsFromIndexedDB, saveVisitsToIndexedDB } from './indexedDbStorage';
 
@@ -69,18 +73,29 @@ export const getLocalKunjunganList = (): KunjunganWargaData[] => {
   return memoryKunjungan.filter((x) => x && x.id && !deletedSet.has(x.id));
 };
 
+function stripKunjunganMediaForBroadcast(items: KunjunganWargaData[]): KunjunganWargaData[] {
+  return items.map((it) => {
+    if (!it) return it;
+    const copy = { ...it };
+    if (typeof copy.fotoUrl === 'string' && copy.fotoUrl.startsWith('data:') && copy.fotoUrl.length > 200) {
+      copy.fotoUrl = '';
+    }
+    return copy;
+  });
+}
+
 export const setLocalKunjunganList = (items: KunjunganWargaData[]): void => {
   const deletedSet = new Set(getDeletedKunjunganIds());
   const cleaned = items.filter((x) => x && x.id && !deletedSet.has(x.id));
   memoryKunjungan = cleaned;
-  safeSetLocalStorage(KUNJUNGAN_STORAGE_KEY, JSON.stringify(cleaned));
+  safeSetLocalStorage(KUNJUNGAN_STORAGE_KEY, JSON.stringify(cleaned), { skipIdbMirror: true });
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('kunjungan-data-updated'));
   }
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(KUNJUNGAN_CHANNEL);
-      bc.postMessage({ type: 'SYNC_KUNJUNGAN', items: cleaned });
+      bc.postMessage({ type: 'SYNC_KUNJUNGAN', items: stripKunjunganMediaForBroadcast(cleaned) });
       bc.close();
     }
   } catch (e) {}
@@ -94,7 +109,7 @@ export const saveKunjunganWargaToFirestore = async (item: KunjunganWargaData): P
     updatedAt: new Date().toISOString(),
   };
 
-  // 1. Update local state
+  // 1. Update local state & IndexedDB
   const current = getLocalKunjunganList();
   const idx = current.findIndex((p) => p.id === dataToSave.id);
   let updatedList = [...current];
@@ -106,14 +121,8 @@ export const saveKunjunganWargaToFirestore = async (item: KunjunganWargaData): P
   setLocalKunjunganList(updatedList);
   saveVisitsToIndexedDB(updatedList).catch(() => {});
 
-  // 2. Save to Firestore if connected
-  try {
-    if (db) {
-      await setDoc(doc(db, KUNJUNGAN_COLLECTION, dataToSave.id), dataToSave, { merge: true });
-    }
-  } catch (err) {
-    console.warn('[kunjunganService] Firestore save error:', err);
-  }
+  // 2. Save to Firestore via resilient write queue
+  await resilientSetDoc(KUNJUNGAN_COLLECTION, dataToSave.id, cleanFirestoreData(dataToSave), { merge: true });
 
   // 3. Save to server API buffer
   try {
@@ -134,13 +143,7 @@ export const deleteKunjunganWargaFromFirestore = async (id: string): Promise<voi
   setLocalKunjunganList(filtered);
   saveVisitsToIndexedDB(filtered).catch(() => {});
 
-  try {
-    if (db) {
-      await deleteDoc(doc(db, KUNJUNGAN_COLLECTION, id));
-    }
-  } catch (err) {
-    console.warn('[kunjunganService] Firestore delete error:', err);
-  }
+  await resilientDeleteDoc(KUNJUNGAN_COLLECTION, id);
 
   try {
     await fetch(`/api/kunjungan/${id}`, { method: 'DELETE' });
@@ -155,13 +158,14 @@ function sortKunjunganDesc(items: KunjunganWargaData[]): KunjunganWargaData[] {
 
 export const fetchKunjunganFromFirestore = async (): Promise<KunjunganWargaData[]> => {
   const local = getLocalKunjunganList();
-  if (!db) return local;
+  if (!db || isFirestoreQuotaCooldownActive()) return local;
   try {
     const colRef = collection(db, KUNJUNGAN_COLLECTION);
     let snap;
     try {
       snap = await getDocsFromServer(colRef);
-    } catch {
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
       snap = await getDocs(colRef);
     }
     const deletedSet = new Set(getDeletedKunjunganIds());
@@ -180,7 +184,11 @@ export const fetchKunjunganFromFirestore = async (): Promise<KunjunganWargaData[
       return sorted;
     }
   } catch (err) {
-    console.warn('[kunjunganService] fetchKunjunganFromFirestore warning:', err);
+    if (isQuotaExhaustedError(err)) {
+      markFirestoreQuotaExhausted(err);
+    } else {
+      console.warn('[kunjunganService] fetchKunjunganFromFirestore warning:', err);
+    }
   }
   return local;
 };
@@ -229,8 +237,9 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
 
   // 4. Realtime Authoritative Firestore Sync
   let unsub: Unsubscribe | null = null;
+  let fallbackTimer: any = null;
   try {
-    if (db) {
+    if (db && !isFirestoreQuotaCooldownActive()) {
       const q = collection(db, KUNJUNGAN_COLLECTION);
       unsub = onSnapshot(
         q,
@@ -259,20 +268,33 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
           }
         },
         (err) => {
+          if (isQuotaExhaustedError(err)) {
+            markFirestoreQuotaExhausted(err);
+            isActive = false;
+            if (fallbackTimer) clearTimeout(fallbackTimer);
+            try { unsub?.(); } catch {}
+            return;
+          }
           console.warn('[kunjunganService] Snapshot listener error:', err);
-          fetchKunjunganFromFirestore().then((items) => {
-            if (isActive && items.length > 0) cb(items);
-          });
+          if (!isFirestoreQuotaCooldownActive()) {
+            fetchKunjunganFromFirestore().then((items) => {
+              if (isActive && items.length > 0) cb(items);
+            });
+          }
         }
       );
 
-      // Parallel explicit server fetch for cold-start mobile / iframe environments
-      fetchKunjunganFromFirestore().then((items) => {
-        if (isActive && !hasLiveFirestore && items.length > 0) {
-          hasLiveFirestore = true;
-          cb(items);
+      // Delayed explicit server fetch only if live snapshot hasn't arrived
+      fallbackTimer = setTimeout(() => {
+        if (isActive && !hasLiveFirestore && !isFirestoreQuotaCooldownActive()) {
+          fetchKunjunganFromFirestore().then((items) => {
+            if (isActive && !hasLiveFirestore && items.length > 0) {
+              hasLiveFirestore = true;
+              cb(items);
+            }
+          });
         }
-      });
+      }, 4500);
     }
   } catch (e) {}
 
@@ -283,7 +305,16 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
       bc = new BroadcastChannel(KUNJUNGAN_CHANNEL);
       bc.onmessage = (event) => {
         if (isActive && event.data && event.data.type === 'SYNC_KUNJUNGAN' && Array.isArray(event.data.items)) {
-          cb(event.data.items);
+          const memMap = new Map<string, KunjunganWargaData>();
+          memoryKunjungan.forEach((m) => { if (m && m.id) memMap.set(m.id, m); });
+          const hydrated = event.data.items.map((it: KunjunganWargaData) => {
+            if (!it?.fotoUrl && memMap.get(it.id)?.fotoUrl) {
+              return { ...it, fotoUrl: memMap.get(it.id)!.fotoUrl };
+            }
+            return it;
+          });
+          memoryKunjungan = hydrated;
+          cb(hydrated);
         }
       };
     }
@@ -291,7 +322,8 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
 
   return () => {
     isActive = false;
-    if (unsub) unsub();
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    if (unsub) { try { unsub(); } catch {} }
     if (bc) bc.close();
   };
 };

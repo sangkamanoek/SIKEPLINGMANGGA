@@ -80,7 +80,6 @@ import {
   formatRekapPbbWaText,
   subscribePbbSummary,
   getCachedPbbOverview,
-  fetchPbbSpptForLingkungan,
   subscribePbbSpptForLingkungan,
   KelurahanPbbOverview,
 } from '../lib/pbbService';
@@ -230,18 +229,6 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
     if (isKepling && keplingLingkunganNum) {
       // Kepling on mobile: load only their own lingkungan (~800 items instead of 22,585 items)
-      fetchPbbSpptForLingkungan(selectedYear, keplingLingkunganNum).then((items) => {
-        if (Array.isArray(items) && items.length > 0) {
-          lastFirestoreItemsRef.current = items;
-          setSpptList(prev => {
-            if (!prev || prev.length === 0) return items;
-            return smartMergeSpptItems(items, prev, false);
-          });
-          const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLastSyncTime(nowStr);
-        }
-      }).catch(() => {});
-
       unsubscribe = subscribePbbSpptForLingkungan(selectedYear, keplingLingkunganNum, (items) => {
         if (Array.isArray(items)) {
           lastFirestoreItemsRef.current = items;
@@ -254,22 +241,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         }
       });
     } else {
-      // Super Admin or Kasi Pem: full list
-      fetchPbbSpptFromFirestore(selectedYear).then((items) => {
-        if (Array.isArray(items) && items.length > 0) {
-          lastFirestoreItemsRef.current = items;
-          setSpptList(prev => {
-            if (!prev || prev.length === 0) return items;
-            return smartMergeSpptItems(items, prev, false);
-          });
-          const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLastSyncTime(nowStr);
-          try {
-            localStorage.setItem(`sikepling_pbb_last_sync_time_${selectedYear}`, nowStr);
-          } catch {}
-        }
-      }).catch(() => {});
-
+      // Super Admin or Kasi Pem: single subscription (no duplicate parallel getDocsFromServer)
       unsubscribe = subscribePbbSpptFromFirestore(selectedYear, (items) => {
         if (Array.isArray(items)) {
           lastFirestoreItemsRef.current = items;

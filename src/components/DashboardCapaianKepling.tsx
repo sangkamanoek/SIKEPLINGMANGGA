@@ -97,12 +97,11 @@ import {
   AVAILABLE_PBB_YEARS,
   DEFAULT_PBB_YEAR,
   getLocalSpptForYear,
+  getPbbSpptFromIndexedDb,
   computePbbOverview,
-  subscribePbbSpptFromFirestore,
   fetchPbbSpptFromFirestore,
   subscribePbbSummary,
   getCachedPbbOverview,
-  fetchPbbSpptForLingkungan,
   subscribePbbSpptForLingkungan,
   KelurahanPbbOverview,
 } from '../lib/pbbService';
@@ -449,9 +448,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   const [summaryOverview, setSummaryOverview] = useState<KelurahanPbbOverview>(() => getCachedPbbOverview(pbbYear));
 
   useEffect(() => {
+    let active = true;
     // 1. Subscribe to summary overview (instant 0ms loading of 24 Lingkungan rankings)
     const unsubSummary = subscribePbbSummary(pbbYear, (ov) => {
-      if (ov && ov.totalWp > 0) setSummaryOverview(ov);
+      if (active && ov && ov.totalWp > 0) setSummaryOverview(ov);
     });
 
     // 2. Kepling role: subscribe only to own Lingkungan records to prevent mobile memory/network drops
@@ -460,23 +460,27 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
     if (isKeplingRole) {
       const lk = activeAccount.nomorLingkungan!;
-      fetchPbbSpptForLingkungan(pbbYear, lk).then((items) => {
-        if (Array.isArray(items) && items.length > 0) setSpptList(items);
-      }).catch(() => {});
+      getPbbSpptFromIndexedDb(pbbYear)
+        .then((items) => {
+          if (active && Array.isArray(items) && items.length > 0) {
+            setSpptList(items.filter((it) => Number(it.lingkungan) === lk));
+          }
+        })
+        .catch(() => {});
       unsubSppt = subscribePbbSpptForLingkungan(pbbYear, lk, (items) => {
-        if (Array.isArray(items)) setSpptList(items);
+        if (active && Array.isArray(items)) setSpptList(items);
       });
     } else {
       setSpptList(getLocalSpptForYear(pbbYear));
-      fetchPbbSpptFromFirestore(pbbYear).then((items) => {
-        if (Array.isArray(items) && items.length > 0) setSpptList(items);
-      }).catch(() => {});
-      unsubSppt = subscribePbbSpptFromFirestore(pbbYear, (items) => {
-        if (Array.isArray(items)) setSpptList(items);
-      });
+      getPbbSpptFromIndexedDb(pbbYear)
+        .then((items) => {
+          if (active && Array.isArray(items) && items.length > 0) setSpptList(items);
+        })
+        .catch(() => {});
     }
 
     return () => {
+      active = false;
       unsubSummary();
       unsubSppt();
     };

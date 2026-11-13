@@ -154,25 +154,31 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-sky-200 overflow-hidden my-6 flex flex-col">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[120] bg-slate-950/85 flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
+    >
+      <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-sky-200 overflow-hidden my-4 sm:my-6 flex flex-col">
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-sky-800 via-cyan-800 to-teal-900 text-white p-4.5 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-white/20 border border-white/30 backdrop-blur-md">
+        <div className="bg-gradient-to-r from-sky-800 via-cyan-800 to-teal-900 text-white p-4 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-2 rounded-xl bg-white/20 border border-white/30 shrink-0">
               <CreditCard className="w-5 h-5 text-amber-300" />
             </div>
-            <div>
-              <h3 className="font-black text-base text-white">
+            <div className="min-w-0">
+              <h3 className="font-black text-base text-white truncate">
                 Kartu Tanda Anggota (KTA) PKK
               </h3>
-              <p className="text-xs text-sky-200">Ukuran Standar ID Card: 85.60 mm × 53.98 mm</p>
+              <p className="text-xs text-sky-200 truncate">Ukuran Standar ID Card: 85.60 mm × 53.98 mm</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-sky-200 hover:text-white rounded-xl hover:bg-white/10 cursor-pointer transition-colors"
+            aria-label="Tutup KTA"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-white bg-white/15 hover:bg-rose-600 border border-white/25 rounded-xl shrink-0 cursor-pointer transition-colors touch-manipulation"
           >
             <X className="w-5 h-5" />
           </button>

@@ -1,7 +1,13 @@
-import { collection, getDocs, getDocsFromServer, doc, setDoc, deleteDoc, query, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, getDocsFromServer, query, onSnapshot } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { db } from './firebase';
+import {
+  db,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+} from './firebase';
 import { cleanFirestoreData } from './firestoreService';
+import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import { AgendaKelurahanItem, StatusAgendaType } from '../types';
 
@@ -39,7 +45,7 @@ export const getLocalAgendaList = (): AgendaKelurahanItem[] => {
 
 export const fetchAgendaFromFirestore = async (): Promise<AgendaKelurahanItem[]> => {
   const local = getLocalAgendaList();
-  if (!db) return local;
+  if (!db || isFirestoreQuotaCooldownActive()) return local;
 
   try {
     const deletedSet = new Set(getDeletedAgendaIds());
@@ -47,7 +53,8 @@ export const fetchAgendaFromFirestore = async (): Promise<AgendaKelurahanItem[]>
     let snap;
     try {
       snap = await getDocsFromServer(colRef);
-    } catch {
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
       snap = await getDocs(colRef);
     }
 
@@ -69,7 +76,11 @@ export const fetchAgendaFromFirestore = async (): Promise<AgendaKelurahanItem[]>
       return firestoreList;
     }
   } catch (err) {
-    console.warn('fetchAgendaFromFirestore warn:', err);
+    if (isQuotaExhaustedError(err)) {
+      markFirestoreQuotaExhausted(err);
+    } else {
+      console.warn('fetchAgendaFromFirestore warn:', err);
+    }
   }
 
   return local;
@@ -78,28 +89,21 @@ export const fetchAgendaFromFirestore = async (): Promise<AgendaKelurahanItem[]>
 export const saveAgendaItem = async (item: AgendaKelurahanItem): Promise<boolean> => {
   const current = getLocalAgendaList();
   const exists = current.some((a) => a.id === item.id);
+  const updatedItem = { ...item, updatedAt: new Date().toISOString() };
   const updated = exists
-    ? current.map((a) => (a.id === item.id ? { ...item, updatedAt: new Date().toISOString() } : a))
-    : [item, ...current];
+    ? current.map((a) => (a.id === item.id ? updatedItem : a))
+    : [updatedItem, ...current];
 
-  safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(updated));
+  safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(updated), { skipIdbMirror: true });
 
   // Trigger cross-component sync event
   window.dispatchEvent(new CustomEvent('agenda-data-updated'));
 
-  if (!db || !item.id) return true;
+  if (!item.id) return true;
 
-  try {
-    const cleaned = cleanFirestoreData({
-      ...item,
-      updatedAt: new Date().toISOString(),
-    });
-    await setDoc(doc(db, 'agenda_kelurahan', item.id), cleaned, { merge: true });
-    return true;
-  } catch (err) {
-    console.error('saveAgendaItem firestore error:', err);
-    return false;
-  }
+  const cleaned = cleanFirestoreData(updatedItem);
+  const res = await resilientSetDoc('agenda_kelurahan', item.id, cleaned, { merge: true });
+  return res.synced || res.queued;
 };
 
 export const updateAgendaStatus = async (
@@ -125,19 +129,14 @@ export const deleteAgendaItem = async (id: string): Promise<boolean> => {
   markAgendaDeleted(id);
   const current = getLocalAgendaList();
   const updated = current.filter((a) => a.id !== id);
-  safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(updated));
+  safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(updated), { skipIdbMirror: true });
 
   window.dispatchEvent(new CustomEvent('agenda-data-updated'));
 
-  if (!db || !id) return true;
+  if (!id) return true;
 
-  try {
-    await deleteDoc(doc(db, 'agenda_kelurahan', id));
-    return true;
-  } catch (err) {
-    console.error('deleteAgendaItem firestore error:', err);
-    return false;
-  }
+  const res = await resilientDeleteDoc('agenda_kelurahan', id);
+  return res.synced || res.queued;
 };
 
 export const subscribeAgendaFromFirestore = (cb: (items: AgendaKelurahanItem[]) => void) => {
@@ -146,13 +145,14 @@ export const subscribeAgendaFromFirestore = (cb: (items: AgendaKelurahanItem[]) 
     cb(initialLocal);
   }
 
-  if (!db) {
+  if (!db || isFirestoreQuotaCooldownActive()) {
     if (initialLocal.length === 0) cb([]);
     return () => {};
   }
 
   let isActive = true;
   let receivedServerSnapshot = false;
+  let fallbackTimer: any = null;
 
   try {
     const q = query(collection(db, 'agenda_kelurahan'));
@@ -184,22 +184,36 @@ export const subscribeAgendaFromFirestore = (cb: (items: AgendaKelurahanItem[]) 
         }
       },
       (err) => {
+        if (isQuotaExhaustedError(err)) {
+          markFirestoreQuotaExhausted(err);
+          isActive = false;
+          if (fallbackTimer) clearTimeout(fallbackTimer);
+          try { unsub(); } catch {}
+          return;
+        }
         console.warn('subscribeAgendaFromFirestore error, trying getDocs fallback:', err);
-        fetchAgendaFromFirestore().then((items) => {
-          if (isActive) cb(items);
-        });
+        if (!isFirestoreQuotaCooldownActive()) {
+          fetchAgendaFromFirestore().then((items) => {
+            if (isActive) cb(items);
+          });
+        }
       }
     );
 
-    fetchAgendaFromFirestore().then((items) => {
-      if (isActive && !receivedServerSnapshot) {
-        cb(items);
+    fallbackTimer = setTimeout(() => {
+      if (isActive && !receivedServerSnapshot && !isFirestoreQuotaCooldownActive()) {
+        fetchAgendaFromFirestore().then((items) => {
+          if (isActive && !receivedServerSnapshot) {
+            cb(items);
+          }
+        });
       }
-    });
+    }, 4500);
 
     return () => {
       isActive = false;
-      unsub();
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      try { unsub(); } catch {}
     };
   } catch (e) {
     cb(getLocalAgendaList());

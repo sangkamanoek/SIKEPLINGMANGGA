@@ -1,16 +1,19 @@
 import { TransaksiKeuanganPkk } from '../types';
-import { db } from './firebase';
+import {
+  db,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+} from './firebase';
 import { cleanFirestoreData } from './firestoreService';
 import {
   collection,
   getDocs,
   getDocsFromServer,
   onSnapshot,
-  setDoc,
-  deleteDoc,
-  doc,
   Unsubscribe,
 } from 'firebase/firestore';
+import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 
 export const KEUANGAN_COLLECTION = 'pkk_keuangan';
@@ -45,13 +48,14 @@ function sortKeuanganDesc(items: TransaksiKeuanganPkk[]): TransaksiKeuanganPkk[]
 }
 
 export const fetchPkkKeuanganFromFirestore = async (): Promise<TransaksiKeuanganPkk[]> => {
-  if (!db) return getLocalTransaksiPkk();
+  if (!db || isFirestoreQuotaCooldownActive()) return getLocalTransaksiPkk();
   try {
     const colRef = collection(db, KEUANGAN_COLLECTION);
     let snap;
     try {
       snap = await getDocsFromServer(colRef);
-    } catch {
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
       snap = await getDocs(colRef);
     }
     const items: TransaksiKeuanganPkk[] = [];
@@ -65,7 +69,11 @@ export const fetchPkkKeuanganFromFirestore = async (): Promise<TransaksiKeuangan
       return sorted;
     }
   } catch (err) {
-    console.warn('[pkkKeuanganService] fetch error:', err);
+    if (isQuotaExhaustedError(err)) {
+      markFirestoreQuotaExhausted(err);
+    } else {
+      console.warn('[pkkKeuanganService] fetch error:', err);
+    }
   }
   return getLocalTransaksiPkk();
 };
@@ -79,9 +87,10 @@ export const subscribePkkKeuangan = (
   let isActive = true;
   let receivedServerSnapshot = false;
   let unsub: Unsubscribe | undefined;
+  let fallbackTimer: any = null;
 
   try {
-    if (db) {
+    if (db && !isFirestoreQuotaCooldownActive()) {
       const colRef = collection(db, KEUANGAN_COLLECTION);
       unsub = onSnapshot(
         colRef,
@@ -104,18 +113,31 @@ export const subscribePkkKeuangan = (
           }
         },
         (err) => {
+          if (isQuotaExhaustedError(err)) {
+            markFirestoreQuotaExhausted(err);
+            isActive = false;
+            if (fallbackTimer) clearTimeout(fallbackTimer);
+            try { unsub?.(); } catch {}
+            return;
+          }
           console.warn('[pkkKeuanganService] Subscription error:', err);
-          fetchPkkKeuanganFromFirestore().then((items) => {
-            if (isActive) onUpdate(items);
-          });
+          if (!isFirestoreQuotaCooldownActive()) {
+            fetchPkkKeuanganFromFirestore().then((items) => {
+              if (isActive) onUpdate(items);
+            });
+          }
         }
       );
 
-      fetchPkkKeuanganFromFirestore().then((items) => {
-        if (isActive && !receivedServerSnapshot && items.length > 0) {
-          onUpdate(items);
+      fallbackTimer = setTimeout(() => {
+        if (isActive && !receivedServerSnapshot && !isFirestoreQuotaCooldownActive()) {
+          fetchPkkKeuanganFromFirestore().then((items) => {
+            if (isActive && !receivedServerSnapshot && items.length > 0) {
+              onUpdate(items);
+            }
+          });
         }
-      });
+      }, 4500);
     }
   } catch (e) {}
 
@@ -131,7 +153,8 @@ export const subscribePkkKeuangan = (
 
   return () => {
     isActive = false;
-    if (unsub) unsub();
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    if (unsub) { try { unsub(); } catch {} }
     if (bc) bc.close();
   };
 };
@@ -141,7 +164,7 @@ export const saveTransaksiPkk = async (item: TransaksiKeuanganPkk) => {
   const payload = { ...item, updatedAt: new Date().toISOString() };
   const idx = current.findIndex((x) => x.id === item.id);
   const updated = idx >= 0 ? current.map((x) => (x.id === item.id ? payload : x)) : [payload, ...current];
-  safeSetLocalStorage(KEUANGAN_STORAGE_KEY, JSON.stringify(updated));
+  safeSetLocalStorage(KEUANGAN_STORAGE_KEY, JSON.stringify(updated), { skipIdbMirror: true });
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(KEUANGAN_CHANNEL);
@@ -149,22 +172,14 @@ export const saveTransaksiPkk = async (item: TransaksiKeuanganPkk) => {
       bc.close();
     }
   } catch (e) {}
-  try {
-    if (db) {
-      await setDoc(doc(db, KEUANGAN_COLLECTION, item.id), cleanFirestoreData(payload));
-    }
-  } catch (e) {}
+  await resilientSetDoc(KEUANGAN_COLLECTION, item.id, cleanFirestoreData(payload), { merge: true });
 };
 
 export const deleteTransaksiPkk = async (id: string) => {
   const current = getLocalTransaksiPkk();
   const updated = current.filter((x) => x.id !== id);
-  safeSetLocalStorage(KEUANGAN_STORAGE_KEY, JSON.stringify(updated));
-  try {
-    if (db) {
-      await deleteDoc(doc(db, KEUANGAN_COLLECTION, id));
-    }
-  } catch (e) {}
+  safeSetLocalStorage(KEUANGAN_STORAGE_KEY, JSON.stringify(updated), { skipIdbMirror: true });
+  await resilientDeleteDoc(KEUANGAN_COLLECTION, id);
 };
 
 export const subscribeTransaksiPkk = subscribePkkKeuangan;

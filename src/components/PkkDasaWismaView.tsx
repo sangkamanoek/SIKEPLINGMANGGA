@@ -338,6 +338,33 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
     setFormDaftarKk(nextList);
   };
 
+  const handleUpdateKkAnggota = (
+    id: string,
+    field: 'namaKepalaKeluarga' | 'alamat' | 'jumlahLakiLaki' | 'jumlahPerempuan',
+    value: string
+  ) => {
+    setFormDaftarKk((prev) =>
+      prev.map((k) => {
+        if (k.id !== id) return k;
+        if (field === 'jumlahLakiLaki' || field === 'jumlahPerempuan') {
+          const numVal = Math.max(0, Number(value) || 0);
+          const nextL = field === 'jumlahLakiLaki' ? numVal : Number(k.jumlahLakiLaki) || 0;
+          const nextP = field === 'jumlahPerempuan' ? numVal : Number(k.jumlahPerempuan) || 0;
+          return {
+            ...k,
+            jumlahLakiLaki: nextL,
+            jumlahPerempuan: nextP,
+            jumlahJiwa: nextL + nextP,
+          };
+        }
+        return {
+          ...k,
+          [field]: value,
+        };
+      })
+    );
+  };
+
   const handleSyncTotalsFromDaftarKk = () => {
     const totalL = formDaftarKk.reduce((acc, x) => acc + (Number(x.jumlahLakiLaki) || 0), 0);
     const totalP = formDaftarKk.reduce((acc, x) => acc + (Number(x.jumlahPerempuan) || 0), 0);
@@ -1268,15 +1295,20 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
 
       {/* Modal Detail & Daftar KK Anggota (Cetak PDF Per Kelompok) */}
       {detailItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col my-4">
-            <div className="bg-pkk-teal text-white p-5 flex items-center justify-between shrink-0">
-              <div>
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDetailItem(null);
+          }}
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/70 p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
+        >
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col my-2 sm:my-4">
+            <div className="bg-pkk-teal text-white p-4 sm:p-5 flex items-center justify-between gap-3 shrink-0">
+              <div className="min-w-0">
                 <span className="text-[10px] font-black uppercase bg-white/20 px-2.5 py-0.5 rounded-full">
                   {detailItem.lingkunganNama || `Lingkungan ${detailItem.lingkunganNomor}`} • RT/RW {detailItem.rtRw || '00/00'}
                 </span>
-                <h3 className="text-lg font-black mt-1">{detailItem.namaKelompok}</h3>
-                <p className="text-xs text-tosca-100">
+                <h3 className="text-base sm:text-lg font-black mt-1 truncate">{detailItem.namaKelompok}</h3>
+                <p className="text-xs text-tosca-100 truncate">
                   Ketua Dawis: <strong>{detailItem.namaKetuaDawis || detailItem.namaKetua || '-'}</strong>
                   {detailItem.namaKrt ? ` • KRT: ${detailItem.namaKrt}` : ''}
                 </p>
@@ -1284,7 +1316,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
               <button
                 type="button"
                 onClick={() => setDetailItem(null)}
-                className="p-1.5 rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition-colors cursor-pointer"
+                aria-label="Tutup Detail Dasa Wisma"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/15 hover:bg-rose-600 border border-white/25 text-white shrink-0 transition-colors cursor-pointer touch-manipulation"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1566,18 +1599,23 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
 
       {/* Modal Form Tambah / Edit Dasa Wisma (Selaras 100% dengan Firestore) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200 my-4 flex flex-col max-h-[92vh]">
-            <div className="bg-pkk-teal text-white p-5 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsModalOpen(false);
+          }}
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/70 p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
+        >
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200 my-2 sm:my-4 flex flex-col max-h-[92vh]">
+            <div className="bg-pkk-teal text-white p-4 sm:p-5 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
                   <Users className="w-4 h-4 text-amber-300" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold">
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold truncate">
                     {editingItem ? 'Edit Kelompok Dasa Wisma' : 'Tambah Kelompok Dasa Wisma'}
                   </h3>
-                  <p className="text-xs text-tosca-100">
+                  <p className="text-xs text-tosca-100 truncate">
                     Formulir terintegrasi sesuai struktur dokumen Firestore TP-PKK
                   </p>
                 </div>
@@ -1585,7 +1623,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition-colors cursor-pointer"
+                aria-label="Tutup Formulir Dasa Wisma"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/15 hover:bg-rose-600 border border-white/25 text-white shrink-0 transition-colors cursor-pointer touch-manipulation"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1764,30 +1803,63 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
                   </div>
                 </div>
 
-                {/* Existing Daftar KK List */}
+                {/* Existing Daftar KK List (Inline Editable) */}
                 {formDaftarKk.length > 0 && (
-                  <div className="max-h-44 overflow-y-auto border border-emerald-200 rounded-xl bg-white">
+                  <div className="max-h-56 overflow-y-auto border border-emerald-200 rounded-xl bg-white">
                     <table className="w-full text-[11px] text-left">
-                      <thead className="bg-emerald-100/70 text-emerald-950 font-bold sticky top-0">
+                      <thead className="bg-emerald-100/70 text-emerald-950 font-bold sticky top-0 z-10">
                         <tr>
-                          <th className="px-2.5 py-1.5 w-8 text-center">No</th>
-                          <th className="px-2.5 py-1.5">Kepala Keluarga</th>
-                          <th className="px-2.5 py-1.5">Alamat</th>
-                          <th className="px-2 py-1.5 text-center">L / P / Jiwa</th>
+                          <th className="px-2 py-1.5 w-8 text-center">No</th>
+                          <th className="px-2 py-1.5">Kepala Keluarga</th>
+                          <th className="px-2 py-1.5">Alamat</th>
+                          <th className="px-1.5 py-1.5 w-14 text-center">L</th>
+                          <th className="px-1.5 py-1.5 w-14 text-center">P</th>
+                          <th className="px-1.5 py-1.5 w-12 text-center">Jiwa</th>
                           <th className="px-2 py-1.5 w-10 text-center">Aksi</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {formDaftarKk.map((kk, i) => (
                           <tr key={kk.id || i} className="hover:bg-slate-50">
-                            <td className="px-2.5 py-1.5 text-center text-slate-500 font-bold">{i + 1}</td>
-                            <td className="px-2.5 py-1.5 font-bold text-slate-800">{kk.namaKepalaKeluarga}</td>
-                            <td className="px-2.5 py-1.5 text-slate-600">{kk.alamat}</td>
-                            <td className="px-2 py-1.5 text-center font-semibold">
-                              {kk.jumlahLakiLaki} / {kk.jumlahPerempuan} /{' '}
-                              <span className="font-black text-emerald-800">{kk.jumlahJiwa}</span>
+                            <td className="px-2 py-1 text-center text-slate-500 font-bold">{i + 1}</td>
+                            <td className="px-1.5 py-1">
+                              <input
+                                type="text"
+                                value={kk.namaKepalaKeluarga}
+                                onChange={(e) => handleUpdateKkAnggota(kk.id, 'namaKepalaKeluarga', e.target.value)}
+                                className="w-full px-2 py-1 bg-slate-50 focus:bg-white border border-slate-200 focus:border-teal-500 rounded text-[11px] font-bold text-slate-800"
+                              />
                             </td>
-                            <td className="px-2 py-1.5 text-center">
+                            <td className="px-1.5 py-1">
+                              <input
+                                type="text"
+                                value={kk.alamat}
+                                onChange={(e) => handleUpdateKkAnggota(kk.id, 'alamat', e.target.value)}
+                                className="w-full px-2 py-1 bg-slate-50 focus:bg-white border border-slate-200 focus:border-teal-500 rounded text-[11px] text-slate-700"
+                              />
+                            </td>
+                            <td className="px-1 py-1 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                value={kk.jumlahLakiLaki}
+                                onChange={(e) => handleUpdateKkAnggota(kk.id, 'jumlahLakiLaki', e.target.value)}
+                                className="w-12 px-1 py-1 bg-slate-50 focus:bg-white border border-slate-200 focus:border-teal-500 rounded text-[11px] text-center font-semibold"
+                              />
+                            </td>
+                            <td className="px-1 py-1 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                value={kk.jumlahPerempuan}
+                                onChange={(e) => handleUpdateKkAnggota(kk.id, 'jumlahPerempuan', e.target.value)}
+                                className="w-12 px-1 py-1 bg-slate-50 focus:bg-white border border-slate-200 focus:border-teal-500 rounded text-[11px] text-center font-semibold"
+                              />
+                            </td>
+                            <td className="px-1.5 py-1 text-center font-black text-emerald-800">
+                              {kk.jumlahJiwa}
+                            </td>
+                            <td className="px-2 py-1 text-center">
                               <button
                                 type="button"
                                 onClick={() => handleRemoveKkAnggota(kk.id)}
@@ -2094,18 +2166,23 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
 
       {/* Modal Transformasi Data Mentah Kader */}
       {isRawModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-8">
-            <div className="bg-gradient-to-r from-indigo-700 to-teal-700 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsRawModalOpen(false);
+          }}
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/70 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
+        >
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-4 sm:my-8">
+            <div className="bg-gradient-to-r from-indigo-700 to-teal-700 text-white p-4 sm:p-5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
                   <Wand2 className="w-4 h-4 text-amber-300" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold">
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold truncate">
                     Transformasi &amp; Validasi Data Mentah Kader
                   </h3>
-                  <p className="text-xs text-indigo-100">
+                  <p className="text-xs text-indigo-100 truncate">
                     Konversi catatan lapangan atau pesan WA menjadi data standar Dasa Wisma
                   </p>
                 </div>
@@ -2113,7 +2190,8 @@ export const PkkDasaWismaView: React.FC<PkkDasaWismaViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsRawModalOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition-colors cursor-pointer"
+                aria-label="Tutup Modal Transformasi"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/15 hover:bg-rose-600 border border-white/25 text-white shrink-0 transition-colors cursor-pointer touch-manipulation"
               >
                 <X className="w-5 h-5" />
               </button>

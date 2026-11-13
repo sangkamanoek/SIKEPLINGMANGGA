@@ -233,7 +233,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
     setB2Nomor(''); setB2Tanggal(getTodayLocalIso()); setB2Jenis('SURAT_MASUK'); setB2Perihal(''); setB2AsalTujuan(''); setB2Keterangan(''); setB2FileUrl(''); setB2FileName('');
     setB3Tanggal(getTodayLocalIso()); setB3Jenis('PENERIMAAN'); setB3Jumlah(0); setB3Kategori('SEKRETARIAT'); setB3Keterangan(''); setB3Bukti(''); setB3NomorBukti('');
     setB4Tanggal(getTodayLocalIso()); setB4Agenda(''); setB4Pimpinan(''); setB4Peserta(0); setB4Keputusan(''); setB4Catatan(''); setB4Keterangan('');
-    setB5Nama(''); setB5Asal(''); setB5Tanggal(getTodayLocalIso()); setB5Jumlah(1); setB5Kondisi('Baik'); setB5Keterangan('');
+    setB5Nama(''); setB5Asal(''); setB5Tanggal(getTodayLocalIso()); setB5Jumlah(1); setB5Kondisi('Baik'); setB5Keterangan(''); setB5Foto('');
     setB6Nama(''); setB6Tanggal(getTodayLocalIso()); setB6Tempat(''); setB6Pokja('SEKRETARIAT'); setB6Keterangan('');
   };
 
@@ -258,7 +258,11 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       setB2Tanggal(item.tanggal || item.tanggalSurat || getTodayLocalIso());
       setB2Jenis(item.jenisSurat || 'SURAT_MASUK');
       setB2Perihal(item.perihal || '');
-      setB2AsalTujuan(item.asalSurat || item.tujuanSurat || '');
+      setB2AsalTujuan(
+        item.jenisSurat === 'SURAT_KELUAR'
+          ? (item.tujuanSurat || item.asalSurat || '')
+          : (item.asalSurat || item.tujuanSurat || '')
+      );
       setB2Keterangan(item.keterangan || item.isiRingkas || '');
       setB2FileUrl(item.fileUrl || '');
       setB2FileName(item.fileName || '');
@@ -285,6 +289,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       setB5Jumlah(item.jumlah || 1);
       setB5Kondisi((item.kondisi || item.kondisiBarang || 'Baik') as any);
       setB5Keterangan(item.keterangan || '');
+      setB5Foto(item.fotoBarang || '');
     } else if (activeBook === 6) {
       setB6Nama(item.namaKegiatan || item.judul || '');
       setB6Tanggal(item.tanggal || item.tanggalPelaksanaan || getTodayLocalIso());
@@ -301,6 +306,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
     try {
       if (activeBook === 1) {
         const item: PkkBuku1Anggota = {
+          ...(editingItem || {}),
           id: editingItem?.id || 'b1_' + Date.now(),
           nik: editingItem?.nik || '',
           nama: b1Nama,
@@ -314,7 +320,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           pendidikan: b1Pendidikan,
           pekerjaan: b1Pekerjaan,
           keterangan: b1Keterangan,
-          pasphotoUrl: b1PasphotoUrl || editingItem?.pasphotoUrl || '',
+          pasphotoUrl: b1PasphotoUrl || '',
           createdAt: editingItem?.createdAt || new Date().toISOString(),
         };
         await saveBuku1Item(item);
@@ -328,22 +334,23 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
         // Agenda Surat Masuk/Keluar
         const isMasuk = b2Jenis === 'SURAT_MASUK';
         const item: SuratKedinasanItem = {
+          ...(editingItem || {}),
           id: editingItem?.id || 'surat_' + Date.now(),
           nomorSurat: b2Nomor,
           tanggalSurat: b2Tanggal,
           jenisSurat: b2Jenis,
           perihal: b2Perihal,
-          kategori: 'PKK',
-          asalSurat: isMasuk ? b2AsalTujuan : 'Nur Aisyah Dewi, A.Md (Sekretaris Tim Penggerak PKK)',
-          tujuanSurat: isMasuk ? 'PKK Kelurahan Mangga' : b2AsalTujuan,
-          sifat: 'BIASA',
-          status: 'DISETUJUI',
+          kategori: editingItem?.kategori || 'PKK',
+          asalSurat: isMasuk ? b2AsalTujuan : (editingItem?.asalSurat && editingItem?.jenisSurat === 'SURAT_KELUAR' ? editingItem.asalSurat : 'Nur Aisyah Dewi, A.Md (Sekretaris Tim Penggerak PKK)'),
+          tujuanSurat: isMasuk ? (editingItem?.tujuanSurat && editingItem?.jenisSurat === 'SURAT_MASUK' ? editingItem.tujuanSurat : 'PKK Kelurahan Mangga') : b2AsalTujuan,
+          sifat: editingItem?.sifat || 'BIASA',
+          status: editingItem?.status || 'DISETUJUI',
           isiRingkas: b2Keterangan,
           fileUrl: b2FileUrl,
           fileName: b2FileName,
-          penandatangan: 'Ny. Fransiska Fery Arapenta Tarigan (Ketua Tim Penggerak PKK)',
-          dibuatOlehNama: currentUser.nama,
-          dibuatOlehRole: currentUser.role,
+          penandatangan: editingItem?.penandatangan || 'Ny. Fransiska Fery Arapenta Tarigan (Ketua Tim Penggerak PKK)',
+          dibuatOlehNama: editingItem?.dibuatOlehNama || currentUser.nama,
+          dibuatOlehRole: editingItem?.dibuatOlehRole || currentUser.role,
           createdAt: editingItem?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -352,6 +359,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
         // Keuangan (Unified TransaksiKeuanganPkk schema + legacy UI aliases)
         const posVal = (b3Kategori in POS_ANGGARAN_LABELS ? b3Kategori : 'LAINNYA') as any;
         const item: any = {
+          ...(editingItem || {}),
           id: editingItem?.id || 'tx_' + Date.now(),
           tanggal: b3Tanggal,
           jenis: b3Jenis,
@@ -364,8 +372,8 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           buktiFotoUrl: b3Bukti || editingItem?.buktiFotoUrl || '',
           dibuatOlehNama: editingItem?.dibuatOlehNama || currentUser.nama,
           dibuatOlehRole: editingItem?.dibuatOlehRole || currentUser.role,
-          petugasId: currentUser.id,
-          petugasNama: currentUser.nama,
+          petugasId: editingItem?.petugasId || currentUser.id,
+          petugasNama: editingItem?.petugasNama || currentUser.nama,
           createdAt: editingItem?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -373,6 +381,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       } else if (activeBook === 4) {
         // Notulen
         const item: PkkBuku4Notulen = {
+          ...(editingItem || {}),
           id: editingItem?.id || 'b4_' + Date.now(),
           tanggal: b4Tanggal,
           tanggalRapat: b4Tanggal,
@@ -392,6 +401,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       } else if (activeBook === 5) {
         // Inventaris
         const item: PkkBuku5Inventaris = {
+          ...(editingItem || {}),
           id: editingItem?.id || 'b5_' + Date.now(),
           namaBarang: b5Nama,
           asalBarang: b5Asal,
@@ -400,14 +410,16 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           kondisi: b5Kondisi,
           kondisiBarang: b5Kondisi,
           keterangan: b5Keterangan,
+          fotoBarang: b5Foto || editingItem?.fotoBarang || '',
           createdAt: editingItem?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
         await saveBuku5Item(item);
       } else if (activeBook === 6) {
-        // Kegiatan (Unified LaporanKegiatanPkk schema)
+        // Kegiatan (Unified LaporanKegiatanPkk schema — preserve photos, participants & region!)
         const normalizedPokja = normalizePokjaValue(b6Pokja);
         const item: any = {
+          ...(editingItem || {}),
           id: editingItem?.id || 'act_' + Date.now(),
           namaKegiatan: b6Nama,
           tanggal: b6Tanggal,
@@ -418,10 +430,15 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           kategoriProgram: editingItem?.kategoriProgram || 'Program Pokok PKK',
           uraianHasil: b6Keterangan,
           keterangan: b6Keterangan,
+          fotoDokumentasi: editingItem?.fotoDokumentasi || [],
+          jumlahPeserta: editingItem?.jumlahPeserta ?? 0,
+          tindakLanjut: editingItem?.tindakLanjut || '',
+          lingkunganNomor: editingItem?.lingkunganNomor ?? 0,
+          lingkunganNama: editingItem?.lingkunganNama || 'TP PKK Kelurahan Mangga',
           pelaporNama: editingItem?.pelaporNama || currentUser.nama,
           pelaporRole: editingItem?.pelaporRole || currentUser.role,
-          petugasId: currentUser.id,
-          petugasNama: currentUser.nama,
+          petugasId: editingItem?.petugasId || currentUser.id,
+          petugasNama: editingItem?.petugasNama || currentUser.nama,
           createdAt: editingItem?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -754,10 +771,10 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                                 <Download className="w-3.5 h-3.5" />
                               </a>
                             )}
-                            <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 cursor-pointer">
+                            <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-500 hover:text-amber-700 rounded-lg hover:bg-amber-50 cursor-pointer" title="Edit Data">
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 cursor-pointer">
+                            <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 cursor-pointer" title="Hapus Data">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -798,10 +815,10 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                         </td>
                         <td className="px-5 py-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 cursor-pointer">
+                            <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-500 hover:text-amber-700 rounded-lg hover:bg-amber-50 cursor-pointer" title="Edit Data">
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 cursor-pointer">
+                            <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 cursor-pointer" title="Hapus Data">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -838,10 +855,10 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                         <td className="px-5 py-3 text-slate-500 italic max-w-[150px] truncate">{it.catatanRapat || it.notulenRingkas || '-'}</td>
                         <td className="px-5 py-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 cursor-pointer">
+                            <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-500 hover:text-amber-700 rounded-lg hover:bg-amber-50 cursor-pointer" title="Edit Data">
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 cursor-pointer">
+                            <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 cursor-pointer" title="Hapus Data">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -890,10 +907,10 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                         <td className="px-5 py-3 text-slate-500 max-w-[150px] truncate">{it.keterangan}</td>
                         <td className="px-5 py-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 cursor-pointer">
+                            <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-500 hover:text-amber-700 rounded-lg hover:bg-amber-50 cursor-pointer" title="Edit Data">
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 cursor-pointer">
+                            <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 cursor-pointer" title="Hapus Data">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -932,10 +949,10 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                         <td className="px-5 py-3 text-slate-500 italic max-w-[200px] truncate">{it.uraianHasil || it.keterangan || it.deskripsi || '-'}</td>
                         <td className="px-5 py-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 cursor-pointer">
+                            <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-500 hover:text-amber-700 rounded-lg hover:bg-amber-50 cursor-pointer" title="Edit Data">
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 cursor-pointer">
+                            <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 cursor-pointer" title="Hapus Data">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -952,20 +969,26 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
 
       {/* Dynamic Form Modal (Universal for 6 Books) */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsFormOpen(false);
+          }}
+          className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-slate-900/70"
+        >
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="p-5 bg-tosca-700 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
-                <BookOpen className="w-5 h-5 text-tosca-200" />
-                <h3 className="font-bold text-sm sm:text-base text-white">
+            <div className="p-4 sm:p-5 bg-tosca-700 text-white flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <BookOpen className="w-5 h-5 text-tosca-200 shrink-0" />
+                <h3 className="font-bold text-sm sm:text-base text-white truncate">
                   {editingItem ? 'Edit' : 'Tambah'} Entri {bookMeta[activeBook].title}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsFormOpen(false)}
-                className="text-white/80 hover:text-white cursor-pointer"
+                aria-label="Tutup Formulir Buku"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-white bg-white/15 hover:bg-rose-600 border border-white/25 rounded-xl shrink-0 cursor-pointer transition-colors touch-manipulation"
               >
                 <X className="w-5 h-5" />
               </button>

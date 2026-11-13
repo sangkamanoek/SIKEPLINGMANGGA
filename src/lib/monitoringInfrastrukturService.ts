@@ -1,20 +1,22 @@
 import { LaporanMonitoringInfrastruktur } from '../types';
-import { db } from './firebase';
+import {
+  db,
+  getAccessToken,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+} from './firebase';
 import { cleanFirestoreData } from './firestoreService';
 import {
   collection,
-  doc,
   getDocs,
   getDocsFromServer,
-  setDoc,
-  deleteDoc,
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
+import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import * as XLSX from 'xlsx';
-
-import { getAccessToken } from './firebase';
 import { syncMonitoringPhotosToDrive } from './driveSync';
 
 export const MONITORING_INFRA_COLLECTION = 'monitoring_infrastruktur';
@@ -74,16 +76,29 @@ export const getLocalMonitoringList = (): LaporanMonitoringInfrastruktur[] => {
   return initialCleaned;
 };
 
+function stripMonitoringMediaForBroadcast(items: LaporanMonitoringInfrastruktur[]): LaporanMonitoringInfrastruktur[] {
+  const strip = (s?: string) => (typeof s === 'string' && s.startsWith('data:') && s.length > 200 ? '' : s);
+  return items.map((it) => {
+    if (!it) return it;
+    const copy: any = { ...it };
+    if (copy.fotoSebelumUrl) copy.fotoSebelumUrl = strip(copy.fotoSebelumUrl);
+    if (copy.fotoProsesUrl) copy.fotoProsesUrl = strip(copy.fotoProsesUrl);
+    if (copy.fotoSelesaiUrl) copy.fotoSelesaiUrl = strip(copy.fotoSelesaiUrl);
+    if (copy.fotoUrl) copy.fotoUrl = strip(copy.fotoUrl);
+    return copy;
+  });
+}
+
 export const setLocalMonitoringList = (items: LaporanMonitoringInfrastruktur[]): void => {
   const deletedSet = new Set(getDeletedMonitoringIds());
   const cleaned = items.filter((x) => x && x.id && !deletedSet.has(x.id));
   memoryMonitoring = cleaned;
-  safeSetLocalStorage(MONITORING_INFRA_STORAGE_KEY, JSON.stringify(cleaned));
+  safeSetLocalStorage(MONITORING_INFRA_STORAGE_KEY, JSON.stringify(cleaned), { skipIdbMirror: true });
 
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(MONITORING_INFRA_CHANNEL);
-      bc.postMessage({ type: 'SYNC_MONITORING', items: cleaned });
+      bc.postMessage({ type: 'SYNC_MONITORING', items: stripMonitoringMediaForBroadcast(cleaned) });
       bc.close();
     }
   } catch {
@@ -115,13 +130,14 @@ export const smartMergeMonitoring = (
 
 export const fetchMonitoringFromFirestore = async (): Promise<LaporanMonitoringInfrastruktur[]> => {
   const local = getLocalMonitoringList();
-  if (!db) return local;
+  if (!db || isFirestoreQuotaCooldownActive()) return local;
   try {
     const colRef = collection(db, MONITORING_INFRA_COLLECTION);
     let snap;
     try {
       snap = await getDocsFromServer(colRef);
-    } catch {
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
       snap = await getDocs(colRef);
     }
     const deletedSet = new Set(getDeletedMonitoringIds());
@@ -143,7 +159,11 @@ export const fetchMonitoringFromFirestore = async (): Promise<LaporanMonitoringI
       return remote;
     }
   } catch (err) {
-    console.warn('[Monitoring Infra fetch error]:', err);
+    if (isQuotaExhaustedError(err)) {
+      markFirestoreQuotaExhausted(err);
+    } else {
+      console.warn('[Monitoring Infra fetch error]:', err);
+    }
   }
   return local;
 };
@@ -164,9 +184,21 @@ export const subscribeMonitoringReports = (
       bc.onmessage = (ev) => {
         if (isActive && ev.data?.items && Array.isArray(ev.data.items)) {
           const deletedSet = new Set(getDeletedMonitoringIds());
-          const cleaned = ev.data.items.filter(
-            (x: LaporanMonitoringInfrastruktur) => x && x.id && !deletedSet.has(x.id)
-          );
+          const memMap = new Map<string, any>();
+          memoryMonitoring.forEach((m) => { if (m && m.id) memMap.set(m.id, m); });
+          const cleaned = ev.data.items
+            .filter((x: LaporanMonitoringInfrastruktur) => x && x.id && !deletedSet.has(x.id))
+            .map((x: any) => {
+              const prev = memMap.get(x.id);
+              if (!prev) return x;
+              return {
+                ...x,
+                fotoSebelumUrl: x.fotoSebelumUrl || prev.fotoSebelumUrl,
+                fotoProsesUrl: x.fotoProsesUrl || prev.fotoProsesUrl,
+                fotoSelesaiUrl: x.fotoSelesaiUrl || prev.fotoSelesaiUrl,
+                fotoUrl: x.fotoUrl || prev.fotoUrl,
+              };
+            });
           memoryMonitoring = cleaned;
           callback(cleaned);
         }
@@ -177,7 +209,8 @@ export const subscribeMonitoringReports = (
   }
 
   let firestoreUnsub: Unsubscribe = () => {};
-  if (db) {
+  let fallbackTimer: any = null;
+  if (db && !isFirestoreQuotaCooldownActive()) {
     try {
       const colRef = collection(db, MONITORING_INFRA_COLLECTION);
       firestoreUnsub = onSnapshot(
@@ -215,18 +248,31 @@ export const subscribeMonitoringReports = (
           }
         },
         (err) => {
+          if (isQuotaExhaustedError(err)) {
+            markFirestoreQuotaExhausted(err);
+            isActive = false;
+            if (fallbackTimer) clearTimeout(fallbackTimer);
+            try { firestoreUnsub(); } catch {}
+            return;
+          }
           console.warn('[Monitoring Infra Firestore error]:', err);
-          fetchMonitoringFromFirestore().then((items) => {
-            if (isActive) callback(items);
-          });
+          if (!isFirestoreQuotaCooldownActive()) {
+            fetchMonitoringFromFirestore().then((items) => {
+              if (isActive) callback(items);
+            });
+          }
         }
       );
 
-      fetchMonitoringFromFirestore().then((items) => {
-        if (isActive && !receivedServerSnapshot && items.length > 0) {
-          callback(items);
+      fallbackTimer = setTimeout(() => {
+        if (isActive && !receivedServerSnapshot && !isFirestoreQuotaCooldownActive()) {
+          fetchMonitoringFromFirestore().then((items) => {
+            if (isActive && !receivedServerSnapshot && items.length > 0) {
+              callback(items);
+            }
+          });
         }
-      });
+      }, 4500);
     } catch (err) {
       console.warn('[Monitoring Infra setup error]:', err);
     }
@@ -234,8 +280,9 @@ export const subscribeMonitoringReports = (
 
   return () => {
     isActive = false;
+    if (fallbackTimer) clearTimeout(fallbackTimer);
     if (bc) bc.close();
-    firestoreUnsub();
+    try { firestoreUnsub(); } catch {}
   };
 };
 
@@ -262,14 +309,8 @@ export const saveMonitoringReport = async (
   });
   setLocalMonitoringList(updated);
 
-  if (db) {
-    try {
-      const cleaned = cleanFirestoreData(itemToSave);
-      await setDoc(doc(db, MONITORING_INFRA_COLLECTION, itemToSave.id), cleaned, { merge: true });
-    } catch (err) {
-      console.warn('[saveMonitoringReport to firestore error]:', err);
-    }
-  }
+  const cleaned = cleanFirestoreData(itemToSave);
+  await resilientSetDoc(MONITORING_INFRA_COLLECTION, itemToSave.id, cleaned, { merge: true });
 };
 
 export const deleteMonitoringReport = async (id: string): Promise<void> => {
@@ -278,13 +319,7 @@ export const deleteMonitoringReport = async (id: string): Promise<void> => {
   const updated = current.filter((x) => x.id !== id);
   setLocalMonitoringList(updated);
 
-  if (db) {
-    try {
-      await deleteDoc(doc(db, MONITORING_INFRA_COLLECTION, id));
-    } catch (err) {
-      console.warn('[deleteMonitoringReport from firestore error]:', err);
-    }
-  }
+  await resilientDeleteDoc(MONITORING_INFRA_COLLECTION, id);
 };
 
 export const formatMonitoringForWhatsApp = (report: LaporanMonitoringInfrastruktur): string => {

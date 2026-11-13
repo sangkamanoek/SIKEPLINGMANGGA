@@ -1,15 +1,18 @@
-import { db } from './firebase';
+import {
+  db,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+} from './firebase';
 import { cleanFirestoreData } from './firestoreService';
 import {
   collection,
   getDocs,
   getDocsFromServer,
   onSnapshot,
-  setDoc,
-  deleteDoc,
-  doc,
   Unsubscribe,
 } from 'firebase/firestore';
+import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import { PKK_DEFAULT_ANGGOTA_LIST } from '../data/pkkDefaultAnggota';
 
@@ -77,13 +80,14 @@ const BUKU1_CHAN = 'sikepling_buku_1_chan';
 export const DEFAULT_BUKU1_ITEMS: PkkBuku1Anggota[] = PKK_DEFAULT_ANGGOTA_LIST;
 
 export const fetchBuku1FromFirestore = async (): Promise<PkkBuku1Anggota[]> => {
-  if (!db) return safeGetLocalStorage<PkkBuku1Anggota[]>(BUKU1_KEY, DEFAULT_BUKU1_ITEMS);
+  if (!db || isFirestoreQuotaCooldownActive()) return safeGetLocalStorage<PkkBuku1Anggota[]>(BUKU1_KEY, DEFAULT_BUKU1_ITEMS);
   try {
     const colRef = collection(db, BUKU1_COL);
     let snap;
     try {
       snap = await getDocsFromServer(colRef);
-    } catch {
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
       snap = await getDocs(colRef);
     }
     const items: PkkBuku1Anggota[] = [];
@@ -101,7 +105,11 @@ export const fetchBuku1FromFirestore = async (): Promise<PkkBuku1Anggota[]> => {
       return items;
     }
   } catch (e) {
-    console.warn('[pkkBukuService] fetchBuku1 error:', e);
+    if (isQuotaExhaustedError(e)) {
+      markFirestoreQuotaExhausted(e);
+    } else {
+      console.warn('[pkkBukuService] fetchBuku1 error:', e);
+    }
   }
   return safeGetLocalStorage<PkkBuku1Anggota[]>(BUKU1_KEY, DEFAULT_BUKU1_ITEMS);
 };
@@ -119,9 +127,10 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
   let isActive = true;
   let receivedServerSnapshot = false;
   let unsub: Unsubscribe | undefined;
+  let fallbackTimer: any = null;
 
   try {
-    if (db) {
+    if (db && !isFirestoreQuotaCooldownActive()) {
       const colRef = collection(db, BUKU1_COL);
       unsub = onSnapshot(
         colRef,
@@ -148,18 +157,31 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
           }
         },
         (err) => {
+          if (isQuotaExhaustedError(err)) {
+            markFirestoreQuotaExhausted(err);
+            isActive = false;
+            if (fallbackTimer) clearTimeout(fallbackTimer);
+            try { unsub?.(); } catch {}
+            return;
+          }
           console.warn('[pkkBukuService] subscribeBuku1 error:', err);
-          fetchBuku1FromFirestore().then((items) => {
-            if (isActive) onUpdate(items);
-          });
+          if (!isFirestoreQuotaCooldownActive()) {
+            fetchBuku1FromFirestore().then((items) => {
+              if (isActive) onUpdate(items);
+            });
+          }
         }
       );
 
-      fetchBuku1FromFirestore().then((items) => {
-        if (isActive && !receivedServerSnapshot && items.length > 0) {
-          onUpdate(items);
+      fallbackTimer = setTimeout(() => {
+        if (isActive && !receivedServerSnapshot && !isFirestoreQuotaCooldownActive()) {
+          fetchBuku1FromFirestore().then((items) => {
+            if (isActive && !receivedServerSnapshot && items.length > 0) {
+              onUpdate(items);
+            }
+          });
         }
-      });
+      }, 4500);
     }
   } catch (e) {}
 
@@ -177,7 +199,8 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
 
   return () => {
     isActive = false;
-    if (unsub) unsub();
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    if (unsub) { try { unsub(); } catch {} }
     if (bc) bc.close();
   };
 };
@@ -187,11 +210,12 @@ export const saveBuku1Item = async (item: PkkBuku1Anggota) => {
   const payload = { ...item, createdAt: item.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
   const idx = current.findIndex((x) => x.id === item.id);
   const updated = idx >= 0 ? current.map((x) => (x.id === item.id ? payload : x)) : [payload, ...current];
-  safeSetLocalStorage(BUKU1_KEY, JSON.stringify(updated));
+  safeSetLocalStorage(BUKU1_KEY, JSON.stringify(updated), { skipIdbMirror: true });
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(BUKU1_CHAN);
-      bc.postMessage({ items: updated });
+      const light = updated.map((x) => (x.pasphotoUrl?.startsWith('data:') ? { ...x, pasphotoUrl: '' } : x));
+      bc.postMessage({ items: light });
       bc.close();
     }
   } catch (e) {}
@@ -203,33 +227,19 @@ export const saveBuku1Item = async (item: PkkBuku1Anggota) => {
     }).catch(() => {});
   } catch {}
 
-  try {
-    if (db) {
-      const savePromise = setDoc(doc(db, BUKU1_COL, item.id), cleanFirestoreData(payload));
-      await Promise.race([
-        savePromise,
-        new Promise((resolve) => setTimeout(resolve, 3500)),
-      ]);
-    }
-  } catch (e) {
-    console.warn('[pkkBukuService] Firestore save error:', e);
-  }
+  await resilientSetDoc(BUKU1_COL, item.id, cleanFirestoreData(payload), { merge: true });
 };
 
 export const deleteBuku1Item = async (id: string) => {
   const current = safeGetLocalStorage<PkkBuku1Anggota[]>(BUKU1_KEY, []);
   const updated = current.filter((x) => x.id !== id);
-  safeSetLocalStorage(BUKU1_KEY, JSON.stringify(updated));
+  safeSetLocalStorage(BUKU1_KEY, JSON.stringify(updated), { skipIdbMirror: true });
   try {
     fetch(`/api/pkk/buku1/${id}`, {
       method: 'DELETE',
     }).catch(() => {});
   } catch {}
-  try {
-    if (db) {
-      await deleteDoc(doc(db, BUKU1_COL, id));
-    }
-  } catch (e) {}
+  await resilientDeleteDoc(BUKU1_COL, id);
 };
 
 // BUKU 4 SERVICE
@@ -238,13 +248,14 @@ const BUKU4_KEY = 'sikepling_pkk_buku_4_v1';
 const BUKU4_CHAN = 'sikepling_buku_4_chan';
 
 export const fetchBuku4FromFirestore = async (): Promise<PkkBuku4Notulen[]> => {
-  if (!db) return safeGetLocalStorage<PkkBuku4Notulen[]>(BUKU4_KEY, []);
+  if (!db || isFirestoreQuotaCooldownActive()) return safeGetLocalStorage<PkkBuku4Notulen[]>(BUKU4_KEY, []);
   try {
     const colRef = collection(db, BUKU4_COL);
     let snap;
     try {
       snap = await getDocsFromServer(colRef);
-    } catch {
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
       snap = await getDocs(colRef);
     }
     const items: PkkBuku4Notulen[] = [];
@@ -262,7 +273,11 @@ export const fetchBuku4FromFirestore = async (): Promise<PkkBuku4Notulen[]> => {
       return items;
     }
   } catch (e) {
-    console.warn('[pkkBukuService] fetchBuku4 error:', e);
+    if (isQuotaExhaustedError(e)) {
+      markFirestoreQuotaExhausted(e);
+    } else {
+      console.warn('[pkkBukuService] fetchBuku4 error:', e);
+    }
   }
   return safeGetLocalStorage<PkkBuku4Notulen[]>(BUKU4_KEY, []);
 };
@@ -274,9 +289,10 @@ export const subscribeBuku4 = (onUpdate: (items: PkkBuku4Notulen[]) => void) => 
   let isActive = true;
   let receivedServerSnapshot = false;
   let unsub: Unsubscribe | undefined;
+  let fallbackTimer: any = null;
 
   try {
-    if (db) {
+    if (db && !isFirestoreQuotaCooldownActive()) {
       const colRef = collection(db, BUKU4_COL);
       unsub = onSnapshot(
         colRef,
@@ -303,18 +319,31 @@ export const subscribeBuku4 = (onUpdate: (items: PkkBuku4Notulen[]) => void) => 
           }
         },
         (err) => {
+          if (isQuotaExhaustedError(err)) {
+            markFirestoreQuotaExhausted(err);
+            isActive = false;
+            if (fallbackTimer) clearTimeout(fallbackTimer);
+            try { unsub?.(); } catch {}
+            return;
+          }
           console.warn('[pkkBukuService] subscribeBuku4 error:', err);
-          fetchBuku4FromFirestore().then((items) => {
-            if (isActive) onUpdate(items);
-          });
+          if (!isFirestoreQuotaCooldownActive()) {
+            fetchBuku4FromFirestore().then((items) => {
+              if (isActive) onUpdate(items);
+            });
+          }
         }
       );
 
-      fetchBuku4FromFirestore().then((items) => {
-        if (isActive && !receivedServerSnapshot && items.length > 0) {
-          onUpdate(items);
+      fallbackTimer = setTimeout(() => {
+        if (isActive && !receivedServerSnapshot && !isFirestoreQuotaCooldownActive()) {
+          fetchBuku4FromFirestore().then((items) => {
+            if (isActive && !receivedServerSnapshot && items.length > 0) {
+              onUpdate(items);
+            }
+          });
         }
-      });
+      }, 4500);
     }
   } catch (e) {}
 
@@ -330,7 +359,8 @@ export const subscribeBuku4 = (onUpdate: (items: PkkBuku4Notulen[]) => void) => 
 
   return () => {
     isActive = false;
-    if (unsub) unsub();
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    if (unsub) { try { unsub(); } catch {} }
     if (bc) bc.close();
   };
 };
@@ -340,30 +370,23 @@ export const saveBuku4Item = async (item: PkkBuku4Notulen) => {
   const payload = { ...item, createdAt: item.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
   const idx = current.findIndex((x) => x.id === item.id);
   const updated = idx >= 0 ? current.map((x) => (x.id === item.id ? payload : x)) : [payload, ...current];
-  safeSetLocalStorage(BUKU4_KEY, JSON.stringify(updated));
+  safeSetLocalStorage(BUKU4_KEY, JSON.stringify(updated), { skipIdbMirror: true });
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(BUKU4_CHAN);
-      bc.postMessage({ items: updated });
+      const light = updated.map((x) => (x.dokumentasiUrl?.startsWith('data:') ? { ...x, dokumentasiUrl: '' } : x));
+      bc.postMessage({ items: light });
       bc.close();
     }
   } catch (e) {}
-  try {
-    if (db) {
-      await setDoc(doc(db, BUKU4_COL, item.id), cleanFirestoreData(payload));
-    }
-  } catch (e) {}
+  await resilientSetDoc(BUKU4_COL, item.id, cleanFirestoreData(payload), { merge: true });
 };
 
 export const deleteBuku4Item = async (id: string) => {
   const current = safeGetLocalStorage<PkkBuku4Notulen[]>(BUKU4_KEY, []);
   const updated = current.filter((x) => x.id !== id);
-  safeSetLocalStorage(BUKU4_KEY, JSON.stringify(updated));
-  try {
-    if (db) {
-      await deleteDoc(doc(db, BUKU4_COL, id));
-    }
-  } catch (e) {}
+  safeSetLocalStorage(BUKU4_KEY, JSON.stringify(updated), { skipIdbMirror: true });
+  await resilientDeleteDoc(BUKU4_COL, id);
 };
 
 // BUKU 5 SERVICE
@@ -372,13 +395,14 @@ const BUKU5_KEY = 'sikepling_pkk_buku_5_v1';
 const BUKU5_CHAN = 'sikepling_buku_5_chan';
 
 export const fetchBuku5FromFirestore = async (): Promise<PkkBuku5Inventaris[]> => {
-  if (!db) return safeGetLocalStorage<PkkBuku5Inventaris[]>(BUKU5_KEY, []);
+  if (!db || isFirestoreQuotaCooldownActive()) return safeGetLocalStorage<PkkBuku5Inventaris[]>(BUKU5_KEY, []);
   try {
     const colRef = collection(db, BUKU5_COL);
     let snap;
     try {
       snap = await getDocsFromServer(colRef);
-    } catch {
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
       snap = await getDocs(colRef);
     }
     const items: PkkBuku5Inventaris[] = [];
@@ -396,7 +420,11 @@ export const fetchBuku5FromFirestore = async (): Promise<PkkBuku5Inventaris[]> =
       return items;
     }
   } catch (e) {
-    console.warn('[pkkBukuService] fetchBuku5 error:', e);
+    if (isQuotaExhaustedError(e)) {
+      markFirestoreQuotaExhausted(e);
+    } else {
+      console.warn('[pkkBukuService] fetchBuku5 error:', e);
+    }
   }
   return safeGetLocalStorage<PkkBuku5Inventaris[]>(BUKU5_KEY, []);
 };
@@ -408,9 +436,10 @@ export const subscribeBuku5 = (onUpdate: (items: PkkBuku5Inventaris[]) => void) 
   let isActive = true;
   let receivedServerSnapshot = false;
   let unsub: Unsubscribe | undefined;
+  let fallbackTimer: any = null;
 
   try {
-    if (db) {
+    if (db && !isFirestoreQuotaCooldownActive()) {
       const colRef = collection(db, BUKU5_COL);
       unsub = onSnapshot(
         colRef,
@@ -437,18 +466,31 @@ export const subscribeBuku5 = (onUpdate: (items: PkkBuku5Inventaris[]) => void) 
           }
         },
         (err) => {
+          if (isQuotaExhaustedError(err)) {
+            markFirestoreQuotaExhausted(err);
+            isActive = false;
+            if (fallbackTimer) clearTimeout(fallbackTimer);
+            try { unsub?.(); } catch {}
+            return;
+          }
           console.warn('[pkkBukuService] subscribeBuku5 error:', err);
-          fetchBuku5FromFirestore().then((items) => {
-            if (isActive) onUpdate(items);
-          });
+          if (!isFirestoreQuotaCooldownActive()) {
+            fetchBuku5FromFirestore().then((items) => {
+              if (isActive) onUpdate(items);
+            });
+          }
         }
       );
 
-      fetchBuku5FromFirestore().then((items) => {
-        if (isActive && !receivedServerSnapshot && items.length > 0) {
-          onUpdate(items);
+      fallbackTimer = setTimeout(() => {
+        if (isActive && !receivedServerSnapshot && !isFirestoreQuotaCooldownActive()) {
+          fetchBuku5FromFirestore().then((items) => {
+            if (isActive && !receivedServerSnapshot && items.length > 0) {
+              onUpdate(items);
+            }
+          });
         }
-      });
+      }, 4500);
     }
   } catch (e) {}
 
@@ -464,7 +506,8 @@ export const subscribeBuku5 = (onUpdate: (items: PkkBuku5Inventaris[]) => void) 
 
   return () => {
     isActive = false;
-    if (unsub) unsub();
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    if (unsub) { try { unsub(); } catch {} }
     if (bc) bc.close();
   };
 };
@@ -478,7 +521,7 @@ export const saveBuku5Item = async (item: PkkBuku5Inventaris) => {
   };
   const idx = current.findIndex((x) => x.id === item.id);
   const updated = idx >= 0 ? current.map((x) => (x.id === item.id ? payload : x)) : [payload, ...current];
-  safeSetLocalStorage(BUKU5_KEY, JSON.stringify(updated));
+  safeSetLocalStorage(BUKU5_KEY, JSON.stringify(updated), { skipIdbMirror: true });
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(BUKU5_CHAN);
@@ -486,20 +529,12 @@ export const saveBuku5Item = async (item: PkkBuku5Inventaris) => {
       bc.close();
     }
   } catch (e) {}
-  try {
-    if (db) {
-      await setDoc(doc(db, BUKU5_COL, item.id), cleanFirestoreData(payload));
-    }
-  } catch (e) {}
+  await resilientSetDoc(BUKU5_COL, item.id, cleanFirestoreData(payload), { merge: true });
 };
 
 export const deleteBuku5Item = async (id: string) => {
   const current = safeGetLocalStorage<PkkBuku5Inventaris[]>(BUKU5_KEY, []);
   const updated = current.filter((x) => x.id !== id);
-  safeSetLocalStorage(BUKU5_KEY, JSON.stringify(updated));
-  try {
-    if (db) {
-      await deleteDoc(doc(db, BUKU5_COL, id));
-    }
-  } catch (e) {}
+  safeSetLocalStorage(BUKU5_KEY, JSON.stringify(updated), { skipIdbMirror: true });
+  await resilientDeleteDoc(BUKU5_COL, id);
 };

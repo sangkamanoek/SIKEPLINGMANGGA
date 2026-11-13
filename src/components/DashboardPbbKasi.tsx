@@ -33,9 +33,9 @@ import {
   AVAILABLE_PBB_YEARS,
   DEFAULT_PBB_YEAR,
   getLocalSpptForYear,
+  getPbbSpptFromIndexedDb,
   computePbbOverview,
   formatRekapPbbWaText,
-  subscribePbbSpptFromFirestore,
   fetchPbbSpptFromFirestore,
   subscribePbbSummary,
   getCachedPbbOverview,
@@ -84,19 +84,19 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   const [isSyncingPbb, setIsSyncingPbb] = useState(false);
 
   useEffect(() => {
+    let active = true;
     const unsubSummary = subscribePbbSummary(pbbYear, (ov) => {
-      if (ov && ov.totalWp > 0) setSummaryOverview(ov);
+      if (active && ov && ov.totalWp > 0) setSummaryOverview(ov);
     });
     setSpptList(getLocalSpptForYear(pbbYear));
-    fetchPbbSpptFromFirestore(pbbYear).then((items) => {
-      if (Array.isArray(items) && items.length > 0) setSpptList(items);
-    }).catch(() => {});
-    const unsub = subscribePbbSpptFromFirestore(pbbYear, (items) => {
-      if (Array.isArray(items) && items.length > 0) setSpptList(items);
-    });
+    getPbbSpptFromIndexedDb(pbbYear)
+      .then((items) => {
+        if (active && Array.isArray(items) && items.length > 0) setSpptList(items);
+      })
+      .catch(() => {});
     return () => {
+      active = false;
       unsubSummary();
-      unsub();
     };
   }, [pbbYear]);
 

@@ -49,7 +49,7 @@ interface LaporanKeuanganPkkViewProps {
   onShowToast?: (msg: string, type?: 'error' | 'info' | 'success') => void;
 }
 
-export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ currentUser }) => {
+export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ currentUser, onShowToast }) => {
   const [transactions, setTransactions] = useState<TransaksiKeuanganPkk[]>(() => getLocalTransaksiPkk());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedJenis, setSelectedJenis] = useState<'ALL' | JenisTransaksiPkk>('ALL');
@@ -102,11 +102,12 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const showToast = useCallback((msg: string) => {
+  const showToast = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToastMessage(msg);
+    onShowToast?.(msg, type);
     const t = setTimeout(() => setToastMessage(null), 3500);
     return () => clearTimeout(t);
-  }, []);
+  }, [onShowToast]);
 
   // Real-time synchronization subscription
   useEffect(() => {
@@ -206,7 +207,9 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
       const lingkunganNama =
         formLingkunganNomor > 0 ? `Lingkungan ${formLingkunganNomor}` : 'TP PKK Kelurahan Mangga';
 
+      const existingTx = isEditing ? transactions.find((x) => x.id === id) : undefined;
       const payload: TransaksiKeuanganPkk = {
+        ...(existingTx || {}),
         id,
         tanggal: formTanggal || todayStr,
         nomorBukti: formNomorBukti.trim() || undefined,
@@ -220,9 +223,9 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
         lingkunganNama,
         buktiFotoUrl: formBuktiFotoUrl || undefined,
         catatan: formCatatan.trim() || undefined,
-        dibuatOlehNama: currentUser.nama,
-        dibuatOlehRole: currentUser.role,
-        createdAt: isEditing ? (transactions.find((x) => x.id === id)?.createdAt || nowIso) : nowIso,
+        dibuatOlehNama: existingTx?.dibuatOlehNama || currentUser.nama,
+        dibuatOlehRole: existingTx?.dibuatOlehRole || currentUser.role,
+        createdAt: existingTx?.createdAt || nowIso,
         updatedAt: nowIso,
       };
 
@@ -863,11 +866,18 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
 
       {/* Modal: Tambah / Edit Transaksi Kas PKK */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-fade-in overflow-y-auto">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 sm:p-7 relative my-8">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsModalOpen(false);
+          }}
+          className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 animate-fade-in overflow-y-auto"
+        >
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full p-5 sm:p-7 relative my-4 sm:my-8">
             <button
+              type="button"
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              aria-label="Tutup Formulir"
+              className="absolute top-4 right-4 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-600 hover:text-rose-700 bg-slate-100 hover:bg-rose-50 border border-slate-200 rounded-xl transition-all cursor-pointer touch-manipulation"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1129,11 +1139,19 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
 
       {/* Lightbox Preview Foto Nota */}
       {previewPhoto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
-          <div className="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl p-4">
+        <div
+          onClick={() => setPreviewPhoto(null)}
+          className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-slate-950/85 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-2xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl p-4 cursor-default"
+          >
             <button
+              type="button"
               onClick={() => setPreviewPhoto(null)}
-              className="absolute top-4 right-4 p-2 bg-slate-900/60 text-white rounded-full hover:bg-slate-900 transition-all cursor-pointer z-10"
+              aria-label="Tutup Foto"
+              className="absolute top-3 right-3 min-w-[44px] min-h-[44px] flex items-center justify-center bg-rose-600 text-white rounded-full hover:bg-rose-500 shadow-lg transition-all cursor-pointer z-10 touch-manipulation"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1151,29 +1169,38 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
 
       {/* Print Document Modal (Format Buku Kas Umum TP PKK) */}
       {isPrintModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-4xl w-full p-4 sm:p-10 shadow-2xl my-4 sm:my-8 relative overflow-hidden max-w-[calc(100vw-1rem)] print:m-0 print:p-0 print:border-none print:shadow-none">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsPrintModalOpen(false);
+          }}
+          className="fixed inset-0 z-[120] flex items-start sm:items-center justify-center p-2 sm:p-4 bg-slate-950/85 overflow-y-auto"
+        >
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-4xl w-full p-4 sm:p-8 shadow-2xl my-2 sm:my-8 relative overflow-hidden max-w-[calc(100vw-1rem)] print:m-0 print:p-0 print:border-none print:shadow-none">
             {/* Modal Header for on-screen controls */}
-            <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-200 print:hidden">
-              <div className="flex items-center gap-2">
-                <Printer className="w-5 h-5 text-tosca-700" />
-                <h3 className="font-black text-slate-900 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-5 border-b border-slate-200 print:hidden">
+              <div className="flex items-center gap-2 min-w-0">
+                <Printer className="w-5 h-5 text-tosca-700 shrink-0" />
+                <h3 className="font-black text-slate-900 text-sm truncate">
                   Pratinjau Cetak Format Resmi Buku Kas Umum PKK
                 </h3>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
+                  type="button"
                   onClick={handlePrint}
-                  className="px-4 py-2 bg-tosca-700 hover:bg-tosca-600 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-1.5"
+                  className="px-4 py-2.5 bg-tosca-700 hover:bg-tosca-600 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-1.5 touch-manipulation"
                 >
                   <Printer className="w-4 h-4" />
                   <span>Cetak / Simpan PDF</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setIsPrintModalOpen(false)}
-                  className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                  aria-label="Tutup Pratinjau"
+                  className="min-w-[44px] min-h-[44px] px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white border border-rose-500 rounded-xl shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs touch-manipulation"
                 >
                   <X className="w-5 h-5" />
+                  <span className="hidden sm:inline">Tutup</span>
                 </button>
               </div>
             </div>
@@ -1257,6 +1284,17 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
                   rightRole="Sekretaris Tim Penggerak PKK Kelurahan Mangga"
                 />
               </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-200 flex justify-end print:hidden">
+              <button
+                type="button"
+                onClick={() => setIsPrintModalOpen(false)}
+                className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl cursor-pointer flex items-center justify-center gap-1.5 touch-manipulation"
+              >
+                <X className="w-4 h-4" />
+                <span>Tutup Pratinjau</span>
+              </button>
             </div>
           </div>
         </div>

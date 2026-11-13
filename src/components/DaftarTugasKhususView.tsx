@@ -28,6 +28,7 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -97,6 +98,7 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
 
   const handleOpenTask = (task: TugasKhusus) => {
     setSelectedTask(task);
+    setModalError(null);
     const existing = submissions[task.id];
     setFotoUrl(existing?.fotoUrl || '');
     setKeterangan(existing?.keterangan || '');
@@ -131,8 +133,9 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
 
   const handleSaveSubmission = async () => {
     if (!selectedTask) return;
+    setModalError(null);
     if (!fotoUrl) {
-      alert('Mohon unggah foto dokumentasi terlebih dahulu.');
+      setModalError('Mohon unggah foto dokumentasi terlebih dahulu.');
       return;
     }
 
@@ -149,7 +152,7 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
       showToast(`Dokumentasi tugas "${selectedTask.judul}" berhasil tersinkron ke Lurah via Firebase!`);
       setSelectedTask(null);
     } catch (err: any) {
-      alert('Gagal menyimpan dokumentasi: ' + (err.message || 'Terjadi kesalahan'));
+      setModalError('Gagal menyimpan dokumentasi: ' + (err?.message || 'Terjadi kesalahan'));
     } finally {
       setIsSaving(false);
     }
@@ -368,6 +371,19 @@ export const DaftarTugasKhususView: React.FC<DaftarTugasKhususViewProps> = ({ cu
                 />
               </div>
             </div>
+
+            {modalError && (
+              <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-900 font-bold flex items-center justify-between gap-2">
+                <span>{modalError}</span>
+                <button
+                  type="button"
+                  onClick={() => setModalError(null)}
+                  className="p-1 text-rose-600 hover:bg-rose-100 rounded cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
               <button

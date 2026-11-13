@@ -35,17 +35,24 @@ export interface AttendanceQREntity {
   [key: string]: any;
 }
 
-import { collection, getDocs, doc, setDoc, deleteDoc, query, onSnapshot } from 'firebase/firestore';
-import { db } from './firebase';
+import { collection, getDocs, doc, deleteDoc, query, onSnapshot } from 'firebase/firestore';
+import {
+  db,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+} from './firebase';
+import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
 
 export const fetchReportsFromFirestore = async (): Promise<any[]> => {
-  if (!db) return [];
+  if (!db || isFirestoreQuotaCooldownActive()) return [];
   try {
     const list: any[] = [];
     const seenIds = new Set<string>();
 
     const collectionsToTry = ['reports', 'laporan_harian', 'SIKEPLINGMANGGA'];
     for (const colName of collectionsToTry) {
+      if (isFirestoreQuotaCooldownActive()) break;
       try {
         const snap = await getDocs(collection(db, colName));
         snap.forEach((d) => {
@@ -56,12 +63,20 @@ export const fetchReportsFromFirestore = async (): Promise<any[]> => {
           }
         });
       } catch (e) {
+        if (isQuotaExhaustedError(e)) {
+          markFirestoreQuotaExhausted(e);
+          break;
+        }
         // Ignore if collection doesn't exist or error
       }
     }
 
     return list;
   } catch (err) {
+    if (isQuotaExhaustedError(err)) {
+      markFirestoreQuotaExhausted(err);
+      return [];
+    }
     console.error('fetchReportsFromFirestore error:', err);
     return [];
   }
@@ -69,26 +84,16 @@ export const fetchReportsFromFirestore = async (): Promise<any[]> => {
 
 
 export const saveReportToFirestore = async (item: any): Promise<boolean> => {
-  if (!db || !item || !item.id) return false;
-  try {
-    const cleaned = cleanFirestoreData(item);
-    await setDoc(doc(db, 'reports', item.id), cleaned, { merge: true });
-    return true;
-  } catch (err) {
-    console.error('saveReportToFirestore error:', err);
-    return false;
-  }
+  if (!item || !item.id) return false;
+  const cleaned = cleanFirestoreData(item);
+  const res = await resilientSetDoc('reports', item.id, cleaned, { merge: true });
+  return res.synced || res.queued;
 };
 
 export const deleteReportFromFirestore = async (id: string): Promise<boolean> => {
-  if (!db || !id) return false;
-  try {
-    await deleteDoc(doc(db, 'reports', id));
-    return true;
-  } catch (err) {
-    console.error('deleteReportFromFirestore error:', err);
-    return false;
-  }
+  if (!id) return false;
+  const res = await resilientDeleteDoc('reports', id);
+  return res.synced || res.queued;
 };
 
 export const resetAllReportsInFirestore = async (): Promise<boolean> => {
@@ -107,13 +112,14 @@ export const resetAllReportsInFirestore = async (): Promise<boolean> => {
 };
 
 export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
-  if (!db) {
+  if (!db || isFirestoreQuotaCooldownActive()) {
     return () => {};
   }
   const collectionsToWatch = ['reports', 'laporan_harian', 'SIKEPLINGMANGGA'];
   const collectionsData: Record<string, any[]> = {};
   const unsubs: (() => void)[] = [];
   let debounceTimer: any = null;
+  let fallbackTimer: any = null;
   let isActive = true;
   let hasReceivedServerData = false;
 
@@ -189,13 +195,22 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
             }
           },
           (err) => {
+            if (isQuotaExhaustedError(err)) {
+              markFirestoreQuotaExhausted(err);
+              isActive = false;
+              if (fallbackTimer) clearTimeout(fallbackTimer);
+              unsubs.forEach((u) => { try { u(); } catch {} });
+              return;
+            }
             console.warn(`subscribeReportsFromFirestore (${colName}) error:`, err);
-            fetchReportsFromFirestore().then((fallbackList) => {
-              if (isActive && fallbackList.length > 0) {
-                hasReceivedServerData = true;
-                cb(fallbackList);
-              }
-            });
+            if (!isFirestoreQuotaCooldownActive()) {
+              fetchReportsFromFirestore().then((fallbackList) => {
+                if (isActive && fallbackList.length > 0) {
+                  hasReceivedServerData = true;
+                  cb(fallbackList);
+                }
+              });
+            }
           }
         );
         unsubs.push(unsub);
@@ -204,18 +219,23 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
       }
     }
 
-    // Parallel getDocs check to guarantee data loads on cold start / restricted iframes
-    fetchReportsFromFirestore().then((fallbackList) => {
-      if (isActive && !hasReceivedServerData && fallbackList.length > 0) {
-        hasReceivedServerData = true;
-        cb(fallbackList);
+    // Delayed fallback only if live snapshot hasn't delivered after cold start
+    fallbackTimer = setTimeout(() => {
+      if (isActive && !hasReceivedServerData && !isFirestoreQuotaCooldownActive()) {
+        fetchReportsFromFirestore().then((fallbackList) => {
+          if (isActive && !hasReceivedServerData && fallbackList.length > 0) {
+            hasReceivedServerData = true;
+            cb(fallbackList);
+          }
+        });
       }
-    });
+    }, 4500);
 
     return () => {
       isActive = false;
       if (debounceTimer) clearTimeout(debounceTimer);
-      unsubs.forEach((u) => u());
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      unsubs.forEach((u) => { try { u(); } catch {} });
     };
   } catch (e) {
     return () => {};
@@ -225,7 +245,7 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
 export const shouldFilterReport = (_r?: any) => false;
 
 export const fetchTargetsFromFirestore = async (): Promise<any> => {
-  if (!db) return {};
+  if (!db || isFirestoreQuotaCooldownActive()) return {};
   try {
     const snap = await getDocs(collection(db, 'targets_capaian'));
     const map: any = {};
@@ -234,19 +254,19 @@ export const fetchTargetsFromFirestore = async (): Promise<any> => {
     });
     return map;
   } catch (err) {
+    if (isQuotaExhaustedError(err)) {
+      markFirestoreQuotaExhausted(err);
+      return {};
+    }
     console.error('fetchTargetsFromFirestore error:', err);
     return {};
   }
 };
 
 export const saveTargetToFirestore = async (item: any) => {
-  if (!db || !item || !item.keplingId) return;
-  try {
-    const cleaned = cleanFirestoreData(item);
-    await setDoc(doc(db, 'targets_capaian', item.keplingId), cleaned, { merge: true });
-  } catch (err) {
-    console.error('saveTargetToFirestore error:', err);
-  }
+  if (!item || !item.keplingId) return;
+  const cleaned = cleanFirestoreData(item);
+  await resilientSetDoc('targets_capaian', item.keplingId, cleaned, { merge: true });
 };
 
 export const saveAllTargetsToFirestore = async (allTargets: any) => {
@@ -276,11 +296,12 @@ export const resetTargetsInFirestore = async () => {
 };
 
 export const subscribeTargetsFromFirestore = (cb: (data: any) => void) => {
-  if (!db) {
+  if (!db || isFirestoreQuotaCooldownActive()) {
     return () => {};
   }
   let isActive = true;
   let hasReceivedData = false;
+  let fallbackTimer: any = null;
   try {
     const q = query(collection(db, 'targets_capaian'));
     const unsub = onSnapshot(q, (snapshot) => {
@@ -293,26 +314,39 @@ export const subscribeTargetsFromFirestore = (cb: (data: any) => void) => {
         cb(map);
       }
     }, (err) => {
+      if (isQuotaExhaustedError(err)) {
+        markFirestoreQuotaExhausted(err);
+        isActive = false;
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        try { unsub(); } catch {}
+        return;
+      }
       console.warn('subscribeTargetsFromFirestore error:', err);
-      fetchTargetsFromFirestore().then((fallback) => {
-        if (isActive && fallback && Object.keys(fallback).length > 0) {
-          hasReceivedData = true;
-          cb(fallback);
-        }
-      });
-    });
-
-    // Proactive getDocs fallback on cold start / restricted iframe
-    fetchTargetsFromFirestore().then((fallback) => {
-      if (isActive && !hasReceivedData && fallback && Object.keys(fallback).length > 0) {
-        hasReceivedData = true;
-        cb(fallback);
+      if (!isFirestoreQuotaCooldownActive()) {
+        fetchTargetsFromFirestore().then((fallback) => {
+          if (isActive && fallback && Object.keys(fallback).length > 0) {
+            hasReceivedData = true;
+            cb(fallback);
+          }
+        });
       }
     });
 
+    fallbackTimer = setTimeout(() => {
+      if (isActive && !hasReceivedData && !isFirestoreQuotaCooldownActive()) {
+        fetchTargetsFromFirestore().then((fallback) => {
+          if (isActive && !hasReceivedData && fallback && Object.keys(fallback).length > 0) {
+            hasReceivedData = true;
+            cb(fallback);
+          }
+        });
+      }
+    }, 4500);
+
     return () => {
       isActive = false;
-      unsub();
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      try { unsub(); } catch {}
     };
   } catch (e) {
     return () => {};

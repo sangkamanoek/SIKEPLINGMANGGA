@@ -1,7 +1,7 @@
 /**
  * Safe Storage & Performance Optimization Utility
  * Provides defensive storage management, non-blocking asynchronous persistence,
- * quota overflow recovery, and memory caching optimized for low-end mobile devices & laptops.
+ * quota overflow recovery, and OOM-safe memory handling across Chrome, Safari, Firefox, and mobile WebViews.
  */
 
 import {
@@ -14,9 +14,10 @@ import {
   savePkkKegiatanToIndexedDB,
 } from './indexedDbStorage';
 
-// Bounded memory cache (max 2MB total) to avoid memory leaks on 1GB/2GB RAM mobile devices
+// Bounded memory cache to avoid memory leaks on 1GB/2GB RAM mobile devices
 const memoryFallbackStorage = new Map<string, string>();
-const MAX_MEMORY_CACHE_ENTRY_BYTES = 150_000; // 150KB per entry max for in-memory string cache
+const MAX_MEMORY_CACHE_ENTRY_BYTES = 120_000;
+const MAX_LOCALSTORAGE_STRING_LEN = 3_200_000; // ~3.2M chars (~6.4MB UTF-16), safely below 5MB browser quota
 
 let idbSaveTimeout: any = null;
 let idPbbSaveTimeout: any = null;
@@ -27,12 +28,12 @@ let idbPosyanduTimeout: any = null;
 let idbPkkKegiatanTimeout: any = null;
 
 /**
- * Clean & sanitize text input to prevent malicious injections (XSS / SQLi / Corrupt characters)
+ * Clean & sanitize text input to prevent malicious injections
  */
 export function sanitizeText(input: unknown): string {
   if (typeof input !== 'string') return '';
   return input
-    .replace(/<[^>]*>?/gm, '') // Remove HTML tags
+    .replace(/<[^>]*>?/gm, '')
     .trim();
 }
 
@@ -49,13 +50,12 @@ export function populateMemoryCache(key: string, value: string): void {
  * Type-safe and error-resilient retrieval from LocalStorage with fallback
  */
 export function safeGetLocalStorage<T>(key: string, defaultValue: T): T {
-  // Check memory cache first for fast lookup of lightweight data
   const cached = memoryFallbackStorage.get(key);
   if (cached !== undefined && cached !== null) {
     try {
       return JSON.parse(cached);
-    } catch (e) {
-      console.warn(`[safeStorage] Memory cache parse error for ${key}:`, e);
+    } catch {
+      memoryFallbackStorage.delete(key);
     }
   }
 
@@ -72,7 +72,7 @@ export function safeGetLocalStorage<T>(key: string, defaultValue: T): T {
 }
 
 /**
- * Helper to strip heavy base64 media strings from objects for lightweight storage
+ * Helper to strip heavy base64 media strings from objects for lightweight localStorage hydration
  */
 function stripHeavyMediaFromItem(item: any): any {
   if (!item || typeof item !== 'object') return item;
@@ -90,6 +90,10 @@ function stripHeavyMediaFromItem(item: any): any {
   if (copy.fotoSebelumUrl) copy.fotoSebelumUrl = stripHeavyStr(copy.fotoSebelumUrl);
   if (copy.fotoProsesUrl) copy.fotoProsesUrl = stripHeavyStr(copy.fotoProsesUrl);
   if (copy.fotoSelesaiUrl) copy.fotoSelesaiUrl = stripHeavyStr(copy.fotoSelesaiUrl);
+  if (copy.fotoUrl) copy.fotoUrl = stripHeavyStr(copy.fotoUrl);
+  if (copy.fotoDokumenUrl) copy.fotoDokumenUrl = stripHeavyStr(copy.fotoDokumenUrl);
+  if (copy.pasphotoUrl) copy.pasphotoUrl = stripHeavyStr(copy.pasphotoUrl);
+  if (copy.dokumentasiUrl) copy.dokumentasiUrl = stripHeavyStr(copy.dokumentasiUrl);
   if (Array.isArray(copy.fotoDokumentasi)) {
     copy.fotoDokumentasi = copy.fotoDokumentasi.map((f: any) => {
       if (!f) return f;
@@ -105,129 +109,146 @@ function stripHeavyMediaFromItem(item: any): any {
   return copy;
 }
 
+function scheduleIdbPersist(key: string, getParsedArray: () => any[] | null): void {
+  if (key.includes('laporan') || key.includes('reports')) {
+    if (idbSaveTimeout) clearTimeout(idbSaveTimeout);
+    idbSaveTimeout = setTimeout(() => {
+      const parsed = getParsedArray();
+      if (parsed && parsed.length > 0) saveReportsToIndexedDB(parsed).catch(() => {});
+    }, 250);
+  }
+
+  if (key.includes('pbb') || key.includes('sppt')) {
+    if (idPbbSaveTimeout) clearTimeout(idPbbSaveTimeout);
+    idPbbSaveTimeout = setTimeout(() => {
+      const parsed = getParsedArray();
+      if (parsed && parsed.length > 0) savePbbToIndexedDB(parsed).catch(() => {});
+    }, 500);
+  }
+
+  if (key.includes('kunjungan') || key.includes('visit')) {
+    if (idbVisitsTimeout) clearTimeout(idbVisitsTimeout);
+    idbVisitsTimeout = setTimeout(() => {
+      const parsed = getParsedArray();
+      if (parsed && parsed.length > 0) saveVisitsToIndexedDB(parsed).catch(() => {});
+    }, 450);
+  }
+
+  if (key.includes('history')) {
+    if (idbHistoryTimeout) clearTimeout(idbHistoryTimeout);
+    idbHistoryTimeout = setTimeout(() => {
+      const parsed = getParsedArray();
+      if (parsed && parsed.length > 0) saveHistoryToIndexedDB(parsed).catch(() => {});
+    }, 550);
+  }
+
+  if (key.includes('surat')) {
+    if (idbSuratTimeout) clearTimeout(idbSuratTimeout);
+    idbSuratTimeout = setTimeout(() => {
+      const parsed = getParsedArray();
+      if (parsed && parsed.length > 0) saveSuratToIndexedDB(parsed).catch(() => {});
+    }, 350);
+  }
+
+  if (key.includes('posyandu')) {
+    if (idbPosyanduTimeout) clearTimeout(idbPosyanduTimeout);
+    idbPosyanduTimeout = setTimeout(() => {
+      const parsed = getParsedArray();
+      if (parsed && parsed.length > 0) savePosyanduToIndexedDB(parsed).catch(() => {});
+    }, 350);
+  }
+
+  if (key.includes('pkk_kegiatan')) {
+    if (idbPkkKegiatanTimeout) clearTimeout(idbPkkKegiatanTimeout);
+    idbPkkKegiatanTimeout = setTimeout(() => {
+      const parsed = getParsedArray();
+      if (parsed && parsed.length > 0) savePkkKegiatanToIndexedDB(parsed).catch(() => {});
+    }, 350);
+  }
+}
+
 /**
- * Safely set localStorage items with defensive quota recovery.
- * Optimized with debounced asynchronous IndexedDB persistence to prevent main-thread lag.
+ * Safely set localStorage items with single-parse OOM protection and defensive quota recovery.
  */
-export function safeSetLocalStorage(key: string, value: string): boolean {
+export function safeSetLocalStorage(
+  key: string,
+  value: string,
+  options?: { skipIdbMirror?: boolean }
+): boolean {
+  let cachedParsed: any | undefined;
+  let didParse = false;
+
+  const parseOnce = (): any => {
+    if (!didParse) {
+      didParse = true;
+      try {
+        cachedParsed = JSON.parse(value);
+      } catch {
+        cachedParsed = null;
+      }
+    }
+    return cachedParsed;
+  };
+
   try {
-    // Only store lightweight keys in memory map to conserve RAM on low-end devices
     if (value.length <= MAX_MEMORY_CACHE_ENTRY_BYTES) {
       memoryFallbackStorage.set(key, value);
     } else {
       memoryFallbackStorage.delete(key);
     }
 
-    // Persist heavy entities to IndexedDB in background with debouncing
-    const isHeavyData = value.length > 250_000;
-
-    if (key.includes('laporan') || key.includes('reports')) {
-      if (idbSaveTimeout) clearTimeout(idbSaveTimeout);
-      idbSaveTimeout = setTimeout(() => {
-        try {
-          const parsed = JSON.parse(value);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            saveReportsToIndexedDB(parsed).catch(() => {});
-          }
-        } catch {}
-      }, 300);
+    if (!options?.skipIdbMirror) {
+      scheduleIdbPersist(key, () => {
+        const parsed = parseOnce();
+        return Array.isArray(parsed) ? parsed : null;
+      });
     }
 
-    if (key.includes('pbb') || key.includes('sppt')) {
-      if (idPbbSaveTimeout) clearTimeout(idPbbSaveTimeout);
-      idPbbSaveTimeout = setTimeout(() => {
-        try {
-          const parsed = JSON.parse(value);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            savePbbToIndexedDB(parsed).catch(() => {});
-          }
-        } catch {}
-      }, 700);
-    }
-
-    if (key.includes('kunjungan') || key.includes('visit')) {
-      if (idbVisitsTimeout) clearTimeout(idbVisitsTimeout);
-      idbVisitsTimeout = setTimeout(() => {
-        try {
-          const parsed = JSON.parse(value);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            saveVisitsToIndexedDB(parsed).catch(() => {});
-          }
-        } catch {}
-      }, 800);
-    }
-
-    if (key.includes('history')) {
-      if (idbHistoryTimeout) clearTimeout(idbHistoryTimeout);
-      idbHistoryTimeout = setTimeout(() => {
-        try {
-          const parsed = JSON.parse(value);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            saveHistoryToIndexedDB(parsed).catch(() => {});
-          }
-        } catch {}
-      }, 900);
-    }
-
-    if (key.includes('surat')) {
-      if (idbSuratTimeout) clearTimeout(idbSuratTimeout);
-      idbSuratTimeout = setTimeout(() => {
-        try {
-          const parsed = JSON.parse(value);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            saveSuratToIndexedDB(parsed).catch(() => {});
-          }
-        } catch {}
-      }, 500);
-    }
-
-    if (key.includes('posyandu')) {
-      if (idbPosyanduTimeout) clearTimeout(idbPosyanduTimeout);
-      idbPosyanduTimeout = setTimeout(() => {
-        try {
-          const parsed = JSON.parse(value);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            savePosyanduToIndexedDB(parsed).catch(() => {});
-          }
-        } catch {}
-      }, 500);
-    }
-
-    if (key.includes('pkk_kegiatan')) {
-      if (idbPkkKegiatanTimeout) clearTimeout(idbPkkKegiatanTimeout);
-      idbPkkKegiatanTimeout = setTimeout(() => {
-        try {
-          const parsed = JSON.parse(value);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            savePkkKegiatanToIndexedDB(parsed).catch(() => {});
-          }
-        } catch {}
-      }, 500);
-    }
-
-    // Optimized Storage Strategy for Mobile:
-    // If payload contains heavy media strings (e.g. photos/base64), strip heavy media
-    // for ultra-fast 0ms synchronous LocalStorage hydration, while preserving full raw data in IndexedDB.
-    if (isHeavyData) {
-      try {
-        const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) {
-          const lightweight = parsed.map(stripHeavyMediaFromItem);
-          const compressed = JSON.stringify(lightweight);
-          localStorage.setItem(key, compressed);
-          return true;
+    // If payload exceeds browser localStorage limit completely, do not thrash localStorage or allocate compressed multi-MB copies unnecessarily
+    if (value.length > MAX_LOCALSTORAGE_STRING_LEN) {
+      const parsed = parseOnce();
+      if (Array.isArray(parsed)) {
+        const lightweight = parsed.map(stripHeavyMediaFromItem);
+        const compressed = JSON.stringify(lightweight);
+        if (compressed.length <= MAX_LOCALSTORAGE_STRING_LEN) {
+          try {
+            localStorage.setItem(key, compressed);
+          } catch {}
+        } else {
+          // Too huge even stripped (e.g. 22k SPPT rows = ~18MB) — safely kept in IndexedDB without blowing localStorage
+          try {
+            localStorage.removeItem(key);
+          } catch {}
         }
-      } catch {}
+      }
+      return true;
+    }
+
+    const isHeavyData = value.length > 250_000;
+    if (isHeavyData) {
+      const parsed = parseOnce();
+      if (Array.isArray(parsed)) {
+        const lightweight = parsed.map(stripHeavyMediaFromItem);
+        const compressed = JSON.stringify(lightweight);
+        if (compressed.length <= MAX_LOCALSTORAGE_STRING_LEN) {
+          localStorage.setItem(key, compressed);
+        }
+        return true;
+      }
     }
 
     try {
       localStorage.setItem(key, value);
     } catch (setErr) {
-      // If direct saving fails due to quota limit, strip heavy media as fallback
-      const parsed = JSON.parse(value);
+      const parsed = parseOnce();
       if (Array.isArray(parsed)) {
         const lightweight = parsed.map(stripHeavyMediaFromItem);
-        localStorage.setItem(key, JSON.stringify(lightweight));
+        const compressed = JSON.stringify(lightweight);
+        if (compressed.length <= MAX_LOCALSTORAGE_STRING_LEN) {
+          localStorage.setItem(key, compressed);
+        } else {
+          return true;
+        }
       } else {
         throw setErr;
       }
@@ -244,60 +265,37 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
     if (isQuotaError) {
       console.warn(`[safeStorage] LocalStorage quota exceeded for key "${key}". Running defensive recovery...`);
 
-      // 1. Aggressively clear volatile and obsolete items to free space immediately
       try {
         localStorage.removeItem('cleaned_reports_v2_kepling21');
         localStorage.removeItem('google_cached_access_token');
         localStorage.removeItem('sikepling_bottom5_monthly_kepling_ids');
 
+        const toDelete: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
-          if (k && (k.includes('_v1') || k.includes('_v2')) && k !== key) {
-            if (!k.includes('history') && !k.includes('reports') && !k.includes('list')) {
-              localStorage.removeItem(k);
-            }
+          if (k && k !== key && (k.includes('sikepling_pbb_master_data_') || k.includes('sikepling_sppt_pbb_records_'))) {
+            toDelete.push(k);
           }
+        }
+        toDelete.forEach((k) => {
+          try { localStorage.removeItem(k); } catch {}
+        });
+      } catch {}
+
+      try {
+        const parsed = parseOnce();
+        if (Array.isArray(parsed)) {
+          const lightweight = parsed.map(stripHeavyMediaFromItem);
+          const compressedJson = JSON.stringify(lightweight);
+          if (compressedJson.length <= MAX_LOCALSTORAGE_STRING_LEN) {
+            try {
+              localStorage.setItem(key, compressedJson);
+            } catch {}
+          }
+          return true;
         }
       } catch {}
 
-      // 2. Selective Payload Compression: Strip heavy base64 media while keeping all text & metadata
-      try {
-        const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) {
-          // Asynchronously persist full data with photos to IndexedDB first
-          if (key.includes('laporan') || key.includes('reports')) {
-            saveReportsToIndexedDB(parsed).catch(() => {});
-          } else if (key.includes('pbb') || key.includes('sppt')) {
-            savePbbToIndexedDB(parsed).catch(() => {});
-          } else if (key.includes('kunjungan') || key.includes('visit')) {
-            saveVisitsToIndexedDB(parsed).catch(() => {});
-          } else if (key.includes('history')) {
-            saveHistoryToIndexedDB(parsed).catch(() => {});
-          } else if (key.includes('surat')) {
-            saveSuratToIndexedDB(parsed).catch(() => {});
-          } else if (key.includes('posyandu')) {
-            savePosyanduToIndexedDB(parsed).catch(() => {});
-          } else if (key.includes('pkk_kegiatan')) {
-            savePkkKegiatanToIndexedDB(parsed).catch(() => {});
-          }
-
-          const lightweight = parsed.map(stripHeavyMediaFromItem);
-          const compressedJson = JSON.stringify(lightweight);
-
-          try {
-            localStorage.setItem(key, compressedJson);
-            console.log(`[safeStorage] Successfully saved stripped lightweight data for "${key}".`);
-            return true;
-          } catch (secondQuotaErr) {
-            console.warn(`[safeStorage] Stripped data still exceeded quota. Offloaded safely to IndexedDB.`);
-            return true;
-          }
-        }
-      } catch (stripError) {
-        console.error('[safeStorage] Error during defensive compression recovery:', stripError);
-      }
-
-      // Defensive: Never overwrite with '[]', preserve whatever is safely stored in IndexedDB and memory
       return true;
     }
 
@@ -346,7 +344,7 @@ export function safeRemoveLocalStorage(key: string): void {
 
 /**
  * Cleans obsolete cache, volatile logs, orphaned tokens, and frees browser memory
- * without deleting essential accounts or master data.
+ * without deleting essential accounts, active _v2 data, or pending Firestore sync queues.
  */
 export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedApproxBytes: number } {
   let freedCount = 0;
@@ -361,7 +359,6 @@ export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedAppro
       if (!k) continue;
 
       const lower = k.toLowerCase();
-      // Whitelist critical persistent items that should NEVER be wiped
       const isEssential =
         lower.includes('account') ||
         lower.includes('profile') ||
@@ -369,20 +366,24 @@ export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedAppro
         lower.includes('active_tab') ||
         lower.includes('auth') ||
         lower.includes('device_id') ||
-        k === 'sikepling_laporan_harian_list' ||
+        lower.includes('write_queue') ||
+        lower.includes('deleted') ||
+        lower.includes('pbb_summary') ||
+        k === 'kepling_local_laporan_history_v2' ||
+        k === 'sikepling_kunjungan_warga_v2' ||
+        k === 'sikepling_monitoring_infra_v2' ||
+        k === 'sikepling_agenda_kelurahan_v2' ||
         k === 'sikepling_surat_kedinasan_v1' ||
-        k === 'sikepling_kunjungan_warga_v1' ||
         k === 'sikepling_pkk_buku_1_v1' ||
         k === 'sikepling_pkk_buku_4_v1' ||
         k === 'sikepling_pkk_buku_5_v1' ||
         k === 'sikepling_pkk_kegiatan_v1' ||
         k === 'sikepling_pkk_keuangan_v1' ||
         k === 'sikepling_pkk_dasa_wisma_v1' ||
-        k === 'sikepling_pkk_dasa_wisma_v2' ||
-        k === 'sikepling_sppt_pbb_records_2026_v3';
+        k === 'sikepling_pkk_posyandu_v2' ||
+        k === 'sikepling_pkk_dasa_wisma_v2';
 
       if (!isEssential) {
-        // Obsolete versions, temporary logs, old sync backups, stale caches
         if (
           lower.includes('backup') ||
           lower.includes('old') ||
@@ -390,6 +391,8 @@ export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedAppro
           lower.includes('cache') ||
           lower.includes('log') ||
           lower.includes('_v1') ||
+          lower.includes('sikepling_pbb_master_data_') ||
+          lower.includes('sikepling_sppt_pbb_records_') ||
           lower.includes('draft') ||
           lower.includes('seen_items') ||
           lower.includes('google_cached') ||
@@ -411,7 +414,6 @@ export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedAppro
       } catch {}
     });
 
-    // Also clear session storage non-essential items
     try {
       sessionStorage.clear();
     } catch {}
@@ -423,4 +425,3 @@ export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedAppro
 
   return { freedKeys: freedCount, freedApproxBytes: freedBytes };
 }
-

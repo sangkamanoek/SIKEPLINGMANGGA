@@ -41,12 +41,10 @@ import {
   DEFAULT_PBB_YEAR,
   AVAILABLE_PBB_YEARS,
   getLocalSpptForYear,
-  fetchPbbSpptFromFirestore,
-  subscribePbbSpptFromFirestore,
+  getPbbSpptFromIndexedDb,
   computePbbOverview,
   subscribePbbSummary,
   getCachedPbbOverview,
-  fetchPbbSpptForLingkungan,
   subscribePbbSpptForLingkungan,
   KelurahanPbbOverview,
 } from '../lib/pbbService';
@@ -117,6 +115,12 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
   });
 
   const [isSyncingFirestore, setIsSyncingFirestore] = useState(false);
+  const [hubNotice, setHubNotice] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+  const showHubNotice = (msg: string, type: 'success' | 'error' = 'success') => {
+    setHubNotice({ msg, type });
+    setTimeout(() => setHubNotice(null), 5000);
+  };
 
   const handleSyncFirestore = async () => {
     setIsSyncingFirestore(true);
@@ -130,9 +134,9 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       if (onForceSyncAll) {
         await onForceSyncAll();
       }
-      alert(`Berhasil menyinkronkan ${fresh.length} data laporan harian ke Cloud Firestore!`);
-    } catch (err) {
-      alert('Gagal menyinkronkan data ke Firestore.');
+      showHubNotice(`Berhasil menyinkronkan ${fresh.length} data laporan harian ke Cloud Firestore!`, 'success');
+    } catch {
+      showHubNotice('Gagal menyinkronkan data ke Firestore.', 'error');
     } finally {
       setIsSyncingFirestore(false);
     }
@@ -147,9 +151,9 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
     setIsCleaningMemory(true);
     try {
       const res = optimizeAndCleanBrowserMemory();
-      alert(`Pembersihan Memori Selesai!\n• Berhasil membuang ${res.freedKeys} entri data lama/sementara.\n• Memori browser kini lebih ringan dan responsif.`);
+      showHubNotice(`Pembersihan Memori Selesai! Berhasil membuang ${res.freedKeys} entri data lama/sementara sehingga browser lebih ringan.`, 'success');
     } catch {
-      alert('Gagal membersihkan memori browser.');
+      showHubNotice('Gagal membersihkan memori browser.', 'error');
     } finally {
       setIsCleaningMemory(false);
     }
@@ -209,24 +213,27 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
 
     if (isKepling && activeAccount.nomorLingkungan) {
       const lk = activeAccount.nomorLingkungan;
-      fetchPbbSpptForLingkungan(pbbYear, lk).then((items) => {
-        if (Array.isArray(items) && items.length > 0) setSpptList(items);
-      }).catch(() => {});
+      getPbbSpptFromIndexedDb(pbbYear)
+        .then((items) => {
+          if (Array.isArray(items) && items.length > 0) {
+            setSpptList(items.filter((it) => Number(it.lingkungan) === lk));
+          }
+        })
+        .catch(() => {});
       unsubSppt = subscribePbbSpptForLingkungan(pbbYear, lk, (items) => {
         if (Array.isArray(items) && items.length > 0) setSpptList(items);
       });
     } else {
-      // Super Admin or Kasi Pem
+      // Super Admin or Kasi Pem: use local IndexedDB + 1-doc pbb_summary instead of downloading 22,585 docs on home dashboard
       const currentLocal = getLocalSpptForYear(pbbYear);
       if (currentLocal.length > 0) {
         setSpptList(currentLocal);
       }
-      fetchPbbSpptFromFirestore(pbbYear).then((items) => {
-        if (Array.isArray(items) && items.length > 0) setSpptList(items);
-      }).catch(() => {});
-      unsubSppt = subscribePbbSpptFromFirestore(pbbYear, (items) => {
-        if (Array.isArray(items) && items.length > 0) setSpptList(items);
-      });
+      getPbbSpptFromIndexedDb(pbbYear)
+        .then((items) => {
+          if (Array.isArray(items) && items.length > 0) setSpptList(items);
+        })
+        .catch(() => {});
     }
 
     const handleSync = () => {
@@ -912,6 +919,25 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         </div>
       </div>
 
+      {hubNotice && (
+        <div
+          className={`rounded-xl px-4 py-3 text-xs font-bold flex items-center justify-between gap-2 border ${
+            hubNotice.type === 'success'
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+              : 'bg-rose-50 border-rose-300 text-rose-900'
+          }`}
+        >
+          <span>{hubNotice.msg}</span>
+          <button
+            type="button"
+            onClick={() => setHubNotice(null)}
+            className="px-2 py-0.5 rounded bg-white/80 hover:bg-white text-[11px] font-bold cursor-pointer"
+          >
+            Tutup
+          </button>
+        </div>
+      )}
+
       {/* Panel Ringkasan Status Sinkronisasi Real-Time (Firebase, Google Sheets, IndexedDB) */}
       <RealtimeSyncStatusPanel
         isGoogleConnected={isGoogleConnected}
@@ -958,7 +984,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           {/* Pilar 2 */}
           <div 
             onClick={() => {
-              if (isPkkRole(activeAccount.role)) {
+              if (isPkkRole(activeAccount.role) || activeAccount.role === 'super_admin') {
                 onNavigate('kegiatan_pkk');
               } else {
                 onNavigate('monitoring');

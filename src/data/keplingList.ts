@@ -1,5 +1,10 @@
 import { UserAccount } from '../types';
-import { db } from '../lib/firebase';
+import {
+  db,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+} from '../lib/firebase';
 import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 
 export interface KeplingInfo {
@@ -746,153 +751,194 @@ export const getAllEffectiveAccounts = (): UserAccount[] => {
   return Array.from(map.values());
 };
 
+let inFlightAccountsSync: Promise<void> | null = null;
+let inFlightPasswordsSync: Promise<void> | null = null;
+let inFlightProfilesSync: Promise<void> | null = null;
+let lastProfilesSyncAt = 0;
+
 export const syncAccountsWithServer = async (): Promise<void> => {
-  if (!db) return;
-  try {
-    const snap = await getDocs(collection(db, 'user_accounts'));
-    const baseIds = new Set(ALL_ACCOUNTS.map((a) => a.id));
-    const currentDynamic = getDynamicAccounts();
-    const dynamicMap = new Map<string, UserAccount>();
-    currentDynamic.forEach((a) => {
-      if (a && a.id) dynamicMap.set(a.id, a);
-    });
-
-    snap.forEach((docSnap) => {
-      const d = docSnap.data() as any;
-      const id = d?.id || docSnap.id;
-      if (id && !baseIds.has(id) && d.role && d.nama) {
-        dynamicMap.set(id, { ...d, id } as UserAccount);
-      }
-    });
-
+  if (!db || isFirestoreQuotaCooldownActive()) return;
+  if (inFlightAccountsSync) return inFlightAccountsSync;
+  inFlightAccountsSync = (async () => {
     try {
-      localStorage.setItem(DYNAMIC_ACCOUNTS_KEY, JSON.stringify(Array.from(dynamicMap.values())));
-    } catch {}
-  } catch (err) {
-    console.warn('Failed to sync dynamic accounts from Firestore:', err);
-  }
+      const snap = await getDocs(collection(db, 'user_accounts'));
+      const baseIds = new Set(ALL_ACCOUNTS.map((a) => a.id));
+      const currentDynamic = getDynamicAccounts();
+      const dynamicMap = new Map<string, UserAccount>();
+      currentDynamic.forEach((a) => {
+        if (a && a.id) dynamicMap.set(a.id, a);
+      });
+
+      snap.forEach((docSnap) => {
+        const d = docSnap.data() as any;
+        const id = d?.id || docSnap.id;
+        if (id && !baseIds.has(id) && d.role && d.nama) {
+          dynamicMap.set(id, { ...d, id } as UserAccount);
+        }
+      });
+
+      try {
+        localStorage.setItem(DYNAMIC_ACCOUNTS_KEY, JSON.stringify(Array.from(dynamicMap.values())));
+      } catch {}
+    } catch (err) {
+      if (isQuotaExhaustedError(err)) {
+        markFirestoreQuotaExhausted(err);
+      } else {
+        console.warn('Failed to sync dynamic accounts from Firestore:', err);
+      }
+    } finally {
+      inFlightAccountsSync = null;
+    }
+  })();
+  return inFlightAccountsSync;
 };
 
 export const syncPasswordsWithServer = async (): Promise<void> => {
-  const local = getCustomPasswords();
-  let merged: Record<string, string> = { ...local };
+  if (inFlightPasswordsSync) return inFlightPasswordsSync;
+  inFlightPasswordsSync = (async () => {
+    const local = getCustomPasswords();
+    let merged: Record<string, string> = { ...local };
 
-  // 1. Fetch from server API
-  try {
-    const res = await fetch('/api/passwords');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.passwords && typeof data.passwords === 'object') {
-        merged = { ...merged, ...data.passwords };
-      }
-    }
-  } catch (err) {
-    console.warn('Failed to sync passwords with server:', err);
-  }
-
-  // 2. Fetch from Firebase Firestore
-  try {
-    if (db) {
-      const snap = await getDocs(collection(db, 'account_passwords'));
-      snap.forEach((docSnap) => {
-        const d = docSnap.data();
-        if (d && d.password && d.accountId) {
-          merged[d.accountId] = d.password;
+    // 1. Fetch from server API
+    try {
+      const res = await fetch('/api/passwords');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.passwords && typeof data.passwords === 'object') {
+          merged = { ...merged, ...data.passwords };
         }
-      });
+      }
+    } catch (err) {
+      console.warn('Failed to sync passwords with server:', err);
     }
-  } catch (err) {
-    console.warn('Failed to sync passwords from Firestore:', err);
-  }
 
-  try {
-    localStorage.setItem(CUSTOM_PASSWORDS_KEY, JSON.stringify(merged));
-  } catch {}
-};
-
-export const syncProfilesWithServer = async (): Promise<void> => {
-  const local = getCustomProfiles();
-  const merged: Record<string, any> = { ...local };
-
-  const mergeProfileEntry = (accountId: string, incoming: { nama?: string; telepon?: string; updatedAt?: string }) => {
-    if (!accountId || !incoming) return;
-    const existing = merged[accountId];
-    const incomingTime = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
-    const existingTime = existing?.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
-    if (!existing || incomingTime >= existingTime) {
-      merged[accountId] = {
-        ...existing,
-        accountId,
-        nama: incoming.nama !== undefined && String(incoming.nama).trim() ? incoming.nama : existing?.nama,
-        telepon: incoming.telepon !== undefined ? incoming.telepon : existing?.telepon,
-        updatedAt: incoming.updatedAt || existing?.updatedAt,
-      };
-    } else if (existing && !existing.telepon && incoming.telepon) {
-      merged[accountId] = {
-        ...existing,
-        telepon: incoming.telepon,
-      };
-    }
-  };
-
-  // 1. Fetch from server API (fallback baseline)
-  try {
-    const res = await fetch('/api/profiles');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.profiles && typeof data.profiles === 'object') {
-        Object.entries(data.profiles).forEach(([accId, prof]: [string, any]) => {
-          mergeProfileEntry(accId, prof);
+    // 2. Fetch from Firebase Firestore
+    try {
+      if (db && !isFirestoreQuotaCooldownActive()) {
+        const snap = await getDocs(collection(db, 'account_passwords'));
+        snap.forEach((docSnap) => {
+          const d = docSnap.data();
+          if (d && d.password && d.accountId) {
+            merged[d.accountId] = d.password;
+          }
         });
       }
+    } catch (err) {
+      if (isQuotaExhaustedError(err)) {
+        markFirestoreQuotaExhausted(err);
+      } else {
+        console.warn('Failed to sync passwords from Firestore:', err);
+      }
     }
-  } catch (err) {
-    console.warn('Failed to sync profiles with server:', err);
-  }
 
-  // 2. Fetch from Firebase Firestore across user_accounts, user_profiles, and account_profiles
-  try {
-    if (db) {
-      const [accountsSnap, profilesSnap, accountProfilesSnap] = await Promise.all([
-        getDocs(collection(db, 'user_accounts')).catch(() => null),
-        getDocs(collection(db, 'user_profiles')).catch(() => null),
-        getDocs(collection(db, 'account_profiles')).catch(() => null),
-      ]);
+    try {
+      localStorage.setItem(CUSTOM_PASSWORDS_KEY, JSON.stringify(merged));
+    } catch {}
+    inFlightPasswordsSync = null;
+  })();
+  return inFlightPasswordsSync;
+};
 
-      accountsSnap?.forEach((docSnap) => {
-        const d = docSnap.data();
-        const accId = d?.id || docSnap.id;
-        if (accId && (d?.nama || d?.telepon)) {
-          mergeProfileEntry(accId, { nama: d.nama, telepon: d.telepon, updatedAt: d.updatedAt });
+export const syncProfilesWithServer = async (force = false): Promise<void> => {
+  if (!force && Date.now() - lastProfilesSyncAt < 60_000) return;
+  if (inFlightProfilesSync) return inFlightProfilesSync;
+
+  inFlightProfilesSync = (async () => {
+    const local = getCustomProfiles();
+    const merged: Record<string, any> = { ...local };
+
+    const mergeProfileEntry = (accountId: string, incoming: { nama?: string; telepon?: string; updatedAt?: string }) => {
+      if (!accountId || !incoming) return;
+      const existing = merged[accountId];
+      const incomingTime = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
+      const existingTime = existing?.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+      if (!existing || incomingTime >= existingTime) {
+        merged[accountId] = {
+          ...existing,
+          accountId,
+          nama: incoming.nama !== undefined && String(incoming.nama).trim() ? incoming.nama : existing?.nama,
+          telepon: incoming.telepon !== undefined ? incoming.telepon : existing?.telepon,
+          updatedAt: incoming.updatedAt || existing?.updatedAt,
+        };
+      } else if (existing && !existing.telepon && incoming.telepon) {
+        merged[accountId] = {
+          ...existing,
+          telepon: incoming.telepon,
+        };
+      }
+    };
+
+    // 1. Fetch from server API (fallback baseline)
+    try {
+      const res = await fetch('/api/profiles');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.profiles && typeof data.profiles === 'object') {
+          Object.entries(data.profiles).forEach(([accId, prof]: [string, any]) => {
+            mergeProfileEntry(accId, prof);
+          });
         }
-      });
-
-      profilesSnap?.forEach((docSnap) => {
-        const d = docSnap.data();
-        const accId = d?.accountId || docSnap.id;
-        if (accId && (d?.nama || d?.telepon)) {
-          mergeProfileEntry(accId, { nama: d.nama, telepon: d.telepon, updatedAt: d.updatedAt });
-        }
-      });
-
-      accountProfilesSnap?.forEach((docSnap) => {
-        const d = docSnap.data();
-        const accId = d?.accountId || docSnap.id;
-        if (accId && (d?.nama || d?.telepon)) {
-          mergeProfileEntry(accId, { nama: d.nama, telepon: d.telepon, updatedAt: d.updatedAt });
-        }
-      });
+      }
+    } catch (err) {
+      console.warn('Failed to sync profiles with server:', err);
     }
-  } catch (err) {
-    console.warn('Failed to sync profiles from Firestore:', err);
-  }
 
-  try {
-    localStorage.setItem(CUSTOM_PROFILES_KEY, JSON.stringify(merged));
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('sikepling_profile_updated'));
+    // 2. Fetch from Firebase Firestore across user_accounts, user_profiles, and account_profiles
+    try {
+      if (db && !isFirestoreQuotaCooldownActive()) {
+        const handleErr = (e: any) => {
+          if (isQuotaExhaustedError(e)) markFirestoreQuotaExhausted(e);
+          return null;
+        };
+        const [accountsSnap, profilesSnap, accountProfilesSnap] = await Promise.all([
+          getDocs(collection(db, 'user_accounts')).catch(handleErr),
+          getDocs(collection(db, 'user_profiles')).catch(handleErr),
+          getDocs(collection(db, 'account_profiles')).catch(handleErr),
+        ]);
+
+        accountsSnap?.forEach((docSnap) => {
+          const d = docSnap.data();
+          const accId = d?.id || docSnap.id;
+          if (accId && (d?.nama || d?.telepon)) {
+            mergeProfileEntry(accId, { nama: d.nama, telepon: d.telepon, updatedAt: d.updatedAt });
+          }
+        });
+
+        profilesSnap?.forEach((docSnap) => {
+          const d = docSnap.data();
+          const accId = d?.accountId || docSnap.id;
+          if (accId && (d?.nama || d?.telepon)) {
+            mergeProfileEntry(accId, { nama: d.nama, telepon: d.telepon, updatedAt: d.updatedAt });
+          }
+        });
+
+        accountProfilesSnap?.forEach((docSnap) => {
+          const d = docSnap.data();
+          const accId = d?.accountId || docSnap.id;
+          if (accId && (d?.nama || d?.telepon)) {
+            mergeProfileEntry(accId, { nama: d.nama, telepon: d.telepon, updatedAt: d.updatedAt });
+          }
+        });
+      }
+    } catch (err) {
+      if (isQuotaExhaustedError(err)) {
+        markFirestoreQuotaExhausted(err);
+      } else {
+        console.warn('Failed to sync profiles from Firestore:', err);
+      }
     }
-  } catch {}
+
+    lastProfilesSyncAt = Date.now();
+    try {
+      localStorage.setItem(CUSTOM_PROFILES_KEY, JSON.stringify(merged));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sikepling_profile_updated'));
+      }
+    } catch {}
+    inFlightProfilesSync = null;
+  })();
+
+  return inFlightProfilesSync;
 };
 
 export type { UserAccount };

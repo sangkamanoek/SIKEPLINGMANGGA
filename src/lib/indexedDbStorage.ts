@@ -2,7 +2,7 @@ import { LaporanHarianItem, SuratKedinasanItem, PosyanduReport, LaporanKegiatanP
 import { SpptPbbItem } from '../data/pbbSampleData';
 
 const DB_NAME = 'sikepling_offline_db';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 const STORE_REPORTS = 'reports_store';
 const STORE_PBB = 'pbb_store';
 const STORE_VISITS = 'visits_store';
@@ -12,49 +12,151 @@ const STORE_POSYANDU = 'posyandu_store';
 const STORE_PKK_DASA_WISMA = 'pkk_dasa_wisma_store';
 const STORE_PKK_KEUANGAN = 'pkk_keuangan_store';
 const STORE_PKK_KEGIATAN = 'pkk_kegiatan_store';
+const STORE_WRITE_QUEUE = 'write_queue_store';
+
+export interface QueuedWriteRecord {
+  key: string;
+  op: 'set' | 'delete';
+  colName: string;
+  docId: string;
+  payload?: Record<string, any>;
+  merge?: boolean;
+  enqueuedAt: number;
+  attempts?: number;
+  lastError?: string;
+  storedInIdbOnly?: boolean;
+}
+
+// Singleton connection cache to avoid leaking IDB handles across rapid calls on iOS/Safari/WebViews
+let dbPromise: Promise<IDBDatabase> | null = null;
+let lastSavedPbbRef: SpptPbbItem[] | null = null;
 
 function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined' || !window.indexedDB) {
-      return reject(new Error('IndexedDB not supported in this environment'));
+  if (typeof window === 'undefined' || !window.indexedDB) {
+    return Promise.reject(new Error('IndexedDB not supported in this environment'));
+  }
+
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise((resolve, reject) => {
+    try {
+      const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains(STORE_REPORTS)) {
+          db.createObjectStore(STORE_REPORTS, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORE_PBB)) {
+          db.createObjectStore(STORE_PBB, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORE_VISITS)) {
+          db.createObjectStore(STORE_VISITS, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORE_HISTORY)) {
+          db.createObjectStore(STORE_HISTORY, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORE_SURAT)) {
+          db.createObjectStore(STORE_SURAT, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORE_POSYANDU)) {
+          db.createObjectStore(STORE_POSYANDU, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORE_PKK_DASA_WISMA)) {
+          db.createObjectStore(STORE_PKK_DASA_WISMA, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORE_PKK_KEUANGAN)) {
+          db.createObjectStore(STORE_PKK_KEUANGAN, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORE_PKK_KEGIATAN)) {
+          db.createObjectStore(STORE_PKK_KEGIATAN, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORE_WRITE_QUEUE)) {
+          db.createObjectStore(STORE_WRITE_QUEUE, { keyPath: 'key' });
+        }
+      };
+
+      request.onblocked = () => {
+        console.warn('[IndexedDB] Database upgrade blocked by another tab');
+      };
+
+      request.onsuccess = () => {
+        const db = request.result;
+        db.onversionchange = () => {
+          try {
+            db.close();
+          } catch {}
+          dbPromise = null;
+        };
+        db.onclose = () => {
+          dbPromise = null;
+        };
+        resolve(db);
+      };
+
+      request.onerror = () => {
+        dbPromise = null;
+        reject(request.error);
+      };
+    } catch (err) {
+      dbPromise = null;
+      reject(err);
     }
-
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_REPORTS)) {
-        db.createObjectStore(STORE_REPORTS, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_PBB)) {
-        db.createObjectStore(STORE_PBB, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_VISITS)) {
-        db.createObjectStore(STORE_VISITS, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_HISTORY)) {
-        db.createObjectStore(STORE_HISTORY, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_SURAT)) {
-        db.createObjectStore(STORE_SURAT, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_POSYANDU)) {
-        db.createObjectStore(STORE_POSYANDU, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_PKK_DASA_WISMA)) {
-        db.createObjectStore(STORE_PKK_DASA_WISMA, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_PKK_KEUANGAN)) {
-        db.createObjectStore(STORE_PKK_KEUANGAN, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_PKK_KEGIATAN)) {
-        db.createObjectStore(STORE_PKK_KEGIATAN, { keyPath: 'id' });
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
   });
+
+  return dbPromise;
+}
+
+export async function putWriteQueueItemIDB(record: QueuedWriteRecord): Promise<boolean> {
+  if (!record || !record.key) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_WRITE_QUEUE, 'readwrite');
+      const store = tx.objectStore(STORE_WRITE_QUEUE);
+      store.put(record);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error putting write queue item:', err);
+    return false;
+  }
+}
+
+export async function getAllWriteQueueItemsIDB(): Promise<QueuedWriteRecord[]> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_WRITE_QUEUE, 'readonly');
+      const store = tx.objectStore(STORE_WRITE_QUEUE);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        resolve(Array.isArray(req.result) ? (req.result as QueuedWriteRecord[]) : []);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function deleteWriteQueueItemIDB(key: string): Promise<boolean> {
+  if (!key) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_WRITE_QUEUE, 'readwrite');
+      const store = tx.objectStore(STORE_WRITE_QUEUE);
+      store.delete(key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } catch {
+    return false;
+  }
 }
 
 export async function saveKeluargaToIndexedDB(_data: any[]): Promise<boolean> {
@@ -66,29 +168,90 @@ export async function getKeluargaFromIndexedDB(): Promise<any[] | null> {
 }
 
 /**
- * Save all PBB data to IndexedDB
+ * Save single SPPT item to IndexedDB cleanly without rewriting all 22k records
  */
-export async function savePbbToIndexedDB(data: SpptPbbItem[]): Promise<boolean> {
-  if (!Array.isArray(data)) return false;
+export async function saveSinglePbbToIndexedDB(item: SpptPbbItem): Promise<boolean> {
+  if (!item || !item.id) return false;
   try {
     const db = await openDatabase();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_PBB, 'readwrite');
-      const store = tx.objectStore(STORE_PBB);
-
-      store.clear();
-      if (data.length > 0) {
-        data.forEach((item) => {
-          if (item && item.id) {
-            store.put(item);
-          }
-        });
-      }
-
+      tx.objectStore(STORE_PBB).put(item);
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error);
     });
+  } catch (err) {
+    console.warn('[IndexedDB] Error saving single PBB item:', err);
+    return false;
+  }
+}
+
+/**
+ * Delete single SPPT item from IndexedDB
+ */
+export async function deleteSinglePbbFromIndexedDB(id: string): Promise<boolean> {
+  if (!id) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PBB, 'readwrite');
+      tx.objectStore(STORE_PBB).delete(id);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error deleting single PBB item:', err);
+    return false;
+  }
+}
+
+/**
+ * Save all PBB data to IndexedDB in chunked transactions to prevent main-thread UI freeze & OOM spikes
+ */
+export async function savePbbToIndexedDB(data: SpptPbbItem[]): Promise<boolean> {
+  if (!Array.isArray(data)) return false;
+  if (lastSavedPbbRef === data) return true;
+
+  try {
+    const db = await openDatabase();
+    lastSavedPbbRef = data;
+
+    // 1. Clear store first cleanly
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_PBB, 'readwrite');
+      tx.objectStore(STORE_PBB).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+
+    if (data.length === 0) return true;
+
+    // 2. Write in batches of 1500 items with micro-yields to avoid memory spikes / browser hangs
+    const CHUNK_SIZE = 1500;
+    for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+      const chunk = data.slice(i, i + CHUNK_SIZE);
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_PBB, 'readwrite');
+        const store = tx.objectStore(STORE_PBB);
+        for (let j = 0; j < chunk.length; j++) {
+          const item = chunk[j];
+          if (item && item.id) {
+            store.put(item);
+          }
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+      if (i + CHUNK_SIZE < data.length) {
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    }
+
+    return true;
   } catch (err) {
     console.warn('[IndexedDB] Error saving PBB data:', err);
     return false;
@@ -240,7 +403,6 @@ export async function saveReportsToIndexedDB(reports: LaporanHarianItem[]): Prom
       const tx = db.transaction(STORE_REPORTS, 'readwrite');
       const store = tx.objectStore(STORE_REPORTS);
 
-      // Clear old and put all new items
       store.clear();
       if (reports.length > 0) {
         reports.forEach((item) => {
@@ -348,14 +510,34 @@ export async function saveSuratToIndexedDB(data: SuratKedinasanItem[]): Promise<
       const tx = db.transaction(STORE_SURAT, 'readwrite');
       const store = tx.objectStore(STORE_SURAT);
 
-      store.clear();
-      if (data.length > 0) {
+      // Preserve existing PDF attachments if incoming list has stripped fileUrl
+      const incomingIds = new Set(data.filter((x) => x && x.id).map((x) => x.id));
+      const keysReq = store.getAllKeys();
+      keysReq.onsuccess = () => {
+        const existingKeys = Array.isArray(keysReq.result) ? keysReq.result : [];
+        existingKeys.forEach((k) => {
+          if (!incomingIds.has(String(k))) {
+            store.delete(k);
+          }
+        });
+
         data.forEach((item) => {
-          if (item && item.id) {
+          if (!item || !item.id) return;
+          if (!item.fileUrl && item.fileName) {
+            const getReq = store.get(item.id);
+            getReq.onsuccess = () => {
+              const prev = getReq.result as SuratKedinasanItem | undefined;
+              store.put(
+                prev && prev.fileUrl
+                  ? { ...item, fileUrl: prev.fileUrl, fileSize: item.fileSize || prev.fileSize, fileType: item.fileType || prev.fileType }
+                  : item
+              );
+            };
+          } else {
             store.put(item);
           }
         });
-      }
+      };
 
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
@@ -462,9 +644,13 @@ function mergeMediaArrayPreservingUrls(
   });
 }
 
+function hasAnyEmptyPhotoUrl(list: FotoDokumentasi[] | undefined): boolean {
+  if (!Array.isArray(list) || list.length === 0) return false;
+  return list.some((f) => !f || typeof f.url !== 'string' || f.url.length <= 20);
+}
+
 /**
- * Save all Posyandu reports to IndexedDB (No 5MB quota limitation)
- * Safely preserves existing non-empty photo URLs if incoming items were stripped for LocalStorage.
+ * Save all Posyandu reports to IndexedDB without loading all existing base64 photos into RAM via getAll().
  */
 export async function savePosyanduToIndexedDB(data: PosyanduReport[]): Promise<boolean> {
   if (!Array.isArray(data)) return false;
@@ -473,29 +659,35 @@ export async function savePosyanduToIndexedDB(data: PosyanduReport[]): Promise<b
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_POSYANDU, 'readwrite');
       const store = tx.objectStore(STORE_POSYANDU);
-      const getReq = store.getAll();
 
-      getReq.onsuccess = () => {
-        const existingMap = new Map<string, PosyanduReport>();
-        const existingRows = Array.isArray(getReq.result) ? (getReq.result as PosyanduReport[]) : [];
-        existingRows.forEach((row) => {
-          if (row && row.id) existingMap.set(row.id, row);
+      const incomingIds = new Set(data.filter((x) => x && x.id).map((x) => x.id));
+      const keysReq = store.getAllKeys();
+
+      keysReq.onsuccess = () => {
+        const existingKeys = Array.isArray(keysReq.result) ? keysReq.result : [];
+        existingKeys.forEach((k) => {
+          if (!incomingIds.has(String(k))) {
+            store.delete(k);
+          }
         });
 
-        store.clear();
-        if (data.length > 0) {
-          data.forEach((item) => {
-            if (item && item.id) {
-              const prev = existingMap.get(item.id);
+        data.forEach((item) => {
+          if (!item || !item.id) return;
+          if (hasAnyEmptyPhotoUrl(item.dokumentasiFoto)) {
+            const getReq = store.get(item.id);
+            getReq.onsuccess = () => {
+              const prev = getReq.result as PosyanduReport | undefined;
               const mergedFotos = mergeMediaArrayPreservingUrls(item.dokumentasiFoto, prev?.dokumentasiFoto);
               store.put(
                 mergedFotos !== undefined
                   ? { ...item, dokumentasiFoto: mergedFotos }
                   : item
               );
-            }
-          });
-        }
+            };
+          } else {
+            store.put(item);
+          }
+        });
       };
 
       tx.oncomplete = () => resolve(true);
@@ -579,7 +771,7 @@ export async function deletePosyanduFromIndexedDB(id: string): Promise<boolean> 
 }
 
 /**
- * Save all PKK Kegiatan reports to IndexedDB (preserves existing non-empty photo URLs)
+ * Save all PKK Kegiatan reports to IndexedDB without loading all existing base64 photos into RAM via getAll().
  */
 export async function savePkkKegiatanToIndexedDB(data: LaporanKegiatanPkk[]): Promise<boolean> {
   if (!Array.isArray(data)) return false;
@@ -588,29 +780,35 @@ export async function savePkkKegiatanToIndexedDB(data: LaporanKegiatanPkk[]): Pr
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_PKK_KEGIATAN, 'readwrite');
       const store = tx.objectStore(STORE_PKK_KEGIATAN);
-      const getReq = store.getAll();
 
-      getReq.onsuccess = () => {
-        const existingMap = new Map<string, LaporanKegiatanPkk>();
-        const existingRows = Array.isArray(getReq.result) ? (getReq.result as LaporanKegiatanPkk[]) : [];
-        existingRows.forEach((row) => {
-          if (row && row.id) existingMap.set(row.id, row);
+      const incomingIds = new Set(data.filter((x) => x && x.id).map((x) => x.id));
+      const keysReq = store.getAllKeys();
+
+      keysReq.onsuccess = () => {
+        const existingKeys = Array.isArray(keysReq.result) ? keysReq.result : [];
+        existingKeys.forEach((k) => {
+          if (!incomingIds.has(String(k))) {
+            store.delete(k);
+          }
         });
 
-        store.clear();
-        if (data.length > 0) {
-          data.forEach((item) => {
-            if (item && item.id) {
-              const prev = existingMap.get(item.id);
+        data.forEach((item) => {
+          if (!item || !item.id) return;
+          if (hasAnyEmptyPhotoUrl(item.fotoDokumentasi)) {
+            const getReq = store.get(item.id);
+            getReq.onsuccess = () => {
+              const prev = getReq.result as LaporanKegiatanPkk | undefined;
               const mergedFotos = mergeMediaArrayPreservingUrls(item.fotoDokumentasi, prev?.fotoDokumentasi);
               store.put(
                 mergedFotos !== undefined
                   ? { ...item, fotoDokumentasi: mergedFotos }
                   : item
               );
-            }
-          });
-        }
+            };
+          } else {
+            store.put(item);
+          }
+        });
       };
 
       tx.oncomplete = () => resolve(true);
@@ -683,4 +881,3 @@ export async function deletePkkKegiatanFromIndexedDB(id: string): Promise<boolea
     return false;
   }
 }
-
