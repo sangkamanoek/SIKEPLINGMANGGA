@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+.DS_Store
+
+# Build Output
+dist/
+build/
+.vite/
+
+# Environment
+.env
+.env.local
+
+# Large local server data backup files (prevent GitHub push payload size errors)
+data/*.json
+!data/profiles.json
+!data/passwords.json
+!data/targets_capaian.json
