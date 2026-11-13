@@ -67,6 +67,7 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
   const [formFotoUrl, setFormFotoUrl] = useState<string | undefined>(undefined);
   const [isCompressing, setIsCompressing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [previewFotoUrl, setPreviewFotoUrl] = useState<string | null>(null);
 
   // Subscribe to real-time changes
   useEffect(() => {
@@ -612,7 +613,7 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
                             src={item.fotoDokumenUrl}
                             alt="Foto Dokumen Agenda"
                             className="w-full h-full object-cover cursor-zoom-in hover:scale-105 transition-transform duration-500"
-                            onClick={() => window.open(item.fotoDokumenUrl, '_blank')}
+                            onClick={() => setPreviewFotoUrl(item.fotoDokumenUrl || null)}
                           />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                             <span className="text-white text-[10px] font-bold flex items-center gap-1">
@@ -915,6 +916,33 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
                 Hapus Sekarang
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Pratinjau Foto Dokumen */}
+      {previewFotoUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setPreviewFotoUrl(null)}
+        >
+          <div
+            className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewFotoUrl(null)}
+              className="self-end mb-2 p-2 rounded-full bg-white/15 hover:bg-white/25 text-white transition-colors cursor-pointer"
+              title="Tutup Pratinjau"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewFotoUrl}
+              alt="Pratinjau Dokumen Agenda"
+              className="max-h-[82vh] w-auto rounded-2xl shadow-2xl border border-white/20 object-contain bg-slate-900"
+            />
           </div>
         </div>
       )}

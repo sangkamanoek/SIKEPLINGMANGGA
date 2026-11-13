@@ -27,6 +27,7 @@ const DEFAULT_SHARED_APP_URL = 'https://ais-pre-ylr7rcnshlcw5yeq7pcvq6-920053872
 export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [installSuccess, setInstallSuccess] = useState(false);
+  const [installGuideVisible, setInstallGuideVisible] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isCopiedWa, setIsCopiedWa] = useState(false);
   const [shareUrl, setShareUrl] = useState(() => {
@@ -50,7 +51,7 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClos
         }, 2000);
       }
     } else {
-      alert("📥 Fitur Pemasangan 1-Klik Sedang Memanggil Google Chrome WebAPK Installer...\n\nJika jendela konfirmasi instalasi Google Chrome belum muncul di layar Anda, silakan ikuti petunjuk cepat berikut:\n1. Ketuk tombol menu titik tiga (⋮) di pojok kanan atas browser Google Chrome Anda.\n2. Pilih menu \"Instal Aplikasi\" atau \"Tambahkan ke Layar Utama\".\n\nAplikasi SI-MANGGA akan langsung terpasang di HP Anda sebagai aplikasi mandiri dengan logo Pemko Medan yang resmi!");
+      setInstallGuideVisible(true);
     }
   };
 
@@ -164,6 +165,28 @@ Silakan buka dan pasang aplikasi resmi *SI-MANGGA* (Sistem Informasi & Administr
                 <Download className="w-4 h-4" />
                 <span>{installSuccess ? 'Aplikasi Sedang Dipasang...' : 'Pasang Aplikasi Sekarang (1-Klik)'}</span>
               </button>
+
+              {installGuideVisible && (
+                <div className="mt-3 bg-white border border-amber-300 rounded-xl p-3 text-xs text-slate-700 space-y-1.5 shadow-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-bold text-amber-900 flex items-center gap-1.5">
+                      <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Petunjuk Pemasangan Manual di Browser Anda</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setInstallGuideVisible(false)}
+                      className="p-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      aria-label="Tutup petunjuk"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-slate-600">
+                    Jika jendela instalasi otomatis belum muncul (umum terjadi di mode pratinjau/iOS), buka tautan di Google Chrome / Safari lalu ketuk menu <strong>⋮</strong> (atau <strong>Bagikan</strong>) dan pilih <strong>&quot;Instal Aplikasi&quot;</strong> / <strong>&quot;Tambahkan ke Layar Utama&quot;</strong>.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

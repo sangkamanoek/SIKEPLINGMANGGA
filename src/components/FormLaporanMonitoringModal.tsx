@@ -179,7 +179,7 @@ export const FormLaporanMonitoringModal: React.FC<FormLaporanMonitoringModalProp
       else if (angle === 2) setFotoAngle2Url(compressed);
       else setFotoAngle3Url(compressed);
     } catch {
-      alert('Gagal memproses file foto. Pastikan format file adalah gambar valid.');
+      setFormError('Gagal memproses file foto. Pastikan format file adalah gambar valid.');
     }
   };
 

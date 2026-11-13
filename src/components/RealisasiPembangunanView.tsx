@@ -406,8 +406,6 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     const text = formatMonitoringForWhatsApp(mon);
     navigator.clipboard?.writeText(text);
     showToast(`Format Laporan WA tersalin! Membuka WhatsApp...`);
-    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
   };
 
   const handleToggleSupervisiStatus = async (
@@ -495,7 +493,9 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       }
     } catch (err) {
       console.error('Gagal memproses gambar:', err);
-      alert('Gagal memproses file foto. Pastikan format file adalah gambar valid.');
+      const errMsg = 'Gagal memproses file foto. Pastikan format file adalah gambar valid.';
+      setFormError(errMsg);
+      showToast(errMsg);
     } finally {
       if (type === 'sebelum') setIsProcessingBefore(false);
       else if (type === 'proses') setIsProcessingProses(false);
@@ -2281,15 +2281,17 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                     {/* Card Actions Footer */}
                     <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          type="button"
+                        <a
+                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(formatMonitoringForWhatsApp(mon))}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           onClick={() => handleShareWhatsApp(mon)}
                           className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border border-emerald-400/30"
                           title="Kirim Format Laporan ke WhatsApp"
                         >
                           <Share2 className="w-3.5 h-3.5" />
                           <span>Laporan WA</span>
-                        </button>
+                        </a>
 
                         {mon.koordinatUrl && (
                           <a

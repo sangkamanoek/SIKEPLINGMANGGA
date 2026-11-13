@@ -1,0 +1,107 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "pbb_sppt_2025",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lingkungan", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pbb_sppt_2026",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lingkungan", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pbb_sppt_2027",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lingkungan", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "keplingId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "kunjungan_warga",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lingkungan", "order": "ASCENDING" },
+        { "fieldPath": "tanggal", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pkk_posyandu_reports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "nomorLingkungan", "order": "ASCENDING" },
+        { "fieldPath": "tanggal", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pkk_kegiatan",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "pokja", "order": "ASCENDING" },
+        { "fieldPath": "tanggal", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "reports",
+      "fieldPath": "dokumentasiFoto",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "pkk_posyandu_reports",
+      "fieldPath": "dokumentasiFoto",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "pkk_kegiatan",
+      "fieldPath": "fotoDokumentasi",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "kunjungan_warga",
+      "fieldPath": "fotoUrl",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "surat_kedinasan",
+      "fieldPath": "fileUrl",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "realisasi_pembangunan",
+      "fieldPath": "fotoSebelumUrl",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "realisasi_pembangunan",
+      "fieldPath": "fotoProsesUrl",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "realisasi_pembangunan",
+      "fieldPath": "fotoProsesList",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "realisasi_pembangunan",
+      "fieldPath": "fotoSesudahUrl",
+      "indexes": []
+    }
+  ]
+}

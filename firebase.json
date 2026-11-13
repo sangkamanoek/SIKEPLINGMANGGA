@@ -1,0 +1,7 @@
+{
+  "firestore": {
+    "database": "ai-studio-remixlaporankegi-ffd5ab59-6cbc-4b0f-aaed-d527ab34bb85",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

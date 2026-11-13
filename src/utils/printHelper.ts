@@ -158,43 +158,35 @@ export const printOfficialDocument = (targetIdOrHtml: string, title: string = 'D
     </html>
   `;
 
-  // Try opening a popup window first
-  let w: Window | null = null;
+  // Print via hidden iframe directly to avoid iframe/popup blocker issues
   try {
-    w = window.open('', '_blank');
-  } catch {
-    w = null;
-  }
+    const existingIframe = document.getElementById('__print_iframe_helper__');
+    if (existingIframe && existingIframe.parentNode) {
+      existingIframe.parentNode.removeChild(existingIframe);
+    }
 
-  if (w) {
-    w.document.open();
-    w.document.write(printHtml);
-    w.document.close();
-  } else {
-    // Fallback using an invisible iframe if popup blocked
-    try {
-      let iframe = document.getElementById('__print_iframe_helper__') as HTMLIFrameElement;
-      if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = '__print_iframe_helper__';
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-      }
-      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (doc) {
-        doc.open();
-        doc.write(printHtml);
-        doc.close();
-      }
-    } catch (err) {
-      console.error('Print helper fallback error:', err);
+    const iframe = document.createElement('iframe');
+    iframe.id = '__print_iframe_helper__';
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.visibility = 'hidden';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(printHtml);
+      doc.close();
+    } else {
       window.print();
     }
+  } catch (err) {
+    console.error('Print helper fallback error:', err);
+    window.print();
   }
 };
 

@@ -70,6 +70,7 @@ const getImageBase64 = async (url: string): Promise<string> => {
 export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClose }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -579,6 +580,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
   // Function to generate and download comprehensive professional PPTX file with embedded footer banner
   const handleDownloadPPT = async () => {
     try {
+      setDownloadError(null);
       setIsGenerating(true);
 
       // Pre-load official "MEDAN UNTUK SEMUA" banner image as base64 for embedding in PPTX
@@ -1739,7 +1741,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
       await pptx.writeFile({ fileName: `Panduan_Penggunaan_SI_MANGGA_${CURRENT_APP_VERSION}.pptx` });
     } catch (err) {
       console.error('Error generating PPTX:', err);
-      alert('Gagal mendownload PPTX. Silakan coba kembali.');
+      setDownloadError('Gagal mengunduh berkas PPTX. Silakan coba kembali.');
     } finally {
       setIsGenerating(false);
     }
@@ -1792,6 +1794,23 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
             </button>
           </div>
         </div>
+
+        {downloadError && (
+          <div className="mx-4 mt-3 bg-rose-50 border border-rose-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-2 text-xs font-bold text-rose-800 shrink-0">
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{downloadError}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setDownloadError(null)}
+              className="p-1 rounded-lg hover:bg-rose-100 text-rose-600 cursor-pointer"
+              aria-label="Tutup pesan kesalahan"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Slide Viewer Screen */}
         <div className="p-3 sm:p-5 overflow-y-auto flex-1 bg-slate-100 flex flex-col justify-center custom-scrollbar">

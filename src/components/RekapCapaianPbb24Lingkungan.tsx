@@ -60,16 +60,9 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
     }
   };
 
-  // Open WhatsApp directly with text
-  const handleShareToWhatsApp = () => {
-    try {
-      const encoded = encodeURIComponent(waText);
-      const url = `https://api.whatsapp.com/send?text=${encoded}`;
-      window.open(url, '_blank');
-    } catch {
-      handleCopyWa();
-    }
-  };
+  const waShareUrl = React.useMemo(() => {
+    return `https://api.whatsapp.com/send?text=${encodeURIComponent(waText)}`;
+  }, [waText]);
 
   // 24 Lingkungan sorted strictly 1 to 24
   const sortedLingkungan = React.useMemo(() => {
@@ -501,15 +494,21 @@ export const RekapCapaianPbb24Lingkungan: React.FC<RekapCapaianPbb24LingkunganPr
                 >
                   Tutup
                 </button>
-                <button
-                  type="button"
-                  onClick={handleShareToWhatsApp}
+                <a
+                  href={waShareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    try {
+                      navigator.clipboard?.writeText(waText);
+                    } catch {}
+                  }}
                   className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-95 text-white text-xs font-black shadow-sm transition-all cursor-pointer"
                   title="Buka langsung di WhatsApp"
                 >
                   <Share2 className="w-3.5 h-3.5" />
                   <span>Kirim ke WhatsApp</span>
-                </button>
+                </a>
                 <button
                   type="button"
                   onClick={handleCopyWa}

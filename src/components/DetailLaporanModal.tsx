@@ -575,63 +575,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
   };
 
   const openPrintableWindow = () => {
-    if (!item) return;
-    const element = document.getElementById('lembar-cetak-laporan-kepling');
-    const contentHtml = element ? element.innerHTML : '';
-    const titleStr = generateReportPdfFileName(item, displayTanggal).replace(/\.pdf$/i, '');
-
-    try {
-      const printWin = window.open('', '_blank');
-      if (!printWin) {
-        // Jika popup diblokir browser, cetak langsung halaman saat ini
-        window.print();
-        return;
-      }
-
-      printWin.document.write(`
-        <!DOCTYPE html>
-        <html lang="id">
-          <head>
-            <title>${titleStr}</title>
-            <meta charset="UTF-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-              @media print {
-                .no-print { display: none !important; }
-                body { background: white !important; margin: 0 !important; padding: 0 !important; }
-                @page { size: A4 portrait; margin: 6mm 8mm 6mm 20mm; }
-              }
-              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #000; padding: 12px; margin: 0; }
-              .print-table { border-collapse: collapse; width: 100%; }
-              .print-table th, .print-table td { border: 1px solid #000; padding: 3px 6px; font-size: 8pt; }
-              .avoid-break { page-break-inside: avoid; break-inside: avoid; }
-            </style>
-          </head>
-          <body>
-            <div class="no-print" style="position: sticky; top: 0; background: #064e3b; color: white; padding: 10px; border-radius: 8px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 9999;">
-              <span style="font-weight: bold; font-size: 13px;">📄 Lembar Cetak Resmi Laporan Kepling (A4)</span>
-              <div style="display: flex; gap: 8px;">
-                <button onclick="window.print()" style="background: #f59e0b; color: #000; font-weight: bold; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px;">🖨️ Cetak / Simpan PDF</button>
-                <button onclick="window.close()" style="background: rgba(255,255,255,0.2); color: white; font-weight: bold; padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px;">Tutup</button>
-              </div>
-            </div>
-            <div style="background: white; max-width: 180mm; margin: 0 auto; padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-              ${contentHtml}
-            </div>
-            <script>
-              window.onload = function() {
-                setTimeout(function() {
-                  try { window.print(); } catch (e) {}
-                }, 400);
-              };
-            </script>
-          </body>
-        </html>
-      `);
-      printWin.document.close();
-    } catch (e) {
-      window.print();
-    }
+    handlePrint();
   };
 
   const handleDownloadPDF = async () => {

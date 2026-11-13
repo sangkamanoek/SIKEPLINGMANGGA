@@ -95,6 +95,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
   const [selectedRecapLingkungan, setSelectedRecapLingkungan] = useState<number | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(null);
 
   const printAreaRef = useRef<HTMLDivElement>(null);
 
@@ -364,10 +365,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       }
     } catch (err: any) {
       console.error('Error uploading photo:', err);
+      const errMsg = 'Gagal mengunggah foto: ' + (err.message || err);
       if (onShowToast) {
-        onShowToast('Gagal mengunggah foto: ' + (err.message || err), 'error');
+        onShowToast(errMsg, 'error');
       } else {
-        alert('Gagal mengunggah foto: ' + (err.message || err));
+        setInlineError(errMsg);
       }
     } finally {
       setUploadingPhotoId(null);
@@ -561,6 +563,19 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in max-w-7xl mx-auto px-2 sm:px-4">
+      {inlineError && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3 text-xs font-bold text-rose-800">
+          <span>{inlineError}</span>
+          <button
+            type="button"
+            onClick={() => setInlineError(null)}
+            className="p-1 rounded-lg hover:bg-rose-100 text-rose-600 cursor-pointer shrink-0"
+            aria-label="Tutup pesan kesalahan"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       {/* 1. ATAS: FORM KUNJUNGAN WARGA SECTION (Siap diisi Kepling tanpa perlu scrolling) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
