@@ -611,49 +611,85 @@ export interface AgendaKelurahanItem {
 }
 
 
+export interface DasaWismaKkAnggota {
+  id: string;
+  namaKepalaKeluarga: string;
+  alamat: string;
+  jumlahJiwa: number;
+  jumlahLakiLaki: number;
+  jumlahPerempuan: number;
+  sumberData?: string;
+}
+
 export interface PkkDasaWismaItem {
   id: string;
   namaKelompok: string;
   lingkunganNomor: number;
-  namaKetua: string;
+  lingkunganNama?: string;
+  namaKetuaDawis?: string;
+  namaKetua?: string; // Legacy alias
+  namaKrt?: string; // Kepala Rumah Tangga
   teleponKetua?: string;
   rtRw?: string;
-  jumlahAnggota?: number; // Total members in the Dasa Wisma group (usually women)
-  
-  // Basic Statistics
+  createdByName?: string;
+  daftarKkAnggota?: DasaWismaKkAnggota[];
+  jumlahAnggota?: number;
+
+  // Basic Statistics (Firestore native + legacy aliases)
   jumlahRumah?: number;
   jumlahKk?: number;
   jumlahJiwa?: number;
-  jumlahJiwaLaki?: number;
-  jumlahJiwaPerempuan?: number;
-  
+  jumlahLakiLaki?: number;
+  jumlahPerempuan?: number;
+  jumlahJiwaLaki?: number; // Legacy alias
+  jumlahJiwaPerempuan?: number; // Legacy alias
+
   // Health & Demographic Statistics
   jumlahIbuHamil?: number;
   jumlahIbuMenyusui?: number;
+  jumlahIbuNifas?: number;
   jumlahBalita?: number;
   jumlahBalitaLaki?: number;
   jumlahBalitaPerempuan?: number;
   jumlahLansia?: number;
-  
+
   // Family Planning & Literacy
   jumlahPus?: number; // Pasangan Usia Subur
   jumlahWus?: number; // Wanita Usia Subur
+  jumlahAkseptorKb?: number;
   jumlahButaAksara?: number;
   jumlahBerkebutuhanKhusus?: number;
 
-  // Environment & Sanitation
-  jumlahJambanSehat?: number;
-  jumlahSpal?: number; // Saluran Pembuangan Air Limbah
+  // Environment, Sanitation & Basic Needs
+  punyaJambanSehat?: number;
+  punyaSpal?: number;
+  punyaToga?: number;
+  jumlahJambanSehat?: number; // Legacy alias
+  jumlahSpal?: number; // Legacy alias
   jumlahTempatSampah?: number;
-  jumlahPekaranganManfaat?: number; // AKU HATINYA PKK
-  sumberAirBersih?: string; // PDAM, Sumur, dll.
-  kriteriaRumah?: 'Sehat' | 'Kurang Sehat' | string;
+  jumlahPekaranganManfaat?: number;
+  sumberAirBersih?: string;
+  sumberAirMinum?: string;
+  makananPokok?: string;
+  kriteriaRumah?: string;
+  stikerP4k?: string;
+
+  // Program / Boolean Flags
+  kegiatanPosyandu?: boolean;
+  kegiatanUp2kKoperasi?: boolean;
+  industriPangan?: boolean;
+  industriSandang?: boolean;
+  ptpToga?: boolean;
+  ptpWarungHidup?: boolean;
+  ptpPeternakan?: boolean;
+  ptpPerikanan?: boolean;
 
   // Other details
   jumlahIndustriRumah?: number;
   kegiatanUtama?: string;
   catatan?: string;
-  
-  createdAt: string;
+  validationWarnings?: any;
+
+  createdAt?: string;
   updatedAt?: string;
 }

@@ -3,6 +3,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  getDocsFromServer,
   setDoc,
   deleteDoc,
   writeBatch,
@@ -130,25 +131,62 @@ export function subscribePbbSummary(
   onData: (overview: KelurahanPbbOverview) => void
 ): Unsubscribe {
   const key = `${PBB_SUMMARY_STORAGE_KEY_PREFIX}${year}`;
+  let isActive = true;
   // 1. Immediately provide cached overview (0ms latency, never NOL)
   const initial = getCachedPbbOverview(year);
   onData(initial);
 
-  // 2. Background refresh
+  // 2. Listen for locally computed live SPPT summary updates (from Firestore SPPT collection)
+  const handlePbbUpdated = (e: Event) => {
+    if (!isActive) return;
+    const detail = (e as CustomEvent)?.detail;
+    if (!detail?.year || detail.year === year) {
+      const latestCached = safeGetLocalStorage<KelurahanPbbOverview | null>(key, null);
+      if (latestCached && latestCached.totalWp > 0) {
+        onData(latestCached);
+      }
+    }
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pbb-data-updated', handlePbbUpdated);
+  }
+
+  // 3. Background refresh from Firestore `pbb_summary/{year}` only if not superseded by fuller local SPPT cache
   fetchPbbSummaryFromFirestore(year).then((latest) => {
+    if (!isActive) return;
+    const localSppt = getLocalSpptForYear(year);
+    if (localSppt.length > 100 && !SAMPLE_SPPT_ITEMS.some((s) => s.id === localSppt[0]?.id)) {
+      const computed = computePbbOverview(localSppt, year);
+      if (computed.totalWp >= (latest?.totalWp || 0)) {
+        safeSetLocalStorage(key, JSON.stringify(computed));
+        onData(computed);
+        return;
+      }
+    }
     if (latest && latest.totalWp > 0) {
       onData(latest);
     }
   }).catch(() => {});
 
-  // 3. Realtime Firestore listener on `pbb_summary/{year}`
+  // 4. Realtime Firestore listener on `pbb_summary/{year}`
+  let unsubSnapshot: Unsubscribe = () => {};
   try {
     const docRef = doc(db, 'pbb_summary', String(year));
-    return onSnapshot(
+    unsubSnapshot = onSnapshot(
       docRef,
       (snap) => {
+        if (!isActive) return;
         if (snap.exists()) {
           const data = snap.data() as KelurahanPbbOverview;
+          const localSppt = getLocalSpptForYear(year);
+          if (localSppt.length > 100 && !SAMPLE_SPPT_ITEMS.some((s) => s.id === localSppt[0]?.id)) {
+            const computed = computePbbOverview(localSppt, year);
+            if (computed.totalWp > (data?.totalWp || 0)) {
+              safeSetLocalStorage(key, JSON.stringify(computed));
+              onData(computed);
+              return;
+            }
+          }
           if (data && data.totalWp > 0) {
             safeSetLocalStorage(key, JSON.stringify(data));
             onData(data);
@@ -161,8 +199,15 @@ export function subscribePbbSummary(
     );
   } catch (e) {
     console.warn('Error setting up pbb_summary subscription:', e);
-    return () => {};
   }
+
+  return () => {
+    isActive = false;
+    unsubSnapshot();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pbb-data-updated', handlePbbUpdated);
+    }
+  };
 }
 
 /**
@@ -219,6 +264,12 @@ export function saveLocalSpptForYear(items: SpptPbbItem[], year: number): void {
   const key = getPbbStorageKey(year);
   safeSetLocalStorage(key, JSON.stringify(items));
   safeSetLocalStorage(`sikepling_pbb_master_data_${year}`, JSON.stringify(items));
+  if (Array.isArray(items) && items.length >= 100) {
+    const computed = computePbbOverview(items, year);
+    if (computed && computed.totalWp > 0) {
+      safeSetLocalStorage(`${PBB_SUMMARY_STORAGE_KEY_PREFIX}${year}`, JSON.stringify(computed));
+    }
+  }
   // Safely persist complete dataset to IndexedDB (prevents mobile quota drop)
   savePbbToIndexedDB(items).catch(() => {});
   if (typeof window !== 'undefined') {
@@ -347,12 +398,19 @@ export async function fetchPbbSpptForLingkungan(year: number = DEFAULT_PBB_YEAR,
   const colName = `${PBB_COLLECTION_PREFIX}${year}`;
   try {
     const q = query(collection(db, colName), where('lingkungan', '==', lingkungan));
-    const snap = await getDocs(q);
+    let snap;
+    try {
+      snap = await getDocsFromServer(q);
+    } catch {
+      snap = await getDocs(q);
+    }
     const items: SpptPbbItem[] = [];
     snap.forEach((docSnap) => {
       const data = docSnap.data() as SpptPbbItem;
-      if (data && data.id) items.push({ ...data, id: docSnap.id || data.id });
+      const docId = docSnap.id || data?.id;
+      if (data && docId) items.push({ ...data, id: docId });
     });
+    items.sort((a, b) => (a.no || 0) - (b.no || 0));
     return items;
   } catch (err) {
     console.warn(`[PBB Fetch] Notice fetching Lingkungan ${lingkungan}:`, err);
@@ -370,22 +428,45 @@ export function subscribePbbSpptForLingkungan(
 ): Unsubscribe {
   const colName = `${PBB_COLLECTION_PREFIX}${year}`;
   const q = query(collection(db, colName), where('lingkungan', '==', lingkungan));
-  return onSnapshot(
+  let isActive = true;
+  let receivedServerSnapshot = false;
+
+  const unsub = onSnapshot(
     q,
     (snapshot) => {
+      if (!isActive) return;
       const items: SpptPbbItem[] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as SpptPbbItem;
-        if (data && data.id) items.push({ ...data, id: docSnap.id || data.id });
+        const docId = docSnap.id || data?.id;
+        if (data && docId) items.push({ ...data, id: docId });
       });
-      if (items.length > 0) {
+      items.sort((a, b) => (a.no || 0) - (b.no || 0));
+      if (!snapshot.metadata.fromCache) {
+        receivedServerSnapshot = true;
+        onData(items);
+      } else if (items.length > 0 && !receivedServerSnapshot) {
         onData(items);
       }
     },
     (err) => {
       console.warn(`[PBB Subscribe] Notice for Lingkungan ${lingkungan}:`, err);
+      fetchPbbSpptForLingkungan(year, lingkungan).then((items) => {
+        if (isActive && items.length > 0) onData(items);
+      });
     }
   );
+
+  fetchPbbSpptForLingkungan(year, lingkungan).then((items) => {
+    if (isActive && !receivedServerSnapshot && items.length > 0) {
+      onData(items);
+    }
+  });
+
+  return () => {
+    isActive = false;
+    unsub();
+  };
 }
 
 /**
@@ -665,54 +746,65 @@ export async function deletePbbFromApi(id: string, year: number = DEFAULT_PBB_YE
  * Fetch SPPT data strictly online: Server API Buffer + Cloud Firestore
  */
 export async function fetchPbbSpptFromFirestore(year: number = DEFAULT_PBB_YEAR): Promise<SpptPbbItem[]> {
-  let currentList: SpptPbbItem[] = [];
   const colName = `${PBB_COLLECTION_PREFIX}${year}`;
 
-  // 1. Fetch from Firebase Firestore (Priority)
+  // 1. Fetch authoritative live records from Firebase Firestore (Priority)
   try {
     console.log(`[PBB Fetch] Fetching from Firestore: ${colName}`);
     const colRef = collection(db, colName);
-    const snapshot = await getDocs(colRef);
+    let snapshot;
+    try {
+      snapshot = await getDocsFromServer(colRef);
+    } catch {
+      snapshot = await getDocs(colRef);
+    }
     const firestoreItems: SpptPbbItem[] = [];
 
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as SpptPbbItem;
-      if (data && data.id) {
-        firestoreItems.push({ ...data, id: docSnap.id || data.id });
+      const docId = docSnap.id || data?.id;
+      if (data && docId) {
+        firestoreItems.push({ ...data, id: docId });
       }
     });
 
     console.log(`[PBB Fetch] Firestore returned ${firestoreItems.length} items for ${colName}`);
 
     if (firestoreItems.length > 0) {
-      currentList = smartMergeSpptItems(currentList, firestoreItems);
-      // Asynchronously cache into local IndexedDB
-      savePbbToIndexedDB(currentList).catch(() => {});
-    } else if (snapshot.size === 0) {
+      firestoreItems.sort((a, b) => {
+        if (a.lingkungan !== b.lingkungan) return a.lingkungan - b.lingkungan;
+        return a.no - b.no;
+      });
+      saveLocalSpptForYear(firestoreItems, year);
+      return firestoreItems;
+    } else if (snapshot.size === 0 && !snapshot.metadata.fromCache) {
       console.warn(`[PBB Fetch] Firestore collection ${colName} is empty.`);
+      return [];
     }
   } catch (err) {
-    console.warn(`[PBB Fetch] Firestore notice for ${colName}, attempting local offline fallback:`, err);
-    try {
-      const idbItems = await getPbbFromIndexedDB();
-      if (idbItems && idbItems.length > 0) {
-        currentList = smartMergeSpptItems(currentList, idbItems);
-      }
-    } catch {}
+    console.warn(`[PBB Fetch] Firestore notice for ${colName}, attempting local/server fallback:`, err);
   }
 
-  // 2. Fetch from Express Server Buffer (/api/pbb) (Fallback/Merge)
+  // 2. Offline / Error Fallback: IndexedDB -> Express Server Buffer (/api/pbb)
+  let fallbackList: SpptPbbItem[] = [];
+  try {
+    const idbItems = await getPbbFromIndexedDB();
+    if (idbItems && idbItems.length > 0) {
+      fallbackList = smartMergeSpptItems(fallbackList, idbItems);
+    }
+  } catch {}
+
   try {
     const apiItems = await fetchPbbFromApi(year);
     if (apiItems.length > 0) {
-      console.log(`[PBB Fetch] Buffer returned ${apiItems.length} items`);
-      currentList = smartMergeSpptItems(currentList, apiItems);
+      console.log(`[PBB Fetch] Fallback buffer returned ${apiItems.length} items`);
+      fallbackList = smartMergeSpptItems(fallbackList, apiItems);
     }
   } catch (err) {
     console.warn(`[PBB Fetch] Buffer warning for ${year}:`, err);
   }
 
-  return currentList;
+  return fallbackList;
 }
 
 /**
@@ -847,53 +939,55 @@ export function subscribePbbSpptFromFirestore(
 ): Unsubscribe {
   const colName = `${PBB_COLLECTION_PREFIX}${year}`;
   const colRef = collection(db, colName);
+  let isActive = true;
+  let hasLiveFirestore = false;
 
   let activeList: SpptPbbItem[] = getLocalSpptForYear(year);
   if (activeList.length > 0) {
     onData(activeList);
   }
 
-  // Hydrate immediately from IndexedDB for zero-lag mobile restoration
+  // Hydrate immediately from IndexedDB for zero-lag mobile restoration ONLY before live Firestore responds
   getPbbFromIndexedDB().then((idb) => {
+    if (!isActive || hasLiveFirestore) return;
     if (idb && idb.length > 0 && idb.length > activeList.length) {
       activeList = smartMergeSpptItems(activeList, idb);
       onData(activeList);
     }
   }).catch(() => {});
 
-  // Initial fetch from Server API buffer
-  fetchPbbFromApi(year).then((apiItems) => {
-    if (apiItems.length > 0) {
-      activeList = smartMergeSpptItems(activeList, apiItems);
-      onData(activeList);
-    }
-  }).catch(() => {});
-
-  // 1. Firestore Real-time listener
+  // 1. Firestore Real-time listener (Authoritative)
   let firestoreUnsub: (() => void) | null = null;
   firestoreUnsub = onSnapshot(
     colRef,
     (snapshot) => {
+      if (!isActive) return;
       const firestoreItems: SpptPbbItem[] = [];
       const isFromCache = snapshot.metadata.fromCache;
-      
+
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as SpptPbbItem;
-        if (data && data.id) {
-          firestoreItems.push({ ...data, id: docSnap.id || data.id });
+        const docId = docSnap.id || data?.id;
+        if (data && docId) {
+          firestoreItems.push({ ...data, id: docId });
         }
       });
 
-      // If the server is genuinely empty (database wiped / fresh start) and we are not loading from offline cache
-      if (snapshot.empty && !isFromCache) {
-        console.warn(`[PBB Sync] Firestore collection appears empty for ${year}. Retaining existing data to prevent flicker.`);
-        // Do NOT set activeList to [] immediately, wait for actual data or explicit wipe command
-      } else if (firestoreItems.length > 0) {
+      if (!isFromCache && firestoreItems.length > 0) {
+        hasLiveFirestore = true;
+        firestoreItems.sort((a, b) => {
+          if (a.lingkungan !== b.lingkungan) return a.lingkungan - b.lingkungan;
+          return a.no - b.no;
+        });
+        activeList = firestoreItems;
+        saveLocalSpptForYear(activeList, year);
+        onData(activeList);
+      } else if (firestoreItems.length > 0 && !hasLiveFirestore) {
         activeList = smartMergeSpptItems(activeList, firestoreItems);
         savePbbToIndexedDB(activeList).catch(() => {});
         onData(activeList);
-      } else if (!snapshot.empty && firestoreItems.length === 0 && !isFromCache) {
-        // This case handles a true empty collection if we know it should be empty
+      } else if (snapshot.empty && !isFromCache) {
+        hasLiveFirestore = true;
         activeList = [];
         onData([]);
       }
@@ -909,13 +1003,29 @@ export function subscribePbbSpptFromFirestore(
           try { firestoreUnsub(); } catch {}
         }
       }
+      fetchPbbSpptFromFirestore(year).then((items) => {
+        if (isActive && items.length > 0) {
+          hasLiveFirestore = true;
+          activeList = items;
+          onData(items);
+        }
+      });
       handleFirestoreError(err, OperationType.LIST, colName);
     }
   );
 
+  // Cold-start getDocsFromServer fallback if onSnapshot takes too long
+  fetchPbbSpptFromFirestore(year).then((items) => {
+    if (isActive && !hasLiveFirestore && items.length > 0) {
+      hasLiveFirestore = true;
+      activeList = items;
+      onData(items);
+    }
+  }).catch(() => {});
+
   // 2. Cross-tab BroadcastChannel listener (instant 0ms update between Super Admin and Kasi Pem)
   const handleBroadcast = (msg: any) => {
-    if (msg?.data?.year === year && msg?.data?.item) {
+    if (isActive && msg?.data?.year === year && msg?.data?.item) {
       activeList = smartMergeSpptItems(activeList, [msg.data.item]);
       onData(activeList);
     }
@@ -927,23 +1037,21 @@ export function subscribePbbSpptFromFirestore(
   // 3. Custom DOM event in same tab / window
   const handleCustomEvent = (e: any) => {
     const detail = e.detail;
-    if (detail?.year === year && detail?.item) {
+    if (isActive && detail?.year === year && detail?.item) {
       activeList = smartMergeSpptItems(activeList, [detail.item]);
       onData(activeList);
     }
   };
   window.addEventListener('pbb-item-synced', handleCustomEvent);
 
-  // 4. Periodic polling from Server API buffer every 30 seconds as fallback only when tab is visible
+  // 4. Periodic fallback polling only when live Firestore is unavailable
   const pollInterval = setInterval(async () => {
-    if (typeof document !== 'undefined' && document.hidden) return;
+    if (!isActive || hasLiveFirestore || (typeof document !== 'undefined' && document.hidden)) return;
     try {
       const apiItems = await fetchPbbFromApi(year);
-      if (apiItems && apiItems.length > 0) {
-        if (apiItems.length !== activeList.length) {
-          activeList = smartMergeSpptItems(activeList, apiItems);
-          onData(activeList);
-        }
+      if (apiItems && apiItems.length > 0 && apiItems.length !== activeList.length) {
+        activeList = smartMergeSpptItems(activeList, apiItems);
+        onData(activeList);
       }
     } catch {
       // ignore
@@ -951,7 +1059,8 @@ export function subscribePbbSpptFromFirestore(
   }, 600000);
 
   return () => {
-    firestoreUnsub();
+    isActive = false;
+    if (firestoreUnsub) firestoreUnsub();
     clearInterval(pollInterval);
     if (pbbBroadcastChannel) {
       pbbBroadcastChannel.removeEventListener('message', handleBroadcast);

@@ -2,8 +2,8 @@ import { db } from './firebase';
 import { cleanFirestoreData } from './firestoreService';
 import {
   collection,
-  query,
-  orderBy,
+  getDocs,
+  getDocsFromServer,
   onSnapshot,
   setDoc,
   deleteDoc,
@@ -11,10 +11,6 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
-import {
-  DEFAULT_PKK_LINGKUNGAN_NAMES,
-  ROMAN_NUMERALS,
-} from '../data/keplingList';
 import { PKK_DEFAULT_ANGGOTA_LIST } from '../data/pkkDefaultAnggota';
 
 export interface PkkBuku1Anggota {
@@ -80,34 +76,89 @@ const BUKU1_CHAN = 'sikepling_buku_1_chan';
 // 37 Data Anggota PKK Asli & Permanen dari Firestore
 export const DEFAULT_BUKU1_ITEMS: PkkBuku1Anggota[] = PKK_DEFAULT_ANGGOTA_LIST;
 
+export const fetchBuku1FromFirestore = async (): Promise<PkkBuku1Anggota[]> => {
+  if (!db) return safeGetLocalStorage<PkkBuku1Anggota[]>(BUKU1_KEY, DEFAULT_BUKU1_ITEMS);
+  try {
+    const colRef = collection(db, BUKU1_COL);
+    let snap;
+    try {
+      snap = await getDocsFromServer(colRef);
+    } catch {
+      snap = await getDocs(colRef);
+    }
+    const items: PkkBuku1Anggota[] = [];
+    snap.forEach((d) => {
+      const data = d.data() as PkkBuku1Anggota;
+      items.push({
+        ...data,
+        id: d.id,
+        createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+      });
+    });
+    items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    if (items.length > 0 || !snap.metadata.fromCache) {
+      safeSetLocalStorage(BUKU1_KEY, JSON.stringify(items));
+      return items;
+    }
+  } catch (e) {
+    console.warn('[pkkBukuService] fetchBuku1 error:', e);
+  }
+  return safeGetLocalStorage<PkkBuku1Anggota[]>(BUKU1_KEY, DEFAULT_BUKU1_ITEMS);
+};
+
 export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => {
   const stored = safeGetLocalStorage<PkkBuku1Anggota[]>(BUKU1_KEY, DEFAULT_BUKU1_ITEMS);
-  // Pastikan data tersimpan tidak menggunakan format placeholder lama
-  const hasPlaceholder = Array.isArray(stored) && stored.some(x => x.id && x.id.startsWith('anggota_pkk_lingkungan_') && !x.pasphotoUrl);
-  const effectiveStored = (Array.isArray(stored) && stored.length >= 25 && !hasPlaceholder)
+  const hasPlaceholder = Array.isArray(stored) && stored.some((x) => x.id && x.id.startsWith('anggota_pkk_lingkungan_') && !x.pasphotoUrl);
+  const effectiveStored = (Array.isArray(stored) && stored.length > 0 && !hasPlaceholder)
     ? stored
     : DEFAULT_BUKU1_ITEMS;
-  
+
   safeSetLocalStorage(BUKU1_KEY, JSON.stringify(effectiveStored));
   onUpdate(effectiveStored);
 
+  let isActive = true;
+  let receivedServerSnapshot = false;
   let unsub: Unsubscribe | undefined;
+
   try {
     if (db) {
-      const q = query(collection(db, BUKU1_COL));
-      unsub = onSnapshot(q, (snap) => {
-        const items: PkkBuku1Anggota[] = [];
-        snap.forEach((d) => {
-          const data = d.data() as PkkBuku1Anggota;
-          items.push({
-            ...data,
-            id: d.id,
-            createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+      const colRef = collection(db, BUKU1_COL);
+      unsub = onSnapshot(
+        colRef,
+        (snap) => {
+          if (!isActive) return;
+          const items: PkkBuku1Anggota[] = [];
+          snap.forEach((d) => {
+            const data = d.data() as PkkBuku1Anggota;
+            items.push({
+              ...data,
+              id: d.id,
+              createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+            });
           });
-        });
-        items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        safeSetLocalStorage(BUKU1_KEY, JSON.stringify(items));
-        onUpdate(items);
+          items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+          if (!snap.metadata.fromCache) {
+            receivedServerSnapshot = true;
+            safeSetLocalStorage(BUKU1_KEY, JSON.stringify(items));
+            onUpdate(items);
+          } else if (items.length > 0 && !receivedServerSnapshot) {
+            safeSetLocalStorage(BUKU1_KEY, JSON.stringify(items));
+            onUpdate(items);
+          }
+        },
+        (err) => {
+          console.warn('[pkkBukuService] subscribeBuku1 error:', err);
+          fetchBuku1FromFirestore().then((items) => {
+            if (isActive) onUpdate(items);
+          });
+        }
+      );
+
+      fetchBuku1FromFirestore().then((items) => {
+        if (isActive && !receivedServerSnapshot && items.length > 0) {
+          onUpdate(items);
+        }
       });
     }
   } catch (e) {}
@@ -117,7 +168,7 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
     if (typeof BroadcastChannel !== 'undefined') {
       bc = new BroadcastChannel(BUKU1_CHAN);
       bc.onmessage = (e) => {
-        if (e.data && e.data.items) {
+        if (isActive && e.data && e.data.items) {
           onUpdate(e.data.items);
         }
       };
@@ -125,6 +176,7 @@ export const subscribeBuku1 = (onUpdate: (items: PkkBuku1Anggota[]) => void) => 
   } catch (e) {}
 
   return () => {
+    isActive = false;
     if (unsub) unsub();
     if (bc) bc.close();
   };
@@ -153,7 +205,6 @@ export const saveBuku1Item = async (item: PkkBuku1Anggota) => {
 
   try {
     if (db) {
-      // Non-blocking Firestore save with 3.5s timeout guard so UI never hangs on slow cellular connections
       const savePromise = setDoc(doc(db, BUKU1_COL, item.id), cleanFirestoreData(payload));
       await Promise.race([
         savePromise,
@@ -186,27 +237,83 @@ const BUKU4_COL = 'pkk_buku_4_notulen';
 const BUKU4_KEY = 'sikepling_pkk_buku_4_v1';
 const BUKU4_CHAN = 'sikepling_buku_4_chan';
 
+export const fetchBuku4FromFirestore = async (): Promise<PkkBuku4Notulen[]> => {
+  if (!db) return safeGetLocalStorage<PkkBuku4Notulen[]>(BUKU4_KEY, []);
+  try {
+    const colRef = collection(db, BUKU4_COL);
+    let snap;
+    try {
+      snap = await getDocsFromServer(colRef);
+    } catch {
+      snap = await getDocs(colRef);
+    }
+    const items: PkkBuku4Notulen[] = [];
+    snap.forEach((d) => {
+      const data = d.data() as PkkBuku4Notulen;
+      items.push({
+        ...data,
+        id: d.id,
+        createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+      });
+    });
+    items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    if (items.length > 0 || !snap.metadata.fromCache) {
+      safeSetLocalStorage(BUKU4_KEY, JSON.stringify(items));
+      return items;
+    }
+  } catch (e) {
+    console.warn('[pkkBukuService] fetchBuku4 error:', e);
+  }
+  return safeGetLocalStorage<PkkBuku4Notulen[]>(BUKU4_KEY, []);
+};
+
 export const subscribeBuku4 = (onUpdate: (items: PkkBuku4Notulen[]) => void) => {
   const stored = safeGetLocalStorage<PkkBuku4Notulen[]>(BUKU4_KEY, []);
   onUpdate(stored);
 
+  let isActive = true;
+  let receivedServerSnapshot = false;
   let unsub: Unsubscribe | undefined;
+
   try {
     if (db) {
-      const q = query(collection(db, BUKU4_COL));
-      unsub = onSnapshot(q, (snap) => {
-        const items: PkkBuku4Notulen[] = [];
-        snap.forEach((d) => {
-          const data = d.data() as PkkBuku4Notulen;
-          items.push({
-            ...data,
-            id: d.id,
-            createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+      const colRef = collection(db, BUKU4_COL);
+      unsub = onSnapshot(
+        colRef,
+        (snap) => {
+          if (!isActive) return;
+          const items: PkkBuku4Notulen[] = [];
+          snap.forEach((d) => {
+            const data = d.data() as PkkBuku4Notulen;
+            items.push({
+              ...data,
+              id: d.id,
+              createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+            });
           });
-        });
-        items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        safeSetLocalStorage(BUKU4_KEY, JSON.stringify(items));
-        onUpdate(items);
+          items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+          if (!snap.metadata.fromCache) {
+            receivedServerSnapshot = true;
+            safeSetLocalStorage(BUKU4_KEY, JSON.stringify(items));
+            onUpdate(items);
+          } else if (items.length > 0 && !receivedServerSnapshot) {
+            safeSetLocalStorage(BUKU4_KEY, JSON.stringify(items));
+            onUpdate(items);
+          }
+        },
+        (err) => {
+          console.warn('[pkkBukuService] subscribeBuku4 error:', err);
+          fetchBuku4FromFirestore().then((items) => {
+            if (isActive) onUpdate(items);
+          });
+        }
+      );
+
+      fetchBuku4FromFirestore().then((items) => {
+        if (isActive && !receivedServerSnapshot && items.length > 0) {
+          onUpdate(items);
+        }
       });
     }
   } catch (e) {}
@@ -216,12 +323,13 @@ export const subscribeBuku4 = (onUpdate: (items: PkkBuku4Notulen[]) => void) => 
     if (typeof BroadcastChannel !== 'undefined') {
       bc = new BroadcastChannel(BUKU4_CHAN);
       bc.onmessage = (e) => {
-        if (e.data && e.data.items) onUpdate(e.data.items);
+        if (isActive && e.data && e.data.items) onUpdate(e.data.items);
       };
     }
   } catch (e) {}
 
   return () => {
+    isActive = false;
     if (unsub) unsub();
     if (bc) bc.close();
   };
@@ -263,27 +371,83 @@ const BUKU5_COL = 'pkk_buku_5_inventaris';
 const BUKU5_KEY = 'sikepling_pkk_buku_5_v1';
 const BUKU5_CHAN = 'sikepling_buku_5_chan';
 
+export const fetchBuku5FromFirestore = async (): Promise<PkkBuku5Inventaris[]> => {
+  if (!db) return safeGetLocalStorage<PkkBuku5Inventaris[]>(BUKU5_KEY, []);
+  try {
+    const colRef = collection(db, BUKU5_COL);
+    let snap;
+    try {
+      snap = await getDocsFromServer(colRef);
+    } catch {
+      snap = await getDocs(colRef);
+    }
+    const items: PkkBuku5Inventaris[] = [];
+    snap.forEach((d) => {
+      const data = d.data() as PkkBuku5Inventaris;
+      items.push({
+        ...data,
+        id: d.id,
+        createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+      });
+    });
+    items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    if (items.length > 0 || !snap.metadata.fromCache) {
+      safeSetLocalStorage(BUKU5_KEY, JSON.stringify(items));
+      return items;
+    }
+  } catch (e) {
+    console.warn('[pkkBukuService] fetchBuku5 error:', e);
+  }
+  return safeGetLocalStorage<PkkBuku5Inventaris[]>(BUKU5_KEY, []);
+};
+
 export const subscribeBuku5 = (onUpdate: (items: PkkBuku5Inventaris[]) => void) => {
   const stored = safeGetLocalStorage<PkkBuku5Inventaris[]>(BUKU5_KEY, []);
   onUpdate(stored);
 
+  let isActive = true;
+  let receivedServerSnapshot = false;
   let unsub: Unsubscribe | undefined;
+
   try {
     if (db) {
-      const q = query(collection(db, BUKU5_COL));
-      unsub = onSnapshot(q, (snap) => {
-        const items: PkkBuku5Inventaris[] = [];
-        snap.forEach((d) => {
-          const data = d.data() as PkkBuku5Inventaris;
-          items.push({
-            ...data,
-            id: d.id,
-            createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+      const colRef = collection(db, BUKU5_COL);
+      unsub = onSnapshot(
+        colRef,
+        (snap) => {
+          if (!isActive) return;
+          const items: PkkBuku5Inventaris[] = [];
+          snap.forEach((d) => {
+            const data = d.data() as PkkBuku5Inventaris;
+            items.push({
+              ...data,
+              id: d.id,
+              createdAt: data.createdAt || data.updatedAt || new Date().toISOString(),
+            });
           });
-        });
-        items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        safeSetLocalStorage(BUKU5_KEY, JSON.stringify(items));
-        onUpdate(items);
+          items.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+          if (!snap.metadata.fromCache) {
+            receivedServerSnapshot = true;
+            safeSetLocalStorage(BUKU5_KEY, JSON.stringify(items));
+            onUpdate(items);
+          } else if (items.length > 0 && !receivedServerSnapshot) {
+            safeSetLocalStorage(BUKU5_KEY, JSON.stringify(items));
+            onUpdate(items);
+          }
+        },
+        (err) => {
+          console.warn('[pkkBukuService] subscribeBuku5 error:', err);
+          fetchBuku5FromFirestore().then((items) => {
+            if (isActive) onUpdate(items);
+          });
+        }
+      );
+
+      fetchBuku5FromFirestore().then((items) => {
+        if (isActive && !receivedServerSnapshot && items.length > 0) {
+          onUpdate(items);
+        }
       });
     }
   } catch (e) {}
@@ -293,12 +457,13 @@ export const subscribeBuku5 = (onUpdate: (items: PkkBuku5Inventaris[]) => void) 
     if (typeof BroadcastChannel !== 'undefined') {
       bc = new BroadcastChannel(BUKU5_CHAN);
       bc.onmessage = (e) => {
-        if (e.data && e.data.items) onUpdate(e.data.items);
+        if (isActive && e.data && e.data.items) onUpdate(e.data.items);
       };
     }
   } catch (e) {}
 
   return () => {
+    isActive = false;
     if (unsub) unsub();
     if (bc) bc.close();
   };
@@ -306,7 +471,11 @@ export const subscribeBuku5 = (onUpdate: (items: PkkBuku5Inventaris[]) => void) 
 
 export const saveBuku5Item = async (item: PkkBuku5Inventaris) => {
   const current = safeGetLocalStorage<PkkBuku5Inventaris[]>(BUKU5_KEY, []);
-  const payload = { ...item, updatedAt: new Date().toISOString() };
+  const payload = {
+    ...item,
+    createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
   const idx = current.findIndex((x) => x.id === item.id);
   const updated = idx >= 0 ? current.map((x) => (x.id === item.id ? payload : x)) : [payload, ...current];
   safeSetLocalStorage(BUKU5_KEY, JSON.stringify(updated));

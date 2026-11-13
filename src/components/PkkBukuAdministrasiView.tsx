@@ -45,8 +45,8 @@ import {
   deleteBuku5Item,
 } from '../lib/pkkBukuService';
 import { subscribeSurat, saveSuratItem, deleteSuratItem } from '../lib/suratService';
-import { subscribePkkKeuangan, getLocalTransaksiPkk, saveTransaksiPkk, deleteTransaksiPkk } from '../lib/pkkKeuanganService';
-import { subscribePkkKegiatan, getLocalPkkKegiatanList, savePkkKegiatan, deletePkkKegiatan } from '../lib/pkkKegiatanService';
+import { subscribePkkKeuangan, getLocalTransaksiPkk, saveTransaksiPkk, deleteTransaksiPkk, POS_ANGGARAN_LABELS } from '../lib/pkkKeuanganService';
+import { subscribePkkKegiatan, getLocalPkkKegiatanList, savePkkKegiatan, deletePkkKegiatan, POKJA_LABELS } from '../lib/pkkKegiatanService';
 import { safeGetLocalStorage } from '../lib/safeStorage';
 import { formatTanggalIndonesia, getTodayLocalIso } from '../lib/formatter';
 import { compressImageFile } from '../lib/imageCompressor';
@@ -55,6 +55,24 @@ interface PkkBukuAdministrasiViewProps {
   currentUser: UserAccount;
   onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
+
+const formatSafeDate = (val?: string): string => {
+  if (!val) return '-';
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? val : formatTanggalIndonesia(d);
+};
+
+const normalizePokjaValue = (
+  raw?: string
+): 'SEKRETARIAT' | 'POKJA_I' | 'POKJA_II' | 'POKJA_III' | 'POKJA_IV' | 'PKK_LINGKUNGAN' => {
+  const v = (raw || '').toUpperCase().trim();
+  if (v === 'I' || v === 'POKJA_I') return 'POKJA_I';
+  if (v === 'II' || v === 'POKJA_II') return 'POKJA_II';
+  if (v === 'III' || v === 'POKJA_III') return 'POKJA_III';
+  if (v === 'IV' || v === 'POKJA_IV') return 'POKJA_IV';
+  if (v === 'PKK_LINGKUNGAN') return 'PKK_LINGKUNGAN';
+  return 'SEKRETARIAT';
+};
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -153,7 +171,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
   const [b3Tanggal, setB3Tanggal] = useState(getTodayLocalIso());
   const [b3Jenis, setB3Jenis] = useState<'PENERIMAAN' | 'PENGELUARAN'>('PENERIMAAN');
   const [b3Jumlah, setB3Jumlah] = useState<number>(0);
-  const [b3Kategori, setB3Kategori] = useState('Kas Umum');
+  const [b3Kategori, setB3Kategori] = useState('SEKRETARIAT');
   const [b3Keterangan, setB3Keterangan] = useState('');
   const [b3Bukti, setB3Bukti] = useState('');
   const [b3NomorBukti, setB3NomorBukti] = useState('');
@@ -180,7 +198,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
   const [b6Nama, setB6Nama] = useState('');
   const [b6Tanggal, setB6Tanggal] = useState(getTodayLocalIso());
   const [b6Tempat, setB6Tempat] = useState('');
-  const [b6Pokja, setB6Pokja] = useState<'UMUM' | 'I' | 'II' | 'III' | 'IV'>('UMUM');
+  const [b6Pokja, setB6Pokja] = useState<'SEKRETARIAT' | 'POKJA_I' | 'POKJA_II' | 'POKJA_III' | 'POKJA_IV' | 'PKK_LINGKUNGAN'>('SEKRETARIAT');
   const [b6Keterangan, setB6Keterangan] = useState('');
   const [isImprovingLanguage, setIsImprovingLanguage] = useState(false);
 
@@ -213,10 +231,10 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
     setEditingItem(null);
     setB1Nama(''); setB1Jabatan(''); setB1Gender('P'); setB1TempatLahir(''); setB1TglLahir(''); setB1Status('Kawin'); setB1Alamat(''); setB1Pendidikan(''); setB1Pekerjaan(''); setB1Keterangan(''); setB1PasphotoUrl('');
     setB2Nomor(''); setB2Tanggal(getTodayLocalIso()); setB2Jenis('SURAT_MASUK'); setB2Perihal(''); setB2AsalTujuan(''); setB2Keterangan(''); setB2FileUrl(''); setB2FileName('');
-    setB3Tanggal(getTodayLocalIso()); setB3Jenis('PENERIMAAN'); setB3Jumlah(0); setB3Kategori('Kas Umum'); setB3Keterangan(''); setB3NomorBukti('');
+    setB3Tanggal(getTodayLocalIso()); setB3Jenis('PENERIMAAN'); setB3Jumlah(0); setB3Kategori('SEKRETARIAT'); setB3Keterangan(''); setB3Bukti(''); setB3NomorBukti('');
     setB4Tanggal(getTodayLocalIso()); setB4Agenda(''); setB4Pimpinan(''); setB4Peserta(0); setB4Keputusan(''); setB4Catatan(''); setB4Keterangan('');
     setB5Nama(''); setB5Asal(''); setB5Tanggal(getTodayLocalIso()); setB5Jumlah(1); setB5Kondisi('Baik'); setB5Keterangan('');
-    setB6Nama(''); setB6Tanggal(getTodayLocalIso()); setB6Tempat(''); setB6Pokja('UMUM'); setB6Keterangan('');
+    setB6Nama(''); setB6Tanggal(getTodayLocalIso()); setB6Tempat(''); setB6Pokja('SEKRETARIAT'); setB6Keterangan('');
   };
 
   // Populate form for Editing
@@ -229,7 +247,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       setB1Gender(item.jenisKelamin || 'P');
       setB1TempatLahir(item.tempatLahir || '');
       setB1TglLahir(item.tanggalLahir || '');
-      setB1Status(item.statusPernikahan || 'Kawin');
+      setB1Status((item.statusPerkawinan || item.statusPernikahan || 'Kawin') as any);
       setB1Alamat(item.alamat || '');
       setB1Pendidikan(item.pendidikan || '');
       setB1Pekerjaan(item.pekerjaan || '');
@@ -248,30 +266,31 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
       setB3Tanggal(item.tanggal || getTodayLocalIso());
       setB3Jenis(item.jenis || 'PENERIMAAN');
       setB3Jumlah(item.jumlah || 0);
-      setB3Kategori(item.kategori || 'Kas Umum');
-      setB3Keterangan(item.keterangan || '');
+      setB3Kategori(item.posAnggaran || item.kategori || 'SEKRETARIAT');
+      setB3Keterangan(item.uraian || item.keterangan || '');
+      setB3Bukti(item.buktiFotoUrl || '');
       setB3NomorBukti(item.nomorBukti || '');
     } else if (activeBook === 4) {
-      setB4Tanggal(item.tanggalRapat || getTodayLocalIso());
-      setB4Agenda(item.agenda || '');
+      setB4Tanggal(item.tanggalRapat || item.tanggal || getTodayLocalIso());
+      setB4Agenda(item.agenda || item.acara || '');
       setB4Pimpinan(item.pimpinanRapat || '');
       setB4Peserta(item.jumlahPeserta || 0);
-      setB4Keputusan(item.hasilKeputusan || '');
-      setB4Catatan(item.catatanRapat || '');
+      setB4Keputusan(item.hasilKeputusan || item.keputusanRapat || '');
+      setB4Catatan(item.catatanRapat || item.notulenRingkas || '');
       setB4Keterangan(item.keterangan || '');
     } else if (activeBook === 5) {
       setB5Nama(item.namaBarang || '');
       setB5Asal(item.asalBarang || '');
-      setB5Tanggal(item.tanggalPerolehan || getTodayLocalIso());
+      setB5Tanggal(item.tanggalPerolehan || item.tahunPengadaan || getTodayLocalIso());
       setB5Jumlah(item.jumlah || 1);
-      setB5Kondisi(item.kondisi || 'Baik');
+      setB5Kondisi((item.kondisi || item.kondisiBarang || 'Baik') as any);
       setB5Keterangan(item.keterangan || '');
     } else if (activeBook === 6) {
       setB6Nama(item.namaKegiatan || item.judul || '');
       setB6Tanggal(item.tanggal || item.tanggalPelaksanaan || getTodayLocalIso());
-      setB6Tempat(item.tempat || item.lokasi || '');
-      setB6Pokja(item.pokja || 'UMUM');
-      setB6Keterangan(item.keterangan || item.deskripsi || '');
+      setB6Tempat(item.lokasi || item.tempat || '');
+      setB6Pokja(normalizePokjaValue(item.pokja));
+      setB6Keterangan(item.uraianHasil || item.keterangan || item.deskripsi || '');
     }
   };
 
@@ -289,6 +308,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           jenisKelamin: b1Gender,
           tempatLahir: b1TempatLahir,
           tanggalLahir: b1TglLahir,
+          statusPerkawinan: b1Status,
           statusPernikahan: b1Status,
           alamat: b1Alamat,
           pendidikan: b1Pendidikan,
@@ -329,17 +349,24 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
         };
         await saveSuratItem(item);
       } else if (activeBook === 3) {
-        // Keuangan
+        // Keuangan (Unified TransaksiKeuanganPkk schema + legacy UI aliases)
+        const posVal = (b3Kategori in POS_ANGGARAN_LABELS ? b3Kategori : 'LAINNYA') as any;
         const item: any = {
           id: editingItem?.id || 'tx_' + Date.now(),
           tanggal: b3Tanggal,
           jenis: b3Jenis,
           jumlah: Number(b3Jumlah),
-          kategori: b3Kategori,
+          posAnggaran: posVal,
+          uraian: b3Keterangan || editingItem?.uraian || '',
+          kategori: POS_ANGGARAN_LABELS[posVal] || b3Kategori,
           keterangan: b3Keterangan,
           nomorBukti: b3NomorBukti,
+          buktiFotoUrl: b3Bukti || editingItem?.buktiFotoUrl || '',
+          dibuatOlehNama: editingItem?.dibuatOlehNama || currentUser.nama,
+          dibuatOlehRole: editingItem?.dibuatOlehRole || currentUser.role,
           petugasId: currentUser.id,
           petugasNama: currentUser.nama,
+          createdAt: editingItem?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
         await saveTransaksiPkk(item);
@@ -347,14 +374,19 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
         // Notulen
         const item: PkkBuku4Notulen = {
           id: editingItem?.id || 'b4_' + Date.now(),
+          tanggal: b4Tanggal,
           tanggalRapat: b4Tanggal,
+          acara: b4Agenda,
           agenda: b4Agenda,
           pimpinanRapat: b4Pimpinan,
           jumlahPeserta: Number(b4Peserta),
+          keputusanRapat: b4Keputusan,
           hasilKeputusan: b4Keputusan,
+          notulenRingkas: b4Catatan,
           catatanRapat: b4Catatan,
           keterangan: b4Keterangan,
           createdAt: editingItem?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
         await saveBuku4Item(item);
       } else if (activeBook === 5) {
@@ -366,22 +398,32 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
           tanggalPerolehan: b5Tanggal,
           jumlah: Number(b5Jumlah),
           kondisi: b5Kondisi,
+          kondisiBarang: b5Kondisi,
           keterangan: b5Keterangan,
           createdAt: editingItem?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
         await saveBuku5Item(item);
       } else if (activeBook === 6) {
-        // Kegiatan
+        // Kegiatan (Unified LaporanKegiatanPkk schema)
+        const normalizedPokja = normalizePokjaValue(b6Pokja);
         const item: any = {
           id: editingItem?.id || 'act_' + Date.now(),
           namaKegiatan: b6Nama,
+          tanggal: b6Tanggal,
           tanggalPelaksanaan: b6Tanggal,
+          lokasi: b6Tempat,
           tempat: b6Tempat,
-          pokja: b6Pokja,
+          pokja: normalizedPokja,
+          kategoriProgram: editingItem?.kategoriProgram || 'Program Pokok PKK',
+          uraianHasil: b6Keterangan,
           keterangan: b6Keterangan,
+          pelaporNama: editingItem?.pelaporNama || currentUser.nama,
+          pelaporRole: editingItem?.pelaporRole || currentUser.role,
           petugasId: currentUser.id,
           petugasNama: currentUser.nama,
           createdAt: editingItem?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
         await savePkkKegiatan(item);
       }
@@ -432,9 +474,9 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
     if (activeBook === 1) {
       return buku1List.filter(it => 
         !query || 
-        it.nama.toLowerCase().includes(query) || 
-        it.jabatan.toLowerCase().includes(query) || 
-        it.alamat.toLowerCase().includes(query)
+        (it.nama || '').toLowerCase().includes(query) || 
+        (it.jabatan || '').toLowerCase().includes(query) || 
+        (it.alamat || '').toLowerCase().includes(query)
       );
     } else if (activeBook === 2) {
       return suratList.filter(it => 
@@ -445,33 +487,40 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
         (it.tujuanSurat || '').toLowerCase().includes(query)
       );
     } else if (activeBook === 3) {
-      return keuanganList.filter(it => 
-        !query || 
-        (it.keterangan || '').toLowerCase().includes(query) || 
-        (it.kategori || '').toLowerCase().includes(query) || 
-        (it.nomorBukti || '').toLowerCase().includes(query)
-      );
+      return keuanganList.filter(it => {
+        if (!query) return true;
+        const posLabel = POS_ANGGARAN_LABELS[it.posAnggaran] || it.posAnggaran || it.kategori || '';
+        return (
+          (it.uraian || it.keterangan || '').toLowerCase().includes(query) ||
+          posLabel.toLowerCase().includes(query) ||
+          (it.nomorBukti || '').toLowerCase().includes(query)
+        );
+      });
     } else if (activeBook === 4) {
       return buku4List.filter(it => 
         !query || 
-        it.agenda.toLowerCase().includes(query) || 
-        it.pimpinanRapat.toLowerCase().includes(query) || 
-        it.hasilKeputusan.toLowerCase().includes(query)
+        (it.agenda || it.acara || '').toLowerCase().includes(query) || 
+        (it.pimpinanRapat || '').toLowerCase().includes(query) || 
+        (it.hasilKeputusan || it.keputusanRapat || '').toLowerCase().includes(query)
       );
     } else if (activeBook === 5) {
       return buku5List.filter(it => 
         !query || 
-        it.namaBarang.toLowerCase().includes(query) || 
-        it.asalBarang.toLowerCase().includes(query) || 
-        it.kondisi.toLowerCase().includes(query)
+        (it.namaBarang || '').toLowerCase().includes(query) || 
+        (it.asalBarang || '').toLowerCase().includes(query) || 
+        (it.kondisi || it.kondisiBarang || '').toLowerCase().includes(query)
       );
     } else if (activeBook === 6) {
-      return kegiatanList.filter(it => 
-        !query || 
-        (it.namaKegiatan || '').toLowerCase().includes(query) || 
-        (it.tempat || '').toLowerCase().includes(query) || 
-        (it.keterangan || '').toLowerCase().includes(query)
-      );
+      return kegiatanList.filter(it => {
+        if (!query) return true;
+        const pokjaLabel = POKJA_LABELS[normalizePokjaValue(it.pokja)] || it.pokja || '';
+        return (
+          (it.namaKegiatan || it.judul || '').toLowerCase().includes(query) ||
+          (it.lokasi || it.tempat || '').toLowerCase().includes(query) ||
+          (it.uraianHasil || it.keterangan || it.deskripsi || '').toLowerCase().includes(query) ||
+          pokjaLabel.toLowerCase().includes(query)
+        );
+      });
     }
     return [];
   }, [activeBook, searchQuery, buku1List, suratList, keuanganList, buku4List, buku5List, kegiatanList]);
@@ -634,8 +683,8 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                         <td className="px-5 py-3 font-black text-slate-800">{it.nama}</td>
                         <td className="px-5 py-3 text-tosca-800 font-extrabold">{it.jabatan}</td>
                         <td className="px-5 py-3 font-bold">{it.jenisKelamin}</td>
-                        <td className="px-5 py-3">{it.tempatLahir}, {it.tanggalLahir ? formatTanggalIndonesia(new Date(it.tanggalLahir)) : ''}</td>
-                        <td className="px-5 py-3">{it.statusPernikahan}</td>
+                        <td className="px-5 py-3">{it.tempatLahir || '-'}{it.tanggalLahir ? `, ${formatSafeDate(it.tanggalLahir)}` : ''}</td>
+                        <td className="px-5 py-3">{it.statusPerkawinan || it.statusPernikahan || '-'}</td>
                         <td className="px-5 py-3 font-bold">{it.pendidikan}</td>
                         <td className="px-5 py-3">{it.pekerjaan}</td>
                         <td className="px-5 py-3 max-w-[150px] truncate">{it.alamat}</td>
@@ -682,7 +731,7 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                       <tr key={it.id} className="hover:bg-slate-50/50">
                         <td className="px-5 py-3 font-bold text-slate-800">{idx + 1}</td>
                         <td className="px-5 py-3 font-black text-slate-800">{it.nomorSurat}</td>
-                        <td className="px-5 py-3 font-bold text-slate-700">{formatTanggalIndonesia(new Date(it.tanggalSurat))}</td>
+                        <td className="px-5 py-3 font-bold text-slate-700">{formatSafeDate(it.tanggalSurat)}</td>
                         <td className="px-5 py-3">
                           <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
                             it.jenisSurat === 'SURAT_MASUK' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
@@ -737,10 +786,10 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                     {currentFilteredList.map((it: any, idx) => (
                       <tr key={it.id} className="hover:bg-slate-50/50">
                         <td className="px-5 py-3 font-bold text-slate-800">{idx + 1}</td>
-                        <td className="px-5 py-3 font-bold">{formatTanggalIndonesia(new Date(it.tanggal))}</td>
+                        <td className="px-5 py-3 font-bold">{formatSafeDate(it.tanggal)}</td>
                         <td className="px-5 py-3 font-black text-slate-800">{it.nomorBukti || '-'}</td>
-                        <td className="px-5 py-3 font-bold text-slate-800 max-w-[200px] truncate">{it.keterangan}</td>
-                        <td className="px-5 py-3">{it.kategori}</td>
+                        <td className="px-5 py-3 font-bold text-slate-800 max-w-[200px] truncate">{it.uraian || it.keterangan || '-'}</td>
+                        <td className="px-5 py-3">{POS_ANGGARAN_LABELS[it.posAnggaran] || it.posAnggaran || it.kategori || '-'}</td>
                         <td className="px-5 py-3 text-right font-black text-emerald-600">
                           {it.jenis === 'PENERIMAAN' ? formatRupiah(it.jumlah) : '-'}
                         </td>
@@ -781,12 +830,12 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                     {currentFilteredList.map((it: PkkBuku4Notulen, idx) => (
                       <tr key={it.id} className="hover:bg-slate-50/50">
                         <td className="px-5 py-3 font-bold text-slate-800">{idx + 1}</td>
-                        <td className="px-5 py-3 font-bold text-slate-700">{formatTanggalIndonesia(new Date(it.tanggalRapat))}</td>
-                        <td className="px-5 py-3 font-black text-slate-800 max-w-[150px] truncate">{it.agenda}</td>
-                        <td className="px-5 py-3 text-tosca-800 font-extrabold">{it.pimpinanRapat}</td>
-                        <td className="px-5 py-3 font-bold text-slate-800">{it.jumlahPeserta} jiwa</td>
-                        <td className="px-5 py-3 font-semibold text-slate-800 max-w-[180px] truncate">{it.hasilKeputusan}</td>
-                        <td className="px-5 py-3 text-slate-500 italic max-w-[150px] truncate">{it.catatanRapat}</td>
+                        <td className="px-5 py-3 font-bold text-slate-700">{formatSafeDate(it.tanggalRapat || it.tanggal)}</td>
+                        <td className="px-5 py-3 font-black text-slate-800 max-w-[150px] truncate">{it.agenda || it.acara || '-'}</td>
+                        <td className="px-5 py-3 text-tosca-800 font-extrabold">{it.pimpinanRapat || '-'}</td>
+                        <td className="px-5 py-3 font-bold text-slate-800">{it.jumlahPeserta || 0} jiwa</td>
+                        <td className="px-5 py-3 font-semibold text-slate-800 max-w-[180px] truncate">{it.hasilKeputusan || it.keputusanRapat || '-'}</td>
+                        <td className="px-5 py-3 text-slate-500 italic max-w-[150px] truncate">{it.catatanRapat || it.notulenRingkas || '-'}</td>
                         <td className="px-5 py-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 cursor-pointer">
@@ -823,15 +872,20 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                         <td className="px-5 py-3 font-bold text-slate-800">{idx + 1}</td>
                         <td className="px-5 py-3 font-black text-slate-800">{it.namaBarang}</td>
                         <td className="px-5 py-3 font-semibold">{it.asalBarang}</td>
-                        <td className="px-5 py-3">{it.tanggalPerolehan ? formatTanggalIndonesia(new Date(it.tanggalPerolehan)) : ''}</td>
+                        <td className="px-5 py-3">{formatSafeDate(it.tanggalPerolehan)}</td>
                         <td className="px-5 py-3 font-extrabold text-slate-800">{it.jumlah} unit</td>
                         <td className="px-5 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                            it.kondisi === 'Baik' ? 'bg-emerald-100 text-emerald-800' :
-                            it.kondisi === 'Cukup' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                          }`}>
-                            {it.kondisi}
-                          </span>
+                          {(() => {
+                            const kond = it.kondisi || it.kondisiBarang || 'Baik';
+                            return (
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                kond === 'Baik' ? 'bg-emerald-100 text-emerald-800' :
+                                kond === 'Cukup' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                {kond}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-5 py-3 text-slate-500 max-w-[150px] truncate">{it.keterangan}</td>
                         <td className="px-5 py-3 text-center">
@@ -868,14 +922,14 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                       <tr key={it.id} className="hover:bg-slate-50/50">
                         <td className="px-5 py-3 font-bold text-slate-800">{idx + 1}</td>
                         <td className="px-5 py-3 font-black text-slate-800">{it.namaKegiatan || it.judul}</td>
-                        <td className="px-5 py-3 font-bold text-slate-700">{formatTanggalIndonesia(new Date(it.tanggalPelaksanaan || it.tanggal))}</td>
-                        <td className="px-5 py-3 font-semibold text-slate-800 truncate max-w-[150px]">{it.tempat || it.lokasi}</td>
+                        <td className="px-5 py-3 font-bold text-slate-700">{formatSafeDate(it.tanggal || it.tanggalPelaksanaan)}</td>
+                        <td className="px-5 py-3 font-semibold text-slate-800 truncate max-w-[150px]">{it.lokasi || it.tempat || '-'}</td>
                         <td className="px-5 py-3">
                           <span className="px-2 py-0.5 rounded-sm bg-indigo-50 border border-indigo-200 text-indigo-800 font-bold">
-                            POKJA {it.pokja || 'UMUM'}
+                            {POKJA_LABELS[normalizePokjaValue(it.pokja)] || it.pokja || 'Sekretariat TP PKK'}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-slate-500 italic max-w-[200px] truncate">{it.keterangan || it.deskripsi}</td>
+                        <td className="px-5 py-3 text-slate-500 italic max-w-[200px] truncate">{it.uraianHasil || it.keterangan || it.deskripsi || '-'}</td>
                         <td className="px-5 py-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             <button onClick={() => handleEditInit(it)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 cursor-pointer">
@@ -1135,7 +1189,18 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                   </div>
                   <div className="space-y-1">
                     <label className="font-extrabold text-slate-700">Pos / Kategori Anggaran</label>
-                    <input type="text" value={b3Kategori} onChange={(e) => setB3Kategori(e.target.value)} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="cth. Iuran Wajib, Operasional Pokja I" />
+                    <select value={b3Kategori} onChange={(e) => setB3Kategori(e.target.value)} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                      {Object.entries(POS_ANGGARAN_LABELS).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                      {!(b3Kategori in POS_ANGGARAN_LABELS) && b3Kategori && (
+                        <option value={b3Kategori}>{b3Kategori}</option>
+                      )}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-extrabold text-slate-700">Uraian / Keterangan Transaksi</label>
+                    <textarea value={b3Keterangan} onChange={(e) => setB3Keterangan(e.target.value)} rows={2} required className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl" placeholder="cth. Iuran kas rutin anggota / pembelian konsumsi rapat" />
                   </div>
                   <div className="space-y-1">
                     <label className="font-extrabold text-slate-700">Foto Bukti Kwitansi / Tanda Terima</label>
@@ -1252,11 +1317,9 @@ export const PkkBukuAdministrasiView: React.FC<PkkBukuAdministrasiViewProps> = (
                     <div className="space-y-1">
                       <label className="font-extrabold text-slate-700">Kelompok / Pokja Pelaksana</label>
                       <select value={b6Pokja} onChange={(e) => setB6Pokja(e.target.value as any)} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">
-                        <option value="UMUM">Sekretariat (Umum / Seluruh PKK)</option>
-                        <option value="I">POKJA I (Pancasila & Gotong Royong)</option>
-                        <option value="II">POKJA II (Pendidikan & Ekonomi)</option>
-                        <option value="III">POKJA III (Pangan, Sandang, Rumah)</option>
-                        <option value="IV">POKJA IV (Kesehatan & Posyandu)</option>
+                        {Object.entries(POKJA_LABELS).map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="space-y-1">

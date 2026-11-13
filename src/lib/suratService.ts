@@ -3,8 +3,8 @@ import { db } from './firebase';
 import { cleanFirestoreData } from './firestoreService';
 import {
   collection,
-  query,
-  orderBy,
+  getDocs,
+  getDocsFromServer,
   onSnapshot,
   setDoc,
   deleteDoc,
@@ -99,7 +99,6 @@ export const smartMergeSurat = (
     if (item && item.id && !deletedSet.has(item.id)) {
       const existing = map.get(item.id);
       if (existing) {
-        // Retain attachment from local if remote stripped it due to Firestore size limits
         const fileUrl = existing.fileUrl || item.fileUrl;
         const fileName = existing.fileName || item.fileName;
         const fileSize = existing.fileSize || item.fileSize;
@@ -127,12 +126,82 @@ export const smartMergeSurat = (
 };
 
 /**
- * Fetch all surat from Server API (/api/surat) and IndexedDB
+ * Hydrate Firestore authoritative list with local/IDB heavy attachments for matching IDs only
+ */
+function buildAuthoritativeSurat(
+  remoteItems: SuratKedinasanItem[],
+  attachmentPool: SuratKedinasanItem[]
+): SuratKedinasanItem[] {
+  const deletedSet = new Set(getDeletedSuratIds());
+  const attachmentMap = new Map<string, SuratKedinasanItem>();
+  attachmentPool.forEach((it) => {
+    if (it && it.id) attachmentMap.set(it.id, it);
+  });
+
+  const resolved: SuratKedinasanItem[] = [];
+  remoteItems.forEach((remote) => {
+    if (!remote || !remote.id || deletedSet.has(remote.id)) return;
+    const cached = attachmentMap.get(remote.id);
+    resolved.push({
+      ...remote,
+      fileUrl: remote.fileUrl || cached?.fileUrl,
+      fileName: remote.fileName || cached?.fileName,
+      fileSize: remote.fileSize || cached?.fileSize,
+      fileType: remote.fileType || cached?.fileType,
+    });
+  });
+
+  resolved.sort((a, b) => {
+    const dateA = a.tanggalSurat || a.createdAt || '';
+    const dateB = b.tanggalSurat || b.createdAt || '';
+    if (dateB !== dateA) return dateB.localeCompare(dateA);
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
+  });
+  return resolved;
+}
+
+/**
+ * Fetch all surat directly from Cloud Firestore (Priority) with Server API/IDB fallback
  */
 export const fetchSuratFromServer = async (): Promise<SuratKedinasanItem[]> => {
-  let serverItems: SuratKedinasanItem[] = [];
+  let idbItems: SuratKedinasanItem[] = [];
+  try {
+    const fromIdb = await getSuratFromIndexedDB();
+    if (Array.isArray(fromIdb) && fromIdb.length > 0) {
+      idbItems = fromIdb;
+    }
+  } catch (err) {
+    console.warn('[suratService] IndexedDB read error:', err);
+  }
+  const currentLocal = getLocalSuratList();
 
-  // 1. Fetch from server API
+  if (db) {
+    try {
+      const colRef = collection(db, SURAT_COLLECTION);
+      let snap;
+      try {
+        snap = await getDocsFromServer(colRef);
+      } catch {
+        snap = await getDocs(colRef);
+      }
+      const remoteItems: SuratKedinasanItem[] = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data() as SuratKedinasanItem;
+        const docId = docSnap.id || data?.id;
+        if (data && docId) remoteItems.push({ ...data, id: docId });
+      });
+
+      if (remoteItems.length > 0 || !snap.metadata.fromCache) {
+        const resolved = buildAuthoritativeSurat(remoteItems, [...idbItems, ...currentLocal]);
+        setLocalSuratList(resolved);
+        return resolved;
+      }
+    } catch (err) {
+      console.warn('[suratService] Firestore fetch error:', err);
+    }
+  }
+
+  let serverItems: SuratKedinasanItem[] = [];
   try {
     const res = await fetch('/api/surat', {
       headers: { 'Cache-Control': 'no-cache' },
@@ -147,18 +216,6 @@ export const fetchSuratFromServer = async (): Promise<SuratKedinasanItem[]> => {
     console.warn('[suratService] Server API fetch error:', err);
   }
 
-  // 2. Fetch from IndexedDB
-  let idbItems: SuratKedinasanItem[] = [];
-  try {
-    const fromIdb = await getSuratFromIndexedDB();
-    if (Array.isArray(fromIdb) && fromIdb.length > 0) {
-      idbItems = fromIdb;
-    }
-  } catch (err) {
-    console.warn('[suratService] IndexedDB read error:', err);
-  }
-
-  const currentLocal = getLocalSuratList();
   const merged = smartMergeSurat(smartMergeSurat(currentLocal, idbItems), serverItems);
   setLocalSuratList(merged);
   return merged;
@@ -183,7 +240,6 @@ export const getSuratWithAttachment = async (id: string): Promise<SuratKedinasan
     if (Array.isArray(idbItems)) {
       const found = idbItems.find((s) => s.id === id);
       if (found && found.fileUrl) {
-        // Update in-memory
         memorySurat = memorySurat.map((s) => (s.id === id ? { ...s, fileUrl: found.fileUrl } : s));
         return found;
       }
@@ -216,30 +272,22 @@ export const subscribeSurat = (
   onUpdate: (items: SuratKedinasanItem[]) => void,
   onError?: (error: any) => void
 ): (() => void) => {
+  let isActive = true;
+  let hasLiveFirestore = false;
+
   // Initial immediate update
   const initial = getLocalSuratList();
   onUpdate(initial);
 
-  // Load from IndexedDB and server asynchronously
+  // Load from IndexedDB asynchronously ONLY if live Firestore hasn't arrived yet
   (async () => {
     try {
       const fromIdb = await getSuratFromIndexedDB();
-      if (Array.isArray(fromIdb) && fromIdb.length > 0) {
+      if (!isActive || hasLiveFirestore) return;
+      if (Array.isArray(fromIdb) && fromIdb.length > 0 && initial.length === 0) {
         const merged = smartMergeSurat(getLocalSuratList(), fromIdb);
         setLocalSuratList(merged);
         onUpdate(merged);
-      }
-    } catch {}
-
-    try {
-      const res = await fetch('/api/surat');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          const merged = smartMergeSurat(getLocalSuratList(), json.data);
-          setLocalSuratList(merged);
-          onUpdate(merged);
-        }
       }
     } catch {}
   })();
@@ -248,26 +296,51 @@ export const subscribeSurat = (
 
   try {
     if (db) {
-      // Query without orderBy to ensure no documents are excluded if tanggalSurat is missing/different
       const colRef = collection(db, SURAT_COLLECTION);
       unsubscribeFirestore = onSnapshot(
         colRef,
-        (snapshot) => {
+        async (snapshot) => {
+          if (!isActive) return;
           const remoteItems: SuratKedinasanItem[] = [];
           snapshot.forEach((docSnap) => {
             const data = docSnap.data() as SuratKedinasanItem;
-            if (data && data.id) remoteItems.push(data);
+            const docId = docSnap.id || data?.id;
+            if (data && docId) remoteItems.push({ ...data, id: docId });
           });
-          const currentLocal = getLocalSuratList();
-          const merged = smartMergeSurat(currentLocal, remoteItems);
-          setLocalSuratList(merged);
-          onUpdate(merged);
+
+          if (!snapshot.metadata.fromCache) {
+            hasLiveFirestore = true;
+            let idbPool: SuratKedinasanItem[] = [];
+            try {
+              const idb = await getSuratFromIndexedDB();
+              if (Array.isArray(idb)) idbPool = idb;
+            } catch {}
+            const resolved = buildAuthoritativeSurat(remoteItems, [...idbPool, ...getLocalSuratList()]);
+            if (isActive) {
+              setLocalSuratList(resolved);
+              onUpdate(resolved);
+            }
+          } else if (remoteItems.length > 0 && !hasLiveFirestore) {
+            const merged = smartMergeSurat(getLocalSuratList(), remoteItems);
+            setLocalSuratList(merged);
+            onUpdate(merged);
+          }
         },
         (error) => {
-          console.warn('Firestore surat subscription error (falling back to local):', error);
+          console.warn('Firestore surat subscription error (falling back to fetch):', error);
+          fetchSuratFromServer().then((items) => {
+            if (isActive) onUpdate(items);
+          });
           if (onError) onError(error);
         }
       );
+
+      // Proactive cold-start fetch
+      fetchSuratFromServer().then((items) => {
+        if (isActive && !hasLiveFirestore) {
+          onUpdate(items);
+        }
+      });
     }
   } catch (e) {
     console.warn('Firestore not initialized for surat:', e);
@@ -279,7 +352,7 @@ export const subscribeSurat = (
     if (typeof BroadcastChannel !== 'undefined') {
       channel = new BroadcastChannel(SURAT_CHANNEL);
       channel.onmessage = (event) => {
-        if (event.data && event.data.type === 'SYNC_SURAT' && Array.isArray(event.data.items)) {
+        if (isActive && event.data && event.data.type === 'SYNC_SURAT' && Array.isArray(event.data.items)) {
           const merged = smartMergeSurat(getLocalSuratList(), event.data.items);
           setLocalSuratList(merged);
           onUpdate(merged);
@@ -289,12 +362,11 @@ export const subscribeSurat = (
   } catch (e) {}
 
   const handleStorageEvent = (event: StorageEvent) => {
-    if (event.key === SURAT_STORAGE_KEY && event.newValue) {
+    if (isActive && event.key === SURAT_STORAGE_KEY && event.newValue) {
       try {
         const parsed = JSON.parse(event.newValue);
         if (Array.isArray(parsed)) {
-          const merged = smartMergeSurat(getLocalSuratList(), parsed);
-          onUpdate(merged);
+          onUpdate(parsed);
         }
       } catch (e) {}
     }
@@ -302,6 +374,7 @@ export const subscribeSurat = (
   window.addEventListener('storage', handleStorageEvent);
 
   return () => {
+    isActive = false;
     if (unsubscribeFirestore) unsubscribeFirestore();
     if (channel) channel.close();
     window.removeEventListener('storage', handleStorageEvent);

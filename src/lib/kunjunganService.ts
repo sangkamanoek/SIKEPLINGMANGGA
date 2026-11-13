@@ -3,11 +3,10 @@ import {
   collection,
   doc,
   getDocs,
+  getDocsFromServer,
   setDoc,
   deleteDoc,
   onSnapshot,
-  query,
-  orderBy,
   Unsubscribe,
 } from 'firebase/firestore';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
@@ -67,7 +66,7 @@ export const getLocalKunjunganList = (): KunjunganWargaData[] => {
     memoryKunjungan = cleaned;
     return cleaned;
   }
-  return [];
+  return memoryKunjungan.filter((x) => x && x.id && !deletedSet.has(x.id));
 };
 
 export const setLocalKunjunganList = (items: KunjunganWargaData[]): void => {
@@ -75,6 +74,9 @@ export const setLocalKunjunganList = (items: KunjunganWargaData[]): void => {
   const cleaned = items.filter((x) => x && x.id && !deletedSet.has(x.id));
   memoryKunjungan = cleaned;
   safeSetLocalStorage(KUNJUNGAN_STORAGE_KEY, JSON.stringify(cleaned));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kunjungan-data-updated'));
+  }
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(KUNJUNGAN_CHANNEL);
@@ -102,6 +104,7 @@ export const saveKunjunganWargaToFirestore = async (item: KunjunganWargaData): P
     updatedList = [dataToSave, ...updatedList];
   }
   setLocalKunjunganList(updatedList);
+  saveVisitsToIndexedDB(updatedList).catch(() => {});
 
   // 2. Save to Firestore if connected
   try {
@@ -129,6 +132,7 @@ export const deleteKunjunganWargaFromFirestore = async (id: string): Promise<voi
   const current = getLocalKunjunganList();
   const filtered = current.filter((p) => p.id !== id);
   setLocalKunjunganList(filtered);
+  saveVisitsToIndexedDB(filtered).catch(() => {});
 
   try {
     if (db) {
@@ -143,43 +147,87 @@ export const deleteKunjunganWargaFromFirestore = async (id: string): Promise<voi
   } catch (e) {}
 };
 
+function sortKunjunganDesc(items: KunjunganWargaData[]): KunjunganWargaData[] {
+  return [...items].sort((a, b) =>
+    (b.updatedAt || b.createdAt || b.tanggal || '').localeCompare(a.updatedAt || a.createdAt || a.tanggal || '')
+  );
+}
+
+export const fetchKunjunganFromFirestore = async (): Promise<KunjunganWargaData[]> => {
+  const local = getLocalKunjunganList();
+  if (!db) return local;
+  try {
+    const colRef = collection(db, KUNJUNGAN_COLLECTION);
+    let snap;
+    try {
+      snap = await getDocsFromServer(colRef);
+    } catch {
+      snap = await getDocs(colRef);
+    }
+    const deletedSet = new Set(getDeletedKunjunganIds());
+    const remoteItems: KunjunganWargaData[] = [];
+    snap.forEach((docSnap) => {
+      const dat = docSnap.data() as KunjunganWargaData;
+      const docId = docSnap.id || dat?.id;
+      if (dat && docId && !deletedSet.has(docId)) {
+        remoteItems.push({ ...dat, id: docId });
+      }
+    });
+    const sorted = sortKunjunganDesc(remoteItems);
+    if (sorted.length > 0 || !snap.metadata.fromCache) {
+      setLocalKunjunganList(sorted);
+      saveVisitsToIndexedDB(sorted).catch(() => {});
+      return sorted;
+    }
+  } catch (err) {
+    console.warn('[kunjunganService] fetchKunjunganFromFirestore warning:', err);
+  }
+  return local;
+};
+
 export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => void): (() => void) => {
+  let isActive = true;
+  let hasLiveFirestore = false;
+
   // 1. Initial local emit (0ms)
   const initialLocal = getLocalKunjunganList();
   cb(initialLocal);
 
-  // 2. Fast IndexedDB restore (10ms)
+  // 2. Fast IndexedDB restore (10ms) if live Firestore hasn't arrived yet
   getVisitsFromIndexedDB()
     .then((idb) => {
+      if (!isActive || hasLiveFirestore) return;
       if (Array.isArray(idb) && idb.length > initialLocal.length) {
         const deletedSet = new Set(getDeletedKunjunganIds());
-        const cleaned = idb.filter((x) => x && x.id && !deletedSet.has(x.id));
+        const cleaned = sortKunjunganDesc(idb.filter((x) => x && x.id && !deletedSet.has(x.id)));
         setLocalKunjunganList(cleaned);
         cb(cleaned);
       }
     })
     .catch(() => {});
 
-  // 3. Fast Server Cache fetch (30-50ms)
+  // 3. Server API buffer ONLY as cold-start fallback if Firestore hasn't delivered yet
   fetch('/api/kunjungan')
     .then((res) => res.json())
     .then((resData) => {
+      if (!isActive || hasLiveFirestore) return;
       if (resData && resData.success && Array.isArray(resData.data) && resData.data.length > 0) {
         const deletedSet = new Set(getDeletedKunjunganIds());
         const serverItems: KunjunganWargaData[] = resData.data.filter(
           (x: any) => x && x.id && !deletedSet.has(x.id)
         );
         const current = getLocalKunjunganList();
-        if (serverItems.length >= current.length) {
-          setLocalKunjunganList(serverItems);
-          saveVisitsToIndexedDB(serverItems).catch(() => {});
-          cb(serverItems);
+        if (current.length === 0 && serverItems.length > 0) {
+          const sorted = sortKunjunganDesc(serverItems);
+          setLocalKunjunganList(sorted);
+          saveVisitsToIndexedDB(sorted).catch(() => {});
+          cb(sorted);
         }
       }
     })
     .catch(() => {});
 
-  // 4. Realtime Firestore Sync
+  // 4. Realtime Authoritative Firestore Sync
   let unsub: Unsubscribe | null = null;
   try {
     if (db) {
@@ -187,33 +235,44 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
       unsub = onSnapshot(
         q,
         (snapshot) => {
+          if (!isActive) return;
+          const deletedSet = new Set(getDeletedKunjunganIds());
           const remoteItems: KunjunganWargaData[] = [];
           snapshot.forEach((docSnap) => {
             const dat = docSnap.data() as KunjunganWargaData;
-            if (dat && dat.id) remoteItems.push(dat);
+            const docId = docSnap.id || dat?.id;
+            if (dat && docId && !deletedSet.has(docId)) {
+              remoteItems.push({ ...dat, id: docId });
+            }
           });
-          if (remoteItems.length > 0) {
-            const deletedSet = new Set(getDeletedKunjunganIds());
-            const local = getLocalKunjunganList();
-            const map = new Map<string, KunjunganWargaData>();
-            local.forEach((l) => map.set(l.id, l));
-            remoteItems.forEach((r) => {
-              if (!deletedSet.has(r.id)) {
-                map.set(r.id, r);
-              }
-            });
-            const merged = Array.from(map.values()).sort((a, b) =>
-              (b.createdAt || '').localeCompare(a.createdAt || '')
-            );
-            setLocalKunjunganList(merged);
-            saveVisitsToIndexedDB(merged).catch(() => {});
-            cb(merged);
+
+          const sorted = sortKunjunganDesc(remoteItems);
+          if (!snapshot.metadata.fromCache) {
+            hasLiveFirestore = true;
+            setLocalKunjunganList(sorted);
+            saveVisitsToIndexedDB(sorted).catch(() => {});
+            cb(sorted);
+          } else if (sorted.length > 0 && !hasLiveFirestore) {
+            setLocalKunjunganList(sorted);
+            saveVisitsToIndexedDB(sorted).catch(() => {});
+            cb(sorted);
           }
         },
         (err) => {
           console.warn('[kunjunganService] Snapshot listener error:', err);
+          fetchKunjunganFromFirestore().then((items) => {
+            if (isActive && items.length > 0) cb(items);
+          });
         }
       );
+
+      // Parallel explicit server fetch for cold-start mobile / iframe environments
+      fetchKunjunganFromFirestore().then((items) => {
+        if (isActive && !hasLiveFirestore && items.length > 0) {
+          hasLiveFirestore = true;
+          cb(items);
+        }
+      });
     }
   } catch (e) {}
 
@@ -223,7 +282,7 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
     if (typeof BroadcastChannel !== 'undefined') {
       bc = new BroadcastChannel(KUNJUNGAN_CHANNEL);
       bc.onmessage = (event) => {
-        if (event.data && event.data.type === 'SYNC_KUNJUNGAN' && Array.isArray(event.data.items)) {
+        if (isActive && event.data && event.data.type === 'SYNC_KUNJUNGAN' && Array.isArray(event.data.items)) {
           cb(event.data.items);
         }
       };
@@ -231,6 +290,7 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
   } catch (e) {}
 
   return () => {
+    isActive = false;
     if (unsub) unsub();
     if (bc) bc.close();
   };

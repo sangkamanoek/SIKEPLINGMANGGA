@@ -61,19 +61,25 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
     }
   }
 
-  // 4. Fallback defaults resmi (Fresh baseline)
+  // 4. Fallback defaults resmi (Fresh baseline) without overwriting Firestore overrides
+  const defaults = getDefaultTargetsCapaianMap();
   if (!resultMap || Object.keys(resultMap).length === 0) {
-    resultMap = getDefaultTargetsCapaianMap();
+    resultMap = defaults;
   } else {
-    // Ensure default baselines for BPJS TK & targetBpjs = 50 if missing in existing stored map
-    const defaults = getDefaultTargetsCapaianMap();
     Object.keys(defaults).forEach((k) => {
       if (resultMap && resultMap[k]) {
-        resultMap[k].overrideBpjs = defaults[k].overrideBpjs;
-        resultMap[k].overridePerlinsos = defaults[k].overridePerlinsos;
+        if (resultMap[k].overrideBpjs === undefined) {
+          resultMap[k].overrideBpjs = defaults[k].overrideBpjs;
+        }
+        if (resultMap[k].overridePerlinsos === undefined) {
+          resultMap[k].overridePerlinsos = defaults[k].overridePerlinsos;
+        }
         if (!resultMap[k].targetBpjs || resultMap[k].targetBpjs < 50) {
           resultMap[k].targetBpjs = 50;
         }
+        // Align Kepling display name with official active Kepling directory if outdated
+        resultMap[k].nama = defaults[k].nama;
+        resultMap[k].lingkungan = defaults[k].lingkungan;
       } else if (resultMap) {
         resultMap[k] = defaults[k];
       }
@@ -81,9 +87,6 @@ export async function fetchTargetsCapaian(): Promise<TargetsCapaianMap> {
   }
 
   safeSetLocalStorage(LOCAL_STORAGE_KEY, JSON.stringify(resultMap));
-  try {
-    saveAllTargetsToFirestore(resultMap).catch(() => {});
-  } catch {}
   return resultMap;
 }
 

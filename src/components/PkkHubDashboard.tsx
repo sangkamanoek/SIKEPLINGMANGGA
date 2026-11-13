@@ -41,7 +41,10 @@ import {
   getLocalPkkKegiatanList,
   POKJA_LABELS,
 } from '../lib/pkkKegiatanService';
-import { getLocalDasaWismaList } from '../lib/pkkDasaWismaService';
+import { getLocalDasaWismaList, subscribeDasaWisma } from '../lib/pkkDasaWismaService';
+import { getLocalPosyanduReports, subscribePosyanduReports } from '../lib/pkkPosyanduService';
+import { subscribeBuku1, DEFAULT_BUKU1_ITEMS, PkkBuku1Anggota } from '../lib/pkkBukuService';
+import { safeGetLocalStorage } from '../lib/safeStorage';
 
 import {
   syncPkkDeviceDataToLiveFirestore,
@@ -69,6 +72,11 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
 }) => {
   const [transaksiList, setTransaksiList] = useState<any[]>(() => getLocalTransaksiPkk());
   const [kegiatanList, setKegiatanList] = useState<any[]>(() => getLocalPkkKegiatanList());
+  const [dasaWismaList, setDasaWismaList] = useState<any[]>(() => getLocalDasaWismaList());
+  const [posyanduList, setPosyanduList] = useState<any[]>(() => getLocalPosyanduReports());
+  const [buku1List, setBuku1List] = useState<PkkBuku1Anggota[]>(() =>
+    safeGetLocalStorage<PkkBuku1Anggota[]>('sikepling_pkk_buku_1_v1', DEFAULT_BUKU1_ITEMS)
+  );
   const [activePokjaInfo, setActivePokjaInfo] = useState<'I' | 'II' | 'III' | 'IV'>('I');
 
   const [isPkkSyncModalOpen, setIsPkkSyncModalOpen] = useState(false);
@@ -106,9 +114,15 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
   useEffect(() => {
     const unsub1 = subscribePkkKeuangan((items) => setTransaksiList(items));
     const unsub2 = subscribePkkKegiatan((items) => setKegiatanList(items));
+    const unsub3 = subscribeDasaWisma((items) => setDasaWismaList(items));
+    const unsub4 = subscribePosyanduReports((items) => setPosyanduList(items));
+    const unsub5 = subscribeBuku1((items) => setBuku1List(items));
     return () => {
       unsub1();
       unsub2();
+      unsub3();
+      unsub4();
+      unsub5();
     };
   }, []);
 
@@ -311,7 +325,9 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                 Dasa Wisma 24 Lingkungan
               </h2>
               <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                24 Lingkungan
+                {dasaWismaList.length > 0
+                  ? `${dasaWismaList.length} Kelompok • ${dasaWismaList.reduce((acc, d) => acc + (Number(d.jumlahKk) || 0), 0)} KK`
+                  : '0 Kelompok'}
               </span>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed mb-4">
@@ -339,7 +355,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                 Laporan Posyandu
               </h2>
               <span className="text-[10px] font-black text-rose-800 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-                Pokja IV
+                {posyanduList.length} Laporan
               </span>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed mb-4">
@@ -367,7 +383,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                 6 Buku Wajib PKK
               </h2>
               <span className="text-[10px] font-black text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                Buku I - VI
+                {buku1List.length} Anggota • Buku I-VI
               </span>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed mb-4">
@@ -601,18 +617,18 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                       {POKJA_LABELS[act.pokja as keyof typeof POKJA_LABELS] || act.pokja}
                     </span>
                     <span className="text-slate-500 font-medium">
-                      📅 {act.tanggal}
+                      📅 {act.tanggal || act.tanggalPelaksanaan || '-'}
                     </span>
                   </div>
                   <h4 className="text-xs font-bold text-slate-900 line-clamp-1">
-                    {act.namaKegiatan}
+                    {act.namaKegiatan || act.judul}
                   </h4>
                   <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
-                    {act.uraianHasil}
+                    {act.uraianHasil || act.keterangan || act.deskripsi || '-'}
                   </p>
                   <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
-                    <span>📍 {act.lokasi}</span>
-                    <span>Pelapor: {normalizePelaporNama(act.pelaporNama)}</span>
+                    <span>📍 {act.lokasi || act.tempat || '-'}</span>
+                    <span>Pelapor: {normalizePelaporNama(act.pelaporNama || act.petugasNama || 'Pengurus PKK')}</span>
                   </div>
                 </div>
               ))}
@@ -669,10 +685,10 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-slate-900 line-clamp-2 leading-snug">
-                        {tx.uraian}
+                        {tx.uraian || tx.keterangan || '-'}
                       </p>
                       <p className="text-[10px] text-slate-500 mt-0.5">
-                        {tx.tanggal} • {POS_ANGGARAN_LABELS[tx.posAnggaran as keyof typeof POS_ANGGARAN_LABELS] || tx.posAnggaran}
+                        {tx.tanggal} • {POS_ANGGARAN_LABELS[tx.posAnggaran as keyof typeof POS_ANGGARAN_LABELS] || tx.kategori || tx.posAnggaran}
                       </p>
                     </div>
                   </div>

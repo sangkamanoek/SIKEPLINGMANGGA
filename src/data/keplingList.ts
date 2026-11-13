@@ -513,6 +513,17 @@ export const saveCustomProfile = (
         },
         { merge: true }
       ).catch(() => {});
+
+      setDoc(
+        doc(db, 'account_profiles', updatedAccount.id),
+        {
+          accountId: updatedAccount.id,
+          nama: cleanNama,
+          telepon: cleanTelepon,
+          updatedAt: now,
+        },
+        { merge: true }
+      ).catch(() => {});
     }
   } catch {}
 
@@ -735,7 +746,32 @@ export const getAllEffectiveAccounts = (): UserAccount[] => {
   return Array.from(map.values());
 };
 
-export const syncAccountsWithServer = async (): Promise<void> => {};
+export const syncAccountsWithServer = async (): Promise<void> => {
+  if (!db) return;
+  try {
+    const snap = await getDocs(collection(db, 'user_accounts'));
+    const baseIds = new Set(ALL_ACCOUNTS.map((a) => a.id));
+    const currentDynamic = getDynamicAccounts();
+    const dynamicMap = new Map<string, UserAccount>();
+    currentDynamic.forEach((a) => {
+      if (a && a.id) dynamicMap.set(a.id, a);
+    });
+
+    snap.forEach((docSnap) => {
+      const d = docSnap.data() as any;
+      const id = d?.id || docSnap.id;
+      if (id && !baseIds.has(id) && d.role && d.nama) {
+        dynamicMap.set(id, { ...d, id } as UserAccount);
+      }
+    });
+
+    try {
+      localStorage.setItem(DYNAMIC_ACCOUNTS_KEY, JSON.stringify(Array.from(dynamicMap.values())));
+    } catch {}
+  } catch (err) {
+    console.warn('Failed to sync dynamic accounts from Firestore:', err);
+  }
+};
 
 export const syncPasswordsWithServer = async (): Promise<void> => {
   const local = getCustomPasswords();
@@ -776,35 +812,74 @@ export const syncPasswordsWithServer = async (): Promise<void> => {
 
 export const syncProfilesWithServer = async (): Promise<void> => {
   const local = getCustomProfiles();
-  let merged: Record<string, any> = { ...local };
+  const merged: Record<string, any> = { ...local };
 
-  // 1. Fetch from server API
+  const mergeProfileEntry = (accountId: string, incoming: { nama?: string; telepon?: string; updatedAt?: string }) => {
+    if (!accountId || !incoming) return;
+    const existing = merged[accountId];
+    const incomingTime = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
+    const existingTime = existing?.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+    if (!existing || incomingTime >= existingTime) {
+      merged[accountId] = {
+        ...existing,
+        accountId,
+        nama: incoming.nama !== undefined && String(incoming.nama).trim() ? incoming.nama : existing?.nama,
+        telepon: incoming.telepon !== undefined ? incoming.telepon : existing?.telepon,
+        updatedAt: incoming.updatedAt || existing?.updatedAt,
+      };
+    } else if (existing && !existing.telepon && incoming.telepon) {
+      merged[accountId] = {
+        ...existing,
+        telepon: incoming.telepon,
+      };
+    }
+  };
+
+  // 1. Fetch from server API (fallback baseline)
   try {
     const res = await fetch('/api/profiles');
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.profiles && typeof data.profiles === 'object') {
-        merged = { ...merged, ...data.profiles };
+        Object.entries(data.profiles).forEach(([accId, prof]: [string, any]) => {
+          mergeProfileEntry(accId, prof);
+        });
       }
     }
   } catch (err) {
     console.warn('Failed to sync profiles with server:', err);
   }
 
-  // 2. Fetch from Firebase Firestore
+  // 2. Fetch from Firebase Firestore across user_accounts, user_profiles, and account_profiles
   try {
     if (db) {
-      const snap = await getDocs(collection(db, 'user_profiles'));
-      snap.forEach((docSnap) => {
+      const [accountsSnap, profilesSnap, accountProfilesSnap] = await Promise.all([
+        getDocs(collection(db, 'user_accounts')).catch(() => null),
+        getDocs(collection(db, 'user_profiles')).catch(() => null),
+        getDocs(collection(db, 'account_profiles')).catch(() => null),
+      ]);
+
+      accountsSnap?.forEach((docSnap) => {
         const d = docSnap.data();
-        if (d && d.accountId) {
-          merged[d.accountId] = {
-            ...merged[d.accountId],
-            accountId: d.accountId,
-            nama: d.nama,
-            telepon: d.telepon,
-            updatedAt: d.updatedAt,
-          };
+        const accId = d?.id || docSnap.id;
+        if (accId && (d?.nama || d?.telepon)) {
+          mergeProfileEntry(accId, { nama: d.nama, telepon: d.telepon, updatedAt: d.updatedAt });
+        }
+      });
+
+      profilesSnap?.forEach((docSnap) => {
+        const d = docSnap.data();
+        const accId = d?.accountId || docSnap.id;
+        if (accId && (d?.nama || d?.telepon)) {
+          mergeProfileEntry(accId, { nama: d.nama, telepon: d.telepon, updatedAt: d.updatedAt });
+        }
+      });
+
+      accountProfilesSnap?.forEach((docSnap) => {
+        const d = docSnap.data();
+        const accId = d?.accountId || docSnap.id;
+        if (accId && (d?.nama || d?.telepon)) {
+          mergeProfileEntry(accId, { nama: d.nama, telepon: d.telepon, updatedAt: d.updatedAt });
         }
       });
     }
@@ -814,6 +889,9 @@ export const syncProfilesWithServer = async (): Promise<void> => {
 
   try {
     localStorage.setItem(CUSTOM_PROFILES_KEY, JSON.stringify(merged));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sikepling_profile_updated'));
+    }
   } catch {}
 };
 

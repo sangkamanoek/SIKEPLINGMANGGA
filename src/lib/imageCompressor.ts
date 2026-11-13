@@ -67,7 +67,22 @@ export function compressImageFile(
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(bitmap, 0, 0, width, height);
 
-            const compressed = canvas.toDataURL('image/jpeg', quality);
+            let compressed = canvas.toDataURL('image/jpeg', quality);
+            // Guarantee single photo stays compact well under Firestore 1MB doc limit
+            if (compressed.length > 220_000) {
+              const targetScale = Math.min(1, 560 / Math.max(width, height));
+              const w2 = Math.max(1, Math.round(width * targetScale));
+              const h2 = Math.max(1, Math.round(height * targetScale));
+              canvas.width = w2;
+              canvas.height = h2;
+              const ctx2 = canvas.getContext('2d', { alpha: false });
+              if (ctx2) {
+                ctx2.imageSmoothingEnabled = true;
+                ctx2.imageSmoothingQuality = 'high';
+                ctx2.drawImage(bitmap, 0, 0, w2, h2);
+                compressed = canvas.toDataURL('image/jpeg', 0.34);
+              }
+            }
 
             // Clean up resources immediately to free GPU memory
             canvas.width = 0;
@@ -128,7 +143,19 @@ function fallbackFileReader(file: File, maxDim: number, quality: number): Promis
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, width, height);
 
-            const compressed = canvas.toDataURL('image/jpeg', quality);
+            let compressed = canvas.toDataURL('image/jpeg', quality);
+            if (compressed.length > 220_000) {
+              const targetScale = Math.min(1, 560 / Math.max(width, height));
+              const w2 = Math.max(1, Math.round(width * targetScale));
+              const h2 = Math.max(1, Math.round(height * targetScale));
+              canvas.width = w2;
+              canvas.height = h2;
+              const ctx2 = canvas.getContext('2d', { alpha: false });
+              if (ctx2) {
+                ctx2.drawImage(img, 0, 0, w2, h2);
+                compressed = canvas.toDataURL('image/jpeg', 0.34);
+              }
+            }
 
             // Explicitly release canvas & image bitmap to free RAM on older phones
             canvas.width = 0;
@@ -138,18 +165,18 @@ function fallbackFileReader(file: File, maxDim: number, quality: number): Promis
             resolve(compressed);
           } else {
             img.src = '';
-            resolve(srcUrl);
+            resolve(srcUrl.length <= 350_000 ? srcUrl : '');
           }
         } catch (canvasErr) {
           console.warn('[ImageCompressor] Canvas export fallback:', canvasErr);
           img.src = '';
-          resolve(srcUrl);
+          resolve(srcUrl.length <= 350_000 ? srcUrl : '');
         }
       };
 
       img.onerror = () => {
         img.src = '';
-        resolve(srcUrl);
+        resolve(srcUrl.length <= 350_000 ? srcUrl : '');
       };
 
       img.src = srcUrl;
@@ -160,6 +187,61 @@ function fallbackFileReader(file: File, maxDim: number, quality: number): Promis
     };
 
     reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Downscale an existing Base64 image data URL when document size threatens Firestore 1MB cap.
+ */
+export function ensureCompactDataUrl(
+  dataUrl: string,
+  maxDim = 560,
+  quality = 0.36
+): Promise<string> {
+  return new Promise((resolve) => {
+    if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+      resolve(dataUrl);
+      return;
+    }
+    if (dataUrl.length <= 140_000) {
+      resolve(dataUrl);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+          const out = canvas.toDataURL('image/jpeg', quality);
+          canvas.width = 0;
+          canvas.height = 0;
+          img.src = '';
+          resolve(out.length < dataUrl.length ? out : dataUrl);
+          return;
+        }
+      } catch {}
+      img.src = '';
+      resolve(dataUrl);
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
   });
 }
 

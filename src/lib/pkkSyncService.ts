@@ -2,9 +2,10 @@ import { db } from './firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { cleanFirestoreData } from './firestoreService';
 import { getLocalTransaksiPkk, KEUANGAN_COLLECTION } from './pkkKeuanganService';
-import { getLocalPkkKegiatanList, PKK_KEGIATAN_COLLECTION } from './pkkKegiatanService';
+import { getLocalPkkKegiatanList, PKK_KEGIATAN_COLLECTION, hasMissingKegiatanPhotoUrls } from './pkkKegiatanService';
 import { getLocalDasaWismaList, PKK_DASA_WISMA_COLLECTION } from './pkkDasaWismaService';
-
+import { getLocalPosyanduReports, hasMissingPosyanduPhotoUrls } from './pkkPosyanduService';
+import { getPosyanduFromIndexedDB, getPkkKegiatanFromIndexedDB } from './indexedDbStorage';
 import { safeGetLocalStorage } from './safeStorage';
 import { PkkBuku1Anggota, PkkBuku4Notulen, PkkBuku5Inventaris } from './pkkBukuService';
 
@@ -34,12 +35,20 @@ export const syncPkkDeviceDataToLiveFirestore = async (
       stats.pkkKeuangan.synced++;
     }
 
-    // Kegiatan
+    // Kegiatan (read hydrated IndexedDB records first so photos aren't stripped)
     onProgress('Menyinkronkan Kegiatan...');
-    const kegiatan = getLocalPkkKegiatanList();
+    const idbKegiatan = await getPkkKegiatanFromIndexedDB().catch(() => null);
+    const kegiatan = Array.isArray(idbKegiatan) && idbKegiatan.length > 0
+      ? idbKegiatan
+      : getLocalPkkKegiatanList();
     stats.pkkKegiatan.total = kegiatan.length;
     for (const item of kegiatan) {
-      await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, item.id), cleanFirestoreData(item), { merge: true });
+      const cleaned = cleanFirestoreData(item);
+      // Never overwrite Firestore photos with stripped empty-url placeholders
+      if (hasMissingKegiatanPhotoUrls(item)) {
+        delete cleaned.fotoDokumentasi;
+      }
+      await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, item.id), cleaned, { merge: true });
       stats.pkkKegiatan.synced++;
     }
 
@@ -52,8 +61,6 @@ export const syncPkkDeviceDataToLiveFirestore = async (
       stats.pkkDasaWisma.synced++;
     }
 
-
-
     // Buku 1, 4, 5
     onProgress('Menyinkronkan Buku Administrasi...');
     const b1 = safeGetLocalStorage<PkkBuku1Anggota[]>('sikepling_pkk_buku_1_v1', []);
@@ -62,7 +69,7 @@ export const syncPkkDeviceDataToLiveFirestore = async (
       await setDoc(doc(db, 'pkk_buku_1_anggota', item.id), cleanFirestoreData(item), { merge: true });
       stats.buku1.synced++;
     }
-    
+
     const b4 = safeGetLocalStorage<PkkBuku4Notulen[]>('sikepling_pkk_buku_4_v1', []);
     stats.buku4.total = b4.length;
     for (const item of b4) {
@@ -77,12 +84,19 @@ export const syncPkkDeviceDataToLiveFirestore = async (
       stats.buku5.synced++;
     }
 
-    // Posyandu
+    // Posyandu (read hydrated IndexedDB records first and NEVER upload stripped empty photo arrays)
     onProgress('Menyinkronkan Laporan Posyandu...');
-    const posyanduData = safeGetLocalStorage<any[]>('sikepling_pkk_posyandu_v1', []);
+    const idbPosyandu = await getPosyanduFromIndexedDB().catch(() => null);
+    const posyanduData = Array.isArray(idbPosyandu) && idbPosyandu.length > 0
+      ? idbPosyandu
+      : getLocalPosyanduReports();
     stats.posyandu.total = posyanduData.length;
     for (const item of posyanduData) {
-      await setDoc(doc(db, 'pkk_posyandu_reports', item.id), cleanFirestoreData(item), { merge: true });
+      const cleaned = cleanFirestoreData(item);
+      if (hasMissingPosyanduPhotoUrls(item)) {
+        delete cleaned.dokumentasiFoto;
+      }
+      await setDoc(doc(db, 'pkk_posyandu_reports', item.id), cleaned, { merge: true });
       stats.posyandu.synced++;
     }
 
@@ -95,10 +109,12 @@ export const syncPkkDeviceDataToLiveFirestore = async (
 };
 
 export const getPkkDeviceDataSnapshot = async () => {
+  const idbKegiatan = await getPkkKegiatanFromIndexedDB().catch(() => null);
+  const idbPosyandu = await getPosyanduFromIndexedDB().catch(() => null);
   return {
     pkkKeuangan: getLocalTransaksiPkk(),
-    pkkKegiatan: getLocalPkkKegiatanList(),
-
+    pkkKegiatan: Array.isArray(idbKegiatan) && idbKegiatan.length > 0 ? idbKegiatan : getLocalPkkKegiatanList(),
+    posyandu: Array.isArray(idbPosyandu) && idbPosyandu.length > 0 ? idbPosyandu : getLocalPosyanduReports(),
     buku1: safeGetLocalStorage<PkkBuku1Anggota[]>('sikepling_pkk_buku_1_v1', []),
     buku4: safeGetLocalStorage<PkkBuku4Notulen[]>('sikepling_pkk_buku_4_v1', []),
     buku5: safeGetLocalStorage<PkkBuku5Inventaris[]>('sikepling_pkk_buku_5_v1', []),

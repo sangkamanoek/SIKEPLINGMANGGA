@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Baby,
   Plus,
@@ -18,6 +18,7 @@ import {
   FileText,
   Image as ImageIcon,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { UserAccount, PosyanduReport, FotoDokumentasi } from '../types';
 import {
@@ -26,12 +27,21 @@ import {
   fetchSinglePosyanduReport,
   savePosyanduReport,
   deletePosyanduReport,
+  hasMissingPosyanduPhotoUrls,
 } from '../lib/pkkPosyanduService';
 import { KETUA_PKK_LINGKUNGAN_ACCOUNTS } from '../data/keplingList';
 import { KopSuratPkk } from './KopSuratPkk';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument, downloadPdfDocument } from '../utils/printHelper';
 import { compressMultipleFiles } from '../lib/imageCompressor';
+import { getDirectImageUrl } from '../lib/formatter';
+
+const resolvePosyanduFotoUrl = (foto: any): string => {
+  if (!foto || typeof foto !== 'object') return '';
+  const raw = foto.url || foto.src || foto.dataUrl || foto.base64 || '';
+  if (!raw || typeof raw !== 'string') return '';
+  return getDirectImageUrl(raw);
+};
 
 const formatProperWriting = (text: string): string => {
   if (!text) return '';
@@ -147,6 +157,9 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
   const [formKeterangan, setFormKeterangan] = useState<string>('');
   const [fotoList, setFotoList] = useState<FotoDokumentasi[]>([]);
   const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
+  const [failedPhotoKeys, setFailedPhotoKeys] = useState<Record<string, boolean>>({});
+  const [hydratingReportId, setHydratingReportId] = useState<string | null>(null);
+  const attemptedHydrationIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     // 1. Subscribe to real-time updates
@@ -175,6 +188,25 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
 
     return () => unsub();
   }, []);
+
+  // Automatically hydrate any report whose dokumentasiFoto has missing URLs (e.g. stripped local cache)
+  useEffect(() => {
+    const candidates = reports.filter(
+      (r) => r && r.id && hasMissingPosyanduPhotoUrls(r) && !attemptedHydrationIdsRef.current.has(r.id)
+    );
+    if (candidates.length === 0) return;
+
+    candidates.forEach((candidate) => {
+      attemptedHydrationIdsRef.current.add(candidate.id);
+      fetchSinglePosyanduReport(candidate.id, true)
+        .then((hydrated) => {
+          if (hydrated && !hasMissingPosyanduPhotoUrls(hydrated)) {
+            setReports((prev) => prev.map((it) => (it.id === hydrated.id ? hydrated : it)));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [reports]);
 
   const totalWargaKumulatif = useMemo(() => {
     return (
@@ -260,23 +292,31 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (report: PosyanduReport) => {
+  const handleOpenEdit = async (report: PosyanduReport) => {
+    let activeReport = report;
+    if (hasMissingPosyanduPhotoUrls(report)) {
+      const hydrated = await fetchSinglePosyanduReport(report.id, true).catch(() => null);
+      if (hydrated) {
+        activeReport = hydrated;
+        setReports((prev) => prev.map((it) => (it.id === hydrated.id ? hydrated : it)));
+      }
+    }
     setIsEditing(true);
-    setEditingId(report.id);
-    setFormLingkunganNomor(report.nomorLingkungan || 1);
-    setFormTanggal(report.tanggal || new Date().toISOString().split('T')[0]);
-    setFormPosyanduNama(report.posyanduNama || '');
-    setFormPosyanduLokasi(report.posyanduLokasi || '');
-    setFormJumlahKader(String(report.posyanduJumlahPetugasKader || ''));
-    setFormBayi02(String(report.posyanduBayi02Tahun || ''));
-    setFormBalita25(String(report.posyanduBalita25Tahun || ''));
-    setFormAnak612(String(report.posyanduAnak612Tahun || ''));
-    setFormRemaja1318(String(report.posyanduRemaja1318Tahun || ''));
-    setFormDewasaBumil1959(String(report.posyanduDewasaIbuHamil1959Tahun || ''));
-    setFormLansia60(String(report.posyanduLansia60TahunKeatas || ''));
-    setFormJenisLayanan(report.posyanduJenisLayanan || []);
-    setFormKeterangan(report.posyanduKeterangan || '');
-    setFotoList(report.dokumentasiFoto || []);
+    setEditingId(activeReport.id);
+    setFormLingkunganNomor(activeReport.nomorLingkungan || 1);
+    setFormTanggal(activeReport.tanggal || new Date().toISOString().split('T')[0]);
+    setFormPosyanduNama(activeReport.posyanduNama || '');
+    setFormPosyanduLokasi(activeReport.posyanduLokasi || '');
+    setFormJumlahKader(String(activeReport.posyanduJumlahPetugasKader || ''));
+    setFormBayi02(String(activeReport.posyanduBayi02Tahun || ''));
+    setFormBalita25(String(activeReport.posyanduBalita25Tahun || ''));
+    setFormAnak612(String(activeReport.posyanduAnak612Tahun || ''));
+    setFormRemaja1318(String(activeReport.posyanduRemaja1318Tahun || ''));
+    setFormDewasaBumil1959(String(activeReport.posyanduDewasaIbuHamil1959Tahun || ''));
+    setFormLansia60(String(activeReport.posyanduLansia60TahunKeatas || ''));
+    setFormJenisLayanan(activeReport.posyanduJenisLayanan || []);
+    setFormKeterangan(activeReport.posyanduKeterangan || '');
+    setFotoList(activeReport.dokumentasiFoto || []);
     setIsModalOpen(true);
   };
 
@@ -604,43 +644,89 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                         <Camera className="w-3.5 h-3.5 text-rose-600" />
                         Dokumentasi Foto ({report.dokumentasiFoto.length}):
                       </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {report.dokumentasiFoto.map((foto, fIdx) => (
-                        <div
-                          key={foto.id || fIdx}
-                          onClick={() => {
-                            if (foto.url && foto.url.length > 20) {
-                              setPreviewPhotoUrl(foto.url);
+                      {hasMissingPosyanduPhotoUrls(report) && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setHydratingReportId(report.id);
+                            const hydrated = await fetchSinglePosyanduReport(report.id, true).catch(() => null);
+                            setHydratingReportId(null);
+                            if (hydrated && !hasMissingPosyanduPhotoUrls(hydrated)) {
+                              setReports((prev) => prev.map((it) => (it.id === hydrated.id ? hydrated : it)));
+                              onShowToast?.('Foto dokumentasi berhasil dimuat dari Cloud!', 'success');
+                            } else {
+                              onShowToast?.('Data foto belum tersimpan utuh di Cloud. Silakan klik ikon Edit untuk unggah ulang foto.', 'info');
                             }
                           }}
-                          className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative group cursor-pointer hover:border-rose-500 transition-all shadow-2xs flex items-center justify-center"
-                          title={foto.name || `Foto ${fIdx + 1}`}
+                          className="text-[10px] font-bold text-rose-700 hover:text-rose-900 flex items-center gap-1 cursor-pointer"
                         >
-                          {foto.url && foto.url.length > 20 ? (
-                            <>
-                              <img
-                                src={foto.url}
-                                alt={foto.name || `Foto ${fIdx + 1}`}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                onError={(e) => {
-                                  (e.currentTarget as HTMLElement).style.display = 'none';
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                                <Eye className="w-4 h-4" />
+                          <RefreshCw className={`w-3 h-3 ${hydratingReportId === report.id ? 'animate-spin' : ''}`} />
+                          <span>{hydratingReportId === report.id ? 'Memuat...' : 'Muat Foto'}</span>
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {report.dokumentasiFoto.map((foto, fIdx) => {
+                        const fotoUrl = resolvePosyanduFotoUrl(foto);
+                        const photoKey = `${report.id}_${foto.id || fIdx}`;
+                        const isRenderable = fotoUrl.length > 20 && !failedPhotoKeys[photoKey];
+                        return (
+                          <div
+                            key={foto.id || fIdx}
+                            onClick={async () => {
+                              if (isRenderable) {
+                                setPreviewPhotoUrl(fotoUrl);
+                              } else {
+                                setHydratingReportId(report.id);
+                                const hydrated = await fetchSinglePosyanduReport(report.id, true).catch(() => null);
+                                setHydratingReportId(null);
+                                if (hydrated) {
+                                  setReports((prev) => prev.map((it) => (it.id === hydrated.id ? hydrated : it)));
+                                  const hydratedUrl = resolvePosyanduFotoUrl(hydrated.dokumentasiFoto?.[fIdx]);
+                                  if (hydratedUrl.length > 20) {
+                                    setFailedPhotoKeys((prev) => {
+                                      const next = { ...prev };
+                                      delete next[photoKey];
+                                      return next;
+                                    });
+                                    setPreviewPhotoUrl(hydratedUrl);
+                                    return;
+                                  }
+                                }
+                                onShowToast?.('File gambar pada Cloud masih kosong. Klik Edit (ikon pensil) untuk unggah ulang foto ini.', 'info');
+                              }
+                            }}
+                            className="aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative group cursor-pointer hover:border-rose-500 transition-all shadow-2xs flex items-center justify-center"
+                            title={foto.name || `Foto ${fIdx + 1}`}
+                          >
+                            {isRenderable ? (
+                              <>
+                                <img
+                                  src={fotoUrl}
+                                  alt={foto.name || `Foto ${fIdx + 1}`}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                  onError={() => {
+                                    setFailedPhotoKeys((prev) => ({ ...prev, [photoKey]: true }));
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                  <Eye className="w-4 h-4" />
+                                </div>
+                              </>
+                            ) : (
+                              <div className="p-1.5 text-center flex flex-col items-center justify-center text-slate-400 w-full h-full">
+                                <ImageIcon className="w-4 h-4 mb-0.5 text-slate-300" />
+                                <span className="text-[8px] text-slate-600 font-semibold truncate max-w-[70px]">
+                                  {foto.name || `Foto ${fIdx + 1}`}
+                                </span>
+                                <span className="text-[7px] text-rose-500 font-medium mt-0.5">
+                                  {hydratingReportId === report.id ? 'Memuat...' : 'Ketuk muat'}
+                                </span>
                               </div>
-                            </>
-                          ) : (
-                            <div className="p-1.5 text-center flex flex-col items-center justify-center text-slate-400 w-full h-full">
-                              <ImageIcon className="w-4 h-4 mb-0.5 text-slate-300" />
-                              <span className="text-[8px] text-slate-600 font-semibold truncate max-w-[70px]">
-                                {foto.name || `Foto ${fIdx + 1}`}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -653,7 +739,16 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setSelectedPrintReport(report)}
+                    onClick={async () => {
+                      setSelectedPrintReport(report);
+                      if (hasMissingPosyanduPhotoUrls(report)) {
+                        const hydrated = await fetchSinglePosyanduReport(report.id, true).catch(() => null);
+                        if (hydrated) {
+                          setSelectedPrintReport(hydrated);
+                          setReports((prev) => prev.map((it) => (it.id === hydrated.id ? hydrated : it)));
+                        }
+                      }
+                    }}
                     className="px-2.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-[10px] cursor-pointer flex items-center gap-1 shadow-2xs transition-all active:scale-95"
                     title="Pratinjau & Cetak Surat Resmi Posyandu A4 (Lengkap Gambar & Isian Laporan)"
                   >
@@ -875,12 +970,14 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                       B. DOKUMENTASI LAPORAN FOTO LAPANGAN TERLAMPIR ({selectedPrintReport.dokumentasiFoto.length} FOTO):
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                      {selectedPrintReport.dokumentasiFoto.map((foto, idx) => (
+                      {selectedPrintReport.dokumentasiFoto.map((foto, idx) => {
+                        const printFotoUrl = resolvePosyanduFotoUrl(foto);
+                        return (
                         <div key={foto.id || idx} className="rounded-lg border border-slate-300 p-1.5 bg-white flex flex-col items-center">
                           <div className="w-full h-[135px] rounded overflow-hidden bg-slate-50 flex items-center justify-center border border-slate-200">
-                            {foto.url && foto.url.length > 20 ? (
+                            {printFotoUrl.length > 20 ? (
                               <img
-                                src={foto.url}
+                                src={printFotoUrl}
                                 alt={foto.name || `Dokumentasi ${idx + 1}`}
                                 className="w-full h-full object-contain object-center"
                                 onError={(e) => {
@@ -911,7 +1008,8 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                             {foto.name ? `Foto ${idx + 1}: ${foto.name}` : `Foto ${idx + 1}: Pelayanan ${selectedPrintReport.posyanduNama}`}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1167,14 +1265,16 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                 </div>
                 {fotoList.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                    {fotoList.map((foto, idx) => (
+                    {fotoList.map((foto, idx) => {
+                      const editFotoUrl = resolvePosyanduFotoUrl(foto);
+                      return (
                       <div
                         key={foto.id || idx}
                         className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-50 flex items-center justify-center shadow-2xs"
                       >
-                        {foto.url && foto.url.length > 20 ? (
+                        {editFotoUrl.length > 20 ? (
                           <img
-                            src={foto.url}
+                            src={editFotoUrl}
                             alt={foto.name || `Foto ${idx + 1}`}
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -1204,7 +1304,8 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
                           {foto.name || `Foto ${idx + 1}`}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

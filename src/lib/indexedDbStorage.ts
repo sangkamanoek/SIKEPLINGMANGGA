@@ -1,4 +1,4 @@
-import { LaporanHarianItem, SuratKedinasanItem, PosyanduReport } from '../types';
+import { LaporanHarianItem, SuratKedinasanItem, PosyanduReport, LaporanKegiatanPkk, FotoDokumentasi } from '../types';
 import { SpptPbbItem } from '../data/pbbSampleData';
 
 const DB_NAME = 'sikepling_offline_db';
@@ -437,8 +437,34 @@ export async function deleteSuratFromIndexedDB(id: string): Promise<boolean> {
   }
 }
 
+function mergeMediaArrayPreservingUrls(
+  incomingList: FotoDokumentasi[] | undefined,
+  existingList: FotoDokumentasi[] | undefined
+): FotoDokumentasi[] | undefined {
+  if (!Array.isArray(incomingList)) return existingList;
+  if (!Array.isArray(existingList) || existingList.length === 0) return incomingList;
+
+  return incomingList.map((inc, idx) => {
+    if (inc && typeof inc.url === 'string' && inc.url.length > 20) {
+      return inc;
+    }
+    const match =
+      (inc?.id ? existingList.find((ex) => ex && ex.id === inc.id && ex.url && ex.url.length > 20) : undefined) ||
+      (inc?.name
+        ? existingList.find((ex, exIdx) => ex && ex.name === inc.name && (exIdx === idx || existingList.length === incomingList.length) && ex.url && ex.url.length > 20)
+        : undefined) ||
+      (existingList[idx] && existingList[idx].url && existingList[idx].url.length > 20 ? existingList[idx] : undefined);
+
+    if (match && match.url) {
+      return { ...inc, url: match.url };
+    }
+    return inc;
+  });
+}
+
 /**
  * Save all Posyandu reports to IndexedDB (No 5MB quota limitation)
+ * Safely preserves existing non-empty photo URLs if incoming items were stripped for LocalStorage.
  */
 export async function savePosyanduToIndexedDB(data: PosyanduReport[]): Promise<boolean> {
   if (!Array.isArray(data)) return false;
@@ -447,15 +473,30 @@ export async function savePosyanduToIndexedDB(data: PosyanduReport[]): Promise<b
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_POSYANDU, 'readwrite');
       const store = tx.objectStore(STORE_POSYANDU);
+      const getReq = store.getAll();
 
-      store.clear();
-      if (data.length > 0) {
-        data.forEach((item) => {
-          if (item && item.id) {
-            store.put(item);
-          }
+      getReq.onsuccess = () => {
+        const existingMap = new Map<string, PosyanduReport>();
+        const existingRows = Array.isArray(getReq.result) ? (getReq.result as PosyanduReport[]) : [];
+        existingRows.forEach((row) => {
+          if (row && row.id) existingMap.set(row.id, row);
         });
-      }
+
+        store.clear();
+        if (data.length > 0) {
+          data.forEach((item) => {
+            if (item && item.id) {
+              const prev = existingMap.get(item.id);
+              const mergedFotos = mergeMediaArrayPreservingUrls(item.dokumentasiFoto, prev?.dokumentasiFoto);
+              store.put(
+                mergedFotos !== undefined
+                  ? { ...item, dokumentasiFoto: mergedFotos }
+                  : item
+              );
+            }
+          });
+        }
+      };
 
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
@@ -533,6 +574,112 @@ export async function deletePosyanduFromIndexedDB(id: string): Promise<boolean> 
     });
   } catch (err) {
     console.warn('[IndexedDB] Error deleting posyandu item from IndexedDB:', err);
+    return false;
+  }
+}
+
+/**
+ * Save all PKK Kegiatan reports to IndexedDB (preserves existing non-empty photo URLs)
+ */
+export async function savePkkKegiatanToIndexedDB(data: LaporanKegiatanPkk[]): Promise<boolean> {
+  if (!Array.isArray(data)) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PKK_KEGIATAN, 'readwrite');
+      const store = tx.objectStore(STORE_PKK_KEGIATAN);
+      const getReq = store.getAll();
+
+      getReq.onsuccess = () => {
+        const existingMap = new Map<string, LaporanKegiatanPkk>();
+        const existingRows = Array.isArray(getReq.result) ? (getReq.result as LaporanKegiatanPkk[]) : [];
+        existingRows.forEach((row) => {
+          if (row && row.id) existingMap.set(row.id, row);
+        });
+
+        store.clear();
+        if (data.length > 0) {
+          data.forEach((item) => {
+            if (item && item.id) {
+              const prev = existingMap.get(item.id);
+              const mergedFotos = mergeMediaArrayPreservingUrls(item.fotoDokumentasi, prev?.fotoDokumentasi);
+              store.put(
+                mergedFotos !== undefined
+                  ? { ...item, fotoDokumentasi: mergedFotos }
+                  : item
+              );
+            }
+          });
+        }
+      };
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error saving pkk kegiatan data:', err);
+    return false;
+  }
+}
+
+export async function getPkkKegiatanFromIndexedDB(): Promise<LaporanKegiatanPkk[] | null> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PKK_KEGIATAN, 'readonly');
+      const store = tx.objectStore(STORE_PKK_KEGIATAN);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const result = request.result;
+        if (Array.isArray(result) && result.length > 0) {
+          resolve(result as LaporanKegiatanPkk[]);
+        } else {
+          resolve(null);
+        }
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error getting pkk kegiatan data:', err);
+    return null;
+  }
+}
+
+export async function saveSinglePkkKegiatanToIndexedDB(item: LaporanKegiatanPkk): Promise<boolean> {
+  if (!item || !item.id) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PKK_KEGIATAN, 'readwrite');
+      const store = tx.objectStore(STORE_PKK_KEGIATAN);
+      store.put(item);
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error saving single pkk kegiatan item:', err);
+    return false;
+  }
+}
+
+export async function deletePkkKegiatanFromIndexedDB(id: string): Promise<boolean> {
+  if (!id) return false;
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PKK_KEGIATAN, 'readwrite');
+      const store = tx.objectStore(STORE_PKK_KEGIATAN);
+      store.delete(id);
+
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[IndexedDB] Error deleting pkk kegiatan item from IndexedDB:', err);
     return false;
   }
 }

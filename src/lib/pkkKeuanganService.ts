@@ -3,8 +3,8 @@ import { db } from './firebase';
 import { cleanFirestoreData } from './firestoreService';
 import {
   collection,
-  query,
-  orderBy,
+  getDocs,
+  getDocsFromServer,
   onSnapshot,
   setDoc,
   deleteDoc,
@@ -38,24 +38,83 @@ export const getLocalTransaksiPkk = (): TransaksiKeuanganPkk[] => {
   return safeGetLocalStorage<TransaksiKeuanganPkk[]>(KEUANGAN_STORAGE_KEY, []);
 };
 
+function sortKeuanganDesc(items: TransaksiKeuanganPkk[]): TransaksiKeuanganPkk[] {
+  return [...items].sort((a, b) =>
+    (b.tanggal || b.createdAt || '').localeCompare(a.tanggal || a.createdAt || '')
+  );
+}
+
+export const fetchPkkKeuanganFromFirestore = async (): Promise<TransaksiKeuanganPkk[]> => {
+  if (!db) return getLocalTransaksiPkk();
+  try {
+    const colRef = collection(db, KEUANGAN_COLLECTION);
+    let snap;
+    try {
+      snap = await getDocsFromServer(colRef);
+    } catch {
+      snap = await getDocs(colRef);
+    }
+    const items: TransaksiKeuanganPkk[] = [];
+    snap.forEach((d) => {
+      const data = d.data() as TransaksiKeuanganPkk;
+      items.push({ ...data, id: d.id });
+    });
+    const sorted = sortKeuanganDesc(items);
+    if (sorted.length > 0 || !snap.metadata.fromCache) {
+      safeSetLocalStorage(KEUANGAN_STORAGE_KEY, JSON.stringify(sorted));
+      return sorted;
+    }
+  } catch (err) {
+    console.warn('[pkkKeuanganService] fetch error:', err);
+  }
+  return getLocalTransaksiPkk();
+};
+
 export const subscribePkkKeuangan = (
   onUpdate: (items: TransaksiKeuanganPkk[]) => void
 ): (() => void) => {
   const stored = getLocalTransaksiPkk();
   onUpdate(stored);
 
+  let isActive = true;
+  let receivedServerSnapshot = false;
   let unsub: Unsubscribe | undefined;
+
   try {
     if (db) {
-      const q = query(collection(db, KEUANGAN_COLLECTION), orderBy('tanggal', 'desc'));
-      unsub = onSnapshot(q, (snap) => {
-        const items: TransaksiKeuanganPkk[] = [];
-        snap.forEach((d) => {
-          const data = d.data() as TransaksiKeuanganPkk;
-          items.push({ ...data, id: d.id });
-        });
-        safeSetLocalStorage(KEUANGAN_STORAGE_KEY, JSON.stringify(items));
-        onUpdate(items);
+      const colRef = collection(db, KEUANGAN_COLLECTION);
+      unsub = onSnapshot(
+        colRef,
+        (snap) => {
+          if (!isActive) return;
+          const items: TransaksiKeuanganPkk[] = [];
+          snap.forEach((d) => {
+            const data = d.data() as TransaksiKeuanganPkk;
+            items.push({ ...data, id: d.id });
+          });
+          const sorted = sortKeuanganDesc(items);
+
+          if (!snap.metadata.fromCache) {
+            receivedServerSnapshot = true;
+            safeSetLocalStorage(KEUANGAN_STORAGE_KEY, JSON.stringify(sorted));
+            onUpdate(sorted);
+          } else if (sorted.length > 0 && !receivedServerSnapshot) {
+            safeSetLocalStorage(KEUANGAN_STORAGE_KEY, JSON.stringify(sorted));
+            onUpdate(sorted);
+          }
+        },
+        (err) => {
+          console.warn('[pkkKeuanganService] Subscription error:', err);
+          fetchPkkKeuanganFromFirestore().then((items) => {
+            if (isActive) onUpdate(items);
+          });
+        }
+      );
+
+      fetchPkkKeuanganFromFirestore().then((items) => {
+        if (isActive && !receivedServerSnapshot && items.length > 0) {
+          onUpdate(items);
+        }
       });
     }
   } catch (e) {}
@@ -65,12 +124,13 @@ export const subscribePkkKeuangan = (
     if (typeof BroadcastChannel !== 'undefined') {
       bc = new BroadcastChannel(KEUANGAN_CHANNEL);
       bc.onmessage = (e) => {
-        if (e.data && e.data.items) onUpdate(e.data.items);
+        if (isActive && e.data && e.data.items) onUpdate(e.data.items);
       };
     }
   } catch (e) {}
 
   return () => {
+    isActive = false;
     if (unsub) unsub();
     if (bc) bc.close();
   };
@@ -108,7 +168,7 @@ export const deleteTransaksiPkk = async (id: string) => {
 };
 
 export const subscribeTransaksiPkk = subscribePkkKeuangan;
-export const fetchPkkKeuanganFromServer = async (): Promise<TransaksiKeuanganPkk[]> => getLocalTransaksiPkk();
+export const fetchPkkKeuanganFromServer = fetchPkkKeuanganFromFirestore;
 export const fetchPkkKegiatanFromServer = async (): Promise<any[]> => [];
 export const clearPkkKeuanganData = async (): Promise<void> => {
   safeSetLocalStorage(KEUANGAN_STORAGE_KEY, JSON.stringify([]));

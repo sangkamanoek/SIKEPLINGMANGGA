@@ -108,15 +108,17 @@ export const resetAllReportsInFirestore = async (): Promise<boolean> => {
 
 export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
   if (!db) {
-    cb([]);
     return () => {};
   }
   const collectionsToWatch = ['reports', 'laporan_harian', 'SIKEPLINGMANGGA'];
   const collectionsData: Record<string, any[]> = {};
   const unsubs: (() => void)[] = [];
   let debounceTimer: any = null;
+  let isActive = true;
+  let hasReceivedServerData = false;
 
   const emitMerged = () => {
+    if (!isActive) return;
     const map = new Map<string, any>();
     for (const colName of collectionsToWatch) {
       const list = collectionsData[colName] || [];
@@ -124,12 +126,21 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
         if (item && item.id) {
           const existing = map.get(item.id);
           if (existing) {
-            // Smart merge: favor the one with more photos or valid URLs
-            const hasPhotos = (it: any) => it.dokumentasiFoto && Array.isArray(it.dokumentasiFoto) && it.dokumentasiFoto.some((f: any) => f.url);
-            if (!hasPhotos(item) && hasPhotos(existing)) {
-               map.set(item.id, { ...item, ...existing });
+            const hasPhotos = (it: any) =>
+              it.dokumentasiFoto &&
+              Array.isArray(it.dokumentasiFoto) &&
+              it.dokumentasiFoto.some((f: any) => f.url);
+            const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+            const itemTime = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
+            if (existingTime > itemTime) {
+              const mergedPhotos = hasPhotos(existing)
+                ? existing.dokumentasiFoto
+                : item.dokumentasiFoto;
+              map.set(item.id, { ...item, ...existing, ...(mergedPhotos ? { dokumentasiFoto: mergedPhotos } : {}) });
+            } else if (!hasPhotos(item) && hasPhotos(existing)) {
+              map.set(item.id, { ...existing, ...item, dokumentasiFoto: existing.dokumentasiFoto });
             } else {
-               map.set(item.id, { ...existing, ...item });
+              map.set(item.id, { ...existing, ...item });
             }
           } else {
             map.set(item.id, item);
@@ -137,9 +148,12 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
         }
       });
     }
+    if (map.size === 0 && !hasReceivedServerData) {
+      return;
+    }
     const merged = Array.from(map.values()).sort((a, b) => {
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.tanggal ? new Date(a.tanggal).getTime() : 0);
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.tanggal ? new Date(b.tanggal).getTime() : 0);
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : a.tanggal ? new Date(a.tanggal).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : b.tanggal ? new Date(b.tanggal).getTime() : 0;
       return timeB - timeA;
     });
     cb(merged);
@@ -166,13 +180,22 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
                 items.push({ ...d, id: docSnap.id });
               }
             });
-            collectionsData[colName] = items;
-            triggerDebouncedEmit();
+            if (!snapshot.metadata.fromCache) {
+              hasReceivedServerData = true;
+            }
+            if (items.length > 0 || !snapshot.metadata.fromCache) {
+              collectionsData[colName] = items;
+              triggerDebouncedEmit();
+            }
           },
           (err) => {
             console.warn(`subscribeReportsFromFirestore (${colName}) error:`, err);
-            collectionsData[colName] = [];
-            triggerDebouncedEmit();
+            fetchReportsFromFirestore().then((fallbackList) => {
+              if (isActive && fallbackList.length > 0) {
+                hasReceivedServerData = true;
+                cb(fallbackList);
+              }
+            });
           }
         );
         unsubs.push(unsub);
@@ -181,12 +204,20 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
       }
     }
 
+    // Parallel getDocs check to guarantee data loads on cold start / restricted iframes
+    fetchReportsFromFirestore().then((fallbackList) => {
+      if (isActive && !hasReceivedServerData && fallbackList.length > 0) {
+        hasReceivedServerData = true;
+        cb(fallbackList);
+      }
+    });
+
     return () => {
+      isActive = false;
       if (debounceTimer) clearTimeout(debounceTimer);
       unsubs.forEach((u) => u());
     };
   } catch (e) {
-    cb([]);
     return () => {};
   }
 };
@@ -246,23 +277,44 @@ export const resetTargetsInFirestore = async () => {
 
 export const subscribeTargetsFromFirestore = (cb: (data: any) => void) => {
   if (!db) {
-    cb({});
     return () => {};
   }
+  let isActive = true;
+  let hasReceivedData = false;
   try {
     const q = query(collection(db, 'targets_capaian'));
-    return onSnapshot(q, (snapshot) => {
+    const unsub = onSnapshot(q, (snapshot) => {
       const map: any = {};
       snapshot.forEach((docSnap) => {
         map[docSnap.id] = { ...docSnap.data(), keplingId: docSnap.id };
       });
-      cb(map);
+      if (Object.keys(map).length > 0 || !snapshot.metadata.fromCache) {
+        hasReceivedData = true;
+        cb(map);
+      }
     }, (err) => {
       console.warn('subscribeTargetsFromFirestore error:', err);
-      cb({});
+      fetchTargetsFromFirestore().then((fallback) => {
+        if (isActive && fallback && Object.keys(fallback).length > 0) {
+          hasReceivedData = true;
+          cb(fallback);
+        }
+      });
     });
+
+    // Proactive getDocs fallback on cold start / restricted iframe
+    fetchTargetsFromFirestore().then((fallback) => {
+      if (isActive && !hasReceivedData && fallback && Object.keys(fallback).length > 0) {
+        hasReceivedData = true;
+        cb(fallback);
+      }
+    });
+
+    return () => {
+      isActive = false;
+      unsub();
+    };
   } catch (e) {
-    cb({});
     return () => {};
   }
 };

@@ -11,6 +11,7 @@ import {
   saveHistoryToIndexedDB,
   saveSuratToIndexedDB,
   savePosyanduToIndexedDB,
+  savePkkKegiatanToIndexedDB,
 } from './indexedDbStorage';
 
 // Bounded memory cache (max 2MB total) to avoid memory leaks on 1GB/2GB RAM mobile devices
@@ -23,6 +24,7 @@ let idbVisitsTimeout: any = null;
 let idbHistoryTimeout: any = null;
 let idbSuratTimeout: any = null;
 let idbPosyanduTimeout: any = null;
+let idbPkkKegiatanTimeout: any = null;
 
 /**
  * Clean & sanitize text input to prevent malicious injections (XSS / SQLi / Corrupt characters)
@@ -88,7 +90,14 @@ function stripHeavyMediaFromItem(item: any): any {
   if (copy.fotoSebelumUrl) copy.fotoSebelumUrl = stripHeavyStr(copy.fotoSebelumUrl);
   if (copy.fotoProsesUrl) copy.fotoProsesUrl = stripHeavyStr(copy.fotoProsesUrl);
   if (copy.fotoSelesaiUrl) copy.fotoSelesaiUrl = stripHeavyStr(copy.fotoSelesaiUrl);
-  if (copy.fotoDokumentasi) copy.fotoDokumentasi = stripHeavyStr(copy.fotoDokumentasi);
+  if (Array.isArray(copy.fotoDokumentasi)) {
+    copy.fotoDokumentasi = copy.fotoDokumentasi.map((f: any) => {
+      if (!f) return f;
+      return { ...f, url: stripHeavyStr(f.url) };
+    });
+  } else if (copy.fotoDokumentasi) {
+    copy.fotoDokumentasi = stripHeavyStr(copy.fotoDokumentasi);
+  }
   if (copy.fotoKkUrl) copy.fotoKkUrl = stripHeavyStr(copy.fotoKkUrl);
   if (copy.fotoRumahUrl) copy.fotoRumahUrl = stripHeavyStr(copy.fotoRumahUrl);
   if (copy.fileUrl) copy.fileUrl = stripHeavyStr(copy.fileUrl);
@@ -184,6 +193,18 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
       }, 500);
     }
 
+    if (key.includes('pkk_kegiatan')) {
+      if (idbPkkKegiatanTimeout) clearTimeout(idbPkkKegiatanTimeout);
+      idbPkkKegiatanTimeout = setTimeout(() => {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            savePkkKegiatanToIndexedDB(parsed).catch(() => {});
+          }
+        } catch {}
+      }, 500);
+    }
+
     // Optimized Storage Strategy for Mobile:
     // If payload contains heavy media strings (e.g. photos/base64), strip heavy media
     // for ultra-fast 0ms synchronous LocalStorage hydration, while preserving full raw data in IndexedDB.
@@ -256,6 +277,8 @@ export function safeSetLocalStorage(key: string, value: string): boolean {
             saveSuratToIndexedDB(parsed).catch(() => {});
           } else if (key.includes('posyandu')) {
             savePosyanduToIndexedDB(parsed).catch(() => {});
+          } else if (key.includes('pkk_kegiatan')) {
+            savePkkKegiatanToIndexedDB(parsed).catch(() => {});
           }
 
           const lightweight = parsed.map(stripHeavyMediaFromItem);
@@ -354,6 +377,7 @@ export function optimizeAndCleanBrowserMemory(): { freedKeys: number; freedAppro
         k === 'sikepling_pkk_buku_5_v1' ||
         k === 'sikepling_pkk_kegiatan_v1' ||
         k === 'sikepling_pkk_keuangan_v1' ||
+        k === 'sikepling_pkk_dasa_wisma_v1' ||
         k === 'sikepling_pkk_dasa_wisma_v2' ||
         k === 'sikepling_sppt_pbb_records_2026_v3';
 

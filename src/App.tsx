@@ -235,14 +235,27 @@ export default function App() {
     }).catch(() => {});
 
     // Use real-time subscription for reports with non-blocking IndexedDB and LocalStorage persistence
+    let gotLiveReports = false;
     const unsub = subscribeReportsFromFirestore((fetched) => {
       if (Array.isArray(fetched)) {
+        gotLiveReports = true;
         const unified = consolidateAllReports(fetched);
         setReports(unified);
         safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(unified));
         saveReportsToIndexedDB(unified).catch(() => {});
       }
     });
+
+    fetchAllReports()
+      .then((fetched) => {
+        if (!gotLiveReports && Array.isArray(fetched) && fetched.length > 0) {
+          const unified = consolidateAllReports(fetched);
+          setReports(unified);
+          safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(unified));
+          saveReportsToIndexedDB(unified).catch(() => {});
+        }
+      })
+      .catch(() => {});
 
     // Use real-time subscription for kunjungan with non-blocking IndexedDB persistence
     const unsubKunjungan = subscribeKunjungan((fetched) => {
@@ -252,10 +265,10 @@ export default function App() {
       }
     });
 
-    // Use real-time subscription for targets
+    // Use real-time subscription for targets (merge defaults for any missing keys)
     const unsubTargets = subscribeTargetsFromFirestore((map) => {
       if (map && Object.keys(map).length > 0) {
-        setTargetsMap(map);
+        setTargetsMap({ ...getDefaultTargetsCapaianMap(), ...map });
       }
     });
     

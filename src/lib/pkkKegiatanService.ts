@@ -1,10 +1,12 @@
-import { LaporanKegiatanPkk, PokjaPkkType } from '../types';
-import { db } from './firebase';
+import { FotoDokumentasi, LaporanKegiatanPkk, PokjaPkkType } from '../types';
+import { db, getAccessToken } from './firebase';
 import { cleanFirestoreData } from './firestoreService';
 import {
   collection,
-  query,
-  orderBy,
+  getDocs,
+  getDocsFromServer,
+  getDoc,
+  getDocFromServer,
   onSnapshot,
   setDoc,
   deleteDoc,
@@ -13,9 +15,14 @@ import {
 } from 'firebase/firestore';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import * as XLSX from 'xlsx';
-
-import { getAccessToken } from './firebase';
 import { syncPkkPhotosToDrive } from './driveSync';
+import { ensureCompactDataUrl } from './imageCompressor';
+import {
+  savePkkKegiatanToIndexedDB,
+  getPkkKegiatanFromIndexedDB,
+  saveSinglePkkKegiatanToIndexedDB,
+  deletePkkKegiatanFromIndexedDB,
+} from './indexedDbStorage';
 
 export const PKK_KEGIATAN_COLLECTION = 'pkk_kegiatan';
 export const PKK_KEGIATAN_STORAGE_KEY = 'sikepling_pkk_kegiatan_v1';
@@ -31,11 +38,73 @@ export const POKJA_LABELS: Record<PokjaPkkType, string> = {
   PKK_LINGKUNGAN: 'TP PKK Lingkungan',
 };
 
-// Initial Seed Kegiatan PKK Kelurahan Mangga TA 2026 (Dikosongkan agar bersih)
 const INITIAL_PKK_KEGIATAN: LaporanKegiatanPkk[] = [];
 
 let memoryKegiatan: LaporanKegiatanPkk[] = [];
 let deletedPkkIdsCache: string[] = safeGetLocalStorage<string[]>(PKK_DELETED_STORAGE_KEY, []);
+
+const extractFotoUrl = (f: any): string => {
+  if (!f || typeof f !== 'object') return '';
+  return String(f.url || f.src || f.dataUrl || f.base64 || '');
+};
+
+export const hasMissingKegiatanPhotoUrls = (item?: LaporanKegiatanPkk | null): boolean => {
+  if (!item || !Array.isArray(item.fotoDokumentasi) || item.fotoDokumentasi.length === 0) {
+    return false;
+  }
+  return item.fotoDokumentasi.some((f) => extractFotoUrl(f).length <= 20);
+};
+
+function mergeFotoArrays(
+  primaryFotos: FotoDokumentasi[] | undefined,
+  fallbackFotos: FotoDokumentasi[] | undefined
+): FotoDokumentasi[] | undefined {
+  if (!Array.isArray(primaryFotos)) return fallbackFotos;
+  if (!Array.isArray(fallbackFotos) || fallbackFotos.length === 0) {
+    return primaryFotos.map((f) => {
+      const url = extractFotoUrl(f);
+      return url && url !== f.url ? { ...f, url } : f;
+    });
+  }
+  return primaryFotos.map((pf, idx) => {
+    const primaryUrl = extractFotoUrl(pf);
+    if (primaryUrl.length > 20) {
+      return primaryUrl !== pf.url ? { ...pf, url: primaryUrl } : pf;
+    }
+    const match =
+      (pf?.id
+        ? fallbackFotos.find((fb) => fb && fb.id === pf.id && extractFotoUrl(fb).length > 20)
+        : undefined) ||
+      (pf?.name
+        ? fallbackFotos.find(
+            (fb, fbIdx) =>
+              fb &&
+              fb.name === pf.name &&
+              (fbIdx === idx || fallbackFotos.length === primaryFotos.length) &&
+              extractFotoUrl(fb).length > 20
+          )
+        : undefined) ||
+      (fallbackFotos[idx] && extractFotoUrl(fallbackFotos[idx]).length > 20
+        ? fallbackFotos[idx]
+        : undefined);
+    return match ? { ...pf, url: extractFotoUrl(match) } : pf;
+  });
+}
+
+function mergeKegiatanPhotos(
+  primary: LaporanKegiatanPkk,
+  fallback?: LaporanKegiatanPkk
+): LaporanKegiatanPkk {
+  if (!fallback) {
+    if (!Array.isArray(primary.fotoDokumentasi)) return primary;
+    return { ...primary, fotoDokumentasi: mergeFotoArrays(primary.fotoDokumentasi, undefined) };
+  }
+  const mergedFotos = mergeFotoArrays(primary.fotoDokumentasi, fallback.fotoDokumentasi);
+  return {
+    ...primary,
+    ...(mergedFotos !== undefined ? { fotoDokumentasi: mergedFotos } : {}),
+  };
+}
 
 export const getDeletedPkkIds = (): string[] => {
   if (!Array.isArray(deletedPkkIdsCache)) deletedPkkIdsCache = [];
@@ -54,8 +123,15 @@ export const markPkkDeleted = (id: string): void => {
 export const getLocalPkkKegiatanList = (): LaporanKegiatanPkk[] => {
   const deletedSet = new Set(getDeletedPkkIds());
   const stored = safeGetLocalStorage<LaporanKegiatanPkk[]>(PKK_KEGIATAN_STORAGE_KEY, []);
+  const memMap = new Map<string, LaporanKegiatanPkk>();
+  memoryKegiatan.forEach((m) => {
+    if (m && m.id) memMap.set(m.id, m);
+  });
+
   if (stored && Array.isArray(stored) && stored.length > 0) {
-    const cleaned = stored.filter((x) => x && x.id && !deletedSet.has(x.id));
+    const cleaned = stored
+      .filter((x) => x && x.id && !deletedSet.has(x.id))
+      .map((x) => mergeKegiatanPhotos(x, memMap.get(x.id)));
     memoryKegiatan = cleaned;
     return cleaned;
   }
@@ -69,6 +145,7 @@ export const getLocalPkkKegiatanList = (): LaporanKegiatanPkk[] => {
 
 export const setLocalPkkKegiatanList = (items: LaporanKegiatanPkk[]): void => {
   memoryKegiatan = items;
+  savePkkKegiatanToIndexedDB(items).catch(() => {});
   safeSetLocalStorage(PKK_KEGIATAN_STORAGE_KEY, JSON.stringify(items));
   try {
     if (typeof BroadcastChannel !== 'undefined') {
@@ -76,10 +153,17 @@ export const setLocalPkkKegiatanList = (items: LaporanKegiatanPkk[]): void => {
       bc.postMessage({ type: 'SYNC_KEGIATAN', items });
       bc.close();
     }
-  } catch (e) {
-    // Ignore BroadcastChannel errors
-  }
+  } catch {}
 };
+
+function sortPkkKegiatanDesc(items: LaporanKegiatanPkk[]): LaporanKegiatanPkk[] {
+  return [...items].sort((a, b) => {
+    const dateA = a.tanggal || a.createdAt || '';
+    const dateB = b.tanggal || b.createdAt || '';
+    if (dateB !== dateA) return dateB.localeCompare(dateA);
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
+  });
+}
 
 export const smartMergePkkKegiatan = (
   local: LaporanKegiatanPkk[],
@@ -91,14 +175,121 @@ export const smartMergePkkKegiatan = (
     if (item && item.id && !deletedSet.has(item.id)) map.set(item.id, item);
   }
   for (const item of remote) {
-    if (item && item.id && !deletedSet.has(item.id)) map.set(item.id, item);
+    if (item && item.id && !deletedSet.has(item.id)) {
+      const prev = map.get(item.id);
+      map.set(item.id, mergeKegiatanPhotos(item, prev));
+    }
   }
-  return Array.from(map.values()).sort((a, b) => {
-    const dateA = a.tanggal || a.createdAt || '';
-    const dateB = b.tanggal || b.createdAt || '';
-    if (dateB !== dateA) return dateB.localeCompare(dateA);
-    return (b.createdAt || '').localeCompare(a.createdAt || '');
+  return sortPkkKegiatanDesc(Array.from(map.values()));
+};
+
+function resolveAuthoritativeKegiatan(
+  serverItems: LaporanKegiatanPkk[],
+  photoPool: LaporanKegiatanPkk[]
+): LaporanKegiatanPkk[] {
+  const deletedSet = new Set(getDeletedPkkIds());
+  const poolMap = new Map<string, LaporanKegiatanPkk>();
+  photoPool.forEach((it) => {
+    if (!it || !it.id) return;
+    const prev = poolMap.get(it.id);
+    poolMap.set(it.id, prev ? mergeKegiatanPhotos(it, prev) : it);
   });
+
+  const resolved = serverItems
+    .filter((it) => it && it.id && !deletedSet.has(it.id))
+    .map((it) => mergeKegiatanPhotos(it, poolMap.get(it.id)));
+
+  return sortPkkKegiatanDesc(resolved);
+}
+
+export const fetchPkkKegiatanFromFirestore = async (): Promise<LaporanKegiatanPkk[]> => {
+  let idbList: LaporanKegiatanPkk[] = [];
+  try {
+    const idb = await getPkkKegiatanFromIndexedDB();
+    if (Array.isArray(idb)) idbList = idb;
+  } catch {}
+
+  const local = resolveAuthoritativeKegiatan(
+    idbList.length > 0 ? idbList : getLocalPkkKegiatanList(),
+    [...idbList, ...memoryKegiatan, ...getLocalPkkKegiatanList()]
+  );
+
+  if (!db) return local;
+  try {
+    const colRef = collection(db, PKK_KEGIATAN_COLLECTION);
+    let snapshot;
+    try {
+      snapshot = await getDocsFromServer(colRef);
+    } catch {
+      snapshot = await getDocs(colRef);
+    }
+    const deletedSet = new Set(getDeletedPkkIds());
+    const remote: LaporanKegiatanPkk[] = [];
+    snapshot.forEach((docSnap) => {
+      const d = docSnap.data();
+      if (d && !deletedSet.has(docSnap.id)) {
+        remote.push({ ...(d as LaporanKegiatanPkk), id: docSnap.id });
+      }
+    });
+    if (remote.length > 0 || !snapshot.metadata.fromCache) {
+      const resolved = resolveAuthoritativeKegiatan(remote, [
+        ...idbList,
+        ...memoryKegiatan,
+        ...local,
+      ]);
+      setLocalPkkKegiatanList(resolved);
+      return resolved;
+    }
+  } catch (err) {
+    console.warn('[PKK Kegiatan fetch error]:', err);
+  }
+  return local;
+};
+
+export const fetchSinglePkkKegiatan = async (
+  id: string,
+  forceServer = false
+): Promise<LaporanKegiatanPkk | null> => {
+  if (!id) return null;
+  const local = getLocalPkkKegiatanList();
+  let best = local.find((x) => x.id === id);
+
+  if (!forceServer && best && !hasMissingKegiatanPhotoUrls(best)) {
+    return best;
+  }
+
+  try {
+    const idbList = await getPkkKegiatanFromIndexedDB();
+    const idbFound = idbList?.find((x) => x.id === id);
+    if (idbFound) {
+      best = best ? mergeKegiatanPhotos(best, idbFound) : idbFound;
+      if (!forceServer && !hasMissingKegiatanPhotoUrls(best)) {
+        return best;
+      }
+    }
+  } catch {}
+
+  if (db) {
+    try {
+      const docRef = doc(db, PKK_KEGIATAN_COLLECTION, id);
+      let snap;
+      try {
+        snap = await getDocFromServer(docRef);
+      } catch {
+        snap = await getDoc(docRef);
+      }
+      if (snap.exists()) {
+        const remote = { ...(snap.data() as LaporanKegiatanPkk), id: snap.id };
+        const resolved = mergeKegiatanPhotos(remote, best);
+        await saveSinglePkkKegiatanToIndexedDB(resolved).catch(() => {});
+        const updated = [resolved, ...local.filter((x) => x.id !== id)];
+        setLocalPkkKegiatanList(sortPkkKegiatanDesc(updated));
+        return resolved;
+      }
+    } catch {}
+  }
+
+  return best || null;
 };
 
 export const subscribePkkKegiatan = (
@@ -107,22 +298,40 @@ export const subscribePkkKegiatan = (
   const initial = getLocalPkkKegiatanList();
   callback(initial);
 
+  let isActive = true;
+  let receivedServerSnapshot = false;
+
+  // Always hydrate from IndexedDB to restore photos even when localStorage stripped them
+  getPkkKegiatanFromIndexedDB()
+    .then((idbItems) => {
+      if (!isActive || !Array.isArray(idbItems) || idbItems.length === 0) return;
+      const hydrated = resolveAuthoritativeKegiatan(
+        initial.length > 0 ? initial : idbItems,
+        [...idbItems, ...memoryKegiatan]
+      );
+      memoryKegiatan = hydrated;
+      if (!receivedServerSnapshot) {
+        callback(hydrated);
+      }
+    })
+    .catch(() => {});
+
   let bc: BroadcastChannel | null = null;
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       bc = new BroadcastChannel(PKK_KEGIATAN_CHANNEL);
       bc.onmessage = (ev) => {
-        if (ev.data?.items && Array.isArray(ev.data.items)) {
+        if (isActive && ev.data?.items && Array.isArray(ev.data.items)) {
           const deletedSet = new Set(getDeletedPkkIds());
-          const cleaned = ev.data.items.filter((x: LaporanKegiatanPkk) => x && x.id && !deletedSet.has(x.id));
+          const cleaned = ev.data.items.filter(
+            (x: LaporanKegiatanPkk) => x && x.id && !deletedSet.has(x.id)
+          );
           memoryKegiatan = cleaned;
           callback(cleaned);
         }
       };
     }
-  } catch (e) {
-    // Ignore BroadcastChannel error
-  }
+  } catch {}
 
   let firestoreUnsub: Unsubscribe = () => {};
   if (db) {
@@ -130,7 +339,8 @@ export const subscribePkkKegiatan = (
       const colRef = collection(db, PKK_KEGIATAN_COLLECTION);
       firestoreUnsub = onSnapshot(
         colRef,
-        (snapshot) => {
+        async (snapshot) => {
+          if (!isActive) return;
           const deletedSet = new Set(getDeletedPkkIds());
           const remote: LaporanKegiatanPkk[] = [];
           snapshot.forEach((docSnap) => {
@@ -143,76 +353,55 @@ export const subscribePkkKegiatan = (
             }
           });
 
-          const local = getLocalPkkKegiatanList();
-          const merged = smartMergePkkKegiatan(local, remote);
-          setLocalPkkKegiatanList(merged);
-          callback(merged);
+          let idbList: LaporanKegiatanPkk[] = [];
+          try {
+            const idb = await getPkkKegiatanFromIndexedDB();
+            if (Array.isArray(idb)) idbList = idb;
+          } catch {}
 
-          // Auto-sync local items that are missing in remote ONLY if they are NOT deleted
-          if (remote.length < merged.length) {
-            const remoteIds = new Set(remote.map((r) => r.id));
-            merged.forEach((item) => {
-              if (!remoteIds.has(item.id) && !deletedSet.has(item.id)) {
-                savePkkKegiatan(item).catch(() => {});
-              }
-            });
+          if (!snapshot.metadata.fromCache) {
+            receivedServerSnapshot = true;
+            const resolved = resolveAuthoritativeKegiatan(remote, [
+              ...idbList,
+              ...memoryKegiatan,
+              ...getLocalPkkKegiatanList(),
+            ]);
+            setLocalPkkKegiatanList(resolved);
+            callback(resolved);
+          } else if (remote.length > 0 && !receivedServerSnapshot) {
+            const local = getLocalPkkKegiatanList();
+            const merged = smartMergePkkKegiatan([...local, ...idbList], remote);
+            memoryKegiatan = merged;
+            callback(merged);
           }
         },
         (err) => {
           console.warn('[PKK Kegiatan Firestore error]:', err);
+          fetchPkkKegiatanFromFirestore().then((items) => {
+            if (isActive) callback(items);
+          });
         }
       );
+
+      fetchPkkKegiatanFromFirestore().then((items) => {
+        if (isActive && !receivedServerSnapshot && items.length > 0) {
+          callback(items);
+        }
+      });
     } catch (err) {
       console.warn('[PKK Kegiatan setup error]:', err);
     }
   }
 
   return () => {
+    isActive = false;
     if (bc) bc.close();
     firestoreUnsub();
   };
 };
 
 export const syncPkkKegiatanDirectly = async (): Promise<LaporanKegiatanPkk[]> => {
-  const local = getLocalPkkKegiatanList();
-  if (!db) return local;
-
-  try {
-    const deletedSet = new Set(getDeletedPkkIds());
-    const { getDocs } = await import('firebase/firestore');
-    const snapshot = await getDocs(collection(db, PKK_KEGIATAN_COLLECTION));
-    const remote: LaporanKegiatanPkk[] = [];
-    snapshot.forEach((docSnap) => {
-      const d = docSnap.data();
-      if (d && !deletedSet.has(docSnap.id)) {
-        remote.push({
-          ...(d as LaporanKegiatanPkk),
-          id: docSnap.id,
-        });
-      }
-    });
-
-    const merged = smartMergePkkKegiatan(local, remote);
-    setLocalPkkKegiatanList(merged);
-
-    // Push local unsynced items to Firestore ONLY if not marked deleted
-    const remoteIds = new Set(remote.map((r) => r.id));
-    for (const item of merged) {
-      if (!remoteIds.has(item.id) && !deletedSet.has(item.id)) {
-        try {
-          const cleaned = cleanFirestoreData(item);
-          await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, item.id), cleaned, { merge: true });
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-
-    return merged;
-  } catch (err) {
-    console.warn('Manual sync PKK kegiatan failed:', err);
-    return local;
-  }
+  return fetchPkkKegiatanFromFirestore();
 };
 
 export const savePkkKegiatan = async (
@@ -220,7 +409,6 @@ export const savePkkKegiatan = async (
 ): Promise<void> => {
   let itemToSave = item;
 
-  // 0. Sync to Drive if connected
   try {
     const activeToken = await getAccessToken();
     if (activeToken) {
@@ -230,12 +418,35 @@ export const savePkkKegiatan = async (
     console.warn('Drive sync for PKK failed:', err);
   }
 
-  const current = getLocalPkkKegiatanList();
-  const filtered = current.filter((x) => x.id !== itemToSave.id);
-  const updated = [itemToSave, ...filtered].sort((a, b) => {
-    if (b.tanggal !== a.tanggal) return b.tanggal.localeCompare(a.tanggal);
-    return (b.createdAt || '').localeCompare(a.createdAt || '');
-  });
+  let idbList: LaporanKegiatanPkk[] = [];
+  try {
+    const idb = await getPkkKegiatanFromIndexedDB();
+    if (Array.isArray(idb)) idbList = idb;
+  } catch {}
+
+  const currentFull = resolveAuthoritativeKegiatan(
+    idbList.length > 0 ? idbList : getLocalPkkKegiatanList(),
+    [...idbList, ...memoryKegiatan, ...getLocalPkkKegiatanList()]
+  );
+
+  // Guard total document size under 1MB
+  if (Array.isArray(itemToSave.fotoDokumentasi) && itemToSave.fotoDokumentasi.length > 0) {
+    if (JSON.stringify(itemToSave).length > 820_000) {
+      const compacted = await Promise.all(
+        itemToSave.fotoDokumentasi.map(async (f) => {
+          if (f && typeof f.url === 'string' && f.url.startsWith('data:image/')) {
+            return { ...f, url: await ensureCompactDataUrl(f.url, 520, 0.34) };
+          }
+          return f;
+        })
+      );
+      itemToSave = { ...itemToSave, fotoDokumentasi: compacted };
+    }
+  }
+
+  const filtered = currentFull.filter((x) => x.id !== itemToSave.id);
+  const updated = sortPkkKegiatanDesc([itemToSave, ...filtered]);
+  await saveSinglePkkKegiatanToIndexedDB(itemToSave).catch(() => {});
   setLocalPkkKegiatanList(updated);
 
   if (db) {
@@ -243,18 +454,22 @@ export const savePkkKegiatan = async (
       const cleaned = cleanFirestoreData(itemToSave);
       await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, itemToSave.id), cleaned, { merge: true });
     } catch (err) {
-      console.warn('[savePkkKegiatan to firestore error, attempting safe fallback]:', err);
-      try {
-        const safeItem = {
-          ...itemToSave,
-          fotoDokumentasi: itemToSave.fotoDokumentasi?.slice(0, 3),
-        };
-        const cleanedSafe = cleanFirestoreData(safeItem);
-        await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, itemToSave.id), cleanedSafe, { merge: true });
-      } catch (fallbackErr) {
-        console.error('[savePkkKegiatan fallback failed]:', fallbackErr);
-        throw fallbackErr;
-      }
+      console.warn('[savePkkKegiatan to firestore error, attempting compacted fallback]:', err);
+      const compactedFotos = Array.isArray(itemToSave.fotoDokumentasi)
+        ? await Promise.all(
+            itemToSave.fotoDokumentasi.map(async (f) =>
+              f?.url?.startsWith('data:image/')
+                ? { ...f, url: await ensureCompactDataUrl(f.url, 420, 0.28) }
+                : f
+            )
+          )
+        : undefined;
+      const safeItem = {
+        ...itemToSave,
+        ...(compactedFotos ? { fotoDokumentasi: compactedFotos } : {}),
+      };
+      const cleanedSafe = cleanFirestoreData(safeItem);
+      await setDoc(doc(db, PKK_KEGIATAN_COLLECTION, itemToSave.id), cleanedSafe, { merge: true });
     }
   }
 };
@@ -263,6 +478,7 @@ export const deletePkkKegiatan = async (id: string): Promise<void> => {
   markPkkDeleted(id);
   const current = getLocalPkkKegiatanList();
   const updated = current.filter((x) => x.id !== id);
+  await deletePkkKegiatanFromIndexedDB(id).catch(() => {});
   setLocalPkkKegiatanList(updated);
 
   if (db) {

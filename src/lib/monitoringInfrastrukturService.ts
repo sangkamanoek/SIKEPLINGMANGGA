@@ -5,6 +5,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDocsFromServer,
   setDoc,
   deleteDoc,
   onSnapshot,
@@ -112,18 +113,56 @@ export const smartMergeMonitoring = (
   });
 };
 
+export const fetchMonitoringFromFirestore = async (): Promise<LaporanMonitoringInfrastruktur[]> => {
+  const local = getLocalMonitoringList();
+  if (!db) return local;
+  try {
+    const colRef = collection(db, MONITORING_INFRA_COLLECTION);
+    let snap;
+    try {
+      snap = await getDocsFromServer(colRef);
+    } catch {
+      snap = await getDocs(colRef);
+    }
+    const deletedSet = new Set(getDeletedMonitoringIds());
+    const remote: LaporanMonitoringInfrastruktur[] = [];
+    snap.forEach((docSnap) => {
+      const d = docSnap.data();
+      if (d && !deletedSet.has(docSnap.id)) {
+        remote.push({ ...(d as LaporanMonitoringInfrastruktur), id: docSnap.id });
+      }
+    });
+    remote.sort((a, b) => {
+      const dateA = a.tanggal || a.createdAt || '';
+      const dateB = b.tanggal || b.createdAt || '';
+      if (dateB !== dateA) return dateB.localeCompare(dateA);
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+    if (remote.length > 0 || !snap.metadata.fromCache) {
+      setLocalMonitoringList(remote);
+      return remote;
+    }
+  } catch (err) {
+    console.warn('[Monitoring Infra fetch error]:', err);
+  }
+  return local;
+};
+
 export const subscribeMonitoringReports = (
   callback: (items: LaporanMonitoringInfrastruktur[]) => void
 ): Unsubscribe => {
   const initial = getLocalMonitoringList();
   callback(initial);
 
+  let isActive = true;
+  let receivedServerSnapshot = false;
+
   let bc: BroadcastChannel | null = null;
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       bc = new BroadcastChannel(MONITORING_INFRA_CHANNEL);
       bc.onmessage = (ev) => {
-        if (ev.data?.items && Array.isArray(ev.data.items)) {
+        if (isActive && ev.data?.items && Array.isArray(ev.data.items)) {
           const deletedSet = new Set(getDeletedMonitoringIds());
           const cleaned = ev.data.items.filter(
             (x: LaporanMonitoringInfrastruktur) => x && x.id && !deletedSet.has(x.id)
@@ -144,6 +183,7 @@ export const subscribeMonitoringReports = (
       firestoreUnsub = onSnapshot(
         colRef,
         (snapshot) => {
+          if (!isActive) return;
           const deletedSet = new Set(getDeletedMonitoringIds());
           const remote: LaporanMonitoringInfrastruktur[] = [];
           snapshot.forEach((docSnap) => {
@@ -156,21 +196,44 @@ export const subscribeMonitoringReports = (
             }
           });
 
-          const local = getLocalMonitoringList();
-          const merged = smartMergeMonitoring(local, remote);
-          setLocalMonitoringList(merged);
-          callback(merged);
+          remote.sort((a, b) => {
+            const dateA = a.tanggal || a.createdAt || '';
+            const dateB = b.tanggal || b.createdAt || '';
+            if (dateB !== dateA) return dateB.localeCompare(dateA);
+            return (b.createdAt || '').localeCompare(a.createdAt || '');
+          });
+
+          if (!snapshot.metadata.fromCache) {
+            receivedServerSnapshot = true;
+            setLocalMonitoringList(remote);
+            callback(remote);
+          } else if (remote.length > 0 && !receivedServerSnapshot) {
+            const local = getLocalMonitoringList();
+            const merged = smartMergeMonitoring(local, remote);
+            setLocalMonitoringList(merged);
+            callback(merged);
+          }
         },
         (err) => {
           console.warn('[Monitoring Infra Firestore error]:', err);
+          fetchMonitoringFromFirestore().then((items) => {
+            if (isActive) callback(items);
+          });
         }
       );
+
+      fetchMonitoringFromFirestore().then((items) => {
+        if (isActive && !receivedServerSnapshot && items.length > 0) {
+          callback(items);
+        }
+      });
     } catch (err) {
       console.warn('[Monitoring Infra setup error]:', err);
     }
   }
 
   return () => {
+    isActive = false;
     if (bc) bc.close();
     firestoreUnsub();
   };

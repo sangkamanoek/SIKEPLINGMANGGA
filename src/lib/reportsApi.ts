@@ -43,15 +43,15 @@ export const isReportDeleted = (r: LaporanHarianItem): boolean => {
  * Fetch all reports with instant offline fallback from HP IndexedDB & LocalStorage
  */
 export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
-  const map = new Map<string, LaporanHarianItem>();
+  const localFallbackMap = new Map<string, LaporanHarianItem>();
 
-  // 1. Fetch from HP IndexedDB & LocalStorage first for instant 0ms result
+  // 1. Read HP IndexedDB & LocalStorage as instant offline fallback / photo hydration source
   try {
     const idbReports = await getReportsFromIndexedDB();
     if (Array.isArray(idbReports)) {
       idbReports.forEach((r) => {
         if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
-          map.set(r.id, r);
+          localFallbackMap.set(r.id, r);
         }
       });
     }
@@ -62,15 +62,50 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     if (Array.isArray(localRaw)) {
       localRaw.forEach((r) => {
         if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
-          if (!map.has(r.id)) {
-            map.set(r.id, r);
+          if (!localFallbackMap.has(r.id)) {
+            localFallbackMap.set(r.id, r);
           }
         }
       });
     }
   } catch (e) {}
 
-  // 2. Fetch directly from Server API buffer (/api/reports)
+  const hasPhotos = (it?: LaporanHarianItem) =>
+    Boolean(
+      it &&
+      Array.isArray(it.dokumentasiFoto) &&
+      it.dokumentasiFoto.some((f: any) => f && f.url)
+    );
+
+  // 2. ALWAYS prioritize live Cloud Firestore ('reports', 'laporan_harian', 'SIKEPLINGMANGGA')
+  try {
+    const firestoreReports = await fetchReportsFromFirestore();
+    if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
+      const authMap = new Map<string, LaporanHarianItem>();
+      firestoreReports.forEach((r) => {
+        if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
+          const cached = localFallbackMap.get(r.id);
+          // Firestore always wins; only borrow cached photo URLs if Firestore doc omitted them
+          if (!hasPhotos(r) && hasPhotos(cached)) {
+            authMap.set(r.id, { ...r, dokumentasiFoto: cached!.dokumentasiFoto });
+          } else {
+            authMap.set(r.id, r);
+          }
+        }
+      });
+      const consolidated = consolidateAllReports(Array.from(authMap.values()));
+      consolidated.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.tanggal ? new Date(a.tanggal).getTime() : 0);
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.tanggal ? new Date(b.tanggal).getTime() : 0);
+        return timeB - timeA;
+      });
+      return consolidated;
+    }
+  } catch (err) {
+    console.warn('[Online Firestore] Error reading Firestore reports:', err);
+  }
+
+  // 3. Fallback to Server API buffer (/api/reports) only if Firestore is unavailable/empty
   try {
     const res = await fetch(`/api/reports?light=true&_t=${Date.now()}`, {
       cache: 'no-store',
@@ -85,17 +120,15 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
       if (Array.isArray(serverReports)) {
         serverReports.forEach((r: LaporanHarianItem) => {
           if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
-            const existing = map.get(r.id);
-            if (existing) {
-              // Merge: favor existing if it has more photos or better URLs
+            const existing = localFallbackMap.get(r.id);
+            if (!existing) {
+              localFallbackMap.set(r.id, r);
+            } else {
               const merged = { ...r, ...existing };
-              // Simple heuristic: if existing has photos and incoming doesn't, keep existing photos
-              if (existing.dokumentasiFoto && existing.dokumentasiFoto.length > 0 && (!r.dokumentasiFoto || r.dokumentasiFoto.length === 0)) {
+              if (hasPhotos(existing) && !hasPhotos(r)) {
                 merged.dokumentasiFoto = existing.dokumentasiFoto;
               }
-              map.set(r.id, merged);
-            } else {
-              map.set(r.id, r);
+              localFallbackMap.set(r.id, merged);
             }
           }
         });
@@ -105,22 +138,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     console.warn('[Online API] Error reading /api/reports:', e);
   }
 
-  // 3. ALWAYS fetch from Firestore ('reports' & 'laporan_harian' collections)
-  try {
-    const firestoreReports = await fetchReportsFromFirestore();
-    if (Array.isArray(firestoreReports) && firestoreReports.length > 0) {
-      firestoreReports.forEach((r) => {
-        if (r && r.id && !sessionDeletedIds.has(r.id) && !shouldFilterReport(r)) {
-          const existing = map.get(r.id);
-          map.set(r.id, existing ? { ...r, ...existing } : r);
-        }
-      });
-    }
-  } catch (err) {
-    console.warn('[Online Firestore] Error reading Firestore reports:', err);
-  }
-
-  const merged = Array.from(map.values());
+  const merged = Array.from(localFallbackMap.values());
   const consolidated = consolidateAllReports(merged);
   consolidated.sort((a, b) => {
     const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.tanggal ? new Date(a.tanggal).getTime() : 0);

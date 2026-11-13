@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDocsFromServer,
   setDoc,
   deleteDoc,
   onSnapshot,
@@ -42,35 +43,6 @@ export const TUGAS_SUBMISSIONS_COLLECTION = 'tugas_khusus_submissions';
 
 export const STORAGE_KEY_TASKS = 'sikepling_tugas_khusus_list';
 export const STORAGE_KEY_SUBMISSIONS = 'sikepling_tugas_khusus_submissions_v1';
-
-const DEFAULT_TASKS: TugasKhusus[] = [
-  {
-    id: 'tugas_default_1',
-    judul: 'Pendataan Tambahan Warga Rentan & Lansia',
-    deskripsi: 'Kepada seluruh Kepala Lingkungan agar mendata ulang warga lansia dan disabilitas di wilayah masing-masing untuk validasi data bansos.',
-    targetAccountId: 'ALL',
-    targetRole: 'kepling',
-    pemberiTugas: 'Lurah Kelurahan Mangga',
-    tanggalMulai: new Date().toISOString().split('T')[0],
-    deadline: '2026-10-31',
-    status: 'aktif',
-    createdAt: new Date().toISOString(),
-    completedBy: [],
-  },
-  {
-    id: 'tugas_pkk_default_1',
-    judul: 'Validasi & Rekapitulasi Data Dasa Wisma Lingkungan',
-    deskripsi: 'Kepada seluruh Pengurus TP-PKK Kelurahan dan PKK Lingkungan agar memastikan pencatatan data Dasa Wisma (Buku I s/d VI) serta data Posyandu di lingkungan masing-masing telah terisi lengkap.',
-    targetAccountId: 'ALL_PKK',
-    targetRole: 'pkk',
-    pemberiTugas: 'Ketua TP-PKK / Lurah Kelurahan Mangga',
-    tanggalMulai: new Date().toISOString().split('T')[0],
-    deadline: '2026-11-15',
-    status: 'aktif',
-    createdAt: new Date().toISOString(),
-    completedBy: [],
-  },
-];
 
 /**
  * Utility to compress image to max dimensions to keep Firestore document size small (< 1 MB)
@@ -118,13 +90,12 @@ export function getTugasKhususList(): TugasKhusus[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_TASKS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(DEFAULT_TASKS));
-      return DEFAULT_TASKS;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : DEFAULT_TASKS;
+    return Array.isArray(parsed) ? parsed.filter((t) => t && t.judul) : [];
   } catch {
-    return DEFAULT_TASKS;
+    return [];
   }
 }
 
@@ -153,55 +124,63 @@ export function saveTugasSubmissionsLocal(map: Record<string, TugasFotoSubmissio
   window.dispatchEvent(new Event('sikepling_tugas_khusus_submissions_updated'));
 }
 
+function parseTugasDocs(docs: any[]): TugasKhusus[] {
+  const result: TugasKhusus[] = [];
+  docs.forEach((d) => {
+    const data = d.data() as Partial<TugasKhusus>;
+    if (data && data.judul) {
+      result.push({
+        id: d.id,
+        judul: data.judul || '',
+        deskripsi: data.deskripsi || '',
+        targetAccountId: data.targetAccountId || 'ALL',
+        targetRole: data.targetRole || 'kepling',
+        pemberiTugas: data.pemberiTugas || 'Lurah Kelurahan Mangga',
+        tanggalMulai: data.tanggalMulai || '',
+        deadline: data.deadline || '',
+        status: (data.status as 'aktif' | 'selesai') || 'aktif',
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: data.updatedAt,
+        completedBy: Array.isArray(data.completedBy) ? data.completedBy : [],
+      });
+    }
+  });
+  result.sort((a, b) => {
+    const timeA = new Date(a.createdAt || 0).getTime();
+    const timeB = new Date(b.createdAt || 0).getTime();
+    return timeB - timeA;
+  });
+  return result;
+}
+
 /**
  * Real-time listener for Tugas Khusus from Firestore.
  * Updates local cache and notifies all mounted listeners immediately.
  */
 export function subscribeTugasKhususFromFirestore(callback?: (tasks: TugasKhusus[]) => void): Unsubscribe {
+  const initialLocal = getTugasKhususList();
+  if (callback && initialLocal.length > 0) {
+    callback(initialLocal);
+  }
+
+  let isActive = true;
+  let receivedServerSnapshot = false;
+
   try {
     const colRef = collection(db, TUGAS_KHUSUS_COLLECTION);
-    return onSnapshot(
+    const unsub = onSnapshot(
       colRef,
       (snapshot) => {
-        const firestoreTasks: TugasKhusus[] = [];
-        snapshot.forEach((d) => {
-          const data = d.data() as Partial<TugasKhusus>;
-          if (data && data.judul) {
-            firestoreTasks.push({
-              id: d.id,
-              judul: data.judul || '',
-              deskripsi: data.deskripsi || '',
-              targetAccountId: data.targetAccountId || 'ALL',
-              targetRole: data.targetRole || 'kepling',
-              pemberiTugas: data.pemberiTugas || 'Lurah Kelurahan Mangga',
-              tanggalMulai: data.tanggalMulai || '',
-              deadline: data.deadline || '',
-              status: (data.status as 'aktif' | 'selesai') || 'aktif',
-              createdAt: data.createdAt || new Date().toISOString(),
-              updatedAt: data.updatedAt,
-              completedBy: Array.isArray(data.completedBy) ? data.completedBy : [],
-            });
-          }
-        });
+        if (!isActive) return;
+        const firestoreTasks = parseTugasDocs(snapshot.docs);
 
-        // Sort: newest first
-        firestoreTasks.sort((a, b) => {
-          const timeA = new Date(a.createdAt || 0).getTime();
-          const timeB = new Date(b.createdAt || 0).getTime();
-          return timeB - timeA;
-        });
-
-        if (firestoreTasks.length > 0) {
+        if (!snapshot.metadata.fromCache) {
+          receivedServerSnapshot = true;
           saveTugasKhususList(firestoreTasks);
           if (callback) callback(firestoreTasks);
-        } else if (snapshot.empty) {
-          // If Firestore is empty, upload any local tasks or default task
-          const localList = getTugasKhususList();
-          if (localList.length > 0) {
-            localList.forEach((t) => {
-              setDoc(doc(db, TUGAS_KHUSUS_COLLECTION, t.id), cleanFirestoreData(t)).catch(() => {});
-            });
-          }
+        } else if (firestoreTasks.length > 0) {
+          saveTugasKhususList(firestoreTasks);
+          if (callback) callback(firestoreTasks);
         }
       },
       (error) => {
@@ -209,12 +188,60 @@ export function subscribeTugasKhususFromFirestore(callback?: (tasks: TugasKhusus
         try {
           handleFirestoreError(error, OperationType.LIST, TUGAS_KHUSUS_COLLECTION);
         } catch {}
+        fetchTugasKhususFromFirestore().then((items) => {
+          if (isActive && callback) callback(items);
+        });
       }
     );
+
+    fetchTugasKhususFromFirestore().then((items) => {
+      if (isActive && !receivedServerSnapshot && callback) {
+        callback(items);
+      }
+    });
+
+    return () => {
+      isActive = false;
+      unsub();
+    };
   } catch (error) {
     console.error('[Firestore Tugas Khusus] subscribe error:', error);
     return () => {};
   }
+}
+
+export async function fetchTugasSubmissionsFromFirestore(): Promise<Record<string, TugasFotoSubmissionItem>> {
+  try {
+    const colRef = collection(db, TUGAS_SUBMISSIONS_COLLECTION);
+    let snap;
+    try {
+      snap = await getDocsFromServer(colRef);
+    } catch {
+      snap = await getDocs(colRef);
+    }
+    const subMap: Record<string, TugasFotoSubmissionItem> = {};
+    snap.forEach((d) => {
+      const item = d.data() as Partial<TugasFotoSubmissionItem>;
+      if (item && item.taskId) {
+        subMap[item.taskId] = {
+          id: d.id,
+          taskId: item.taskId,
+          accountId: item.accountId || '',
+          namaKepling: item.namaKepling || '',
+          fotoUrl: item.fotoUrl || '',
+          keterangan: item.keterangan || '',
+          updatedAt: item.updatedAt || new Date().toISOString(),
+        };
+      }
+    });
+    if (Object.keys(subMap).length > 0 || !snap.metadata.fromCache) {
+      saveTugasSubmissionsLocal(subMap);
+      return subMap;
+    }
+  } catch (err) {
+    console.warn('[Firestore Tugas Submissions] fetch error:', err);
+  }
+  return getTugasSubmissionsLocal();
 }
 
 /**
@@ -223,16 +250,24 @@ export function subscribeTugasKhususFromFirestore(callback?: (tasks: TugasKhusus
 export function subscribeTugasKhususSubmissions(
   callback?: (submissions: Record<string, TugasFotoSubmissionItem>) => void
 ): Unsubscribe {
+  const initialLocal = getTugasSubmissionsLocal();
+  if (callback && Object.keys(initialLocal).length > 0) {
+    callback(initialLocal);
+  }
+
+  let isActive = true;
+  let receivedServerSnapshot = false;
+
   try {
     const colRef = collection(db, TUGAS_SUBMISSIONS_COLLECTION);
-    return onSnapshot(
+    const unsub = onSnapshot(
       colRef,
       (snapshot) => {
+        if (!isActive) return;
         const subMap: Record<string, TugasFotoSubmissionItem> = {};
         snapshot.forEach((d) => {
           const item = d.data() as Partial<TugasFotoSubmissionItem>;
           if (item && item.taskId) {
-            // Index by taskId or docId
             subMap[item.taskId] = {
               id: d.id,
               taskId: item.taskId,
@@ -245,16 +280,36 @@ export function subscribeTugasKhususSubmissions(
           }
         });
 
-        saveTugasSubmissionsLocal(subMap);
-        if (callback) callback(subMap);
+        if (!snapshot.metadata.fromCache) {
+          receivedServerSnapshot = true;
+          saveTugasSubmissionsLocal(subMap);
+          if (callback) callback(subMap);
+        } else if (Object.keys(subMap).length > 0) {
+          saveTugasSubmissionsLocal(subMap);
+          if (callback) callback(subMap);
+        }
       },
       (error) => {
         console.error('[Firestore Tugas Submissions] onSnapshot error:', error);
         try {
           handleFirestoreError(error, OperationType.LIST, TUGAS_SUBMISSIONS_COLLECTION);
         } catch {}
+        fetchTugasSubmissionsFromFirestore().then((subMap) => {
+          if (isActive && callback) callback(subMap);
+        });
       }
     );
+
+    fetchTugasSubmissionsFromFirestore().then((subMap) => {
+      if (isActive && !receivedServerSnapshot && callback) {
+        callback(subMap);
+      }
+    });
+
+    return () => {
+      isActive = false;
+      unsub();
+    };
   } catch (error) {
     console.error('[Firestore Tugas Submissions] subscribe error:', error);
     return () => {};
@@ -262,34 +317,20 @@ export function subscribeTugasKhususSubmissions(
 }
 
 /**
- * Fetch all tasks from Firestore once (fallback)
+ * Fetch all tasks from Firestore once
  */
 export async function fetchTugasKhususFromFirestore(): Promise<TugasKhusus[]> {
   try {
     const colRef = collection(db, TUGAS_KHUSUS_COLLECTION);
-    const snap = await getDocs(colRef);
-    const result: TugasKhusus[] = [];
-    snap.forEach((d) => {
-      const data = d.data() as Partial<TugasKhusus>;
-      if (data && data.judul) {
-        result.push({
-          id: d.id,
-          judul: data.judul,
-          deskripsi: data.deskripsi || '',
-          targetAccountId: data.targetAccountId || 'ALL',
-          targetRole: data.targetRole || 'kepling',
-          pemberiTugas: data.pemberiTugas || 'Lurah Kelurahan Mangga',
-          tanggalMulai: data.tanggalMulai || '',
-          deadline: data.deadline || '',
-          status: (data.status as 'aktif' | 'selesai') || 'aktif',
-          createdAt: data.createdAt || new Date().toISOString(),
-          updatedAt: data.updatedAt,
-          completedBy: Array.isArray(data.completedBy) ? data.completedBy : [],
-        });
-      }
-    });
+    let snap;
+    try {
+      snap = await getDocsFromServer(colRef);
+    } catch {
+      snap = await getDocs(colRef);
+    }
+    const result = parseTugasDocs(snap.docs);
 
-    if (result.length > 0) {
+    if (result.length > 0 || !snap.metadata.fromCache) {
       saveTugasKhususList(result);
       return result;
     }

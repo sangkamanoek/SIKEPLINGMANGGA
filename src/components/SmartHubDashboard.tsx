@@ -50,6 +50,16 @@ import {
   subscribePbbSpptForLingkungan,
   KelurahanPbbOverview,
 } from '../lib/pbbService';
+import {
+  isReportMatchingKepling,
+  isReportMatchingDate,
+  getTodayLocalIso,
+  isKunjunganMatchingKepling,
+} from '../lib/formatter';
+import { getLocalKunjunganList, subscribeKunjunganWarga } from '../lib/kunjunganService';
+import { getLocalAgendaList, subscribeAgendaFromFirestore } from '../lib/agendaService';
+import { getTugasKhususList, subscribeTugasKhususFromFirestore } from '../lib/tugasKhususService';
+import { getLocalPembangunanList, subscribeToPembangunan } from '../lib/pembangunanService';
 
 interface SmartHubDashboardProps {
   activeAccount: UserAccount;
@@ -160,6 +170,33 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
     } catch {}
     return [];
   });
+
+  const [menuDataTick, setMenuDataTick] = useState(0);
+
+  // Reactive live subscriptions & window events for secondary Firestore collections (agenda, tugas khusus, kunjungan, pembangunan)
+  useEffect(() => {
+    const bump = () => setMenuDataTick((t) => t + 1);
+    const unsubAgenda = subscribeAgendaFromFirestore(() => bump());
+    const unsubTugas = subscribeTugasKhususFromFirestore(() => bump());
+    const unsubKunjungan = subscribeKunjunganWarga(() => bump());
+    const unsubPembangunan = subscribeToPembangunan(() => bump());
+
+    window.addEventListener('agenda-data-updated', bump);
+    window.addEventListener('sikepling_tugas_khusus_updated', bump);
+    window.addEventListener('kunjungan-data-updated', bump);
+    window.addEventListener('pembangunan-data-updated', bump);
+
+    return () => {
+      unsubAgenda();
+      unsubTugas();
+      unsubKunjungan();
+      unsubPembangunan();
+      window.removeEventListener('agenda-data-updated', bump);
+      window.removeEventListener('sikepling_tugas_khusus_updated', bump);
+      window.removeEventListener('kunjungan-data-updated', bump);
+      window.removeEventListener('pembangunan-data-updated', bump);
+    };
+  }, []);
 
   // Subscribe to real-time PBB updates (Firestore, API buffer, LocalStorage, BroadcastChannel)
   useEffect(() => {
@@ -295,20 +332,19 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       percent: 0,
       percentWp: 0,
     };
-  }, [spptList, isKepling, activeAccount.nomorLingkungan, pbbYear]);
+  }, [spptList, isKepling, activeAccount.nomorLingkungan, pbbYear, summaryOverview]);
 
   // Stats / Compliance Helpers
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayLocalIso();
   
   const hasSubmittedReportToday = reports.some(
-    (r) => r.petugasNama === activeAccount.nama && r.tanggalLaporan?.startsWith(todayStr)
+    (r) => isReportMatchingKepling(r, activeAccount) && isReportMatchingDate(r, todayStr)
   );
 
-  const todayReportsCount = reports.filter((r) => r.tanggalLaporan?.startsWith(todayStr)).length;
+  const todayReportsList = reports.filter((r) => isReportMatchingDate(r, todayStr));
+  const todayReportsCount = todayReportsList.length;
   const uniqueKeplingsWithReportsToday = new Set(
-    reports
-      .filter((r) => r.tanggalLaporan?.startsWith(todayStr))
-      .map((r) => r.petugasNama)
+    todayReportsList.map((r) => r.keplingId || r.namaKepling || String(r.lingkungan))
   ).size;
 
   const todayApelCount = uniqueKeplingsWithReportsToday;
@@ -329,46 +365,41 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       switch (id) {
         case 'riwayat': {
           const count = isKepling
-            ? reports.filter(r => String(r.lingkungan) === String(activeAccount.nomorLingkungan) || r.petugasNama === activeAccount.nama || r.namaKepling === activeAccount.nama).length
+            ? reports.filter(r => isReportMatchingKepling(r, activeAccount)).length
             : reports.length;
           return { num: count, label: `${count} Laporan` };
         }
         case 'kunjungan': {
-          let count = 0;
-          try {
-            const raw = localStorage.getItem('sikepling_kunjungan_warga_v1');
-            if (raw) count = JSON.parse(raw).length;
-          } catch {}
+          const allVisits = getLocalKunjunganList();
+          const count = isKepling
+            ? allVisits.filter(v => isKunjunganMatchingKepling(v, activeAccount)).length
+            : allVisits.length;
           return { num: count, label: `${count} Sambang` };
         }
         case 'agenda': {
-          let count = 0;
-          try {
-            const raw = localStorage.getItem('sikepling_agenda_kelurahan_v1');
-            if (raw) count = JSON.parse(raw).length;
-          } catch {}
+          const count = getLocalAgendaList().length;
           return { num: count, label: `${count} Agenda` };
         }
         case 'daftar_tugas_khusus': {
-          let count = 0;
-          try {
-            const raw = localStorage.getItem('sikepling_tugas_khusus_v1');
-            if (raw) count = JSON.parse(raw).length;
-          } catch {}
+          const allTasks = getTugasKhususList();
+          const relevantTasks = isPkkRole(activeAccount.role)
+            ? allTasks.filter(t => t.targetRole === 'pkk' || t.targetRole === 'all' || t.targetAccountId === 'ALL_PKK' || t.targetAccountId === activeAccount.id)
+            : isKepling
+            ? allTasks.filter(t => !t.targetRole || t.targetRole === 'kepling' || t.targetRole === 'all' || t.targetAccountId === 'ALL' || t.targetAccountId === activeAccount.id)
+            : allTasks;
+          const count = relevantTasks.length;
           return { num: count, label: `${count} Tugas` };
         }
 
         case 'pbb_lingkungan':
         case 'rekap_pbb': {
-          const count = pbbSummary.totalCount || spptList.length || 1240;
+          const count = pbbSummary.totalCount || (isKepling && activeAccount.nomorLingkungan
+            ? spptList.filter(item => Number(item.lingkungan) === activeAccount.nomorLingkungan).length
+            : spptList.length);
           return { num: count, label: `${count.toLocaleString('id-ID')} SPPT` };
         }
         case 'realisasi_pembangunan': {
-          let count = 0;
-          try {
-            const raw = localStorage.getItem('sikepling_realisasi_pembangunan_v1');
-            if (raw) count = JSON.parse(raw).length;
-          } catch {}
+          let count = getLocalPembangunanList().length;
           if (count === 0) {
             count = reports.filter(r => Boolean(r.kinerja?.infrastrukturAdaGiat)).length;
           }
@@ -385,14 +416,14 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           return { num: reports.length, label: `${reports.length} Laporan` };
         }
         case 'form': {
-          const count = reports.filter(r => r.petugasNama === activeAccount.nama || String(r.lingkungan) === String(activeAccount.nomorLingkungan)).length;
+          const count = reports.filter(r => isReportMatchingKepling(r, activeAccount)).length;
           return { num: count, label: `${count} Laporan` };
         }
         default:
           return { num: reports.length, label: `${reports.length} Data` };
       }
     };
-  }, [reports, pbbSummary, spptList, isKepling, activeAccount, todayReportsCount]);
+  }, [reports, pbbSummary, spptList, isKepling, activeAccount, todayReportsCount, menuDataTick]);
 
   // Define menu items for UIX filtering strictly tailored per role
   const menuItems = useMemo(() => {
@@ -733,17 +764,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             },
           ]
         : []),
-      {
-        id: 'realisasi_pembangunan',
-        title: 'Monitoring & Realisasi Pembangunan Wilayah',
-        desc: 'Monitoring realisasi perbaikan jalan, drainase, pemasangan paving blok, lampu LPJU, dan penambahan tiang baru di wilayah masing-masing.',
-        category: 'laporan',
-        icon: Wrench,
-        iconBg: 'bg-indigo-50 text-indigo-700',
-        badge: 'PEMBANGUNAN',
-        badgeColor: 'bg-indigo-100 text-indigo-900',
-        action: () => onNavigate('realisasi_pembangunan'),
-      },
 
       // 3. INSIGHT & MONITORING (INSIGHT & MONITORING)
       {
@@ -770,17 +790,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       },
       ...(isAdmin
         ? [
-            {
-              id: 'monitoring',
-              title: 'Monitoring Keaktifan Kepling',
-              desc: 'Pantau status keaktifan laporan harian, rekapitulasi apel pagi, dan peta interaktif kelurahan.',
-              category: 'capaian',
-              icon: ShieldCheck,
-              iconBg: 'bg-amber-50 text-amber-600',
-              badge: 'ADMIN',
-              badgeColor: 'bg-rose-100 text-rose-800',
-              action: () => onNavigate('monitoring'),
-            },
             {
               id: 'dashboard_kasi',
               title: 'Dashboard Bidang Sektoral 3 Kasi',

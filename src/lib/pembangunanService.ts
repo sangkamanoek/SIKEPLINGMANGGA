@@ -1,15 +1,14 @@
 import { RealisasiPembangunan } from '../types';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import { db } from './firebase';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  setDoc, 
-  doc, 
+import {
+  collection,
+  onSnapshot,
+  setDoc,
+  doc,
   deleteDoc,
-  getDocs
+  getDocs,
+  getDocsFromServer,
 } from 'firebase/firestore';
 import { cleanFirestoreData } from './firestoreService';
 
@@ -27,6 +26,9 @@ export const getLocalPembangunanList = (): RealisasiPembangunan[] => {
 
 export const setLocalPembangunanList = (items: RealisasiPembangunan[]): void => {
   safeSetLocalStorage(PEMBANGUNAN_STORAGE_KEY, JSON.stringify(items));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('pembangunan-data-updated'));
+  }
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(PEMBANGUNAN_CHANNEL);
@@ -36,34 +38,48 @@ export const setLocalPembangunanList = (items: RealisasiPembangunan[]): void => 
   } catch (e) {}
 };
 
+function sortPembangunanDesc(items: RealisasiPembangunan[]): RealisasiPembangunan[] {
+  return [...items].sort((a, b) =>
+    (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || '')
+  );
+}
+
 export const fetchPembangunanAll = async (): Promise<RealisasiPembangunan[]> => {
   if (!db) return getLocalPembangunanList();
 
   try {
-    const q = query(collection(db, PEMBANGUNAN_COLLECTION), orderBy('createdAt', 'desc'));
-    const snap = await getDocs(q);
+    const colRef = collection(db, PEMBANGUNAN_COLLECTION);
+    let snap;
+    try {
+      snap = await getDocsFromServer(colRef);
+    } catch {
+      snap = await getDocs(colRef);
+    }
     const items: RealisasiPembangunan[] = [];
-    snap.forEach(d => items.push({ ...d.data(), id: d.id } as RealisasiPembangunan));
-    setLocalPembangunanList(items);
-    return items;
+    snap.forEach((d) => items.push({ ...d.data(), id: d.id } as RealisasiPembangunan));
+    const sorted = sortPembangunanDesc(items);
+    if (sorted.length > 0 || !snap.metadata.fromCache) {
+      setLocalPembangunanList(sorted);
+      return sorted;
+    }
   } catch (err) {
     console.warn('[pembangunanService] Firestore fetch error:', err);
-    return getLocalPembangunanList();
   }
+  return getLocalPembangunanList();
 };
 
 export const savePembangunanToServer = async (item: RealisasiPembangunan): Promise<RealisasiPembangunan> => {
-  const payload = { 
-    ...item, 
+  const payload = {
+    ...item,
     updatedAt: new Date().toISOString(),
-    createdAt: item.createdAt || new Date().toISOString()
+    createdAt: item.createdAt || new Date().toISOString(),
   };
 
   // Update local
   const current = getLocalPembangunanList();
   const idx = current.findIndex((p) => p.id === item.id);
-  const updatedList = idx >= 0 
-    ? current.map(p => p.id === item.id ? payload : p)
+  const updatedList = idx >= 0
+    ? current.map((p) => (p.id === item.id ? payload : p))
     : [payload, ...current];
   setLocalPembangunanList(updatedList);
 
@@ -95,7 +111,7 @@ export const deletePembangunanFromServer = async (id: string): Promise<void> => 
 
 export const batchSyncPembangunan = async (items: RealisasiPembangunan[]): Promise<boolean> => {
   if (!Array.isArray(items) || items.length === 0) return true;
-  
+
   for (const item of items) {
     await savePembangunanToServer(item);
   }
@@ -108,15 +124,46 @@ export const subscribePembangunan = (cb: (items: RealisasiPembangunan[]) => void
 
   if (!db) return () => {};
 
+  let isActive = true;
+  let receivedServerSnapshot = false;
+
   try {
-    const q = query(collection(db, PEMBANGUNAN_COLLECTION), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, (snap) => {
-      const items: RealisasiPembangunan[] = [];
-      snap.forEach(d => items.push({ ...d.data(), id: d.id } as RealisasiPembangunan));
-      setLocalPembangunanList(items);
-      cb(items);
+    const colRef = collection(db, PEMBANGUNAN_COLLECTION);
+    const unsub = onSnapshot(
+      colRef,
+      (snap) => {
+        if (!isActive) return;
+        const items: RealisasiPembangunan[] = [];
+        snap.forEach((d) => items.push({ ...d.data(), id: d.id } as RealisasiPembangunan));
+        const sorted = sortPembangunanDesc(items);
+
+        if (!snap.metadata.fromCache) {
+          receivedServerSnapshot = true;
+          setLocalPembangunanList(sorted);
+          cb(sorted);
+        } else if (sorted.length > 0 && !receivedServerSnapshot) {
+          setLocalPembangunanList(sorted);
+          cb(sorted);
+        }
+      },
+      (err) => {
+        console.warn('[pembangunanService] Subscription error, using getDocs fallback:', err);
+        fetchPembangunanAll().then((items) => {
+          if (isActive) cb(items);
+        });
+      }
+    );
+
+    fetchPembangunanAll().then((items) => {
+      if (isActive && !receivedServerSnapshot && items.length > 0) {
+        cb(items);
+      }
     });
-    return unsub;
+
+    return () => {
+      isActive = false;
+      unsub();
+    };
   } catch (e) {
     console.error('Pembangunan subscription failed:', e);
     return () => {};

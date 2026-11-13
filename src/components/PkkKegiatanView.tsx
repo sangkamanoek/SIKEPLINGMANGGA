@@ -27,6 +27,8 @@ import {
   deletePkkKegiatan,
   exportPkkKegiatanToExcel,
   syncPkkKegiatanDirectly,
+  fetchSinglePkkKegiatan,
+  hasMissingKegiatanPhotoUrls,
   POKJA_LABELS,
 } from '../lib/pkkKegiatanService';
 import { KopSuratPkk } from './KopSuratPkk';
@@ -34,6 +36,14 @@ import { SignatureBlock } from './SignatureBlock';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { printOfficialDocument, downloadPdfDocument } from '../utils/printHelper';
 import { compressMultipleFiles } from '../lib/imageCompressor';
+import { getDirectImageUrl } from '../lib/formatter';
+
+const resolveKegiatanFotoUrl = (foto: any): string => {
+  if (!foto || typeof foto !== 'object') return '';
+  const raw = foto.url || foto.src || foto.dataUrl || foto.base64 || '';
+  if (!raw || typeof raw !== 'string') return '';
+  return getDirectImageUrl(raw);
+};
 
 
 interface PkkKegiatanViewProps {
@@ -159,12 +169,33 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [alertMsg, setAlertMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  const [failedPhotoKeys, setFailedPhotoKeys] = useState<Record<string, boolean>>({});
+  const attemptedHydrationIdsRef = React.useRef<Set<string>>(new Set());
+
   useEffect(() => {
     const unsub = subscribePkkKegiatan((items) => {
       setKegiatanList(items);
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const candidates = kegiatanList.filter(
+      (k) => k && k.id && hasMissingKegiatanPhotoUrls(k) && !attemptedHydrationIdsRef.current.has(k.id)
+    );
+    if (candidates.length === 0) return;
+
+    candidates.forEach((candidate) => {
+      attemptedHydrationIdsRef.current.add(candidate.id);
+      fetchSinglePkkKegiatan(candidate.id, true)
+        .then((hydrated) => {
+          if (hydrated && !hasMissingKegiatanPhotoUrls(hydrated)) {
+            setKegiatanList((prev) => prev.map((it) => (it.id === hydrated.id ? hydrated : it)));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [kegiatanList]);
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -518,14 +549,40 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                 {/* Photo Preview if any */}
                 {item.fotoDokumentasi && item.fotoDokumentasi.length > 0 ? (
                   <div
-                    onClick={() => setSelectedDetail(item)}
-                    className="relative h-44 bg-slate-100 overflow-hidden cursor-pointer group"
+                    onClick={async () => {
+                      setSelectedDetail(item);
+                      if (hasMissingKegiatanPhotoUrls(item)) {
+                        const hydrated = await fetchSinglePkkKegiatan(item.id, true).catch(() => null);
+                        if (hydrated) {
+                          setSelectedDetail(hydrated);
+                          setKegiatanList((prev) => prev.map((it) => (it.id === hydrated.id ? hydrated : it)));
+                        }
+                      }
+                    }}
+                    className="relative h-44 bg-slate-100 overflow-hidden cursor-pointer group flex items-center justify-center"
                   >
-                    <img
-                      src={item.fotoDokumentasi[0].url}
-                      alt={item.namaKegiatan}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
+                    {(() => {
+                      const thumbUrl = resolveKegiatanFotoUrl(item.fotoDokumentasi[0]);
+                      const thumbKey = `${item.id}_thumb`;
+                      if (thumbUrl.length > 20 && !failedPhotoKeys[thumbKey]) {
+                        return (
+                          <img
+                            src={thumbUrl}
+                            alt={item.namaKegiatan}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={() => setFailedPhotoKeys((prev) => ({ ...prev, [thumbKey]: true }))}
+                          />
+                        );
+                      }
+                      return (
+                        <div className="flex flex-col items-center justify-center text-slate-400 p-4 text-center">
+                          <ImageIcon className="w-8 h-8 text-slate-300 mb-1" />
+                          <span className="text-[11px] font-semibold text-slate-500">
+                            {item.fotoDokumentasi[0]?.name || 'Dokumentasi Foto'}
+                          </span>
+                        </div>
+                      );
+                    })()}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-3">
                       <span className="text-[11px] font-bold text-white bg-black/40 px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1">
                         <ImageIcon className="w-3 h-3" />
@@ -718,24 +775,41 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
 
                 {selectedDetail.fotoDokumentasi && selectedDetail.fotoDokumentasi.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {selectedDetail.fotoDokumentasi.map((ft, idx) => (
+                    {selectedDetail.fotoDokumentasi.map((ft, idx) => {
+                      const fotoUrl = resolveKegiatanFotoUrl(ft);
+                      const photoKey = `detail_${selectedDetail.id}_${ft.id || idx}`;
+                      const isRenderable = fotoUrl.length > 20 && !failedPhotoKeys[photoKey];
+                      return (
                       <div
                         key={ft.id || idx}
                         className="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs hover:shadow-md transition-all cursor-pointer"
-                        onClick={() => window.open(ft.url, '_blank')}
+                        onClick={() => {
+                          if (isRenderable) window.open(fotoUrl, '_blank');
+                        }}
                       >
-                        <div className="h-36 w-full overflow-hidden">
-                          <img
-                            src={ft.url}
-                            alt={`Dokumentasi ${idx + 1}`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
+                        <div className="h-36 w-full overflow-hidden flex items-center justify-center">
+                          {isRenderable ? (
+                            <img
+                              src={fotoUrl}
+                              alt={`Dokumentasi ${idx + 1}`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={() => setFailedPhotoKeys((prev) => ({ ...prev, [photoKey]: true }))}
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center text-slate-400 p-2 text-center">
+                              <ImageIcon className="w-6 h-6 text-slate-300 mb-1" />
+                              <span className="text-[10px] text-slate-500 truncate max-w-[110px]">
+                                {ft.name || `Foto ${idx + 1}`}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="p-2 bg-white border-t border-slate-100 text-[10px] font-bold text-slate-700 truncate">
                           Foto {idx + 1}: {selectedDetail.namaKegiatan}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="p-4 rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-400 bg-slate-50">
@@ -1028,7 +1102,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                             }}
                           >
                             <img
-                              src={ft.url}
+                              src={resolveKegiatanFotoUrl(ft)}
                               alt={`Dokumentasi ${idx + 1}`}
                               crossOrigin="anonymous"
                               style={{
@@ -1575,7 +1649,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser })
                         }}
                       >
                         <img
-                          src={ft.url}
+                          src={resolveKegiatanFotoUrl(ft)}
                           alt={`Dokumentasi ${idx + 1}`}
                           crossOrigin="anonymous"
                           style={{

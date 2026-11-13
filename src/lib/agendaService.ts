@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, setDoc, deleteDoc, query, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, getDocsFromServer, doc, setDoc, deleteDoc, query, onSnapshot } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { db } from './firebase';
 import { cleanFirestoreData } from './firestoreService';
@@ -8,64 +8,7 @@ import { AgendaKelurahanItem, StatusAgendaType } from '../types';
 const AGENDA_STORAGE_KEY = 'sikepling_agenda_kelurahan_v2';
 const AGENDA_DELETED_KEY = 'sikepling_agenda_deleted_v1';
 
-export const SAMPLE_AGENDA_ITEMS: AgendaKelurahanItem[] = [
-  {
-    id: 'ag_01_2026',
-    namaKegiatan: 'Rapat Koordinasi Evaluasi PBB-P2 & Optimalisasi Pendataan Lingkungan',
-    tanggalKegiatan: '2026-10-30',
-    jamKegiatan: '09:00 WIB',
-    lokasi: 'Aula Utama Kantor Kelurahan Mangga',
-    peserta: 'Lurah, Seklur, Kasi Pemerintahan, & 24 Kepala Lingkungan',
-    statusSelesai: 'BELUM',
-    catatan: 'Seluruh Kepling wajib membawa rekapitulasi SPPT PBB-P2 dan daftar warga yang belum bayar.',
-    penanggungJawab: 'Kasi Tata Pemerintahan',
-    createdByName: 'KASI TATA PEMERINTAHAN',
-    createdByRole: 'kasi_pemerintahan',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'ag_02_2026',
-    namaKegiatan: 'Pelaksanaan Posyandu ILP & Penimbangan Balita Stunting',
-    tanggalKegiatan: '2026-10-28',
-    jamKegiatan: '08:30 WIB',
-    lokasi: 'Posyandu Kapas Lingkungan XVIII',
-    peserta: 'Bidan Kelurahan, TP-PKK Lingkungan XVIII, & 29 Warga Balita/Lansia',
-    statusSelesai: 'SELESAI',
-    catatan: 'Pelayanan penimbangan 29 warga berjalan lancar. Pemberian PMT balita terlaksana.',
-    penanggungJawab: 'Ketua TP-PKK Kelurahan / Kader Posyandu',
-    createdByName: 'Ketua PKK Lingkungan XVIII',
-    createdByRole: 'ketua_pkk_lingkungan',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: 'ag_03_2026',
-    namaKegiatan: 'Gotong Royong Massal Kebersihan Drainase Parit Anti-Banjir',
-    tanggalKegiatan: '2026-10-25',
-    jamKegiatan: '07:30 WIB',
-    lokasi: 'Ruas Jl. Flamboyan Raya & Parit Utama Lk. IV & V',
-    peserta: 'Kepling Lk. IV & V, Tim Trantibum, P3SU, & Warga Sekitar',
-    statusSelesai: 'SELESAI',
-    catatan: 'Pembersihan parit sepanjang 250m selesai. Sampah diangkut truk kebersihan.',
-    penanggungJawab: 'Kasi Trantibum & Linmas',
-    createdByName: 'KASI TRANTIBUM',
-    createdByRole: 'kasi_trantibum',
-    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
-  },
-  {
-    id: 'ag_04_2026',
-    namaKegiatan: 'Apel Pagi Gabungan & Evaluasi Disiplin Kepling 24 Lingkungan',
-    tanggalKegiatan: '2026-11-02',
-    jamKegiatan: '07:30 WIB',
-    lokasi: 'Halaman Kantor Kelurahan Mangga',
-    peserta: 'Lurah, Seklur, Seluruh Kasi, ASN, & 24 Kepala Lingkungan',
-    statusSelesai: 'BELUM',
-    catatan: 'Peserta wajib hadir tepat waktu di Halaman Kantor Kelurahan Mangga.',
-    penanggungJawab: 'Sekretaris Kelurahan / Lurah',
-    createdByName: 'SUPER ADMIN',
-    createdByRole: 'super_admin',
-    createdAt: new Date().toISOString(),
-  },
-];
+export const SAMPLE_AGENDA_ITEMS: AgendaKelurahanItem[] = [];
 
 let deletedAgendaIdsCache: string[] = safeGetLocalStorage<string[]>(AGENDA_DELETED_KEY, []);
 
@@ -86,19 +29,12 @@ export const markAgendaDeleted = (id: string): void => {
 export const getLocalAgendaList = (): AgendaKelurahanItem[] => {
   const deletedSet = new Set(getDeletedAgendaIds());
   const local = safeGetLocalStorage<AgendaKelurahanItem[]>(AGENDA_STORAGE_KEY, []);
-  
-  // 1. If we have local user-saved data, use it (filtered by deletions)
-  if (local && Array.isArray(local) && local.length > 0) {
-    const filteredLocal = local.filter(x => !deletedSet.has(x.id));
-    // If user has saved things but then deleted everything, we should probably respect that.
-    // However, if the deletion was just of a sample, we might still want to see the rest.
-    if (filteredLocal.length > 0 || local.some(x => !SAMPLE_AGENDA_ITEMS.some(s => s.id === x.id))) {
-      return filteredLocal;
-    }
+
+  if (local && Array.isArray(local)) {
+    return local.filter((x) => x && x.id && !deletedSet.has(x.id));
   }
 
-  // 2. If no user data, return sample data (filtered by deletions)
-  return SAMPLE_AGENDA_ITEMS.filter(x => !deletedSet.has(x.id));
+  return [];
 };
 
 export const fetchAgendaFromFirestore = async (): Promise<AgendaKelurahanItem[]> => {
@@ -107,7 +43,14 @@ export const fetchAgendaFromFirestore = async (): Promise<AgendaKelurahanItem[]>
 
   try {
     const deletedSet = new Set(getDeletedAgendaIds());
-    const snap = await getDocs(collection(db, 'agenda_kelurahan'));
+    const colRef = collection(db, 'agenda_kelurahan');
+    let snap;
+    try {
+      snap = await getDocsFromServer(colRef);
+    } catch {
+      snap = await getDocs(colRef);
+    }
+
     const firestoreList: AgendaKelurahanItem[] = [];
     snap.forEach((d) => {
       const data = d.data() as AgendaKelurahanItem;
@@ -116,16 +59,14 @@ export const fetchAgendaFromFirestore = async (): Promise<AgendaKelurahanItem[]>
       }
     });
 
-    if (firestoreList.length > 0) {
-      // Merge with local items by id
-      const map = new Map<string, AgendaKelurahanItem>();
-      local.forEach((item) => map.set(item.id, item));
-      firestoreList.forEach((item) => map.set(item.id, item));
-      const merged = Array.from(map.values()).sort((a, b) =>
-        b.tanggalKegiatan.localeCompare(a.tanggalKegiatan)
-      );
-      safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(merged));
-      return merged;
+    firestoreList.sort((a, b) => (b.tanggalKegiatan || '').localeCompare(a.tanggalKegiatan || ''));
+
+    if (firestoreList.length > 0 || !snap.metadata.fromCache) {
+      safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(firestoreList));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('agenda-data-updated'));
+      }
+      return firestoreList;
     }
   } catch (err) {
     console.warn('fetchAgendaFromFirestore warn:', err);
@@ -200,16 +141,25 @@ export const deleteAgendaItem = async (id: string): Promise<boolean> => {
 };
 
 export const subscribeAgendaFromFirestore = (cb: (items: AgendaKelurahanItem[]) => void) => {
+  const initialLocal = getLocalAgendaList();
+  if (initialLocal.length > 0) {
+    cb(initialLocal);
+  }
+
   if (!db) {
-    cb(getLocalAgendaList());
+    if (initialLocal.length === 0) cb([]);
     return () => {};
   }
 
+  let isActive = true;
+  let receivedServerSnapshot = false;
+
   try {
     const q = query(collection(db, 'agenda_kelurahan'));
-    return onSnapshot(
+    const unsub = onSnapshot(
       q,
       (snapshot) => {
+        if (!isActive) return;
         const deletedSet = new Set(getDeletedAgendaIds());
         const firestoreItems: AgendaKelurahanItem[] = [];
         snapshot.forEach((docSnap) => {
@@ -219,25 +169,38 @@ export const subscribeAgendaFromFirestore = (cb: (items: AgendaKelurahanItem[]) 
           }
         });
 
-        if (firestoreItems.length > 0) {
-          const local = getLocalAgendaList();
-          const map = new Map<string, AgendaKelurahanItem>();
-          local.forEach((item) => map.set(item.id, item));
-          firestoreItems.forEach((item) => map.set(item.id, item));
-          const merged = Array.from(map.values()).sort((a, b) =>
-            b.tanggalKegiatan.localeCompare(a.tanggalKegiatan)
-          );
-          safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(merged));
-          cb(merged);
-        } else {
-          cb(getLocalAgendaList());
+        firestoreItems.sort((a, b) => (b.tanggalKegiatan || '').localeCompare(a.tanggalKegiatan || ''));
+
+        if (!snapshot.metadata.fromCache) {
+          receivedServerSnapshot = true;
+          safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(firestoreItems));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('agenda-data-updated'));
+          }
+          cb(firestoreItems);
+        } else if (firestoreItems.length > 0) {
+          safeSetLocalStorage(AGENDA_STORAGE_KEY, JSON.stringify(firestoreItems));
+          cb(firestoreItems);
         }
       },
       (err) => {
-        console.warn('subscribeAgendaFromFirestore error:', err);
-        cb(getLocalAgendaList());
+        console.warn('subscribeAgendaFromFirestore error, trying getDocs fallback:', err);
+        fetchAgendaFromFirestore().then((items) => {
+          if (isActive) cb(items);
+        });
       }
     );
+
+    fetchAgendaFromFirestore().then((items) => {
+      if (isActive && !receivedServerSnapshot) {
+        cb(items);
+      }
+    });
+
+    return () => {
+      isActive = false;
+      unsub();
+    };
   } catch (e) {
     cb(getLocalAgendaList());
     return () => {};
