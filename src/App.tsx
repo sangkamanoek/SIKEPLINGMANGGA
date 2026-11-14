@@ -398,6 +398,12 @@ export default function App() {
   const handleTabChange = useCallback((tab: AppTabType) => {
     if (activeAccount && activeAccount.role !== 'super_admin') {
       const isPkk = isPkkRole(activeAccount.role);
+      if (activeAccount.role === 'kepling' && tab === 'monitoring') {
+        showToast('Akses Dibatasi: Halaman Monitoring Laporan khusus untuk Pimpinan & Kasi Kelurahan.', 'info');
+        setActiveTab('hub');
+        safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
+        return;
+      }
       if (isPkk && PKK_RESTRICTED_TABS.includes(tab)) {
         showToast('Akses Dibatasi: Halaman ini khusus untuk Aparatur Kelurahan.', 'info');
         setActiveTab('hub');
@@ -422,7 +428,10 @@ export default function App() {
     if (!activeAccount || activeAccount.role === 'super_admin') return;
     const isPkk = isPkkRole(activeAccount.role);
 
-    if (isPkk && PKK_RESTRICTED_TABS.includes(activeTab)) {
+    if (activeAccount.role === 'kepling' && activeTab === 'monitoring') {
+      setActiveTab('hub');
+      safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
+    } else if (isPkk && PKK_RESTRICTED_TABS.includes(activeTab)) {
       showToast('Akses Dibatasi: Dialihkan ke Pusat Menu PKK.', 'info');
       setActiveTab('hub');
       safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');

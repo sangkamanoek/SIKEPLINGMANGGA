@@ -74,7 +74,19 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
   ];
 
-  // Standard Kelurahan & Kepling Navigation Menu Items
+  // Dedicated Kepling Navigation Menu Items (Excludes Monitoring)
+  const keplingMenuItems: MenuItemConfig[] = [
+    { id: 'hub', label: 'Pusat Menu', icon: Compass },
+    { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
+    { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
+    { id: 'capaian', label: 'Capaian Target', icon: Trophy },
+    { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
+    { id: 'form', label: 'Input Laporan', icon: FileText },
+    { id: 'kunjungan', label: 'Kunjungan Warga', icon: Users },
+    { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
+  ];
+
+  // Standard Kelurahan Kasi / Admin Navigation Menu Items
   const standardMenuItems: MenuItemConfig[] = [
     { id: 'hub', label: 'Pusat Menu', icon: Compass },
     { id: 'monitoring', label: 'Monitoring Laporan', icon: ShieldCheck, badge: 'MONITORING', badgeVariant: 'mint' },
@@ -88,7 +100,7 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
   ];
 
   const isSuperAdmin = activeAccount?.role === 'super_admin';
-  const menuItems = isSuperAdmin ? superAdminMenuItems : isPkk ? pkkMenuItems : standardMenuItems;
+  const menuItems = isSuperAdmin ? superAdminMenuItems : isPkk ? pkkMenuItems : isKepling ? keplingMenuItems : standardMenuItems;
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
