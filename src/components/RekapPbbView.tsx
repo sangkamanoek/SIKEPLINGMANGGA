@@ -601,6 +601,45 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     }
   };
 
+  // Export Filtered WP List to Excel / CSV (.csv)
+  const handleExportWpExcel = () => {
+    if (filteredSpptList.length === 0) {
+      notify('Tidak ada data Wajib Pajak yang sesuai dengan filter untuk diekspor.', 'info');
+      return;
+    }
+    try {
+      const headers = ['No', 'NOP', 'Nama Wajib Pajak', 'Alamat OP', 'Lingkungan', 'PBB Ketetapan (Rp)', 'Status Bayar', 'Tanggal Bayar', 'Keterangan'];
+      const rows = filteredSpptList.map((item, idx) => [
+        idx + 1,
+        `'${item.nop}`,
+        item.namaWp || '-',
+        item.alamatOp || '-',
+        `Lingkungan ${item.lingkungan}`,
+        item.pbbTerutang || 0,
+        item.status === 'Sudah Bayar' ? 'Sudah Bayar' : 'Belum Bayar',
+        item.tglBayar || '-',
+        item.keterangan || '-',
+      ]);
+
+      const csvContent =
+        'data:text/csv;charset=utf-8,\uFEFF' +
+        [headers.join(','), ...rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `Daftar_WP_PBB_${selectedYear}_Lingkungan_${selectedLingkungan}_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      notify(`Berhasil mengekspor ${filteredSpptList.length} data Wajib Pajak ke file Excel!`, 'success');
+    } catch (err) {
+      console.error(err);
+      notify('Gagal mengekspor data Wajib Pajak.', 'error');
+    }
+  };
+
   // Open Modal for Adding New WP
   const handleOpenAddModal = () => {
     if (!canManageWp) {
@@ -1712,6 +1751,15 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   <span>+ Tambah WP Baru</span>
                 </button>
               )}
+
+              <button
+                onClick={handleExportWpExcel}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md cursor-pointer border border-emerald-500"
+                title="Unduh Daftar WP Sesuai Filter ke File Excel / CSV (.csv)"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Ekspor Excel WP</span>
+              </button>
 
               <button
                 onClick={() => printOfficialDocument('lembar-cetak-rekap-pbb', `Rekap_PBB_${selectedYear}_A4`)}
