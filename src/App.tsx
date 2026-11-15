@@ -56,11 +56,11 @@ const SuratKedinasanView = React.lazy(() =>
 const RealisasiPembangunanView = React.lazy(() =>
   import('./components/RealisasiPembangunanView').then((m) => ({ default: m.RealisasiPembangunanView }))
 );
-const DaftarTugasKhususView = React.lazy(() =>
-  import('./components/DaftarTugasKhususView').then((m) => ({ default: m.DaftarTugasKhususView }))
-);
 const AgendaKelurahanView = React.lazy(() =>
   import('./components/AgendaKelurahanView').then((m) => ({ default: m.AgendaKelurahanView }))
+);
+const AbsensiAgendaKeplingView = React.lazy(() =>
+  import('./components/AbsensiAgendaKeplingView').then((m) => ({ default: m.AbsensiAgendaKeplingView }))
 );
 const KunjunganHarianView = React.lazy(() =>
   import('./components/KunjunganHarianView').then((m) => ({ default: m.KunjunganHarianView }))
@@ -193,7 +193,7 @@ export default function App() {
   const [restoredPhotoReportIds, setRestoredPhotoReportIds] = useState<string[]>([]);
   const [isRestoringPhotosToCloud, setIsRestoringPhotosToCloud] = useState<boolean>(false);
 
-  // Real-time audio chime & mobile vibration alert for Agenda Kelurahan & Tugas Khusus Lurah
+  // Real-time audio chime & mobile vibration alert for Agenda Kelurahan & PBB Pindah NOP
   const { activeAlert, dismissAlert, replayAlertSound } = useAgendaTugasRealtimeAlert(activeAccount);
 
   // Unread feature notifications engine (tracks unread new reports since last application/tab visit)
@@ -384,7 +384,7 @@ export default function App() {
     'riwayat',
     'monitoring',
     'realisasi_pembangunan',
-    'daftar_tugas_khusus',
+    'absensi_kepling',
   ], []);
 
   const KELURAHAN_RESTRICTED_TABS: AppTabType[] = useMemo(() => [
@@ -398,6 +398,12 @@ export default function App() {
   const handleTabChange = useCallback((tab: AppTabType) => {
     if (activeAccount && activeAccount.role !== 'super_admin') {
       const isPkk = isPkkRole(activeAccount.role);
+      if (tab === 'absensi_kepling' && activeAccount.role !== 'sekretaris') {
+        showToast('Akses Dibatasi: Absensi Kepala Lingkungan hanya dapat diakses oleh Superadmin dan Seklur.', 'info');
+        setActiveTab('hub');
+        safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
+        return;
+      }
       if (activeAccount.role === 'kepling' && tab === 'monitoring') {
         showToast('Akses Dibatasi: Halaman Monitoring Laporan khusus untuk Pimpinan & Kasi Kelurahan.', 'info');
         setActiveTab('hub');
@@ -428,7 +434,11 @@ export default function App() {
     if (!activeAccount || activeAccount.role === 'super_admin') return;
     const isPkk = isPkkRole(activeAccount.role);
 
-    if (activeAccount.role === 'kepling' && activeTab === 'monitoring') {
+    if (activeTab === 'absensi_kepling' && activeAccount.role !== 'sekretaris') {
+      showToast('Akses Dibatasi: Absensi Kepala Lingkungan khusus Superadmin & Seklur.', 'info');
+      setActiveTab('hub');
+      safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
+    } else if (activeAccount.role === 'kepling' && activeTab === 'monitoring') {
       setActiveTab('hub');
       safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
     } else if (isPkk && PKK_RESTRICTED_TABS.includes(activeTab)) {
@@ -676,6 +686,7 @@ export default function App() {
         onNavigate={handleTabChange}
         isAdmin={activeAccount?.role === 'super_admin' || activeAccount?.role === 'sekretaris'}
         activeAccount={activeAccount}
+        unreadCounts={unreadCounts}
       />
 
       {/* Update Toast Banner */}
@@ -835,6 +846,11 @@ export default function App() {
             onNavigateToForm={() => handleTabChange('form')}
             onOpenRekapPbb={() => handleTabChange('rekap_pbb')}
             onNavigateToKunjungan={() => handleTabChange('kunjungan')}
+            onOpenAbsensiKepling={
+              activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris'
+                ? () => handleTabChange('absensi_kepling')
+                : undefined
+            }
             kunjunganList={kunjunganList}
           />
         )}
@@ -854,13 +870,6 @@ export default function App() {
           />
         )}
 
-        {/* TAB 10: Daftar Tugas Khusus */}
-        {activeTab === 'daftar_tugas_khusus' && (
-          <DaftarTugasKhususView
-            currentUser={activeAccount}
-          />
-        )}
-
         {/* TAB: Agenda Kelurahan */}
         {activeTab === 'agenda' && (
           <AgendaKelurahanView
@@ -868,6 +877,16 @@ export default function App() {
             onShowToast={showToast}
           />
         )}
+
+        {/* TAB: Absensi Kepala Lingkungan (Hanya Superadmin & Seklur) */}
+        {activeTab === 'absensi_kepling' &&
+          (activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris') && (
+            <AbsensiAgendaKeplingView
+              currentUser={activeAccount}
+              onShowToast={showToast}
+              onGoToAgendaTab={() => handleTabChange('agenda')}
+            />
+          )}
 
         {/* TAB 11: Kunjungan Warga */}
         {activeTab === 'kunjungan' && (
@@ -941,6 +960,7 @@ export default function App() {
         activeTab={activeTab}
         onSelectTab={handleTabChange}
         activeAccount={activeAccount}
+        unreadCounts={unreadCounts}
       />
 
       {/* Interactive Modals */}

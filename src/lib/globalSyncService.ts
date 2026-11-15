@@ -13,12 +13,7 @@ import { saveLocalSpptForYear } from './pbbService';
 import { MONITORING_INFRA_COLLECTION, MONITORING_INFRA_STORAGE_KEY } from './monitoringInfrastrukturService';
 import { KUNJUNGAN_COLLECTION, KUNJUNGAN_STORAGE_KEY } from './kunjunganService';
 import { PEMBANGUNAN_STORAGE_KEY } from './pembangunanService';
-import {
-  STORAGE_KEY_TASKS,
-  STORAGE_KEY_SUBMISSIONS,
-  TUGAS_KHUSUS_COLLECTION,
-  TUGAS_SUBMISSIONS_COLLECTION,
-} from './tugasKhususService';
+import { ABSENSI_COLLECTION, ABSENSI_STORAGE_KEY } from './absensiAgendaService';
 
 async function getColDocs(colName: string) {
   const colRef = collection(db, colName);
@@ -141,25 +136,7 @@ export const pullAllDataFromFirestore = async (
     pembangunanSnap.forEach((d) => pembangunan.push({ ...d.data(), id: d.id }));
     safeSetLocalStorage(PEMBANGUNAN_STORAGE_KEY, JSON.stringify(pembangunan));
 
-    // 13. Tugas Khusus
-    onProgress('Mengambil Data Tugas Khusus...');
-    const tasksSnap = await getColDocs(TUGAS_KHUSUS_COLLECTION);
-    const tasks: any[] = [];
-    tasksSnap.forEach((d) => {
-      const data = d.data();
-      if (data && data.judul) tasks.push({ ...data, id: d.id });
-    });
-    safeSetLocalStorage(STORAGE_KEY_TASKS, JSON.stringify(tasks));
-
-    const subsSnap = await getColDocs(TUGAS_SUBMISSIONS_COLLECTION);
-    const subs: Record<string, any> = {};
-    subsSnap.forEach((d) => {
-      const data = d.data();
-      if (data.taskId) subs[data.taskId] = { ...data, id: d.id };
-    });
-    safeSetLocalStorage(STORAGE_KEY_SUBMISSIONS, JSON.stringify(subs));
-
-    // 14. PBB SPPT (Hanya Tahun Aktif 2026 agar ringan di memori HP)
+    // 13. PBB SPPT (Hanya Tahun Aktif 2026 agar ringan di memori HP)
     onProgress('Mengambil Data PBB SPPT Tahun 2026...');
     try {
       const pbbSnap = await getColDocs('pbb_sppt_2026');
@@ -172,14 +149,25 @@ export const pullAllDataFromFirestore = async (
       console.warn('PBB SPPT pull error:', e);
     }
 
+    // 14. Absensi Kepala Lingkungan (Agenda Kelurahan)
+    onProgress('Mengambil Data Absensi Kepala Lingkungan...');
+    try {
+      const absensiSnap = await getColDocs(ABSENSI_COLLECTION);
+      const absensiList: any[] = [];
+      absensiSnap.forEach((d) => absensiList.push({ ...d.data(), id: d.id }));
+      safeSetLocalStorage(ABSENSI_STORAGE_KEY, JSON.stringify(absensiList));
+    } catch (e) {
+      console.warn('Absensi Kepling pull error:', e);
+    }
+
     onProgress('Semua data berhasil ditarik dari Cloud!');
 
     // Trigger window events to notify UI to refresh
     window.dispatchEvent(new CustomEvent('agenda-data-updated'));
+    window.dispatchEvent(new CustomEvent('absensi-agenda-updated'));
     window.dispatchEvent(new CustomEvent('kunjungan-data-updated'));
     window.dispatchEvent(new CustomEvent('pembangunan-data-updated'));
     window.dispatchEvent(new CustomEvent('pbb-data-updated', { detail: { year: 2026 } }));
-    window.dispatchEvent(new Event('sikepling_tugas_khusus_updated'));
 
     return { success: true, message: 'Berhasil menarik seluruh data dari Cloud Firestore.' };
   } catch (err) {

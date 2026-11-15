@@ -235,6 +235,46 @@
         "jumlah": { "type": "number" }
       },
       "required": ["id", "namaBarang"]
+    },
+    "PbbPindahNotif": {
+      "title": "Notifikasi Pindah NOP PBB",
+      "description": "Notifikasi real-time saat Kepala Lingkungan memindahkan lingkungan objek pajak (NOP) PBB.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 100 },
+        "spptId": { "type": "string", "maxLength": 120 },
+        "nop": { "type": "string", "maxLength": 40 },
+        "namaWp": { "type": "string", "maxLength": 200 },
+        "alamatOp": { "type": "string", "maxLength": 300 },
+        "tahun": { "type": "number" },
+        "dariLingkungan": { "type": "number" },
+        "keLingkungan": { "type": "number" },
+        "dipindahOlehId": { "type": "string", "maxLength": 80 },
+        "dipindahOlehNama": { "type": "string", "maxLength": 120 },
+        "dipindahOlehRole": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "readBy": { "type": "array" }
+      },
+      "required": ["id", "nop", "keLingkungan", "dipindahOlehId", "createdAt"]
+    },
+    "AbsensiAgendaKepling": {
+      "title": "Absensi Kepala Lingkungan per Agenda",
+      "description": "Daftar hadir 24 Kepala Lingkungan berdasarkan Agenda Kelurahan Mangga (Hadir, Tidak Hadir, Sakit, Izin).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 120 },
+        "agendaId": { "type": "string", "maxLength": 100 },
+        "namaKegiatan": { "type": "string", "maxLength": 300 },
+        "tanggalKegiatan": { "type": "string", "maxLength": 20 },
+        "jamKegiatan": { "type": "string", "maxLength": 40 },
+        "lokasi": { "type": "string", "maxLength": 300 },
+        "entries": { "type": "object" },
+        "diinputOlehNama": { "type": "string", "maxLength": 120 },
+        "diinputOlehRole": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "agendaId", "namaKegiatan", "tanggalKegiatan"]
     }
   },
   "firestore": {
@@ -302,6 +342,14 @@
     "deleted_reports/{reportId}": {
       "schema": { "type": "object", "properties": { "id": { "type": "string" }, "deletedAt": { "type": "string" } } },
       "description": "Tombstone untuk laporan yang dihapus."
+    },
+    "pbb_pindah_notifications/{notifId}": {
+      "schema": "PbbPindahNotif",
+      "description": "Koleksi notifikasi real-time pemindahan NOP PBB untuk Kasi Pemerintahan, Super Admin, dan Kepling tujuan."
+    },
+    "absensi_agenda_kepling/{docId}": {
+      "schema": "AbsensiAgendaKepling",
+      "description": "Koleksi daftar hadir 24 Kepala Lingkungan per Agenda Kelurahan (khusus Superadmin dan Seklur)."
     }
   }
 }

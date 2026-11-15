@@ -39,23 +39,10 @@ import {
   UploadCloud as CloudUpload,
   Server,
   Database,
-  Bell,
-  Camera,
   UserCheck,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import QRCode from 'react-qr-code';
-import {
-  getTugasKhususList,
-  addTugasKhusus,
-  deleteTugasKhusus,
-  updateTugasKhususStatus,
-  TugasKhusus,
-  subscribeTugasKhususFromFirestore,
-  subscribeTugasKhususSubmissions,
-  TugasFotoSubmissionItem,
-  getTugasSubmissionsLocal,
-} from '../lib/tugasKhususService';
 import {
   saveSuperAdminDeviceDataToFirestore,
   syncSuperAdminDeviceDataToLiveFirestore,
@@ -73,7 +60,6 @@ import {
   TitikRumahBangunan,
   RuasJalanLingkungan,
   LingkunganPolygon,
-  isPkkRole,
 } from '../types';
 import { 
   KEPLING_ACCOUNTS, 
@@ -141,85 +127,9 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
 }) => {
   const todayIso = getTodayLocalIso();
 
-  // Tab mode for Monitoring Dashboard: Laporan Harian vs Realisasi PBB vs Akun vs Tugas Khusus
-  const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PBB_REALISASI' | 'ACCOUNTS' | 'TUGAS_KHUSUS'>('LAPORAN');
-
-  // Tugas Khusus Lurah states
-  const [tugasList, setTugasList] = useState<TugasKhusus[]>(() => getTugasKhususList());
-  const [tugasSubmissions, setTugasSubmissions] = useState<Record<string, TugasFotoSubmissionItem>>(() => getTugasSubmissionsLocal());
-  const [viewingSubmission, setViewingSubmission] = useState<{ task: TugasKhusus; sub: TugasFotoSubmissionItem } | null>(null);
-  const [taskJudul, setTaskJudul] = useState('');
-  const [taskDeskripsi, setTaskDeskripsi] = useState('');
-  const [taskTargetAccountId, setTaskTargetAccountId] = useState('ALL');
-  const [taskDeadline, setTaskDeadline] = useState(todayIso);
-  const [taskError, setTaskError] = useState('');
-  const [taskSuccess, setTaskSuccess] = useState('');
+  // Tab mode for Monitoring Dashboard: Laporan Harian vs Realisasi PBB vs Akun
+  const [activeMainTab, setActiveMainTab] = useState<'LAPORAN' | 'PBB_REALISASI' | 'ACCOUNTS'>('LAPORAN');
   const [copiedWa, setCopiedWa] = useState<boolean>(false);
-
-  useEffect(() => {
-    // 1. Initial cached values
-    setTugasList(getTugasKhususList());
-    setTugasSubmissions(getTugasSubmissionsLocal());
-
-    // 2. Real-time Firestore sync
-    const unsubTasks = subscribeTugasKhususFromFirestore((liveTasks) => {
-      setTugasList(liveTasks);
-    });
-    const unsubSubs = subscribeTugasKhususSubmissions((liveSubs) => {
-      setTugasSubmissions(liveSubs);
-    });
-
-    const handleTugasUpdate = () => {
-      setTugasList(getTugasKhususList());
-      setTugasSubmissions(getTugasSubmissionsLocal());
-    };
-    window.addEventListener('sikepling_tugas_khusus_updated', handleTugasUpdate);
-    window.addEventListener('sikepling_tugas_khusus_submissions_updated', handleTugasUpdate);
-    return () => {
-      unsubTasks();
-      unsubSubs();
-      window.removeEventListener('sikepling_tugas_khusus_updated', handleTugasUpdate);
-      window.removeEventListener('sikepling_tugas_khusus_submissions_updated', handleTugasUpdate);
-    };
-  }, []);
-
-  const handleCreateTugas = (e: React.FormEvent) => {
-    e.preventDefault();
-    setTaskError('');
-    setTaskSuccess('');
-    if (!taskJudul.trim() || !taskDeskripsi.trim()) {
-      setTaskError('Judul dan Deskripsi Tugas Khusus wajib diisi.');
-      return;
-    }
-    try {
-      const isTargetPkkAll = taskTargetAccountId === 'ALL_PKK';
-      const isTargetAllKepling = taskTargetAccountId === 'ALL';
-      const targetAcc = accountsList.find((a) => a.id === taskTargetAccountId);
-      const targetRole = isTargetPkkAll
-        ? 'pkk'
-        : isTargetAllKepling
-        ? 'kepling'
-        : targetAcc?.role || 'all';
-
-      addTugasKhusus({
-        judul: taskJudul.trim(),
-        deskripsi: taskDeskripsi.trim(),
-        targetAccountId: taskTargetAccountId,
-        targetRole,
-        pemberiTugas: isTargetPkkAll ? 'Lurah / Ketua TP-PKK' : 'Lurah Kelurahan Mangga',
-        tanggalMulai: todayIso,
-        deadline: taskDeadline || todayIso,
-        status: 'aktif',
-      });
-      setTaskJudul('');
-      setTaskDeskripsi('');
-      setTaskTargetAccountId('ALL');
-      setTaskSuccess('Tugas Khusus berhasil diterbitkan dan langsung tampil di perangkat target!');
-      setTimeout(() => setTaskSuccess(''), 4000);
-    } catch (err: any) {
-      setTaskError(err.message || 'Gagal menyimpan tugas khusus.');
-    }
-  };
 
   // Account management states
   const [accountSubTab, setAccountSubTab] = useState<'KASI' | 'ALL'>('KASI');
@@ -652,16 +562,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
 
             <button
               type="button"
-              onClick={() => setActiveMainTab('TUGAS_KHUSUS')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 text-xs font-bold transition-colors cursor-pointer shadow-xs animate-pulse"
-              title="Buat dan kelola Tugas Khusus dari Lurah"
-            >
-              <Bell className="w-4 h-4 text-rose-300" />
-              <span>Tugas Khusus Lurah</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => setIsDeviceSyncModalOpen(true)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-100 border border-indigo-400/40 text-xs font-bold transition-colors cursor-pointer shadow-xs"
               title="Sinkronisasikan data HP/Laptop lokal Anda ke Firestore Cloud"
@@ -852,26 +752,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
               : 'bg-indigo-100 text-indigo-800'
           }`}>
             {accountsList.length} Akun
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveMainTab('TUGAS_KHUSUS')}
-          className={`flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer snap-start shrink-0 ${
-            activeMainTab === 'TUGAS_KHUSUS'
-              ? 'bg-rose-600 text-white shadow-sm border border-rose-500'
-              : 'text-slate-300 hover:text-white hover:bg-slate-700'
-          }`}
-        >
-          <Bell className="w-4 h-4 text-rose-300" />
-          <span>Tugas Khusus Lurah</span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold hidden sm:inline-block ${
-            activeMainTab === 'TUGAS_KHUSUS'
-              ? 'bg-white/20 text-white'
-              : 'bg-rose-100 text-rose-800'
-          }`}>
-            {tugasList.filter(t => t.status === 'aktif').length} Aktif
           </span>
         </button>
       </div>
@@ -2445,298 +2325,6 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {activeMainTab === 'TUGAS_KHUSUS' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          {/* Header Banner */}
-          <div className="bg-gradient-to-r from-rose-950 via-slate-900 to-pink-950 rounded-2xl p-5 sm:p-6 text-white border border-rose-800/50 shadow-xl relative overflow-hidden">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5 flex-1 min-w-0">
-                <div className="w-12 h-12 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-300 flex items-center justify-center font-bold shadow-inner shrink-0">
-                  <Bell className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest bg-rose-500 text-slate-950 px-2 py-0.5 rounded shadow-xs">
-                      Instruksi & Tugas Khusus Lurah
-                    </span>
-                    <span className="text-[10px] font-bold bg-white/10 text-rose-200 px-2 py-0.5 rounded border border-white/15">
-                      Pemberitahuan Pop-Up Real-Time
-                    </span>
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-bold tracking-tight text-white mt-1">
-                    Buat & Kirim Tugas Khusus ke Kepala Lingkungan
-                  </h3>
-                  <p className="text-xs text-slate-300 mt-0.5">
-                    Pesan, perintah, atau tugas khusus yang Anda terbitkan di sini akan langsung tampil sebagai Pop-Up Banner kuning di perangkat akun Kepala Lingkungan atau seluruh staf terkait.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Form Create Tugas Khusus */}
-          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-4">
-            <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
-              <PlusCircle className="w-4 h-4 text-rose-600" /> Form Penerbitan Tugas Khusus Baru
-            </h4>
-
-            {taskError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-bold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" /> {taskError}
-              </div>
-            )}
-            {taskSuccess && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-bold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0" /> {taskSuccess}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateTugas} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-slate-700 mb-1">Judul Tugas / Perintah *</label>
-                <input
-                  type="text"
-                  value={taskJudul}
-                  onChange={(e) => setTaskJudul(e.target.value)}
-                  placeholder="Contoh: Pendataan Tambahan Warga Rentan & Lansia Lk. IV"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-slate-700 mb-1">Deskripsi & Instruksi Detail dari Lurah *</label>
-                <textarea
-                  rows={3}
-                  value={taskDeskripsi}
-                  onChange={(e) => setTaskDeskripsi(e.target.value)}
-                  placeholder="Tuliskan detail instruksi, sasaran, atau catatan khusus yang harus dikerjakan oleh penerima tugas..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Target Sasaran Penerima</label>
-                <select
-                  value={taskTargetAccountId}
-                  onChange={(e) => setTaskTargetAccountId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none bg-white"
-                >
-                  <option value="ALL">📢 Semua Kepala Lingkungan (Broadcast Kepling)</option>
-                  <option value="ALL_PKK">🌸 Semua Pengurus TP-PKK (Broadcast PKK)</option>
-                  <optgroup label="Pengurus & Anggota TP-PKK">
-                    {accountsList.filter(a => isPkkRole(a.role)).map(acc => (
-                      <option key={acc.id} value={acc.id}>
-                        🌸 {acc.nama} ({acc.jabatan || acc.id})
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Kepala Lingkungan (Kepling 1-24)">
-                    {accountsList.filter(a => a.role === 'kepling').map(acc => (
-                      <option key={acc.id} value={acc.id}>
-                        📍 {acc.nama} ({acc.jabatan || acc.id})
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Deadline / Batas Waktu</label>
-                <input
-                  type="date"
-                  value={taskDeadline}
-                  onChange={(e) => setTaskDeadline(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="sm:col-span-2 flex justify-end">
-                <button
-                  type="submit"
-                  className="bg-rose-600 hover:bg-rose-700 text-white font-black px-6 py-2.5 rounded-xl text-xs shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer inline-flex items-center gap-2"
-                >
-                  <Bell className="w-4 h-4" /> Terbitkan & Kirim Tugas Khusus
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* List of Published Tugas Khusus */}
-          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-indigo-600" /> Riwayat Tugas Khusus Diterbitkan ({tugasList.length})
-              </h4>
-              <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 self-start sm:self-auto">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                Tersinkronisasi Real-Time ke Seluruh HP
-              </span>
-            </div>
-
-            {tugasList.length === 0 ? (
-              <div className="text-center py-8 text-slate-400 text-xs">
-                Belum ada Tugas Khusus yang diterbitkan. Silakan buat melalui form di atas.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {tugasList.map((t) => {
-                  const targetName = t.targetAccountId === 'ALL'
-                    ? 'Semua Kepala Lingkungan (Broadcast)'
-                    : accountsList.find(a => a.id === t.targetAccountId)?.nama || t.targetAccountId;
-                  const submission = tugasSubmissions[t.id];
-                  const completedNames = (t.completedBy || []).map(id => {
-                    return accountsList.find(a => a.id === id)?.nama || id;
-                  });
-
-                  return (
-                    <div key={t.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition-all space-y-2.5">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                            t.status === 'aktif' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
-                          }`}>
-                            {t.status === 'aktif' ? 'Aktif Berjalan' : 'Selesai'}
-                          </span>
-                          <span className="text-xs font-bold text-slate-600">
-                            Target: <strong className="text-slate-900">{targetName}</strong>
-                          </span>
-                          <span className="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded">
-                            Deadline: {t.deadline}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => updateTugasKhususStatus(t.id, t.status === 'aktif' ? 'selesai' : 'aktif')}
-                            className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 cursor-pointer"
-                          >
-                            {t.status === 'aktif' ? 'Tandai Selesai' : 'Aktifkan Kembali'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (window.confirm('Hapus tugas khusus ini?')) {
-                                deleteTugasKhusus(t.id);
-                              }
-                            }}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
-                            title="Hapus Tugas"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <h5 className="font-black text-sm text-slate-900">{t.judul}</h5>
-                      <p className="text-xs text-slate-700 leading-relaxed">{t.deskripsi}</p>
-
-                      {/* Dokumentasi Foto Submisi dari Kepling */}
-                      {submission && submission.fotoUrl && (
-                        <div className="p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <img
-                              src={submission.fotoUrl}
-                              alt="Bukti Dokumentasi"
-                              className="w-10 h-10 object-cover rounded-lg border border-indigo-200 shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <span className="text-[10px] font-bold uppercase text-indigo-700 block">
-                                Bukti Lapangan Diterima: {submission.namaKepling || 'Kepling'}
-                              </span>
-                              <p className="text-xs text-slate-700 truncate font-medium">
-                                {submission.keterangan || 'Tidak ada catatan tambahan'}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setViewingSubmission({ task: t, sub: submission })}
-                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer inline-flex items-center gap-1 shadow-xs"
-                          >
-                            <Camera className="w-3.5 h-3.5" /> Buka Foto
-                          </button>
-                        </div>
-                      )}
-
-                      <div className="pt-2 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-500">
-                        <span>Pemberi: {t.pemberiTugas}</span>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-indigo-700">
-                            {t.completedBy?.length || 0} Akun Selesai:
-                          </span>
-                          {completedNames.length > 0 ? (
-                            <span className="text-slate-700 font-semibold">
-                              {completedNames.join(', ')}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 italic">Belum ada akun</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Modal Preview Bukti Dokumentasi Tugas Khusus */}
-          {viewingSubmission && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
-              <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-                <div className="flex items-start justify-between pb-3 border-b border-slate-100">
-                  <div>
-                    <span className="text-[10px] font-black uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-md">
-                      Bukti Dokumentasi Lapangan
-                    </span>
-                    <h3 className="text-base font-black text-slate-900 mt-1">
-                      {viewingSubmission.task.judul}
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Pengirim: <strong>{viewingSubmission.sub.namaKepling || 'Kepling'}</strong> &bull; {new Date(viewingSubmission.sub.updatedAt).toLocaleString('id-ID')}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setViewingSubmission(null)}
-                    className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 aspect-video flex items-center justify-center">
-                    <img
-                      src={viewingSubmission.sub.fotoUrl}
-                      alt="Foto Bukti Lapangan"
-                      className="max-h-full max-w-full object-contain"
-                    />
-                  </div>
-
-                  {viewingSubmission.sub.keterangan && (
-                    <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs text-slate-800 space-y-1">
-                      <span className="font-bold text-slate-600 block">Keterangan / Laporan Kepling:</span>
-                      <p className="leading-relaxed">{viewingSubmission.sub.keterangan}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-end pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setViewingSubmission(null)}
-                    className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer"
-                  >
-                    Tutup
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

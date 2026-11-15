@@ -5,6 +5,12 @@ import { subscribeToPembangunan } from '../lib/pembangunanService';
 import { subscribePkkKegiatan, getLocalPkkKegiatanList } from '../lib/pkkKegiatanService';
 import { subscribePosyanduReports } from '../lib/pkkPosyanduService';
 import { subscribeTransaksiPkk, getLocalTransaksiPkk } from '../lib/pkkKeuanganService';
+import {
+  PbbPindahNotifItem,
+  subscribePbbPindahNotifs,
+  getLocalPbbPindahNotifs,
+  isPbbPindahNotifUnreadForAccount,
+} from '../lib/pbbMoveNotifService';
 import { getReportIsoDate, getTodayLocalIso, isReportMatchingKepling, isKunjunganMatchingKepling } from '../lib/formatter';
 
 export type FeatureNotificationKey =
@@ -16,7 +22,8 @@ export type FeatureNotificationKey =
   | 'kegiatan_pkk'
   | 'posyandu_pkk'
   | 'keuangan_pkk'
-  | 'buku_pkk';
+  | 'buku_pkk'
+  | 'rekap_pbb';
 
 interface UseFeatureNotificationsProps {
   activeAccount: UserAccount;
@@ -118,6 +125,14 @@ export function useFeatureNotifications({
     }
   });
 
+  const [pbbMoveNotifs, setPbbMoveNotifs] = useState<PbbPindahNotifItem[]>(() => {
+    try {
+      return getLocalPbbPindahNotifs();
+    } catch {
+      return [];
+    }
+  });
+
   // Track seen IDs per feature in state
   const [seenMap, setSeenMap] = useState<Record<string, Set<string>>>(() => {
     return {
@@ -145,6 +160,9 @@ export function useFeatureNotifications({
     const unsubPembangunan = subscribeToPembangunan((items) =>
       setPembangunanItems(items)
     );
+    const unsubPbbMove = subscribePbbPindahNotifs((items) =>
+      setPbbMoveNotifs(items)
+    );
 
     let unsubPkkKegiatan = () => {};
     let unsubPkkPosyandu = () => {};
@@ -159,6 +177,7 @@ export function useFeatureNotifications({
     return () => {
       unsubSurat();
       unsubPembangunan();
+      unsubPbbMove();
       unsubPkkKegiatan();
       unsubPkkPosyandu();
       unsubPkkKeuangan();
@@ -293,8 +312,13 @@ export function useFeatureNotifications({
       counts[feature] = unread;
     });
 
+    // Dedicated unread count for PBB Pindah NOP notifications (only clears when marked read)
+    counts['rekap_pbb'] = (pbbMoveNotifs || []).filter((n) =>
+      isPbbPindahNotifUnreadForAccount(n, activeAccount)
+    ).length;
+
     return counts;
-  }, [featureItemsMap, seenMap, activeTab]);
+  }, [featureItemsMap, seenMap, activeTab, pbbMoveNotifs, activeAccount]);
 
   // Total unread across all features
   const totalUnreadCount = useMemo(() => {

@@ -278,18 +278,12 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   }, [items]);
 
   const isKepling = activeAccount?.role === 'kepling';
-  const keplingLingkungan = activeAccount?.lingkungan || '';
-  const keplingNama = activeAccount?.nama || '';
 
   // Scoped items based on active role (Domain Partitioning)
   const domainScopedItems = useMemo(() => {
     let base = items;
-    if (isKepling) {
-      base = base.filter((item) => {
-        const matchLingkungan = keplingLingkungan && item.lingkungan && String(item.lingkungan).toLowerCase().includes(keplingLingkungan.toLowerCase());
-        const matchNama = keplingNama && item.namaKepling && item.namaKepling.toLowerCase().includes(keplingNama.toLowerCase());
-        return Boolean(matchLingkungan || matchNama);
-      });
+    if (isKepling && activeAccount) {
+      base = base.filter((item) => isReportMatchingKepling(item, activeAccount));
     } else if (isKasiPem) {
       base = base.filter(isReportForPemerintahan);
     } else if (isKasiBang) {
@@ -298,7 +292,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
       base = base.filter(isReportForTrantibum);
     }
     return base;
-  }, [items, isKepling, keplingLingkungan, keplingNama, isKasiPem, isKasiBang, isKasiTrantib]);
+  }, [items, isKepling, activeAccount, isKasiPem, isKasiBang, isKasiTrantib]);
 
   // Comprehensive multi-criteria filtering
   const filtered = useMemo(() => {
@@ -1093,7 +1087,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
           <div className="font-semibold text-slate-700 flex items-center gap-1.5">
             <CheckCircle className="w-4 h-4 text-emerald-600" />
             <span>
-              Menampilkan <strong>{filtered.length}</strong> dari <strong>{items.length}</strong> total laporan tersimpan.
+              Menampilkan <strong>{filtered.length}</strong> dari <strong>{domainScopedItems.length}</strong> total laporan tersimpan.
             </span>
           </div>
 

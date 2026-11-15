@@ -159,6 +159,7 @@ export const FormLaporanMonitoringModal: React.FC<FormLaporanMonitoringModalProp
 
   // Handler when Lingkungan changes -> automatically sync Kepling name
   const handleLingkunganChange = (no: number) => {
+    if (currentUser.role === 'kepling') return;
     setLingkunganNomor(no);
     const foundKepling = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === no);
     if (foundKepling && foundKepling.nama) {
@@ -202,12 +203,17 @@ export const FormLaporanMonitoringModal: React.FC<FormLaporanMonitoringModalProp
       return;
     }
 
+    const effectiveLingkNo =
+      currentUser.role === 'kepling' && currentUser.nomorLingkungan
+        ? currentUser.nomorLingkungan
+        : Number(lingkunganNomor) || 1;
+
     const reportData: LaporanMonitoringInfrastruktur = {
       id: initialReport?.id || `mon_${Date.now()}`,
       nomorLaporan: nomorLaporan.trim(),
       subjek: subjek.trim(),
       lokasi: lokasi.trim(),
-      lingkunganNomor: Number(lingkunganNomor) || 1,
+      lingkunganNomor: effectiveLingkNo,
       koordinatUrl: koordinatUrl.trim() || undefined,
       tanggal: tanggal.trim() || new Date().toISOString().split('T')[0],
       pelapor: pelapor.trim(),
@@ -357,11 +363,19 @@ export const FormLaporanMonitoringModal: React.FC<FormLaporanMonitoringModalProp
               <div className="space-y-1">
                 <label className="font-bold text-slate-700">Nomor Lingkungan</label>
                 <select
-                  value={lingkunganNomor}
+                  value={
+                    currentUser.role === 'kepling' && currentUser.nomorLingkungan
+                      ? currentUser.nomorLingkungan
+                      : lingkunganNomor
+                  }
                   onChange={(e) => handleLingkunganChange(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+                  disabled={currentUser.role === 'kepling'}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold text-xs focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-slate-100 disabled:text-slate-700 disabled:cursor-not-allowed"
                 >
-                  {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                  {(currentUser.role === 'kepling' && currentUser.nomorLingkungan
+                    ? [currentUser.nomorLingkungan]
+                    : Array.from({ length: 24 }, (_, i) => i + 1)
+                  ).map((n) => (
                     <option key={n} value={n}>
                       Lingkungan {n}
                     </option>
@@ -410,26 +424,29 @@ export const FormLaporanMonitoringModal: React.FC<FormLaporanMonitoringModalProp
                     </span>
                     <span>Dari (Nama Pelapor / Kepling) <span className="text-rose-500">*</span></span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const found = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === lingkunganNomor);
-                      if (found?.nama) setPelapor(found.nama);
-                    }}
-                    className="text-[10px] text-blue-700 hover:text-blue-900 font-bold bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors"
-                    title="Gunakan nama Kepling yang bertugas di Lingkungan ini"
-                  >
-                    <User className="w-3 h-3" />
-                    <span>Sync Kepling Lingk. {lingkunganNomor}</span>
-                  </button>
+                  {currentUser.role !== 'kepling' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const found = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === lingkunganNomor);
+                        if (found?.nama) setPelapor(found.nama);
+                      }}
+                      className="text-[10px] text-blue-700 hover:text-blue-900 font-bold bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Gunakan nama Kepling yang bertugas di Lingkungan ini"
+                    >
+                      <User className="w-3 h-3" />
+                      <span>Sync Kepling Lingk. {lingkunganNomor}</span>
+                    </button>
+                  )}
                 </div>
                 <input
                   type="text"
                   required
+                  readOnly={currentUser.role === 'kepling'}
                   value={pelapor}
                   onChange={(e) => setPelapor(e.target.value)}
                   placeholder="Nama Kepala Lingkungan"
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-black text-xs sm:text-sm text-blue-950 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50/50"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-black text-xs sm:text-sm text-blue-950 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50/50 read-only:bg-slate-100"
                 />
               </div>
 

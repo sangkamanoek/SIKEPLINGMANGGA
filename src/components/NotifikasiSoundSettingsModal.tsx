@@ -19,7 +19,6 @@ import {
   isVibrationEnabled,
   setVibrationEnabled,
   playAgendaKelurahanSound,
-  playTugasKhususLurahSound,
   triggerDeviceVibration,
 } from '../lib/soundVibrationService';
 import { requestNotificationPermission } from '../lib/safeNotification';
@@ -39,7 +38,7 @@ export const NotifikasiSoundSettingsModal: React.FC<NotifikasiSoundSettingsModal
   const [vibrateEnabled, setVibrateEnabled] = useState(isVibrationEnabled);
   const [notifPermission, setNotifPermission] = useState<string>('default');
   const [hasVibrationApi, setHasVibrationApi] = useState(false);
-  const [testPlaying, setTestPlaying] = useState<'agenda' | 'tugas' | null>(null);
+  const [testPlaying, setTestPlaying] = useState<'agenda' | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -76,13 +75,6 @@ export const NotifikasiSoundSettingsModal: React.FC<NotifikasiSoundSettingsModal
     await playAgendaKelurahanSound();
     triggerDeviceVibration([250, 100, 250, 100, 450]);
     setTimeout(() => setTestPlaying(null), 1000);
-  };
-
-  const handleTestTugas = async () => {
-    setTestPlaying('tugas');
-    await playTugasKhususLurahSound();
-    triggerDeviceVibration([350, 100, 350, 100, 350, 100, 700]);
-    setTimeout(() => setTestPlaying(null), 1200);
   };
 
   return (
@@ -142,11 +134,11 @@ export const NotifikasiSoundSettingsModal: React.FC<NotifikasiSoundSettingsModal
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                   <span className="text-xs font-black text-emerald-950 uppercase tracking-wide">
-                    1. Agenda Kelurahan
+                    Agenda Kelurahan &amp; Arahan Lurah
                   </span>
                 </div>
                 <p className="text-xs text-slate-700">
-                  Bunyi melodi 3-nada resmi + 2x getar HP ketika ada rapat/agenda baru.
+                  Bunyi melodi 3-nada resmi + 2x getar HP ketika ada rapat, agenda, atau arahan baru dari Lurah.
                 </p>
               </div>
 
@@ -158,31 +150,6 @@ export const NotifikasiSoundSettingsModal: React.FC<NotifikasiSoundSettingsModal
               >
                 <Play className={`w-3.5 h-3.5 ${testPlaying === 'agenda' ? 'animate-spin' : ''}`} />
                 <span>{testPlaying === 'agenda' ? 'Membunyikan...' : 'Tes Bunyi & Getar'}</span>
-              </button>
-            </div>
-
-            {/* Test 2: Tugas Khusus Lurah */}
-            <div className="p-4 rounded-2xl border-2 border-amber-300 bg-amber-50/70 hover:bg-amber-50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-600 animate-ping" />
-                  <span className="text-xs font-black text-amber-950 uppercase tracking-wide">
-                    2. Tugas Khusus dari Lurah
-                  </span>
-                </div>
-                <p className="text-xs text-slate-700">
-                  Bunyi sirene komando resmi + 3x getar HP kuat untuk instruksi langsung.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleTestTugas}
-                disabled={testPlaying !== null}
-                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs inline-flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-95 shrink-0"
-              >
-                <Play className={`w-3.5 h-3.5 ${testPlaying === 'tugas' ? 'animate-spin' : ''}`} />
-                <span>{testPlaying === 'tugas' ? 'Membunyikan...' : 'Tes Bunyi & Getar'}</span>
               </button>
             </div>
           </div>

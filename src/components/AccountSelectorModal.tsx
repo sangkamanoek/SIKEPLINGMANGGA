@@ -501,7 +501,7 @@ export const AccountSelectorModal: React.FC<AccountSelectorModalProps> = ({
                             </span>
                           </div>
                           <div className="text-xs text-slate-600 font-medium mt-0.5">
-                            {SEKRETARIS_ACCOUNT.jabatan} • Monitoring, PBB, Pembangunan, Surat & Tugas Khusus
+                            {SEKRETARIS_ACCOUNT.jabatan} • Monitoring, PBB, Pembangunan, Surat & Agenda Kelurahan
                           </div>
                         </div>
                       </div>

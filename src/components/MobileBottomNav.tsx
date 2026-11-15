@@ -37,8 +37,8 @@ export type AppTabType =
   | 'dasa_wisma'
   | 'surat_kedinasan'
   | 'buku_pkk'
-  | 'daftar_tugas_khusus'
-  | 'agenda';
+  | 'agenda'
+  | 'absensi_kepling';
 
 
 interface MobileBottomNavProps {
@@ -214,7 +214,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 id="btn-mobile-nav-pbb-center"
                 type="button"
                 onClick={() => onSelectTab('rekap_pbb')}
-                className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer border-2 border-white ${
+                className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer border-2 border-white relative ${
                   activeTab === 'rekap_pbb'
                     ? 'bg-gradient-to-tr from-emerald-800 to-teal-700 text-white ring-2 ring-emerald-500 ring-offset-2'
                     : 'bg-gradient-to-tr from-teal-700 to-emerald-600 text-white hover:brightness-105'
@@ -222,6 +222,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 title="Realisasi PBB-P2 2026"
               >
                 <FileSpreadsheet className="w-5 h-5 stroke-[2.5]" />
+                {renderBadge('rekap_pbb')}
                 <span className="sr-only">PBB</span>
               </button>
             </div>
@@ -445,7 +446,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <Landmark className={`w-5 h-5 ${activeTab === 'rekap_pbb' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              <div className="relative">
+                <Landmark className={`w-5 h-5 ${activeTab === 'rekap_pbb' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                {renderBadge('rekap_pbb')}
+              </div>
               <span className="text-[10px] mt-0.5 tracking-tight">PBB</span>
             </button>
 

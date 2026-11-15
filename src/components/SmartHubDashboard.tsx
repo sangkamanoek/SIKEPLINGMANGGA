@@ -33,7 +33,6 @@ import { saveReportToFirestore } from '../lib/firestoreService';
 import { fetchAllReports } from '../lib/reportsApi';
 import { optimizeAndCleanBrowserMemory } from '../lib/safeStorage';
 import { UserAccount, LaporanHarianItem, isPkkRole } from '../types';
-import { DeadlineNotifAlert } from './DeadlineNotifAlert';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { SpptPbbItem } from '../data/pbbSampleData';
 import { AgendaKelurahanBanner } from './AgendaKelurahanBanner';
@@ -56,14 +55,13 @@ import {
 } from '../lib/formatter';
 import { getLocalKunjunganList, subscribeKunjunganWarga } from '../lib/kunjunganService';
 import { getLocalAgendaList, subscribeAgendaFromFirestore } from '../lib/agendaService';
-import { getTugasKhususList, subscribeTugasKhususFromFirestore } from '../lib/tugasKhususService';
 import { getLocalPembangunanList, subscribeToPembangunan } from '../lib/pembangunanService';
 
 interface SmartHubDashboardProps {
   activeAccount: UserAccount;
   reports: LaporanHarianItem[];
   unreadCounts?: Record<string, number>;
-  onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan' | 'daftar_tugas_khusus' | 'agenda' | string) => void;
+  onNavigate: (tab: 'form' | 'capaian' | 'monitoring' | 'capaian_admin' | 'riwayat' | 'kunjungan' | 'dashboard_kasi' | 'kegiatan_khusus' | 'rekap_pbb' | 'database_keluarga' | 'realisasi_pembangunan' | 'agenda' | 'absensi_kepling' | string) => void;
   onOpenPPTModal: () => void;
   onOpenUpdateModal?: () => void;
   isGoogleConnected?: boolean;
@@ -177,26 +175,22 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
 
   const [menuDataTick, setMenuDataTick] = useState(0);
 
-  // Reactive live subscriptions & window events for secondary Firestore collections (agenda, tugas khusus, kunjungan, pembangunan)
+  // Reactive live subscriptions & window events for secondary Firestore collections (agenda, kunjungan, pembangunan)
   useEffect(() => {
     const bump = () => setMenuDataTick((t) => t + 1);
     const unsubAgenda = subscribeAgendaFromFirestore(() => bump());
-    const unsubTugas = subscribeTugasKhususFromFirestore(() => bump());
     const unsubKunjungan = subscribeKunjunganWarga(() => bump());
     const unsubPembangunan = subscribeToPembangunan(() => bump());
 
     window.addEventListener('agenda-data-updated', bump);
-    window.addEventListener('sikepling_tugas_khusus_updated', bump);
     window.addEventListener('kunjungan-data-updated', bump);
     window.addEventListener('pembangunan-data-updated', bump);
 
     return () => {
       unsubAgenda();
-      unsubTugas();
       unsubKunjungan();
       unsubPembangunan();
       window.removeEventListener('agenda-data-updated', bump);
-      window.removeEventListener('sikepling_tugas_khusus_updated', bump);
       window.removeEventListener('kunjungan-data-updated', bump);
       window.removeEventListener('pembangunan-data-updated', bump);
     };
@@ -387,15 +381,8 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           const count = getLocalAgendaList().length;
           return { num: count, label: `${count} Agenda` };
         }
-        case 'daftar_tugas_khusus': {
-          const allTasks = getTugasKhususList();
-          const relevantTasks = isPkkRole(activeAccount.role)
-            ? allTasks.filter(t => t.targetRole === 'pkk' || t.targetRole === 'all' || t.targetAccountId === 'ALL_PKK' || t.targetAccountId === activeAccount.id)
-            : isKepling
-            ? allTasks.filter(t => !t.targetRole || t.targetRole === 'kepling' || t.targetRole === 'all' || t.targetAccountId === 'ALL' || t.targetAccountId === activeAccount.id)
-            : allTasks;
-          const count = relevantTasks.length;
-          return { num: count, label: `${count} Tugas` };
+        case 'absensi_kepling': {
+          return { num: 24, label: `24 Kepling · PDF` };
         }
 
         case 'pbb_lingkungan':
@@ -406,9 +393,15 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           return { num: count, label: `${count.toLocaleString('id-ID')} SPPT` };
         }
         case 'realisasi_pembangunan': {
-          let count = getLocalPembangunanList().length;
+          const allPemb = getLocalPembangunanList();
+          let count = isKepling && activeAccount.nomorLingkungan
+            ? allPemb.filter((p) => Number(p.lingkunganNomor) === Number(activeAccount.nomorLingkungan)).length
+            : allPemb.length;
           if (count === 0) {
-            count = reports.filter(r => Boolean(r.kinerja?.infrastrukturAdaGiat)).length;
+            const scopedReps = isKepling
+              ? reports.filter((r) => isReportMatchingKepling(r, activeAccount))
+              : reports;
+            count = scopedReps.filter((r) => Boolean(r.kinerja?.infrastrukturAdaGiat)).length;
           }
           return { num: count, label: `${count} Progres` };
         }
@@ -417,7 +410,9 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         }
         case 'capaian':
         case 'capaian_admin': {
-          return { num: 24, label: `24 Kepling` };
+          return isKepling
+            ? { num: 1, label: `Lingk. ${activeAccount.nomorLingkungan || ''}` }
+            : { num: 24, label: `24 Kepling` };
         }
         case 'dashboard_kasi': {
           return { num: reports.length, label: `${reports.length} Laporan` };
@@ -426,8 +421,12 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           const count = reports.filter(r => isReportMatchingKepling(r, activeAccount)).length;
           return { num: count, label: `${count} Laporan` };
         }
-        default:
-          return { num: reports.length, label: `${reports.length} Data` };
+        default: {
+          const defaultCount = isKepling
+            ? reports.filter((r) => isReportMatchingKepling(r, activeAccount)).length
+            : reports.length;
+          return { num: defaultCount, label: `${defaultCount} Data` };
+        }
       }
     };
   }, [reports, pbbSummary, spptList, isKepling, activeAccount, todayReportsCount, menuDataTick]);
@@ -497,20 +496,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
 
     // Dedicated Role Tim Penggerak PKK (Pusat Kendali Mandiri TP-PKK)
     if (isPkk) {
-      return [
-        ...pkkItems,
-        {
-          id: 'daftar_tugas_khusus',
-          title: 'Daftar Tugas Khusus & Petunjuk Giat',
-          desc: 'Lihat daftar instruksi penugasan khusus dan dokumentasikan kegiatan tindak lanjut di lapangan.',
-          category: 'laporan',
-          icon: Award,
-          iconBg: 'bg-amber-50 text-amber-700',
-          badge: 'PENUGASAN',
-          badgeColor: 'bg-amber-100 text-amber-900',
-          action: () => onNavigate('daftar_tugas_khusus'),
-        },
-      ];
+      return pkkItems;
     }
 
     if (isBapenda) {
@@ -674,22 +660,30 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
 
     // Default: Super Admin or Kepling
     return [
-      {
-        id: 'monitoring',
-        title: 'Monitoring Laporan 24 Lingkungan',
-        desc: 'Pantau status pengiriman laporan harian, rekapitulasi kehadiran, dan kegiatan kebersihan/trantib 24 Lingkungan real-time.',
-        category: 'laporan',
-        icon: ShieldCheck,
-        iconBg: 'bg-teal-50 text-teal-700',
-        badge: 'MONITORING REALTIME',
-        badgeColor: 'bg-teal-100 text-teal-900',
-        bgGradient: 'bg-gradient-to-r from-teal-950 via-emerald-950 to-slate-900 text-white border-teal-600/60',
-        action: () => onNavigate('monitoring'),
-      },
+      ...(!isKepling
+        ? [
+            {
+              id: 'monitoring',
+              title: 'Monitoring Laporan 24 Lingkungan',
+              desc: 'Pantau status pengiriman laporan harian, rekapitulasi kehadiran, dan kegiatan kebersihan/trantib 24 Lingkungan real-time.',
+              category: 'laporan',
+              icon: ShieldCheck,
+              iconBg: 'bg-teal-50 text-teal-700',
+              badge: 'MONITORING REALTIME',
+              badgeColor: 'bg-teal-100 text-teal-900',
+              bgGradient: 'bg-gradient-to-r from-teal-950 via-emerald-950 to-slate-900 text-white border-teal-600/60',
+              action: () => onNavigate('monitoring'),
+            },
+          ]
+        : []),
       {
         id: 'realisasi_pembangunan',
-        title: 'Monitoring & Realisasi Pembangunan Wilayah',
-        desc: 'Pusat data realisasi fisik infrastruktur, Musrenbang, perbaikan jalan, drainase parit, LPJU, dan Bedah Rumah RTLH.',
+        title: isKepling
+          ? `Monitoring & Pembangunan Lingkungan ${activeAccount.nomorLingkungan || ''}`
+          : 'Monitoring & Realisasi Pembangunan Wilayah',
+        desc: isKepling
+          ? `Pusat data realisasi fisik infrastruktur, perbaikan jalan, drainase parit, dan LPJU khusus Lingkungan ${activeAccount.nomorLingkungan || ''}.`
+          : 'Pusat data realisasi fisik infrastruktur, Musrenbang, perbaikan jalan, drainase parit, LPJU, dan Bedah Rumah RTLH.',
         category: 'laporan',
         icon: Wrench,
         iconBg: 'bg-rose-50 text-rose-700',
@@ -740,19 +734,21 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             },
           ]
         : []),
-      {
-        id: 'daftar_tugas_khusus',
-        title: 'Daftar Tugas Khusus & Dokumentasi',
-        desc: 'Lihat seluruh perintah & instruksi dari Lurah serta unggah foto bukti dokumentasi pelaksanaannya di lapangan.',
-        category: 'laporan',
-        icon: ClipboardList,
-        iconBg: 'bg-amber-50 text-amber-700',
-        badge: 'TUGAS LURAH',
-        badgeColor: 'bg-amber-100 text-amber-900',
-        action: () => onNavigate('daftar_tugas_khusus'),
-      },
-
-
+      ...(activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris'
+        ? [
+            {
+              id: 'absensi_kepling',
+              title: 'Absensi Kepala Lingkungan (Agenda & Cetak PDF)',
+              desc: 'Daftar hadir 24 Kepala Lingkungan berdasarkan Agenda Kelurahan dengan rekap harian, mingguan, bulanan & cetak PDF resmi ber-KOP Kelurahan.',
+              category: 'absen',
+              icon: UserCheck,
+              iconBg: 'bg-teal-50 text-teal-700',
+              badge: 'SUPERADMIN & SEKLUR',
+              badgeColor: 'bg-teal-100 text-teal-900',
+              action: () => onNavigate('absensi_kepling'),
+            },
+          ]
+        : []),
 
       ...(isPbbAllowed
         ? [
@@ -776,7 +772,9 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       {
         id: 'riwayat',
         title: isKepling ? 'Riwayat Laporan Saya' : 'Database Riwayat Laporan',
-        desc: 'Pusat arsip pencarian, filter, edit, verifikasi, dan ekspor laporan harian seluruh lingkungan.',
+        desc: isKepling
+          ? 'Pusat arsip pencarian, filter, edit, dan ekspor laporan harian lingkungan Anda.'
+          : 'Pusat arsip pencarian, filter, edit, verifikasi, dan ekspor laporan harian seluruh lingkungan.',
         category: 'laporan',
         icon: History,
         iconBg: 'bg-slate-100 text-slate-700',
@@ -787,7 +785,9 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       {
         id: 'capaian',
         title: isKepling ? 'Dashboard Capaian Saya' : 'Kelola Target & Capaian 24 Kepling',
-        desc: 'Grafik real-time realisasi target PBB, Perlinsos (DTKS), dan Trantibum secara transparan.',
+        desc: isKepling
+          ? 'Grafik real-time realisasi target PBB, Perlinsos (DTKS), Kehadiran, dan Trantibum lingkungan Anda.'
+          : 'Grafik real-time realisasi target PBB, Perlinsos (DTKS), dan Trantibum secara transparan.',
         category: 'capaian',
         icon: Trophy,
         iconBg: 'bg-amber-50 text-amber-600',
@@ -946,9 +946,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         onForceSyncAll={onForceSyncAll}
       />
 
-      {/* Visual Alert & Deadline 23:30 Push Notif Component */}
-      <DeadlineNotifAlert activeAccount={activeAccount} reports={reports} onNavigate={onNavigate} />
-
       {/* Agenda Kelurahan Banner for Kepling */}
       <AgendaKelurahanBanner activeAccount={activeAccount} />
 
@@ -986,6 +983,8 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             onClick={() => {
               if (isPkkRole(activeAccount.role) || activeAccount.role === 'super_admin') {
                 onNavigate('kegiatan_pkk');
+              } else if (isKepling) {
+                onNavigate('kunjungan');
               } else {
                 onNavigate('monitoring');
               }
@@ -997,8 +996,12 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             </div>
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-teal-800 uppercase block tracking-wider">Pilar 2</span>
-              <h4 className="text-xs font-bold text-slate-900 truncate">Kegiatan TP-PKK</h4>
-              <p className="text-[11px] text-slate-500 truncate">Pusat Menu & Laporan PKK</p>
+              <h4 className="text-xs font-bold text-slate-900 truncate">
+                {isKepling ? 'Buku Kunjungan Warga' : 'Kegiatan TP-PKK'}
+              </h4>
+              <p className="text-[11px] text-slate-500 truncate">
+                {isKepling ? 'Sambang Door-to-Door Wilayah' : 'Pusat Menu & Laporan PKK'}
+              </p>
             </div>
           </div>
 
@@ -1065,11 +1068,17 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                   className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
                 >
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
                         📊 Realisasi PBB-P2 2026
                       </span>
-                      <span className="text-[10px] text-slate-400 font-bold">SPPT Master</span>
+                      {(unreadCounts?.['rekap_pbb'] || 0) > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-xs animate-pulse">
+                          {unreadCounts!['rekap_pbb']} Pindah NOP
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-bold">SPPT Master</span>
+                      )}
                     </div>
                     <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
                       Kolektibilitas Pajak PBB
@@ -1320,7 +1329,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                       👥 Kunjungan Door-to-Door
                     </span>
                     <h3 className="text-lg font-black tracking-tight mt-2 flex items-center gap-1.5 text-slate-100">
-                      <span>Buku Sambang 24 Lingkungan</span>
+                      <span>{isKepling ? `Buku Sambang ${activeAccount.lingkungan || 'Lingkungan Saya'}` : 'Buku Sambang 24 Lingkungan'}</span>
                     </h3>
                     <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
                       Pencatatan langsung sambang warga per rumah, verifikasi status Perlinsos, aktivasi IKD, dan cek SPPT PBB.
@@ -1353,13 +1362,19 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                     className="bg-white border border-slate-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
                   >
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-[9px] uppercase font-black tracking-widest text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
                           📊 Realisasi PBB-P2 {isKepling && activeAccount.nomorLingkungan ? `(Lingk. ${activeAccount.nomorLingkungan})` : `(${pbbYear})`}
                         </span>
-                        <span className="text-[10px] text-slate-400 font-bold">
-                          {spptList.length > 0 ? 'Live Database' : 'Siap Input'}
-                        </span>
+                        {(unreadCounts?.['rekap_pbb'] || 0) > 0 ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-xs animate-pulse">
+                            {unreadCounts!['rekap_pbb']} Pindah NOP
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-bold">
+                            {pbbSummary.totalCount > 0 ? 'Live Database' : 'Siap Input'}
+                          </span>
+                        )}
                       </div>
                       <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
                         Capaian Penerimaan PBB
@@ -1422,8 +1437,14 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                         <span className="w-7 h-7 rounded-full bg-emerald-300 border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-2xs">✓</span>
                       </div>
                       <div>
-                        <p className="text-xs font-black text-slate-800">{todayApelCount} Kepling Hadir Apel</p>
-                        <p className="text-[10px] text-slate-400 font-semibold">Tersinkronisasi Real-Time</p>
+                        <p className="text-xs font-black text-slate-800">
+                          {isKepling
+                            ? (hasSubmittedReportToday ? 'Sudah Lapor Hari Ini' : 'Belum Lapor Hari Ini')
+                            : `${todayApelCount} Kepling Hadir Apel`}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-semibold">
+                          {isKepling ? (activeAccount.lingkungan || 'Lingkungan Anda') : 'Tersinkronisasi Real-Time'}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -1706,7 +1727,10 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredMenus.map((menu) => {
             const isSpecialGis = false;
-            const unreadCount = unreadCounts?.[menu.id] ?? 0;
+            const unreadCount =
+              menu.id === 'pbb_lingkungan' || menu.id === 'rekap_pbb'
+                ? (unreadCounts?.['rekap_pbb'] ?? 0)
+                : (unreadCounts?.[menu.id] ?? 0);
             const totalCountInfo = getMenuCountBadge(menu.id);
 
             return (

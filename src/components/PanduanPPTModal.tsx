@@ -1650,7 +1650,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
       });
       s10_sop.addText('07.30 - 08.30 WIB', { x: 1.2, y: 1.7, w: 3.1, h: 0.35, fontSize: 13, bold: true, color: '34D399' });
       s10_sop.addText(
-        'KOORDINASI PAGI & MONITORING\n\nKoordinasi kerja harian aparatur kelurahan, pemantauan tugas khusus Lurah, dan pengecekan agenda lapangan.',
+        'KOORDINASI PAGI & MONITORING\n\nKoordinasi kerja harian aparatur kelurahan, penyampaian arahan Lurah, dan pengecekan agenda lapangan.',
         {
           x: 1.2,
           y: 2.15,

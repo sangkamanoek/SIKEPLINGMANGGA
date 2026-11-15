@@ -364,6 +364,21 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     title: string;
   } | null>(null);
 
+  // Strictly scoped items for Kepling
+  const scopedItems = useMemo(() => {
+    if (isKeplingRole && currentUser.nomorLingkungan) {
+      return items.filter((i) => Number(i.lingkunganNomor) === Number(currentUser.nomorLingkungan));
+    }
+    return items;
+  }, [items, isKeplingRole, currentUser.nomorLingkungan]);
+
+  const scopedMonitoringItems = useMemo(() => {
+    if (isKeplingRole && currentUser.nomorLingkungan) {
+      return monitoringItems.filter((m) => Number(m.lingkunganNomor) === Number(currentUser.nomorLingkungan));
+    }
+    return monitoringItems;
+  }, [monitoringItems, isKeplingRole, currentUser.nomorLingkungan]);
+
   // Subscribe to real-time monitoring reports
   useEffect(() => {
     const unsub = subscribeMonitoringReports((mList) => {
@@ -655,7 +670,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       }
       return true;
     });
-  }, [monitoringItems, filterMonitoringLingkungan, filterMonitoringKategori, filterMonitoringStatus, searchMonitoring]);
+  }, [monitoringItems, filterMonitoringLingkungan, filterMonitoringKategori, filterMonitoringStatus, searchMonitoring, isKeplingRole, currentUser.nomorLingkungan]);
 
   // Aggregate Monitoring Stats
   const monitoringStats = useMemo(() => {
@@ -782,10 +797,15 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     }
     setFormError(null);
 
-    const keplingObj = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === formLingkunganNo);
-    const keplingName = keplingObj ? keplingObj.nama : `Kepling Lingkungan ${formLingkunganNo}`;
+    const effectiveLingkNo =
+      isKeplingRole && currentUser.nomorLingkungan
+        ? currentUser.nomorLingkungan
+        : formLingkunganNo;
+
+    const keplingObj = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === effectiveLingkNo);
+    const keplingName = keplingObj ? keplingObj.nama : `Kepling Lingkungan ${effectiveLingkNo}`;
     const creatorDisplay = currentUser.role === 'kepling'
-      ? `${currentUser.nama} (${currentUser.jabatan || `Kepala Lingkungan ${formLingkunganNo}`})`
+      ? `${currentUser.nama} (${currentUser.jabatan || `Kepala Lingkungan ${effectiveLingkNo}`})`
       : `${currentUser.nama} (${keplingName})`;
 
     const cleanSebelumList = formFotoSebelumList.length > 0 ? formFotoSebelumList : (formFotoSebelum ? [formFotoSebelum] : []);
@@ -796,8 +816,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       // Update
       const updated: RealisasiPembangunan = {
         ...editingItem,
-        lingkunganNomor: formLingkunganNo,
-        lingkunganId: `kepling_${formLingkunganNo}`,
+        lingkunganNomor: effectiveLingkNo,
+        lingkunganId: `kepling_${effectiveLingkNo}`,
         jenisPembangunan: formJenis,
         namaProyek: formNamaProyek.trim(),
         lokasiDetail: formLokasiDetail.trim(),
@@ -830,8 +850,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       // Create new
       const newItem: RealisasiPembangunan = {
         id: `pemb_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        lingkunganId: `kepling_${formLingkunganNo}`,
-        lingkunganNomor: formLingkunganNo,
+        lingkunganId: `kepling_${effectiveLingkNo}`,
+        lingkunganNomor: effectiveLingkNo,
         jenisPembangunan: formJenis,
         namaProyek: formNamaProyek.trim(),
         lokasiDetail: formLokasiDetail.trim(),
@@ -1023,7 +1043,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
                 activeSubTab === 'realisasi' ? 'bg-white/20 text-white border border-white/25' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
               }`}>
-                {items.length} Proyek
+                {scopedItems.length} Proyek
               </span>
             </div>
           </button>
@@ -1045,7 +1065,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
                 activeSubTab === 'monitoring' ? 'bg-white/20 text-white border border-white/25' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
               }`}>
-                {monitoringItems.length} Laporan
+                {scopedMonitoringItems.length} Laporan
               </span>
             </div>
           </button>
@@ -1106,7 +1126,9 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
           </h1>
 
           <p className="text-xs sm:text-sm text-blue-100 max-w-3xl font-normal leading-relaxed">
-            Monitoring realisasi perbaikan jalan, normalisasi drainase, perbaikan lampu LPJU, dan penambahan tiang LPJU baru secara akuntabel di 24 Lingkungan.
+            {isKeplingRole
+              ? `Monitoring realisasi perbaikan jalan, normalisasi drainase, perbaikan lampu LPJU, dan sarana publik khusus Lingkungan ${currentUser.nomorLingkungan || ''}.`
+              : 'Monitoring realisasi perbaikan jalan, normalisasi drainase, perbaikan lampu LPJU, dan penambahan tiang LPJU baru secara akuntabel di 24 Lingkungan.'}
           </p>
         </div>
 
@@ -1141,7 +1163,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
             </button>
           </div>
 
-          {items.length > 0 && (
+          {!isKeplingRole && items.length > 0 && (
             <button
               type="button"
               onClick={() => setIsClearAllModalOpen(true)}
@@ -1279,12 +1301,16 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               Wilayah Lingkungan:
             </label>
             <select
-              value={filterLingkungan}
+              value={isKeplingRole && currentUser.nomorLingkungan ? String(currentUser.nomorLingkungan) : filterLingkungan}
               onChange={(e) => setFilterLingkungan(e.target.value)}
-              className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
+              disabled={isKeplingRole}
+              className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-700 disabled:cursor-not-allowed"
             >
-              <option value="all">📍 Semua Lingkungan (I - XXIV)</option>
-              {Array.from({ length: 24 }, (_, i) => i + 1).map((no) => (
+              {!isKeplingRole && <option value="all">📍 Semua Lingkungan (I - XXIV)</option>}
+              {(isKeplingRole && currentUser.nomorLingkungan
+                ? [currentUser.nomorLingkungan]
+                : Array.from({ length: 24 }, (_, i) => i + 1)
+              ).map((no) => (
                 <option key={no} value={String(no)}>
                   Lingkungan {no}
                 </option>
@@ -1959,12 +1985,16 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   Wilayah Lingkungan:
                 </label>
                 <select
-                  value={filterMonitoringLingkungan}
+                  value={isKeplingRole && currentUser.nomorLingkungan ? String(currentUser.nomorLingkungan) : filterMonitoringLingkungan}
                   onChange={(e) => setFilterMonitoringLingkungan(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500"
+                  disabled={isKeplingRole}
+                  className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500 disabled:bg-slate-100 disabled:text-slate-700 disabled:cursor-not-allowed"
                 >
-                  <option value="all">📍 Semua Lingkungan (I - XXIV)</option>
-                  {Array.from({ length: 24 }, (_, i) => i + 1).map((no) => (
+                  {!isKeplingRole && <option value="all">📍 Semua Lingkungan (I - XXIV)</option>}
+                  {(isKeplingRole && currentUser.nomorLingkungan
+                    ? [currentUser.nomorLingkungan]
+                    : Array.from({ length: 24 }, (_, i) => i + 1)
+                  ).map((no) => (
                     <option key={no} value={String(no)}>
                       Lingkungan {no}
                     </option>
@@ -2379,12 +2409,19 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                     Wilayah Lingkungan *
                   </label>
                   <select
-                    value={formLingkunganNo}
+                    value={
+                      isKeplingRole && currentUser.nomorLingkungan
+                        ? currentUser.nomorLingkungan
+                        : formLingkunganNo
+                    }
                     onChange={(e) => setFormLingkunganNo(Number(e.target.value))}
                     disabled={isKeplingRole && Boolean(currentUser.nomorLingkungan)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 disabled:opacity-75"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 disabled:opacity-75 disabled:bg-slate-100 disabled:cursor-not-allowed"
                   >
-                    {Array.from({ length: 24 }, (_, i) => i + 1).map((no) => (
+                    {(isKeplingRole && currentUser.nomorLingkungan
+                      ? [currentUser.nomorLingkungan]
+                      : Array.from({ length: 24 }, (_, i) => i + 1)
+                    ).map((no) => (
                       <option key={no} value={no}>
                         Lingkungan {no}
                       </option>

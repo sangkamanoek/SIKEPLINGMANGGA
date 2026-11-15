@@ -23,6 +23,8 @@ import {
   X,
   Copy,
   Check,
+  Bell,
+  ArrowRightLeft,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { LaporanHarianItem, TargetsCapaianMap, UserAccount } from '../types';
@@ -41,6 +43,11 @@ import {
   getCachedPbbOverview,
   KelurahanPbbOverview,
 } from '../lib/pbbService';
+import {
+  PbbPindahNotifItem,
+  subscribePbbPindahNotifs,
+  isPbbPindahNotifUnreadForAccount,
+} from '../lib/pbbMoveNotifService';
 import { SpptPbbItem } from '../data/pbbSampleData';
 import { RekapCapaianPbb24Lingkungan } from './RekapCapaianPbb24Lingkungan';
 
@@ -82,6 +89,18 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
   const [spptList, setSpptList] = useState<SpptPbbItem[]>(() => getLocalSpptForYear(pbbYear));
   const [summaryOverview, setSummaryOverview] = useState<KelurahanPbbOverview>(() => getCachedPbbOverview(pbbYear));
   const [isSyncingPbb, setIsSyncingPbb] = useState(false);
+  const [pbbMoveNotifs, setPbbMoveNotifs] = useState<PbbPindahNotifItem[]>([]);
+
+  useEffect(() => {
+    const unsub = subscribePbbPindahNotifs((items) => {
+      setPbbMoveNotifs(Array.isArray(items) ? items : []);
+    });
+    return () => unsub();
+  }, []);
+
+  const unreadMoveNotifs = useMemo(() => {
+    return pbbMoveNotifs.filter((n) => isPbbPindahNotifUnreadForAccount(n, currentUser));
+  }, [pbbMoveNotifs, currentUser]);
 
   useEffect(() => {
     let active = true;
@@ -519,6 +538,35 @@ export const DashboardPbbKasi: React.FC<DashboardPbbKasiProps> = ({
 
       {subView === 'pbb' && (
         <>
+          {unreadMoveNotifs.length > 0 && (
+            <div className="bg-indigo-50 border-2 border-indigo-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-indigo-600 text-white shrink-0 animate-pulse">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-black text-indigo-950 flex items-center gap-2 flex-wrap">
+                    <span>{unreadMoveNotifs.length} Notifikasi Pindah NOP dari Kepling</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-600 text-white font-black">BARU</span>
+                  </p>
+                  <p className="text-[11px] text-indigo-800 font-medium mt-0.5">
+                    Terbaru: NOP <span className="font-mono font-bold">{unreadMoveNotifs[0].nop}</span> ({unreadMoveNotifs[0].namaWp}) dipindah ke Lingkungan {unreadMoveNotifs[0].keLingkungan} oleh {unreadMoveNotifs[0].dipindahOlehNama}.
+                  </p>
+                </div>
+              </div>
+              {onOpenRekapPbb && (
+                <button
+                  type="button"
+                  onClick={onOpenRekapPbb}
+                  className="px-4 py-2 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-black flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0 self-start sm:self-center"
+                >
+                  <ArrowRightLeft className="w-4 h-4" />
+                  <span>Lihat di Rincian PBB</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Realisasi Penerimaan Ketetapan PBB-P2 24 Lingkungan (SPPT Nominal & Kepatuhan) */}
           <div className="bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 rounded-3xl p-6 text-white border border-emerald-800/60 shadow-xl space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

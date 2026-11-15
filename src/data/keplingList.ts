@@ -602,6 +602,22 @@ export const getEffectiveProfile = (account: UserAccount): UserAccount => {
     }
   }
 
+  // Auto-Fix (Self-Healing) for PKK Lingkungan accounts if name is generic placeholder
+  if (account.id && account.id.startsWith('pkk_lingkungan_')) {
+    const numMatch = account.id.match(/pkk_lingkungan_(\d+)/);
+    if (numMatch) {
+      const idx = parseInt(numMatch[1], 10) - 1;
+      const expectedName = DEFAULT_PKK_LINGKUNGAN_NAMES[idx];
+      const currentName = custom?.nama || account.nama || '';
+      if (expectedName && (currentName.startsWith('Ketua PKK Lingkungan') || currentName.includes('Ketua PKK'))) {
+        return {
+          ...account,
+          nama: expectedName,
+        };
+      }
+    }
+  }
+
   const effectiveNama =
     custom?.nama && String(custom.nama).trim()
       ? String(custom.nama).trim()

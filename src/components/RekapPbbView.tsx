@@ -40,8 +40,18 @@ import {
   Lock,
   Copy,
   Share2,
+  ArrowRightLeft,
+  Bell,
 } from 'lucide-react';
 import { INITIAL_PBB_SUMMARY, SAMPLE_SPPT_ITEMS, SpptPbbItem } from '../data/pbbSampleData';
+import {
+  PbbPindahNotifItem,
+  savePbbPindahNotif,
+  subscribePbbPindahNotifs,
+  markPbbPindahNotifRead,
+  markAllPbbPindahNotifsRead,
+  isPbbPindahNotifUnreadForAccount,
+} from '../lib/pbbMoveNotifService';
 import { parsePbbCsv } from '../utils/pbbParser';
 import { UserAccount } from '../types';
 import { DuplicateCheckBadge } from './DuplicateCheckBadge';
@@ -85,6 +95,8 @@ import {
   deduplicateSpptItems,
 } from '../lib/pbbService';
 import { RekapCapaianPbb24Lingkungan } from './RekapCapaianPbb24Lingkungan';
+import { RekapNopBermasalahView } from './RekapNopBermasalahView';
+import * as XLSX from 'xlsx';
 
 interface RekapPbbViewProps {
   activeAccount?: UserAccount | null;
@@ -92,14 +104,17 @@ interface RekapPbbViewProps {
 }
 
 export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onShowToast }) => {
-  const isKepling = activeAccount?.role === 'kepling' && typeof activeAccount?.nomorLingkungan === 'number';
-  const keplingLingkunganNum = isKepling ? activeAccount.nomorLingkungan : undefined;
+  const isKepling = activeAccount?.role === 'kepling';
+  const keplingLingkunganNum = isKepling ? (activeAccount.nomorLingkungan || 1) : undefined;
 
   // Check authorization for Edit & Add WP & Status change (Only Super Admin and Kasi Pemerintahan; Kepling is read-only)
   const canManageWp =
     activeAccount?.role === 'super_admin' ||
     activeAccount?.role === 'kasi_pemerintahan' ||
     (!activeAccount && process.env.NODE_ENV !== 'production');
+
+  // Allow Kepala Lingkungan (Kepling) to edit SPPT details and move NOP to correct Lingkungan
+  const canEditWp = canManageWp || isKepling;
 
   // Year State (Default to 2026)
   const [selectedYear, setSelectedYear] = useState<number>(() => {
@@ -139,7 +154,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'lingkungan' | 'persentase' | 'target' | 'wp_lunas_pct' | 'wp_lunas_qty'>('persentase');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [activeSubTab, setActiveTab] = useState<'rekap_lingkungan' | 'grafik_tren' | 'detail_sppt' | 'import_csv'>(() => {
+  const [activeSubTab, setActiveTab] = useState<'rekap_lingkungan' | 'grafik_tren' | 'detail_sppt' | 'rekap_bermasalah' | 'import_csv'>(() => {
     if (activeAccount?.role === 'kepling') {
       return 'detail_sppt';
     }
@@ -161,12 +176,27 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [copiedPbbWa, setCopiedPbbWa] = useState<boolean>(false);
 
+  const [pbbMoveNotifs, setPbbMoveNotifs] = useState<PbbPindahNotifItem[]>([]);
+
   useEffect(() => {
     const unsubSummary = subscribePbbSummary(selectedYear, (ov) => {
       if (ov && ov.totalWp > 0) setSummaryOverview(ov);
     });
     return () => unsubSummary();
   }, [selectedYear]);
+
+  useEffect(() => {
+    const unsubMoveNotifs = subscribePbbPindahNotifs((items) => {
+      setPbbMoveNotifs(Array.isArray(items) ? items : []);
+    });
+    return () => unsubMoveNotifs();
+  }, []);
+
+  const unreadMoveNotifs = useMemo(() => {
+    return pbbMoveNotifs.filter((n) =>
+      isPbbPindahNotifUnreadForAccount(n, activeAccount)
+    );
+  }, [pbbMoveNotifs, activeAccount]);
 
   // Compute live 24-Lingkungan PBB overview for official WA reporting
   const livePbbOverview = useMemo(() => {
@@ -176,8 +206,17 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     return summaryOverview;
   }, [spptList, selectedYear, summaryOverview, isKepling]);
 
+  // Scoped SPPT List strictly for Kepling's own environment
+  const scopedSpptList = useMemo(() => {
+    if (isKepling && keplingLingkunganNum) {
+      return spptList.filter((item) => Number(item.lingkungan) === keplingLingkunganNum);
+    }
+    return spptList;
+  }, [spptList, isKepling, keplingLingkunganNum]);
+
   // Handler Salin Rekap PBB WA
   const handleCopyPbbWa = () => {
+    if (isKepling) return;
     try {
       const text = formatRekapPbbWaText(livePbbOverview, selectedYear);
       navigator.clipboard.writeText(text);
@@ -210,7 +249,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     return spptList.filter(item => {
       const match = firestoreMap.get(item.id);
       if (!match) return true; // Added locally, not on server
-      return match.status !== item.status || match.namaWp !== item.namaWp || match.lingkungan !== item.lingkungan; // Modified locally, not synced
+      return (
+        match.status !== item.status ||
+        match.namaWp !== item.namaWp ||
+        match.lingkungan !== item.lingkungan ||
+        Boolean(match.isBermasalah) !== Boolean(item.isBermasalah) ||
+        (match.masalahNote || '') !== (item.masalahNote || '')
+      ); // Modified locally, not synced
     });
   }, [spptList, lastFirestoreItemsRef.current]);
 
@@ -295,9 +340,12 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
       if (forceCloud) {
         // Abaikan data lokal, gunakan online murni
-        setSpptList(onlineArray);
-        lastFirestoreItemsRef.current = onlineArray;
-        saveLocalSpptForYear(onlineArray, selectedYear);
+        const effectiveList = isKepling && keplingLingkunganNum
+          ? onlineArray.filter((item) => Number(item.lingkungan) === keplingLingkunganNum)
+          : onlineArray;
+        setSpptList(effectiveList);
+        lastFirestoreItemsRef.current = effectiveList;
+        saveLocalSpptForYear(effectiveList, selectedYear);
         notify(`Pemulihan Data Cloud Berhasil! Data PBB Tahun ${selectedYear} di perangkat ini kini 100% identik dengan Firestore.`, 'success');
       } else {
         // 2. Gabungkan secara cerdas:
@@ -552,6 +600,161 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [isWpModalOpen, setIsWpModalOpen] = useState<boolean>(false);
   const [editingWpItem, setEditingWpItem] = useState<SpptPbbItem | null>(null);
 
+  // Dedicated Pindah Lingkungan Modal State
+  const [isPindahLingkunganModalOpen, setIsPindahLingkunganModalOpen] = useState<boolean>(false);
+  const [pindahTargetItem, setPindahTargetItem] = useState<SpptPbbItem | null>(null);
+  const [targetLingkunganNum, setTargetLingkunganNum] = useState<number>(1);
+
+  const handleOpenPindahLingkunganModal = (item: SpptPbbItem) => {
+    setPindahTargetItem(item);
+    setTargetLingkunganNum(item.lingkungan > 0 ? item.lingkungan : (activeAccount?.nomorLingkungan || 1));
+    setIsPindahLingkunganModalOpen(true);
+  };
+
+  const handleSavePindahLingkungan = () => {
+    if (!pindahTargetItem) return;
+    const dariLingkungan = Number(pindahTargetItem.lingkungan) || 0;
+    const keLingkungan = Number(targetLingkunganNum) || 0;
+
+    const updatedItem: SpptPbbItem = {
+      ...pindahTargetItem,
+      lingkungan: keLingkungan,
+      updatedAt: new Date().toISOString(),
+    };
+    setSpptList((prev) =>
+      prev.map((i) => (i.id === pindahTargetItem.id ? updatedItem : i))
+    );
+    savePbbSpptToFirestore(updatedItem, selectedYear).catch(() => {});
+
+    if (isKepling && dariLingkungan !== keLingkungan && keLingkungan > 0) {
+      savePbbPindahNotif({
+        spptId: pindahTargetItem.id,
+        nop: pindahTargetItem.nop,
+        namaWp: pindahTargetItem.namaWp || '-',
+        alamatOp: pindahTargetItem.alamatOp || '-',
+        tahun: selectedYear,
+        dariLingkungan,
+        keLingkungan,
+        dipindahOlehId: activeAccount?.id || 'kepling',
+        dipindahOlehNama: activeAccount?.nama || 'Kepala Lingkungan',
+        dipindahOlehRole: activeAccount?.role || 'kepling',
+        readBy: activeAccount?.id ? [activeAccount.id] : [],
+      }).catch(() => {});
+      notify(
+        `Berhasil memindahkan NOP ${pindahTargetItem.nop} (${pindahTargetItem.namaWp}) ke Lingkungan ${keLingkungan}! Notifikasi terkirim ke Kasi Pemerintahan, Super Admin, & Kepling Lingkungan ${keLingkungan}.`,
+        'success'
+      );
+    } else {
+      notify(
+        `Berhasil memindahkan NOP ${pindahTargetItem.nop} (${pindahTargetItem.namaWp}) ke Lingkungan ${keLingkungan}!`,
+        'success'
+      );
+    }
+
+    setIsPindahLingkunganModalOpen(false);
+    setPindahTargetItem(null);
+  };
+
+  // Dedicated NOP Bermasalah Modal State (Kepling & quick problem reporting)
+  const NOP_BERMASALAH_PRESET_OPTIONS = [
+    'Objek Pajak Tidak Ditemukan',
+    'WP Sudah Meninggal / Pindah',
+    'Nama Berbeda dengan Sertifikat',
+    'Alamat Tidak Jelas',
+    'NOP Ganda',
+    'Bangunan Sudah Runtuh/Dihapus',
+    'Sengketa Lahan',
+  ];
+  const CUSTOM_MASALAH_OPTION = 'Ketik Masalah Lainnya (Tulis Manual)';
+
+  const [isBermasalahModalOpen, setIsBermasalahModalOpen] = useState<boolean>(false);
+  const [bermasalahTargetItem, setBermasalahTargetItem] = useState<SpptPbbItem | null>(null);
+  const [selectedMasalahOption, setSelectedMasalahOption] = useState<string>('');
+  const [customMasalahText, setCustomMasalahText] = useState<string>('');
+  const [bermasalahModalError, setBermasalahModalError] = useState<string | null>(null);
+
+  const handleOpenBermasalahModal = (item: SpptPbbItem) => {
+    setBermasalahTargetItem(item);
+    setBermasalahModalError(null);
+    const existingNote = (item.masalahNote || '').trim();
+    if (item.isBermasalah && existingNote) {
+      if (NOP_BERMASALAH_PRESET_OPTIONS.includes(existingNote)) {
+        setSelectedMasalahOption(existingNote);
+        setCustomMasalahText('');
+      } else if (
+        existingNote === 'Dilaporkan bermasalah oleh Kepala Lingkungan' ||
+        existingNote === 'Masalah Lainnya (Tulis di Keterangan)'
+      ) {
+        setSelectedMasalahOption(CUSTOM_MASALAH_OPTION);
+        setCustomMasalahText('');
+      } else {
+        setSelectedMasalahOption(CUSTOM_MASALAH_OPTION);
+        setCustomMasalahText(existingNote);
+      }
+    } else {
+      setSelectedMasalahOption('');
+      setCustomMasalahText('');
+    }
+    setIsBermasalahModalOpen(true);
+  };
+
+  const handleSaveBermasalahModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bermasalahTargetItem) return;
+
+    if (!selectedMasalahOption) {
+      setBermasalahModalError('Silakan pilih salah satu jenis masalah atau pilih "Ketik Masalah Lainnya".');
+      return;
+    }
+
+    let finalNote = selectedMasalahOption;
+    if (selectedMasalahOption === CUSTOM_MASALAH_OPTION) {
+      if (!customMasalahText.trim()) {
+        setBermasalahModalError('Silakan ketik detail masalah NOP pada kolom yang tersedia.');
+        return;
+      }
+      finalNote = customMasalahText.trim();
+    }
+
+    const updatedItem: SpptPbbItem = {
+      ...bermasalahTargetItem,
+      isBermasalah: true,
+      masalahNote: finalNote,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setSpptList((prev) =>
+      prev.map((i) => (i.id === bermasalahTargetItem.id ? updatedItem : i))
+    );
+    savePbbSpptToFirestore(updatedItem, selectedYear).catch(() => {});
+    notify(
+      `NOP ${bermasalahTargetItem.nop} (${bermasalahTargetItem.namaWp}) ditandai BERMASALAH: "${finalNote}".`,
+      'info'
+    );
+    setIsBermasalahModalOpen(false);
+    setBermasalahTargetItem(null);
+  };
+
+  const handleClearBermasalahFromModal = () => {
+    if (!bermasalahTargetItem) return;
+    const updatedItem: SpptPbbItem = {
+      ...bermasalahTargetItem,
+      isBermasalah: false,
+      masalahNote: '',
+      updatedAt: new Date().toISOString(),
+    };
+    setSpptList((prev) =>
+      prev.map((i) => (i.id === bermasalahTargetItem.id ? updatedItem : i))
+    );
+    savePbbSpptToFirestore(updatedItem, selectedYear).catch(() => {});
+    notify(
+      `Status bermasalah pada NOP ${bermasalahTargetItem.nop} (${bermasalahTargetItem.namaWp}) telah dicabut.`,
+      'success'
+    );
+    setIsBermasalahModalOpen(false);
+    setBermasalahTargetItem(null);
+  };
+
   // Form Fields State
   const [formNop, setFormNop] = useState<string>('');
   const [formNamaWp, setFormNamaWp] = useState<string>('');
@@ -570,6 +773,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const [formKeterangan, setFormKeterangan] = useState<string>('');
   const [formIsBermasalah, setFormIsBermasalah] = useState<boolean>(false);
   const [formMasalahNote, setFormMasalahNote] = useState<string>('');
+  const [formCustomMasalahNote, setFormCustomMasalahNote] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
 
   // Debounced NOP check state for instant validation
@@ -601,42 +805,56 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     }
   };
 
-  // Export Filtered WP List to Excel / CSV (.csv)
+  // Export Filtered WP List to Excel (.xlsx)
   const handleExportWpExcel = () => {
     if (filteredSpptList.length === 0) {
       notify('Tidak ada data Wajib Pajak yang sesuai dengan filter untuk diekspor.', 'info');
       return;
     }
     try {
-      const headers = ['No', 'NOP', 'Nama Wajib Pajak', 'Alamat OP', 'Lingkungan', 'PBB Ketetapan (Rp)', 'Status Bayar', 'Tanggal Bayar', 'Keterangan'];
-      const rows = filteredSpptList.map((item, idx) => [
-        idx + 1,
-        `'${item.nop}`,
-        item.namaWp || '-',
-        item.alamatOp || '-',
-        `Lingkungan ${item.lingkungan}`,
-        item.pbbTerutang || 0,
-        item.status === 'Sudah Bayar' ? 'Sudah Bayar' : 'Belum Bayar',
-        item.tglBayar || '-',
-        item.keterangan || '-',
-      ]);
+      const excelData = filteredSpptList.map((item, idx) => ({
+        'No': idx + 1,
+        'NOP': item.nop || '-',
+        'Nama Wajib Pajak': item.namaWp || '-',
+        'Alamat OP': item.alamatOp || '-',
+        'Lingkungan': item.lingkungan > 0 ? `Lingkungan ${item.lingkungan}` : 'Belum Dipetakan (0)',
+        'Golongan Buku': item.buku || '-',
+        'PBB Ketetapan (Rp)': Number(item.pbbTerutang) || 0,
+        'Status Bayar': item.status === 'Sudah Bayar' ? 'Sudah Bayar' : 'Belum Bayar',
+        'Tanggal Bayar': item.tglBayar || '-',
+        'Status Bermasalah': item.isBermasalah ? 'BERMASALAH' : 'Normal',
+        'Jenis / Detail Masalah': item.isBermasalah ? (item.masalahNote || 'Dilaporkan bermasalah') : '-',
+        'Keterangan': item.keterangan || '-',
+      }));
 
-      const csvContent =
-        'data:text/csv;charset=utf-8,\uFEFF' +
-        [headers.join(','), ...rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      worksheet['!cols'] = [
+        { wch: 6 },
+        { wch: 24 },
+        { wch: 30 },
+        { wch: 32 },
+        { wch: 18 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 16 },
+        { wch: 36 },
+        { wch: 24 },
+      ];
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Daftar WP PBB');
 
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `Daftar_WP_PBB_${selectedYear}_Lingkungan_${selectedLingkungan}_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const dateStr = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(
+        workbook,
+        `Daftar_WP_PBB_${selectedYear}_Lingkungan_${selectedLingkungan}_${dateStr}.xlsx`
+      );
 
-      notify(`Berhasil mengekspor ${filteredSpptList.length} data Wajib Pajak ke file Excel!`, 'success');
+      notify(`Berhasil mengekspor ${filteredSpptList.length} data Wajib Pajak ke file Excel (.xlsx)!`, 'success');
     } catch (err) {
       console.error(err);
-      notify('Gagal mengekspor data Wajib Pajak.', 'error');
+      notify('Gagal mengekspor data Wajib Pajak ke Excel.', 'error');
     }
   };
 
@@ -664,14 +882,15 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     setFormKeterangan('');
     setFormIsBermasalah(false);
     setFormMasalahNote('');
+    setFormCustomMasalahNote('');
     setFormError(null);
     setIsWpModalOpen(true);
   };
 
   // Open Modal for Editing Existing WP
   const handleOpenEditModal = (item: SpptPbbItem) => {
-    if (!canManageWp) {
-      notify('Akses Dibatasi: Hanya Superadmin dan Kasi Pemerintahan yang berwenang mengedit data PBB.', 'error');
+    if (!canEditWp) {
+      notify('Akses Dibatasi: Anda tidak berwenang mengedit data PBB.', 'error');
       return;
     }
     setEditingWpItem(item);
@@ -686,7 +905,16 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     setFormTglBayar(item.tglBayar || (item.status === 'Sudah Bayar' ? (item.updatedAt ? item.updatedAt.split('T')[0] : new Date().toISOString().split('T')[0]) : ''));
     setFormKeterangan(item.keterangan || '');
     setFormIsBermasalah(Boolean(item.isBermasalah));
-    setFormMasalahNote(item.masalahNote || '');
+    const existingNote = (item.masalahNote || '').trim();
+    if (!existingNote || NOP_BERMASALAH_PRESET_OPTIONS.includes(existingNote)) {
+      setFormMasalahNote(existingNote);
+      setFormCustomMasalahNote('');
+    } else {
+      setFormMasalahNote('Masalah Lainnya (Tulis di Keterangan)');
+      setFormCustomMasalahNote(
+        existingNote === 'Masalah Lainnya (Tulis di Keterangan)' ? '' : existingNote
+      );
+    }
     setFormError(null);
     setIsWpModalOpen(true);
   };
@@ -694,8 +922,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   // Save (Add or Edit) WP Item
   const handleSaveWpItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canManageWp) {
-      notify('Akses Dibatasi: Hanya Superadmin dan Kasi Pemerintahan yang berwenang menyimpan perubahan data PBB.', 'error');
+    if (!canEditWp) {
+      notify('Akses Dibatasi: Anda tidak berwenang menyimpan perubahan data PBB.', 'error');
       return;
     }
     if (!formNop.trim()) {
@@ -717,8 +945,39 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     const cleanBayarStr = formJumlahBayar.replace(/[^0-9]/g, '');
     const nominalBayar = cleanBayarStr ? parseInt(cleanBayarStr, 10) : nominalPbb;
 
+    if (
+      formIsBermasalah &&
+      formMasalahNote === 'Masalah Lainnya (Tulis di Keterangan)' &&
+      !formCustomMasalahNote.trim()
+    ) {
+      setFormError('Silakan ketik detail masalah NOP pada kolom Ketik Masalah Lainnya.');
+      return;
+    }
+
+    const effectiveMasalahNote = formIsBermasalah
+      ? formMasalahNote === 'Masalah Lainnya (Tulis di Keterangan)'
+        ? formCustomMasalahNote.trim()
+        : formMasalahNote.trim()
+      : '';
+
     if (editingWpItem) {
-      // Update Existing Item
+      if (isKepling) {
+        // Kepling is strictly allowed to move Lingkungan only
+        const updatedItem: SpptPbbItem = {
+          ...editingWpItem,
+          lingkungan: formLingkungan,
+          updatedAt: new Date().toISOString(),
+        };
+        setSpptList((prev) =>
+          prev.map((item) => (item.id === editingWpItem.id ? updatedItem : item))
+        );
+        savePbbSpptToFirestore(updatedItem, selectedYear).catch(() => {});
+        notify(`Berhasil memindahkan NOP ${editingWpItem.nop} (${editingWpItem.namaWp}) ke Lingkungan ${formLingkungan}!`, 'success');
+        setIsWpModalOpen(false);
+        return;
+      }
+
+      // Update Existing Item (Super Admin / Kasi)
       const formattedNop = formatNop(formNop.trim());
       // Determine tglBayar: if becoming Sudah Bayar today, record today's date YYYY-MM-DD (or use user-chosen date)
       let effectiveTglBayar = formTglBayar ? formTglBayar.trim() : editingWpItem.tglBayar;
@@ -742,7 +1001,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         status: formStatus,
         keterangan: formKeterangan.trim(),
         isBermasalah: formIsBermasalah,
-        masalahNote: formMasalahNote.trim(),
+        masalahNote: effectiveMasalahNote,
         tglBayar: effectiveTglBayar,
         updatedAt: new Date().toISOString(),
       };
@@ -772,7 +1031,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         status: formStatus,
         keterangan: formKeterangan.trim(),
         isBermasalah: formIsBermasalah,
-        masalahNote: formMasalahNote.trim(),
+        masalahNote: effectiveMasalahNote,
         tglBayar: formStatus === 'Sudah Bayar' ? todayIso : null,
         updatedAt: new Date().toISOString(),
       };
@@ -850,8 +1109,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
   const summaryByLingkungan = useMemo(() => {
     const dataMap: Record<number, { targetNominal: number; realisasiNominal: number; totalWp: number; wpLunas: number; bermasalahCount: number }> = {};
 
-    // Initialize 24 Lingkungan with 0 baseline
-    for (let i = 1; i <= 24; i++) {
+    // Initialize target Lingkungan with 0 baseline
+    const targetLingkungans =
+      isKepling && keplingLingkunganNum
+        ? [keplingLingkunganNum]
+        : Array.from({ length: 24 }, (_, i) => i + 1);
+
+    targetLingkungans.forEach((i) => {
       dataMap[i] = {
         targetNominal: 0,
         realisasiNominal: 0,
@@ -859,13 +1123,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         wpLunas: 0,
         bermasalahCount: 0,
       };
-    }
+    });
 
-    // Tally target and realization directly from user-imported spptList
-    spptList.forEach((item) => {
+    // Tally target and realization directly from scopedSpptList
+    scopedSpptList.forEach((item) => {
       const ling = Number(item.lingkungan);
       const nominal = Number(item.pbbTerutang) || 0;
-      if (ling >= 1 && ling <= 24 && dataMap[ling]) {
+      if (dataMap[ling]) {
         dataMap[ling].totalWp += 1;
         dataMap[ling].targetNominal += nominal;
         if (item.status === 'Sudah Bayar') {
@@ -936,7 +1200,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     });
 
     return list;
-  }, [spptList, selectedLingkungan, sortBy, sortOrder]);
+  }, [scopedSpptList, isKepling, keplingLingkunganNum, selectedLingkungan, sortBy, sortOrder]);
 
   // Filtered Summary for Chart and Table view
   const filteredSummaryByLingkungan = useMemo(() => {
@@ -947,7 +1211,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     return summaryByLingkungan.filter((item) => item.lingkungan === lingNum);
   }, [summaryByLingkungan, selectedLingkungan]);
 
-  // Total overall Kelurahan metrics
+  // Total overall Kelurahan metrics (strictly isolated for Kepling)
   const kelurahanTotals = useMemo(() => {
     let target = 0;
     let realisasi = 0;
@@ -955,12 +1219,12 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
     let lunas = 0;
     let bermasalah = 0;
 
-    if (selectedLingkungan === 'all') {
-      wp = spptList.length;
-      const lunasItems = spptList.filter(item => item.status === 'Sudah Bayar');
+    if (selectedLingkungan === 'all' && !isKepling) {
+      wp = scopedSpptList.length;
+      const lunasItems = scopedSpptList.filter(item => item.status === 'Sudah Bayar');
       lunas = lunasItems.length;
-      bermasalah = spptList.filter(item => item.isBermasalah).length;
-      target = spptList.reduce((acc, item) => acc + (Number(item.pbbTerutang) || 0), 0);
+      bermasalah = scopedSpptList.filter(item => item.isBermasalah).length;
+      target = scopedSpptList.reduce((acc, item) => acc + (Number(item.pbbTerutang) || 0), 0);
       realisasi = lunasItems.reduce((acc, item) => {
         const actualPaid = item.jumlahBayar !== undefined && item.jumlahBayar !== null 
           ? Number(item.jumlahBayar) 
@@ -991,11 +1255,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       persentaseRealisasi: persentase,
       persentaseWpLunas: persentaseWp,
     };
-  }, [summaryByLingkungan, spptList, selectedLingkungan]);
+  }, [summaryByLingkungan, scopedSpptList, selectedLingkungan, isKepling]);
 
   // Monthly Progress Calculation for Header Card
   const monthlyProgress = useMemo(() => {
-    const lunasItems = spptList.filter(item => item.status === 'Sudah Bayar');
+    const lunasItems = scopedSpptList.filter(item => item.status === 'Sudah Bayar');
 
     const getPaymentMonth = (item: SpptPbbItem): number => {
       // Deterministic hash based on ID
@@ -1044,11 +1308,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       nominalBulanLalu: totalAgustus,
       persentaseKenaikan: kenaikanPersentase
     };
-  }, [spptList]);
+  }, [scopedSpptList]);
 
   // Filtered SPPT Items for Detail View
   const filteredSpptList = useMemo(() => {
-    return spptList.filter((item) => {
+    return scopedSpptList.filter((item) => {
       // Lingkungan filter
       if (selectedLingkungan !== 'all') {
         if (selectedLingkungan === '0') {
@@ -1120,11 +1384,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
 
       return true;
     });
-  }, [spptList, selectedLingkungan, selectedStatusFilter, selectedNopClassification, searchQuery]);
+  }, [scopedSpptList, selectedLingkungan, selectedStatusFilter, selectedNopClassification, searchQuery]);
 
   // Quick environmental SPPT metrics summary for subtab header
   const subTabSummary = useMemo(() => {
-    const baseList = spptList.filter(item => {
+    const baseList = scopedSpptList.filter(item => {
       if (selectedLingkungan !== 'all' && item.lingkungan !== parseInt(selectedLingkungan, 10)) {
         return false;
       }
@@ -1147,12 +1411,13 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
       belumCount,
       belumNominal,
     };
-  }, [spptList, selectedLingkungan]);
+  }, [scopedSpptList, selectedLingkungan]);
 
   // Detect NOPs with unassigned environments (lingkungan === 0)
   const unassignedNops = useMemo(() => {
+    if (isKepling) return [];
     return spptList.filter(item => item.lingkungan === 0);
-  }, [spptList]);
+  }, [spptList, isKepling]);
 
   // Client-Side Pagination States for ultra-fast, lag-free table rendering
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -1690,19 +1955,21 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               </div>
 
               {/* Tombol Salin Rekap PBB WA (24 Lingkungan) */}
-              <button
-                type="button"
-                onClick={handleCopyPbbWa}
-                title="Salin rekapitulasi capaian persentase PBB 24 Lingkungan ke format WhatsApp"
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all shadow-md cursor-pointer ${
-                  copiedPbbWa
-                    ? 'bg-emerald-400 text-slate-950 scale-102 ring-2 ring-emerald-300'
-                    : 'bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white border border-emerald-400/60'
-                }`}
-              >
-                {copiedPbbWa ? <Check className="w-4 h-4 text-slate-950" /> : <Copy className="w-4 h-4 text-emerald-200" />}
-                <span>{copiedPbbWa ? 'Tersalin!' : 'Salin Rekap PBB WA'}</span>
-              </button>
+              {!isKepling && (
+                <button
+                  type="button"
+                  onClick={handleCopyPbbWa}
+                  title="Salin rekapitulasi capaian persentase PBB 24 Lingkungan ke format WhatsApp"
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all shadow-md cursor-pointer ${
+                    copiedPbbWa
+                      ? 'bg-emerald-400 text-slate-950 scale-102 ring-2 ring-emerald-300'
+                      : 'bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white border border-emerald-400/60'
+                  }`}
+                >
+                  {copiedPbbWa ? <Check className="w-4 h-4 text-slate-950" /> : <Copy className="w-4 h-4 text-emerald-200" />}
+                  <span>{copiedPbbWa ? 'Tersalin!' : 'Salin Rekap PBB WA'}</span>
+                </button>
+              )}
 
               {/* Tombol Sinkronkan Data Realtime */}
               <button
@@ -1802,6 +2069,123 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         </div>
       )}
 
+      {/* INBOX NOTIFIKASI PINDAH NOP MASUK (Untuk Kasi Pemerintahan, Super Admin, & Kepling Tujuan) */}
+      {unreadMoveNotifs.length > 0 && (
+        <div className="p-4 sm:p-5 bg-gradient-to-r from-indigo-50 via-white to-amber-50 border-2 border-indigo-300 rounded-2xl shadow-sm space-y-3 print:hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-200/80 pb-3">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-xs shrink-0 animate-pulse">
+                <Bell className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-black text-indigo-950 text-sm">
+                    Notifikasi Pindah NOP dari Kepala Lingkungan
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black">
+                    {unreadMoveNotifs.length} Baru
+                  </span>
+                </div>
+                <p className="text-xs text-indigo-800 font-medium mt-0.5">
+                  Terdapat pemindahan lingkungan Wajib Pajak (SPPT) oleh Kepling yang perlu diketahui.
+                </p>
+              </div>
+            </div>
+
+            {activeAccount?.id && (
+              <button
+                type="button"
+                onClick={() =>
+                  markAllPbbPindahNotifsRead(
+                    activeAccount.id,
+                    unreadMoveNotifs.map((n) => n.id)
+                  )
+                }
+                className="px-3.5 py-2 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-black shadow-xs transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-center shrink-0"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Tandai Semua Dibaca</span>
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            {unreadMoveNotifs.map((notif) => (
+              <div
+                key={notif.id}
+                className="bg-white border border-indigo-200/90 rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs"
+              >
+                <div className="space-y-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-900 text-[10px] font-black">
+                      <ArrowRightLeft className="w-3 h-3" />
+                      <span>
+                        {notif.dariLingkungan > 0 ? `Lingk. ${notif.dariLingkungan}` : 'Lingk. 0'} ➔ Lingk. {notif.keLingkungan}
+                      </span>
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                      NOP: {notif.nop}
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
+                      Tahun {notif.tahun}
+                    </span>
+                  </div>
+                  <p className="text-xs font-black text-slate-900 uppercase truncate">
+                    {notif.namaWp}
+                    {notif.alamatOp ? (
+                      <span className="font-normal text-slate-500 ml-1.5">({notif.alamatOp})</span>
+                    ) : null}
+                  </p>
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    Dipindahkan oleh <strong className="text-slate-800">{notif.dipindahOlehNama}</strong> •{' '}
+                    {notif.createdAt
+                      ? new Date(notif.createdAt).toLocaleString('id-ID', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : 'Baru saja'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isKepling && notif.keLingkungan > 0) {
+                        setSelectedLingkungan(String(notif.keLingkungan));
+                      }
+                      setSelectedStatusFilter('all');
+                      setSelectedNopClassification('all');
+                      setSearchQuery(notif.nop);
+                      setActiveTab('detail_sppt');
+                      if (activeAccount?.id) {
+                        markPbbPindahNotifRead(notif.id, activeAccount.id);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Lihat NOP</span>
+                  </button>
+                  {activeAccount?.id && (
+                    <button
+                      type="button"
+                      onClick={() => markPbbPindahNotifRead(notif.id, activeAccount.id)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition-all cursor-pointer border border-slate-200"
+                    >
+                      Tandai Dibaca
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* NOP BARU / UNMAPPED DETECTED WARNING BANNER */}
       {unassignedNops.length > 0 && (
         <div className="p-4 bg-gradient-to-r from-rose-50 to-amber-50 border-2 border-rose-200 rounded-2xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1897,20 +2281,26 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50/50 to-white shadow-2xs space-y-2 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setActiveTab('rekap_bermasalah')}
+          title="Klik untuk membuka Diagram, Rekap & Daftar NOP Bermasalah"
+          className="bg-white p-5 rounded-2xl border border-rose-200 hover:border-rose-400 bg-gradient-to-br from-rose-50/50 to-white shadow-2xs hover:shadow-md space-y-2 overflow-hidden text-left transition-all cursor-pointer group"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">NOP Bermasalah</span>
-            <div className="p-2 bg-rose-100 text-rose-700 rounded-xl">
+            <div className="p-2 bg-rose-100 group-hover:bg-rose-200 text-rose-700 rounded-xl transition-colors">
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
           <div className="text-sm sm:text-base md:text-lg font-black text-rose-900 tracking-tight break-words">
             {kelurahanTotals.totalBermasalah.toLocaleString('id-ID')} <span className="text-xs text-slate-500 font-normal">NOP</span>
           </div>
-          <div className="text-[10px] text-rose-700 font-medium leading-tight pt-1">
-            Laporan kendala penagihan PBB dari lapangan oleh Kepling.
+          <div className="text-[10px] text-rose-700 font-bold leading-tight pt-1 flex items-center justify-between gap-1">
+            <span>Klik untuk Diagram &amp; Ekspor Excel</span>
+            <ChevronRight className="w-3.5 h-3.5 text-rose-500 group-hover:translate-x-0.5 transition-transform shrink-0" />
           </div>
-        </div>
+        </button>
 
         {/* Progres Bulanan PBB (Hanya untuk Super Admin / Kasi Pemerintahan, disembunyikan untuk Akun Kepling) */}
         {!isKepling && (
@@ -2033,7 +2423,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           >
             <span className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
-              <span>Rekapitulasi 24 Lingkungan</span>
+              <span>
+                {isKepling
+                  ? `Rekapitulasi Lingkungan ${keplingLingkunganNum}`
+                  : 'Rekapitulasi 24 Lingkungan'}
+              </span>
             </span>
           </button>
 
@@ -2067,6 +2461,23 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               <span>Detail SPPT Per Wajib Pajak</span>
               <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800">
                 {filteredSpptList.length}
+              </span>
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('rekap_bermasalah')}
+            className={`py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'rekap_bermasalah'
+                ? 'border-rose-600 text-rose-800 font-black'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600" />
+              <span>Diagram &amp; Rekap NOP Bermasalah</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-100 text-rose-800 font-black">
+                {kelurahanTotals.totalBermasalah}
               </span>
             </span>
           </button>
@@ -2148,18 +2559,24 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               </div>
 
               {/* Lingkungan Filter */}
-              <select
-                value={selectedLingkungan}
-                onChange={(e) => setSelectedLingkungan(e.target.value)}
-                className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="all">Semua Lingkungan (1 - 24)</option>
-                {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={String(n)}>
-                    Lingkungan {n}
-                  </option>
-                ))}
-              </select>
+              {isKepling && keplingLingkunganNum ? (
+                <span className="px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-xs font-black text-emerald-900">
+                  👑 Lingkungan {keplingLingkunganNum} (Wilayah Anda)
+                </span>
+              ) : (
+                <select
+                  value={selectedLingkungan}
+                  onChange={(e) => setSelectedLingkungan(e.target.value)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="all">Semua Lingkungan (1 - 24)</option>
+                  {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={String(n)}>
+                      Lingkungan {n}
+                    </option>
+                  ))}
+                </select>
+              )}
 
               {/* Sort By */}
               <select
@@ -2489,7 +2906,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
               <tfoot className="bg-slate-900 text-white font-black text-xs sm:text-sm border-t-2 border-slate-700">
                 <tr>
                   <td colSpan={2} className="py-3.5 px-4 text-right uppercase">
-                    TOTAL KELURAHAN MANGGA:
+                    {isKepling ? `TOTAL LINGKUNGAN ${keplingLingkunganNum}:` : 'TOTAL KELURAHAN MANGGA:'}
                   </td>
                   <td className="py-3.5 px-4 text-center">
                     {kelurahanTotals.wpLunas.toLocaleString('id-ID')} / {kelurahanTotals.totalWp.toLocaleString('id-ID')}
@@ -2507,18 +2924,20 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           </div>
 
           {/* Rekap Total Capaian Kepatuhan PBB 24 Lingkungan (Grid & Tabel + Salin WA) */}
-          <div className="pt-4 border-t border-slate-200">
-            <RekapCapaianPbb24Lingkungan
-              overview={livePbbOverview}
-              selectedYear={selectedYear}
-              onSelectLingkungan={(lingkunganNum) => {
-                setSelectedLingkungan(String(lingkunganNum));
-                setActiveTab('detail_sppt');
-              }}
-              onShowToast={notify}
-              defaultViewMode="grid"
-            />
-          </div>
+          {!isKepling && (
+            <div className="pt-4 border-t border-slate-200">
+              <RekapCapaianPbb24Lingkungan
+                overview={livePbbOverview}
+                selectedYear={selectedYear}
+                onSelectLingkungan={(lingkunganNum) => {
+                  setSelectedLingkungan(String(lingkunganNum));
+                  setActiveTab('detail_sppt');
+                }}
+                onShowToast={notify}
+                defaultViewMode="grid"
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -2529,13 +2948,26 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
             selectedYear={selectedYear}
             selectedLingkungan={selectedLingkungan}
             onSelectLingkungan={setSelectedLingkungan}
-            spptList={spptList}
+            spptList={scopedSpptList}
             summaryByLingkungan={summaryByLingkungan}
             kelurahanTotals={kelurahanTotals}
             isKepling={isKepling}
             keplingLingkunganNum={keplingLingkunganNum}
           />
         </React.Suspense>
+      )}
+
+      {/* SUB-TAB: DIAGRAM & REKAP NOP BERMASALAH */}
+      {activeSubTab === 'rekap_bermasalah' && (
+        <RekapNopBermasalahView
+          spptList={scopedSpptList}
+          selectedYear={selectedYear}
+          isKepling={isKepling}
+          keplingLingkunganNum={keplingLingkunganNum}
+          canEditWp={canEditWp}
+          onManageBermasalah={handleOpenBermasalahModal}
+          onShowToast={notify}
+        />
       )}
 
       {/* SUB-TAB 2: DETAIL SPPT PER WP */}
@@ -2632,7 +3064,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   title="Klasifikasi NOP Lapangan (Buku, Blok, Prioritas Penagihan)"
                 >
                   <option value="all">📁 Semua Golongan NOP</option>
-                  <option value="nop_baru" className="text-rose-600 font-black">🆕 NOP BARU (Belum Masuk Lingkungan)</option>
+                  {!isKepling && (
+                    <option value="nop_baru" className="text-rose-600 font-black">
+                      🆕 NOP BARU (Belum Masuk Lingkungan)
+                    </option>
+                  )}
                   <option value="bermasalah" className="text-rose-700 font-black bg-rose-50">❌ NOP BERMASALAH (Laporan Lapangan)</option>
                   <option value="diskon_pembayaran" className="text-emerald-700 font-black bg-emerald-50">🏷️ Mendapat Diskon / Keringanan Pembayaran (Stimulus PBB)</option>
                   <option value="buku_1">📗 Buku 1 (Ketetapan ≤ Rp 100rb)</option>
@@ -2805,9 +3241,17 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                             </span>
                           )}
                           {item.isBermasalah && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-100 text-rose-900 border border-rose-300 flex items-center gap-1 whitespace-nowrap animate-pulse" title={item.masalahNote || 'Laporan kendala lapangan'}>
-                              <AlertTriangle className="w-3 h-3 text-rose-600" />
-                              <span>! BERMASALAH</span>
+                            <span
+                              className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-100 text-rose-900 border border-rose-300 inline-flex items-center gap-1 max-w-[230px]"
+                              title={item.masalahNote || 'Laporan kendala lapangan'}
+                            >
+                              <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
+                              <span className="shrink-0">! BERMASALAH</span>
+                              {item.masalahNote && (
+                                <span className="truncate font-semibold text-rose-700">
+                                  — {item.masalahNote}
+                                </span>
+                              )}
                             </span>
                           )}
                         </div>
@@ -2881,10 +3325,42 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-center print:hidden">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {canManageWp ? (
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          {isKepling ? (
                             <>
-                              {/* Toggle status button (Hanya Superadmin & Kasi Pemerintahan) */}
+                              {/* Pindah Lingkungan Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPindahLingkunganModal(item)}
+                                className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-black transition-all shadow-xs flex items-center gap-1 cursor-pointer border border-amber-400"
+                                title="Pindah Lingkungan NOP"
+                              >
+                                <MapPin className="w-3 h-3" />
+                                <span>Pindah Lingkungan</span>
+                              </button>
+
+                              {/* NOP Bermasalah Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenBermasalahModal(item)}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all shadow-xs flex items-center gap-1 cursor-pointer border ${
+                                  item.isBermasalah
+                                    ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 animate-pulse'
+                                    : 'bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 text-slate-700 border-slate-300'
+                                }`}
+                                title={
+                                  item.isBermasalah
+                                    ? `Masalah: ${item.masalahNote || 'Bermasalah'} — Klik untuk ubah atau cabut status`
+                                    : 'Klik untuk memilih jenis masalah atau ketik masalah NOP'
+                                }
+                              >
+                                <AlertTriangle className="w-3 h-3" />
+                                <span>{item.isBermasalah ? 'NOP Bermasalah' : 'Tandai Bermasalah'}</span>
+                              </button>
+                            </>
+                          ) : canEditWp ? (
+                            <>
+                              {/* Toggle status button */}
                               <button
                                 onClick={() => handleToggleStatusWp(item.id)}
                                 className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
@@ -2897,7 +3373,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                                 {item.status === 'Sudah Bayar' ? 'Ubah Belum' : 'Tandai Lunas'}
                               </button>
 
-                              {/* Edit button */}
+                              {/* Edit & Pindah Lingkungan button */}
                               <button
                                 onClick={() => handleOpenEditModal(item)}
                                 className={`p-1 rounded-lg cursor-pointer transition-colors ${
@@ -2905,19 +3381,21 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                                     ? 'bg-rose-600 text-white hover:bg-rose-700 border border-rose-700 animate-pulse ring-2 ring-rose-400'
                                     : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300'
                                 }`}
-                                title={item.lingkungan === 0 ? "⚠️ Klik untuk Petakan Lingkungan Secara Manual" : "Edit Data Wajib Pajak"}
+                                title={item.lingkungan === 0 ? "⚠️ Klik untuk Petakan Lingkungan Secara Manual" : "Edit / Pindah Lingkungan Data Wajib Pajak"}
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
                               </button>
 
-                              {/* Delete button */}
-                              <button
-                                onClick={() => handleDeleteWpItem(item)}
-                                className="p-1 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 cursor-pointer transition-colors"
-                                title="Hapus Data Wajib Pajak"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {/* Delete button (Restricted to Superadmin & Kasi) */}
+                              {canManageWp && (
+                                <button
+                                  onClick={() => handleDeleteWpItem(item)}
+                                  className="p-1 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 cursor-pointer transition-colors"
+                                  title="Hapus Data Wajib Pajak"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </>
                           ) : (
                             <span
@@ -3348,6 +3826,249 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
         </div>
       )}
 
+      {/* MODAL KHUSUS PINDAH LINGKUNGAN */}
+      {isPindahLingkunganModalOpen && pindahTargetItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs animate-fade-in print:hidden">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-scale-up">
+            <div className="bg-gradient-to-r from-amber-600 to-amber-700 text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-amber-200" />
+                <h3 className="text-sm font-black tracking-tight">Pindah Lingkungan Objek Pajak (NOP)</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPindahLingkunganModalOpen(false)}
+                className="p-1 rounded-lg hover:bg-amber-800/60 text-amber-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Informasi Objek Pajak</p>
+                <p className="text-xs font-mono font-bold text-slate-800">NOP: {pindahTargetItem.nop}</p>
+                <p className="text-xs font-black text-slate-900 uppercase">Nama WP: {pindahTargetItem.namaWp || '-'}</p>
+                <p className="text-[11px] text-slate-600 uppercase">Alamat: {pindahTargetItem.alamatOp || '-'}</p>
+                <p className="text-[11px] font-bold text-amber-800 pt-1">
+                  Lingkungan Saat Ini: {pindahTargetItem.lingkungan === 0 ? 'Belum Dipetakan (Lingkungan 0)' : `Lingkungan ${pindahTargetItem.lingkungan}`}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                  <span>Pilih Lingkungan Tujuan Baru <span className="text-red-500">*</span></span>
+                </label>
+                <select
+                  value={targetLingkunganNum}
+                  onChange={(e) => setTargetLingkunganNum(parseInt(e.target.value, 10))}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                >
+                  {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>
+                      Lingkungan {n} {n === activeAccount?.nomorLingkungan ? '(Lingkungan Anda)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  Sistem akan memperbarui nomor lingkungan NOP ini secara instan di database lokal & Cloud Firestore.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsPindahLingkunganModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSavePindahLingkungan}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Simpan Pemindahan Lingkungan</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KHUSUS NOP BERMASALAH (KEPLING) */}
+      {isBermasalahModalOpen && bermasalahTargetItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs animate-fade-in print:hidden">
+          <div className="bg-white rounded-2xl shadow-2xl border border-rose-200 w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden animate-scale-up">
+            <div className="bg-gradient-to-r from-rose-600 to-rose-700 text-white p-4 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-rose-800/60 rounded-lg border border-rose-400/40">
+                  <AlertTriangle className="w-5 h-5 text-rose-100" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black tracking-tight">Tandai / Kelola NOP Bermasalah</h3>
+                  <p className="text-[10px] text-rose-100 font-medium">
+                    Pilih jenis kendala di lapangan atau ketik masalah secara manual
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBermasalahModalOpen(false)}
+                className="p-1 rounded-lg hover:bg-rose-800/60 text-rose-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBermasalahModal} className="p-5 space-y-4 overflow-y-auto">
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Informasi Objek Pajak</p>
+                  {bermasalahTargetItem.isBermasalah && (
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-100 text-rose-700 border border-rose-300">
+                      SAAT INI BERMASALAH
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs font-mono font-bold text-slate-800">NOP: {bermasalahTargetItem.nop}</p>
+                <p className="text-xs font-black text-slate-900 uppercase">Nama WP: {bermasalahTargetItem.namaWp || '-'}</p>
+                <p className="text-[11px] text-slate-600 uppercase">Alamat: {bermasalahTargetItem.alamatOp || '-'}</p>
+              </div>
+
+              {bermasalahModalError && (
+                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-800 text-xs font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{bermasalahModalError}</span>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-xs font-black text-slate-800 block">
+                  Pilih Jenis Masalah NOP <span className="text-rose-600">*</span>
+                </label>
+
+                <div className="grid grid-cols-1 gap-1.5">
+                  {NOP_BERMASALAH_PRESET_OPTIONS.map((option) => {
+                    const isSelected = selectedMasalahOption === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => {
+                          setSelectedMasalahOption(option);
+                          setBermasalahModalError(null);
+                        }}
+                        className={`w-full text-left px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                          isSelected
+                            ? 'bg-rose-50 border-rose-500 text-rose-900 ring-2 ring-rose-200'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                        }`}
+                      >
+                        <span>{option}</span>
+                        <span
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                            isSelected ? 'border-rose-600 bg-rose-600 text-white' : 'border-slate-300'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-2.5 h-2.5" />}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {/* Pilihan ke-8: Ketik Masalah Lainnya */}
+                  {(() => {
+                    const isCustomSelected = selectedMasalahOption === CUSTOM_MASALAH_OPTION;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedMasalahOption(CUSTOM_MASALAH_OPTION);
+                          setBermasalahModalError(null);
+                        }}
+                        className={`w-full text-left px-3.5 py-2.5 rounded-xl border text-xs font-black transition-all flex items-center justify-between cursor-pointer ${
+                          isCustomSelected
+                            ? 'bg-amber-50 border-amber-500 text-amber-950 ring-2 ring-amber-200'
+                            : 'bg-slate-50 border-dashed border-slate-300 text-slate-800 hover:bg-amber-50/50 hover:border-amber-400'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Edit3 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>{CUSTOM_MASALAH_OPTION}</span>
+                        </div>
+                        <span
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                            isCustomSelected ? 'border-amber-600 bg-amber-600 text-white' : 'border-slate-300'
+                          }`}
+                        >
+                          {isCustomSelected && <Check className="w-2.5 h-2.5" />}
+                        </span>
+                      </button>
+                    );
+                  })()}
+                </div>
+
+                {selectedMasalahOption === CUSTOM_MASALAH_OPTION && (
+                  <div className="pt-2 space-y-1.5 animate-fade-in">
+                    <label className="text-[11px] font-black text-amber-900 block">
+                      Ketik Detail Masalah NOP <span className="text-rose-600">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={customMasalahText}
+                      onChange={(e) => {
+                        setCustomMasalahText(e.target.value);
+                        if (bermasalahModalError) setBermasalahModalError(null);
+                      }}
+                      placeholder="Contoh: Tanah sudah diwakafkan untuk mushola / Ahli waris belum sepakat / Salah ketik nama dan luas bangunan..."
+                      autoFocus
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-amber-400 text-xs font-medium text-slate-900 bg-amber-50/40 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <p className="text-[10px] text-slate-500">
+                      Keterangan yang Anda ketik akan langsung tampil di tabel PBB serta dapat dibaca oleh Kasi Pemerintahan dan Super Admin.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
+                <div>
+                  {bermasalahTargetItem.isBermasalah && (
+                    <button
+                      type="button"
+                      onClick={handleClearBermasalahFromModal}
+                      className="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-black transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Cabut Status (Normal)</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setIsBermasalahModalOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Simpan Status Bermasalah</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL EDIT / TAMBAH WAJIB PAJAK */}
       {isWpModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in print:hidden">
@@ -3409,11 +4130,12 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   <input
                     type="text"
                     required
+                    disabled={isKepling}
                     maxLength={24}
                     value={formNop}
                     onChange={(e) => setFormNop(formatNop(e.target.value))}
                     placeholder="Contoh: 12.75.010.009.005-0012.0"
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-600"
                   />
                   <DuplicateCheckBadge
                     type="nop"
@@ -3431,10 +4153,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   <input
                     type="text"
                     required
+                    disabled={isKepling}
                     value={formNamaWp}
                     onChange={(e) => setFormNamaWp(e.target.value)}
                     placeholder="Nama lengkap pemilik/wajib pajak..."
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-600"
                   />
                 </div>
 
@@ -3446,10 +4169,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   </label>
                   <input
                     type="text"
+                    disabled={isKepling}
                     value={formAlamatOp}
                     onChange={(e) => setFormAlamatOp(e.target.value)}
                     placeholder="Jl. Letjen Djamin Ginting No..."
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-600"
                   />
                 </div>
 
@@ -3478,8 +4202,9 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   <label className="text-xs font-bold text-slate-700">Golongan Buku</label>
                   <select
                     value={formBuku}
+                    disabled={isKepling}
                     onChange={(e) => setFormBuku(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white disabled:bg-slate-100 disabled:text-slate-600"
                   >
                     <option value="I, II, III">Buku I, II, III</option>
                     <option value="IV, V">Buku IV, V</option>
@@ -3495,10 +4220,11 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   <input
                     type="text"
                     required
+                    disabled={isKepling}
                     value={formPbbTerutang}
                     onChange={(e) => setFormPbbTerutang(e.target.value)}
                     placeholder="Contoh: 450000"
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-mono font-bold text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-mono font-bold text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-600"
                   />
                   {formPbbTerutang && !isNaN(parseInt(formPbbTerutang.replace(/[^0-9]/g, ''), 10)) && (
                     <div className="text-[11px] font-bold text-emerald-700 pt-0.5">
@@ -3733,11 +4459,16 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   </div>
                   
                   {formIsBermasalah && (
-                    <div className="space-y-1.5 pt-1 animate-fade-in">
+                    <div className="space-y-2 pt-1 animate-fade-in">
                       <label className="text-[10px] font-bold text-rose-800 uppercase tracking-tight">Jenis / Catatan Masalah:</label>
                       <select
                         value={formMasalahNote}
-                        onChange={(e) => setFormMasalahNote(e.target.value)}
+                        onChange={(e) => {
+                          setFormMasalahNote(e.target.value);
+                          if (e.target.value !== 'Masalah Lainnya (Tulis di Keterangan)') {
+                            setFormCustomMasalahNote('');
+                          }
+                        }}
                         className="w-full px-3 py-1.5 rounded-xl border border-rose-300 text-xs font-bold text-rose-950 bg-white focus:outline-none focus:ring-2 focus:ring-rose-500"
                       >
                         <option value="">-- Pilih Jenis Masalah --</option>
@@ -3748,8 +4479,22 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                         <option value="NOP Ganda">NOP Ganda</option>
                         <option value="Bangunan Sudah Runtuh/Dihapus">Bangunan Sudah Runtuh/Dihapus</option>
                         <option value="Sengketa Lahan">Sengketa Lahan</option>
-                        <option value="Masalah Lainnya (Tulis di Keterangan)">Masalah Lainnya</option>
+                        <option value="Masalah Lainnya (Tulis di Keterangan)">Ketik Masalah Lainnya (Tulis Manual)</option>
                       </select>
+                      {formMasalahNote === 'Masalah Lainnya (Tulis di Keterangan)' && (
+                        <div className="space-y-1 pt-1">
+                          <label className="text-[10px] font-black text-rose-900 block">
+                            Ketik Detail Masalah NOP <span className="text-red-600">*</span>
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={formCustomMasalahNote}
+                            onChange={(e) => setFormCustomMasalahNote(e.target.value)}
+                            placeholder="Ketik masalah spesifik NOP di lapangan..."
+                            className="w-full px-3 py-2 rounded-xl border border-rose-300 text-xs font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                          />
+                        </div>
+                      )}
                       <p className="text-[10px] text-rose-600 font-medium">
                         * NOP bertanda masalah akan muncul di rekapitulasi khusus NOP Bermasalah.
                       </p>

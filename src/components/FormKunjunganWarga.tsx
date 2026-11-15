@@ -69,8 +69,11 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       setFotoUrl(
         editItem.fotoUrl || (editItem as any)?.foto || (editItem as any)?.fotoDokumentasi || ''
       );
+    } else if (isKepling) {
+      setLingkungan(defaultLingkungan);
+      setNamaKepling(defaultKeplingName);
     }
-  }, [editItem, defaultLingkungan, defaultKeplingName]);
+  }, [editItem, isKepling, defaultLingkungan, defaultKeplingName]);
 
   const handlePhotoUpload = async (file?: File) => {
     if (!file) return;
@@ -100,7 +103,10 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    if (!lingkungan) {
+    const effectiveLingkungan = isKepling ? (defaultLingkungan || lingkungan) : lingkungan;
+    const effectiveKepling = isKepling ? (defaultKeplingName || namaKepling) : namaKepling;
+
+    if (!effectiveLingkungan) {
       setErrorMsg('Harap pilih lingkungan yang dikunjungi.');
       return;
     }
@@ -120,8 +126,10 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
         tanggal,
         namaWarga: namaWarga.trim().toUpperCase(),
         alamat: alamat.trim(),
-        lingkungan,
-        namaKepling,
+        lingkungan: effectiveLingkungan,
+        namaKepling: effectiveKepling,
+        keplingId: isKepling ? currentUser?.id : editItem?.keplingId,
+        lingkunganNomor: isKepling ? currentUser?.nomorLingkungan : editItem?.lingkunganNomor,
         perlinsos,
         ikd,
         pbb,
@@ -188,28 +196,42 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
           Lingkungan <span className="text-rose-600">*</span>:
         </label>
         <select
-          value={lingkungan}
+          value={isKepling ? defaultLingkungan : lingkungan}
           onChange={(e) => {
+            if (isKepling) return;
             const val = e.target.value;
             setLingkungan(val);
             const found = KEPLING_ACCOUNTS.find((k) => k.lingkungan === val);
             if (found) setNamaKepling(found.nama);
           }}
-          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
+          disabled={isKepling}
+          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer disabled:bg-slate-100 disabled:text-slate-700 disabled:cursor-not-allowed"
           required
         >
-          <option value="">-- Pilih Lingkungan (Pilih Manual) --</option>
-          {KEPLING_ACCOUNTS.map((k) => (
+          {!isKepling && <option value="">-- Pilih Lingkungan (Pilih Manual) --</option>}
+          {(isKepling
+            ? KEPLING_ACCOUNTS.filter(
+                (k) =>
+                  k.id === currentUser?.id ||
+                  (currentUser?.nomorLingkungan && k.nomorLingkungan === currentUser.nomorLingkungan) ||
+                  k.lingkungan === defaultLingkungan
+              )
+            : KEPLING_ACCOUNTS
+          ).map((k) => (
             <option key={k.id} value={k.lingkungan}>
               {k.lingkungan} - {k.nama}
             </option>
           ))}
         </select>
-        {!lingkungan && (
+        {isKepling ? (
+          <p className="text-[11px] text-emerald-700 font-bold mt-1">
+            Terkunci otomatis sesuai akun Kepala Lingkungan Anda.
+          </p>
+        ) : !lingkungan ? (
           <p className="text-[11px] text-amber-600 font-bold mt-1 flex items-center gap-1">
             ⚠️ Pilihan lingkungan dikosongkan. Harap pilih lingkungan yang dikunjungi secara manual agar terhindar dari kesalahan.
           </p>
-        )}
+        ) : null}
       </div>
 
       <div>

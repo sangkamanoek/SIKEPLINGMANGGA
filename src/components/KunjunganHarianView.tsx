@@ -46,7 +46,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import { getTodayLocalIso, formatTanggalIndonesia } from '../lib/formatter';
+import { getTodayLocalIso, formatTanggalIndonesia, isKunjunganMatchingKepling } from '../lib/formatter';
 import { printOfficialDocument } from '../utils/printHelper';
 
 interface KunjunganHarianViewProps {
@@ -124,23 +124,23 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     return 0;
   };
 
+  // Strictly scoped visits list: Kepling only sees visits belonging to their own Lingkungan
+  const keplingLingkNum = currentUser?.nomorLingkungan || getLingkunganIndex(userLingkungan);
+  const scopedVisits = useMemo(() => {
+    if (isKepling && currentUser) {
+      return visits.filter((v) => isKunjunganMatchingKepling(v, currentUser));
+    }
+    return visits;
+  }, [visits, isKepling, currentUser]);
+
   // Date filtering logic
   const filteredVisits = useMemo(() => {
     const todayIso = getTodayLocalIso();
     const today = new Date();
 
-    return visits.filter((item) => {
-      // 1. Role restriction (Strictly locked to Kepling's own inputs/lingkungan)
-      if (isKepling) {
-        const matchesLingkungan = userLingkungan && item.lingkungan && item.lingkungan.toLowerCase().includes(userLingkungan.toLowerCase());
-        const matchesName = currentUser?.nama && item.namaKepling && item.namaKepling.toLowerCase() === currentUser.nama.toLowerCase();
-        if (!matchesLingkungan && !matchesName) {
-          return false;
-        }
-      }
-
-      // 2. Environment filter
-      if (selectedLingkungan !== 'ALL') {
+    return scopedVisits.filter((item) => {
+      // 1. Environment filter (non-Kepling or specific filter)
+      if (!isKepling && selectedLingkungan !== 'ALL') {
         const itemIdx = getLingkunganIndex(item.lingkungan);
         const selectedIdx = getLingkunganIndex(selectedLingkungan);
         if (itemIdx !== selectedIdx && item.lingkungan !== selectedLingkungan) {
@@ -197,9 +197,8 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       return matchesSearch;
     });
   }, [
-    visits,
+    scopedVisits,
     isKepling,
-    userLingkungan,
     selectedLingkungan,
     selectedKategori,
     activePeriod,
@@ -209,21 +208,20 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     searchTerm,
   ]);
 
-  // Cumulative counts (all time for each environment)
+  // Cumulative counts (all time for each environment, scoped for Kepling)
   const cumulativeCounts = useMemo(() => {
     const counts: { [key: number]: number } = {};
     for (let i = 1; i <= 24; i++) {
       counts[i] = 0;
     }
-    // Always use the full visits list for cumulative totals
-    visits.forEach((v) => {
+    scopedVisits.forEach((v) => {
       const idx = getLingkunganIndex(v.lingkungan);
       if (idx >= 1 && idx <= 24) {
         counts[idx] = (counts[idx] || 0) + 1;
       }
     });
     return counts;
-  }, [visits]);
+  }, [scopedVisits]);
 
   // Photo count
   const fotoCount = useMemo(() => {
@@ -308,7 +306,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       days.push(iso);
       daysMap[iso] = 0;
     }
-    visits.forEach((v) => {
+    scopedVisits.forEach((v) => {
       const d = v.tanggal ? v.tanggal.slice(0, 10) : '';
       if (daysMap[d] !== undefined) {
         daysMap[d] += 1;
@@ -323,7 +321,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         kunjungan: daysMap[dateIso] || 0,
       };
     });
-  }, [visits]);
+  }, [scopedVisits]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -381,9 +379,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
     const dateLabel = activePeriod === 'HARI_INI' ? `Hari Ini (${selectedDate || todayIso})` : (selectedDate || todayIso);
     
     let text = `*REKAP KUNJUNGAN HARIAN DOOR-TO-DOOR*\n`;
-    text += `*KELURAHAN MANGGA, KEC. MEDAN TUNTUNGAN*\n`;
+    text += isKepling
+      ? `*${(userLingkungan || 'LINGKUNGAN').toUpperCase()} - KELURAHAN MANGGA, KEC. MEDAN TUNTUNGAN*\n`
+      : `*KELURAHAN MANGGA, KEC. MEDAN TUNTUNGAN*\n`;
     text += `Periode / Tanggal: ${dateLabel}\n`;
-    text += `Total Kunjungan: ${filteredVisits.length} Rumah\n\n`;
+    text += `Total Kunjungan (Periode Dipilih): ${filteredVisits.length} Rumah\n\n`;
     text += `----------------------------------------\n`;
 
     // Group filtered visits by Environment for daily details
@@ -412,14 +412,18 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       text += `\n`;
     });
 
-    // Cumulative stats
-    text += `*TOTAL KUNJUNGAN PER LINGKUNGAN SAMPAI DENGAN HARI INI:*\n`;
-    for (let i = 1; i <= 24; i++) {
-      const rom = ROMAN_NUMERALS[i - 1];
-      const count = cumulativeCounts[i] || 0;
-      text += `- Lingkungan ${rom}: ${count} Warga\n`;
+    // Cumulative stats (Kepling only sees their own environment accumulation)
+    if (isKepling) {
+      text += `*TOTAL AKUMULASI KUNJUNGAN ${(userLingkungan || 'LINGKUNGAN ANDA').toUpperCase()}: ${scopedVisits.length} Warga*`;
+    } else {
+      text += `*TOTAL KUNJUNGAN PER LINGKUNGAN SAMPAI DENGAN HARI INI:*\n`;
+      for (let i = 1; i <= 24; i++) {
+        const rom = ROMAN_NUMERALS[i - 1];
+        const count = cumulativeCounts[i] || 0;
+        text += `- Lingkungan ${rom}: ${count} Warga\n`;
+      }
+      text += `\n*TOTAL SELURUH KUNJUNGAN: ${scopedVisits.length} Warga*`;
     }
-    text += `\n*TOTAL SELURUH KUNJUNGAN: ${visits.length} Warga*`;
 
     navigator.clipboard.writeText(text);
     if (onShowToast) onShowToast('Rekap Kunjungan WA berhasil disalin!', 'success');
@@ -618,7 +622,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               DATABASE KUNJUNGAN AKTIF
             </span>
             <span className="text-xs text-slate-300 font-medium">
-              Total Tercatat: <strong className="text-amber-300 font-black text-sm">{visits.length} Kunjungan Warga</strong>
+              Total Tercatat: <strong className="text-amber-300 font-black text-sm">{scopedVisits.length} Kunjungan Warga</strong>
             </span>
           </div>
           <div className="text-xs text-slate-200">
@@ -626,23 +630,23 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               filteredVisits.length > 0 ? (
                 <span>Menampilkan <strong className="text-emerald-300">{filteredVisits.length} kunjungan</strong> yang tercatat hari ini ({formatTanggalIndonesia(selectedDate || getTodayLocalIso())}).</span>
               ) : (
-                <span>Belum ada kunjungan yang diinput untuk hari ini ({formatTanggalIndonesia(selectedDate || getTodayLocalIso())}). Tersimpan <strong className="text-amber-300 font-bold">{visits.length} riwayat kunjungan</strong> pada periode sebelumnya.</span>
+                <span>Belum ada kunjungan yang diinput untuk hari ini ({formatTanggalIndonesia(selectedDate || getTodayLocalIso())}). Tersimpan <strong className="text-amber-300 font-bold">{scopedVisits.length} riwayat kunjungan</strong> pada periode sebelumnya.</span>
               )
             ) : (
-              <span>Menampilkan <strong className="text-emerald-300">{filteredVisits.length} kunjungan</strong> dari total {visits.length} kunjungan tersimpan (Filter: {activePeriod === 'SEMUA' ? 'Semua Riwayat' : activePeriod}).</span>
+              <span>Menampilkan <strong className="text-emerald-300">{filteredVisits.length} kunjungan</strong> dari total {scopedVisits.length} kunjungan tersimpan (Filter: {activePeriod === 'SEMUA' ? 'Semua Riwayat' : activePeriod}).</span>
             )}
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {activePeriod === 'HARI_INI' && visits.length > 0 && (
+          {activePeriod === 'HARI_INI' && scopedVisits.length > 0 && (
             <button
               type="button"
               onClick={() => setActivePeriod('SEMUA')}
               className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-md hover:scale-[1.02] transition-all cursor-pointer"
             >
               <Eye className="w-4 h-4 text-slate-950" />
-              <span>Lihat Seluruh {visits.length} Kunjungan (Semua Periode)</span>
+              <span>Lihat Seluruh {scopedVisits.length} Kunjungan (Semua Periode)</span>
             </button>
           )}
           {activePeriod !== 'HARI_INI' && (
@@ -718,7 +722,13 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 font-bold outline-none cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
             >
               {!isKepling && <option value="ALL">Semua 24 Lingkungan</option>}
-              {KEPLING_ACCOUNTS.filter(k => !isKepling || k.lingkungan === userLingkungan).map((k) => (
+              {KEPLING_ACCOUNTS.filter(
+                (k) =>
+                  !isKepling ||
+                  k.id === currentUser?.id ||
+                  (keplingLingkNum > 0 && k.nomorLingkungan === keplingLingkNum) ||
+                  k.lingkungan === userLingkungan
+              ).map((k) => (
                 <option key={k.id} value={k.lingkungan}>
                   {k.lingkungan} - {k.nama}
                 </option>
@@ -1020,11 +1030,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                 : 'Belum ada data kunjungan warga sesuai kriteria filter'}
             </h3>
             <p className="text-xs text-slate-500 max-w-lg mx-auto leading-relaxed">
-              {activePeriod === 'HARI_INI' && visits.length > 0
-                ? `Tersimpan total ${visits.length} riwayat kunjungan pada database (periode bulan September–Oktober). Anda dapat melihat seluruh riwayat kunjungan warga sebelumnya dengan mengklik tombol di bawah ini:`
+              {activePeriod === 'HARI_INI' && scopedVisits.length > 0
+                ? `Tersimpan total ${scopedVisits.length} riwayat kunjungan pada database${isKepling ? ` (${userLingkungan || 'Lingkungan Anda'})` : ''}. Anda dapat melihat seluruh riwayat kunjungan warga sebelumnya dengan mengklik tombol di bawah ini:`
                 : 'Gunakan form di atas untuk mencatat sambang warga baru atau sesuaikan kriteria pencarian & filter periode.'}
             </p>
-            {activePeriod === 'HARI_INI' && visits.length > 0 && (
+            {activePeriod === 'HARI_INI' && scopedVisits.length > 0 && (
               <div className="pt-2">
                 <button
                   type="button"
@@ -1032,7 +1042,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
                 >
                   <Eye className="w-4 h-4 text-emerald-200" />
-                  <span>Tampilkan Seluruh {visits.length} Riwayat Kunjungan Warga</span>
+                  <span>Tampilkan Seluruh {scopedVisits.length} Riwayat Kunjungan Warga</span>
                 </button>
               </div>
             )}
@@ -1393,7 +1403,9 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                 Rekapitulasi Kunjungan Per Lingkungan (Sampai Dengan Hari Ini)
               </h2>
               <p className="text-xs text-slate-500 font-medium">
-                Total akumulasi sambang warga door-to-door se-Kelurahan Mangga (24 Lingkungan)
+                {isKepling
+                  ? `Total akumulasi sambang warga door-to-door ${userLingkungan || 'Lingkungan Anda'}`
+                  : 'Total akumulasi sambang warga door-to-door se-Kelurahan Mangga (24 Lingkungan)'}
               </p>
             </div>
           </div>
@@ -1401,10 +1413,10 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
           <div className="flex items-center gap-3 shrink-0">
             <div className="bg-[#1f5f4b] text-white px-5 py-2.5 rounded-xl text-center shadow-xs">
               <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-200">
-                TOTAL KUNJUNGAN {isKepling ? userLingkungan.toUpperCase() : 'SELURUH'}
+                TOTAL KUNJUNGAN {isKepling ? (userLingkungan || 'LINGKUNGAN ANDA').toUpperCase() : 'SELURUH'}
               </div>
               <div className="text-lg font-black tracking-tight">
-                {isKepling ? filteredVisits.length : visits.length} Warga
+                {scopedVisits.length} Warga
               </div>
             </div>
 
@@ -1419,15 +1431,15 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
           </div>
         </div>
 
-        {/* 24 Lingkungan Grid */}
+        {/* 24 Lingkungan Grid (Hanya lingkungan sendiri untuk Kepling) */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {Array.from({ length: 24 }).map((_, idx) => {
             const lingkNum = idx + 1;
             const rom = ROMAN_NUMERALS[idx];
             const count = cumulativeCounts[lingkNum] || 0;
-            
-            // If Kepling, only show their own neighborhood
-            if (isKepling && !userLingkungan.toLowerCase().includes(`lingkungan ${lingkNum}`) && !userLingkungan.toLowerCase().includes(`lk ${lingkNum}`)) {
+
+            // If Kepling, strictly show ONLY their exact environment number
+            if (isKepling && keplingLingkNum > 0 && lingkNum !== keplingLingkNum) {
               return null;
             }
 
@@ -1435,7 +1447,10 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               <button
                 key={lingkNum}
                 type="button"
-                onClick={() => setSelectedRecapLingkungan(lingkNum)}
+                onClick={() => {
+                  if (isKepling && keplingLingkNum > 0 && lingkNum !== keplingLingkNum) return;
+                  setSelectedRecapLingkungan(lingkNum);
+                }}
                 className={`flex flex-col p-3 rounded-2xl border transition-all text-left group hover:scale-[1.02] cursor-pointer ${
                   count > 0 ? 'bg-emerald-50 border-emerald-100 hover:border-emerald-300' : 'bg-slate-50 border-slate-100'
                 }`}
@@ -1466,16 +1481,16 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
             </div>
             <div>
               <div className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-100">
-                TOTAL KUNJUNGAN {isKepling ? userLingkungan.toUpperCase() : 'SELURUH'}
+                TOTAL KUNJUNGAN {isKepling ? (userLingkungan || 'LINGKUNGAN ANDA').toUpperCase() : 'SELURUH'}
               </div>
               <div className="text-[11px] text-emerald-200 font-semibold">
-                AKUMULASI SAMBANG WARGA {isKepling ? userLingkungan.toUpperCase() : '24 LINGKUNGAN'} (HARI INI ({getTodayLocalIso()}))
+                AKUMULASI SAMBANG WARGA {isKepling ? (userLingkungan || 'LINGKUNGAN ANDA').toUpperCase() : '24 LINGKUNGAN'} (KESELURUHAN s.d. {getTodayLocalIso()})
               </div>
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl sm:text-4xl font-black tracking-tight">
-              {isKepling ? filteredVisits.length : visits.length}
+              {scopedVisits.length}
             </span>
             <span className="text-sm sm:text-base font-extrabold uppercase tracking-wider text-emerald-200">
               WARGA
@@ -1494,7 +1509,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-black text-slate-900">Tren Kunjungan Harian (14 Hari Terakhir)</h3>
-              <p className="text-[11px] text-slate-500">Aktivitas kunjungan door-to-door se-Kelurahan Mangga</p>
+              <p className="text-[11px] text-slate-500">
+                {isKepling
+                  ? `Aktivitas kunjungan door-to-door ${userLingkungan || 'Lingkungan Anda'}`
+                  : 'Aktivitas kunjungan door-to-door se-Kelurahan Mangga'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1621,13 +1640,13 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto py-4 space-y-2">
-              {(isKepling ? filteredVisits : visits)
+              {scopedVisits
                 .filter((v) => {
                   const idx = getLingkunganIndex(v.lingkungan);
                   return idx === selectedRecapLingkungan;
                 })
                 .sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''))
-                .map((v, i) => (
+                .map((v) => (
                   <div key={v.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/30 transition-all flex items-center justify-between group">
                     <div>
                       <div className="font-bold text-slate-900 text-sm">{v.namaWarga}</div>
@@ -1641,7 +1660,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                     )}
                   </div>
                 ))}
-              {(isKepling ? filteredVisits : visits).filter(v => getLingkunganIndex(v.lingkungan) === selectedRecapLingkungan).length === 0 && (
+              {scopedVisits.filter(v => getLingkunganIndex(v.lingkungan) === selectedRecapLingkungan).length === 0 && (
                 <div className="py-12 text-center text-slate-400">
                   <Users className="w-12 h-12 mx-auto mb-2 opacity-20" />
                   <p className="text-sm font-bold">Belum ada data kunjungan tercatat</p>

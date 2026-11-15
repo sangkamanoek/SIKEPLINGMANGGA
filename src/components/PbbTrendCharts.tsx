@@ -217,7 +217,11 @@ export const PbbTrendCharts: React.FC<PbbTrendChartsProps> = ({
 
   // Leaderboard / Lingkungan Comparison Data for Recharts
   const comparisonData = useMemo(() => {
-    return summaryByLingkungan.map((item) => ({
+    const list =
+      isKepling && keplingLingkunganNum
+        ? summaryByLingkungan.filter((item) => item.lingkungan === keplingLingkunganNum)
+        : summaryByLingkungan;
+    return list.map((item) => ({
       name: `Lk ${item.lingkungan}`,
       lingkungan: item.lingkungan,
       targetNominal: item.targetNominal,
@@ -227,7 +231,7 @@ export const PbbTrendCharts: React.FC<PbbTrendChartsProps> = ({
       wpLunas: item.wpLunas,
       persentaseWp: item.persentaseWpLunas,
     }));
-  }, [summaryByLingkungan]);
+  }, [summaryByLingkungan, isKepling, keplingLingkunganNum]);
 
   const persentaseCapaianAktif =
     currentTargetNominal > 0 ? (currentRealisasiNominal / currentTargetNominal) * 100 : 0;
@@ -249,7 +253,9 @@ export const PbbTrendCharts: React.FC<PbbTrendChartsProps> = ({
                   Visualisasi &amp; Tren Realisasi PBB-P2 Tahun {selectedYear}
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">
-                  {selectedLingkungan === 'all'
+                  {isKepling && keplingLingkunganNum
+                    ? `Monitoring tren dan progres bulanan khusus Lingkungan ${keplingLingkunganNum}`
+                    : selectedLingkungan === 'all'
                     ? 'Progres realisasi kumulatif bulanan se-Kelurahan Mangga (24 Lingkungan)'
                     : `Monitoring tren dan progres bulanan khusus Lingkungan ${selectedLingkungan}`}
                 </p>
@@ -263,18 +269,24 @@ export const PbbTrendCharts: React.FC<PbbTrendChartsProps> = ({
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700">
               <Filter className="w-3.5 h-3.5 text-slate-500" />
               <span>Wilayah:</span>
-              <select
-                value={selectedLingkungan}
-                onChange={(e) => onSelectLingkungan(e.target.value)}
-                className="bg-white border border-slate-300 text-slate-900 font-black rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-              >
-                <option value="all">Semua Lingkungan (1 - 24)</option>
-                {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={String(n)}>
-                    Lingkungan {n} {isKepling && keplingLingkunganNum === n ? '👑 (Saya)' : ''}
-                  </option>
-                ))}
-              </select>
+              {isKepling && keplingLingkunganNum ? (
+                <span className="px-2.5 py-1 text-xs font-black text-emerald-900 bg-emerald-50 border border-emerald-300 rounded-lg">
+                  👑 Lingkungan {keplingLingkunganNum} (Wilayah Anda)
+                </span>
+              ) : (
+                <select
+                  value={selectedLingkungan}
+                  onChange={(e) => onSelectLingkungan(e.target.value)}
+                  className="bg-white border border-slate-300 text-slate-900 font-black rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                >
+                  <option value="all">Semua Lingkungan (1 - 24)</option>
+                  {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={String(n)}>
+                      Lingkungan {n}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Metric Mode Switcher */}
@@ -303,18 +315,20 @@ export const PbbTrendCharts: React.FC<PbbTrendChartsProps> = ({
                 <Users className="w-3.5 h-3.5" />
                 <span>Wajib Pajak (WP)</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setChartMode('perbandingan')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                  chartMode === 'perbandingan'
-                    ? 'bg-white text-emerald-800 font-black shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span>24 Lingkungan</span>
-              </button>
+              {!isKepling && (
+                <button
+                  type="button"
+                  onClick={() => setChartMode('perbandingan')}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    chartMode === 'perbandingan'
+                      ? 'bg-white text-emerald-800 font-black shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>24 Lingkungan</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

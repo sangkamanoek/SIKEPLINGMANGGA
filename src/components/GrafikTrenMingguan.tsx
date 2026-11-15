@@ -78,7 +78,8 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
   const [activeMetricMode, setActiveMetricMode] = useState<
     'COMPOSITE' | 'ALL_INDICATORS' | 'PERLINSOS_PBB' | 'ATTENDANCE_VISIT'
   >('COMPOSITE');
-  const [showBenchmark, setShowBenchmark] = useState<boolean>(true);
+  const [showBenchmark, setShowBenchmark] = useState<boolean>(mode === 'super_admin');
+  const effectiveShowBenchmark = mode === 'super_admin' && showBenchmark;
 
   // Daftar bulan yang tersedia
   const availableMonths = useMemo(() => {
@@ -340,20 +341,22 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
             </div>
           )}
 
-          {/* Toggle Benchmark Kelurahan */}
-          <button
-            type="button"
-            onClick={() => setShowBenchmark(!showBenchmark)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex items-center gap-1.5 ${
-              showBenchmark
-                ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-xs'
-                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-            }`}
-            title="Tampilkan / Sembunyikan garis pembanding rata-rata 24 Lingkungan Kelurahan Mangga"
-          >
-            <Compass className="w-3.5 h-3.5 text-amber-600" />
-            <span>Benchmark Kelurahan</span>
-          </button>
+          {/* Toggle Benchmark Kelurahan (Hanya Super Admin) */}
+          {mode === 'super_admin' && (
+            <button
+              type="button"
+              onClick={() => setShowBenchmark(!showBenchmark)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex items-center gap-1.5 ${
+                showBenchmark
+                  ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-xs'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+              title="Tampilkan / Sembunyikan garis pembanding rata-rata 24 Lingkungan Kelurahan Mangga"
+            >
+              <Compass className="w-3.5 h-3.5 text-amber-600" />
+              <span>Benchmark Kelurahan</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -510,7 +513,7 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
                         </span>
                       </div>
 
-                      {showBenchmark && point?.avgKelurahanScore !== undefined && (
+                      {effectiveShowBenchmark && point?.avgKelurahanScore !== undefined && (
                         <div className="flex items-center justify-between text-amber-300 text-[11px]">
                           <span className="flex items-center gap-1">
                             <span className="w-2 h-2 rounded-full bg-amber-400" />
@@ -568,7 +571,7 @@ export const GrafikTrenMingguan: React.FC<GrafikTrenMingguanProps> = ({
             )}
 
             {/* Benchmark Rata-Rata Kelurahan (Garis Emas Putus-Putus) */}
-            {showBenchmark && (activeMetricMode === 'COMPOSITE' || activeMetricMode === 'ALL_INDICATORS') && (
+            {effectiveShowBenchmark && (activeMetricMode === 'COMPOSITE' || activeMetricMode === 'ALL_INDICATORS') && (
               <Line
                 type="monotone"
                 dataKey="avgKelurahanScore"

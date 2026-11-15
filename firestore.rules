@@ -156,6 +156,27 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Notifikasi Pemindahan Lingkungan (Pindah NOP) PBB oleh Kepling
+    match /pbb_pindah_notifications/{notifId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'nop', 'keLingkungan'])
+                            && isValidString(request.resource.data.id, 1, 100)
+                            && isValidString(request.resource.data.nop, 1, 40)
+                            && request.resource.data.keLingkungan is number;
+      allow delete: if true;
+    }
+
+    // Absensi Kepala Lingkungan berdasarkan Agenda Kelurahan
+    match /absensi_agenda_kepling/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'agendaId', 'tanggalKegiatan', 'namaKegiatan'])
+                            && isValidString(request.resource.data.id, 1, 120)
+                            && isValidString(request.resource.data.agendaId, 1, 100)
+                            && isValidString(request.resource.data.tanggalKegiatan, 4, 20)
+                            && isValidString(request.resource.data.namaKegiatan, 1, 300);
+      allow delete: if true;
+    }
+
     // Default Fallback Match
     match /{document=**} {
       allow read: if true;

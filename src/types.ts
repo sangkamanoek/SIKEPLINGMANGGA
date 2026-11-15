@@ -610,6 +610,31 @@ export interface AgendaKelurahanItem {
   updatedAt?: string;
 }
 
+export type StatusKehadiranKepling = 'Hadir' | 'Tidak Hadir' | 'Sakit' | 'Izin';
+
+export interface AbsensiKeplingEntry {
+  keplingId: string;
+  nomorLingkungan: number;
+  namaKepling: string;
+  jabatan: string;
+  status: StatusKehadiranKepling;
+  catatan?: string;
+}
+
+export interface AbsensiAgendaKepling {
+  id: string;
+  agendaId: string;
+  namaKegiatan: string;
+  tanggalKegiatan: string; // YYYY-MM-DD
+  jamKegiatan?: string;
+  lokasi?: string;
+  entries: Record<string, AbsensiKeplingEntry>;
+  diinputOlehNama?: string;
+  diinputOlehRole?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 
 export interface DasaWismaKkAnggota {
   id: string;

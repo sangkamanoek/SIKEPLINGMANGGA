@@ -143,52 +143,6 @@ export async function playAgendaKelurahanSound(): Promise<void> {
 }
 
 /**
- * Plays an urgent, commanding 4-tone alert chime for TUGAS KHUSUS DARI LURAH
- * Frequencies: A4 (440 Hz) -> C#5 (554.37 Hz) -> E5 (659.25 Hz) -> A5 (880 Hz)
- */
-export async function playTugasKhususLurahSound(): Promise<void> {
-  if (!isSoundNotificationEnabled()) return;
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    if (ctx.state === 'suspended') {
-      await ctx.resume().catch(() => {});
-    }
-
-    const now = ctx.currentTime;
-    // Urgent dispatcher alert notes
-    const notes = [
-      { freq: 440.00, time: 0.00, dur: 0.22, type: 'sine' as OscillatorType },
-      { freq: 554.37, time: 0.12, dur: 0.22, type: 'sine' as OscillatorType },
-      { freq: 659.25, time: 0.24, dur: 0.25, type: 'sine' as OscillatorType },
-      { freq: 880.00, time: 0.38, dur: 0.80, type: 'triangle' as OscillatorType },
-      // Secondary resonant ping for extra attention
-      { freq: 1108.73, time: 0.50, dur: 0.60, type: 'sine' as OscillatorType },
-    ];
-
-    notes.forEach(({ freq, time, dur, type }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, now + time);
-
-      gain.gain.setValueAtTime(0.001, now + time);
-      gain.gain.exponentialRampToValueAtTime(0.5, now + time + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + time + dur);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(now + time);
-      osc.stop(now + time + dur + 0.05);
-    });
-  } catch (err) {
-    console.warn('[Audio] playTugasKhususLurahSound error:', err);
-  }
-}
-
-/**
  * Triggers sound + vibration + optional OS notification for AGENDA KELURAHAN
  */
 export function notifyAgendaKelurahan(title: string, detail?: string) {
@@ -209,21 +163,63 @@ export function notifyAgendaKelurahan(title: string, detail?: string) {
 }
 
 /**
- * Triggers sound + vibration + optional OS notification for TUGAS KHUSUS DARI LURAH
+ * Plays a distinct 3-tone chime for PBB PINDAH NOP notifications
+ * Frequencies: E5 (659.25 Hz) -> G#5 (830.61 Hz) -> B5 (987.77 Hz)
  */
-export function notifyTugasKhususLurah(title: string, detail?: string) {
-  playTugasKhususLurahSound();
-  // Stronger, urgent vibration pulse for official assignment from Lurah
-  triggerDeviceVibration([350, 100, 350, 100, 350, 100, 700]);
+export async function playPbbPindahNopSound(): Promise<void> {
+  if (!isSoundNotificationEnabled()) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      await ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    const notes = [
+      { freq: 659.25, time: 0.00, dur: 0.24 },
+      { freq: 830.61, time: 0.14, dur: 0.24 },
+      { freq: 987.77, time: 0.28, dur: 0.55 },
+    ];
+
+    notes.forEach(({ freq, time, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + time);
+
+      gain.gain.setValueAtTime(0.001, now + time);
+      gain.gain.exponentialRampToValueAtTime(0.42, now + time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + time + dur);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now + time);
+      osc.stop(now + time + dur + 0.05);
+    });
+  } catch (err) {
+    console.warn('[Audio] playPbbPindahNopSound error:', err);
+  }
+}
+
+/**
+ * Triggers sound + vibration + optional OS notification for PBB PINDAH NOP
+ */
+export function notifyPbbPindahNop(title: string, detail?: string) {
+  playPbbPindahNopSound();
+  triggerDeviceVibration([220, 80, 220, 80, 420]);
 
   if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
     try {
-      new Notification('⚡ TUGAS KHUSUS DARI LURAH', {
+      new Notification('📍 NOTIFIKASI PINDAH NOP PBB', {
         body: `${title}${detail ? `\n${detail}` : ''}`,
         icon: '/logo_pemko_medan.png',
         badge: '/icon-192.png',
-        tag: 'tugas-khusus-notif',
+        tag: 'pbb-pindah-nop-notif',
       });
     } catch {}
   }
 }
+

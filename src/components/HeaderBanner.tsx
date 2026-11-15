@@ -535,7 +535,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
                   type="button"
                   onClick={onOpenNotifSoundSettings}
                   className="p-1.5 rounded-lg bg-emerald-900/80 hover:bg-emerald-700 border border-emerald-600/50 text-teal-200 hover:text-white transition-all cursor-pointer relative"
-                  title="Pengaturan Bunyi & Getar Notifikasi HP (Agenda & Tugas Lurah)"
+                  title="Pengaturan Bunyi & Getar Notifikasi HP (Agenda Kelurahan)"
                   aria-label="Bunyi & Getar Notifikasi"
                 >
                   <Volume2 className="w-4 h-4 text-teal-300" />

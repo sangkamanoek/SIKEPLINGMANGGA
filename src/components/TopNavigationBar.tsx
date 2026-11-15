@@ -17,6 +17,7 @@ import {
   Mail,
   Award,
   Calendar,
+  UserCheck,
 } from 'lucide-react';
 import { AppTabType } from './MobileBottomNav';
 import { UserAccount, isPkkRole } from '../types';
@@ -26,6 +27,7 @@ interface TopNavigationBarProps {
   onNavigate: (tab: AppTabType) => void;
   isAdmin?: boolean;
   activeAccount?: UserAccount;
+  unreadCounts?: Record<string, number>;
 }
 
 interface MenuItemConfig {
@@ -41,6 +43,7 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
   onNavigate,
   isAdmin,
   activeAccount,
+  unreadCounts,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isPkk = activeAccount ? isPkkRole(activeAccount.role) : false;
@@ -62,6 +65,7 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'monitoring', label: 'Monitoring Laporan', icon: ShieldCheck, badge: 'MONITORING', badgeVariant: 'mint' },
     { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
     { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
+    { id: 'absensi_kepling', label: 'Absensi Kepling', icon: UserCheck, badge: 'PDF', badgeVariant: 'mint' },
     { id: 'capaian_admin', label: 'Capaian Target', icon: Trophy, badge: 'TARGET', badgeVariant: 'mint' },
     { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
     { id: 'surat_kedinasan', label: 'Surat Kedinasan', icon: Mail, badge: 'SURAT', badgeVariant: 'mint' },
@@ -86,12 +90,16 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
   ];
 
-  // Standard Kelurahan Kasi / Admin Navigation Menu Items
+  // Standard Kelurahan Kasi / Seklur Navigation Menu Items
+  const isSeklur = activeAccount?.role === 'sekretaris';
   const standardMenuItems: MenuItemConfig[] = [
     { id: 'hub', label: 'Pusat Menu', icon: Compass },
     { id: 'monitoring', label: 'Monitoring Laporan', icon: ShieldCheck, badge: 'MONITORING', badgeVariant: 'mint' },
     { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
     { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
+    ...(isSeklur
+      ? [{ id: 'absensi_kepling' as AppTabType, label: 'Absensi Kepling', icon: UserCheck, badge: 'PDF', badgeVariant: 'mint' as const }]
+      : []),
     { id: 'capaian', label: 'Capaian Target', icon: Trophy },
     { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
     { id: 'form', label: 'Input Laporan', icon: FileText },
@@ -161,21 +169,34 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
                 />
                 <span className="tracking-tight">{item.label}</span>
 
-                {item.badge && (
-                  <span
-                    className={`text-[9px] font-black px-1.5 py-0.5 rounded-lg transition-colors border ${
-                      isActive
-                        ? 'bg-white/20 text-white border-white/20'
-                        : item.badgeVariant === 'rose'
-                        ? 'bg-rose-50 text-rose-700 border-rose-200 group-hover:bg-rose-100'
-                        : item.badgeVariant === 'mint'
-                        ? 'bg-teal-50 text-teal-700 border-teal-200 group-hover:bg-teal-100'
-                        : 'bg-slate-100 text-slate-500 border-slate-200 group-hover:bg-slate-200'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
+                {(() => {
+                  const unread = unreadCounts?.[item.id] || 0;
+                  if (unread > 0) {
+                    return (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white shadow-xs animate-pulse">
+                        {unread > 99 ? '99+' : unread} Baru
+                      </span>
+                    );
+                  }
+                  if (item.badge) {
+                    return (
+                      <span
+                        className={`text-[9px] font-black px-1.5 py-0.5 rounded-lg transition-colors border ${
+                          isActive
+                            ? 'bg-white/20 text-white border-white/20'
+                            : item.badgeVariant === 'rose'
+                            ? 'bg-rose-50 text-rose-700 border-rose-200 group-hover:bg-rose-100'
+                            : item.badgeVariant === 'mint'
+                            ? 'bg-teal-50 text-teal-700 border-teal-200 group-hover:bg-teal-100'
+                            : 'bg-slate-100 text-slate-500 border-slate-200 group-hover:bg-slate-200'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
               </button>
             );
           })}

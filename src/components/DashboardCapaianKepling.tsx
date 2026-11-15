@@ -35,6 +35,8 @@ import {
   TargetsCapaianMap,
   KeplingTargetCapaian,
   EventAttendance,
+  AbsensiAgendaKepling,
+  StatusKehadiranKepling,
   type CustomEvent,
 } from '../types';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
@@ -106,9 +108,16 @@ import {
   KelurahanPbbOverview,
 } from '../lib/pbbService';
 import { SpptPbbItem } from '../data/pbbSampleData';
+import {
+  getLocalAbsensiAgendaList,
+  fetchAbsensiAgendaFromFirestore,
+  subscribeAbsensiAgendaFromFirestore,
+  formatTanggalSingkatIndonesia,
+} from '../lib/absensiAgendaService';
 
 export type LeaderboardSortCriterion =
   | 'KOMPOSIT'
+  | 'KEHADIRAN'
   | 'KEGIATAN'
   | 'PERLINSOS'
   | 'PBB'
@@ -125,6 +134,7 @@ interface DashboardCapaianKeplingProps {
   onNavigateToForm?: () => void;
   onOpenRekapPbb?: () => void;
   onNavigateToKunjungan?: () => void;
+  onOpenAbsensiKepling?: () => void;
   eventAttendanceList?: EventAttendance[];
   customEvents?: CustomEvent[];
   kunjunganList?: KunjunganWargaData[];
@@ -319,6 +329,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   onNavigateToForm,
   onOpenRekapPbb,
   onNavigateToKunjungan,
+  onOpenAbsensiKepling,
   eventAttendanceList = [],
   customEvents = [],
   kunjunganList = [],
@@ -390,6 +401,41 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       }
     });
     return () => unsub();
+  }, []);
+
+  // Real-time Absensi Kehadiran Kepala Lingkungan berdasarkan Agenda Kelurahan
+  const [absensiAgendaList, setAbsensiAgendaList] = useState<AbsensiAgendaKepling[]>(() =>
+    getLocalAbsensiAgendaList()
+  );
+
+  useEffect(() => {
+    let active = true;
+    fetchAbsensiAgendaFromFirestore()
+      .then((items) => {
+        if (active && Array.isArray(items)) {
+          setAbsensiAgendaList(items);
+        }
+      })
+      .catch(() => {});
+
+    const unsubAbsensi = subscribeAbsensiAgendaFromFirestore((items) => {
+      if (active && Array.isArray(items)) {
+        setAbsensiAgendaList(items);
+      }
+    });
+
+    const handleLocalUpdate = () => {
+      if (active) {
+        setAbsensiAgendaList(getLocalAbsensiAgendaList());
+      }
+    };
+    window.addEventListener('absensi-agenda-updated', handleLocalUpdate);
+
+    return () => {
+      active = false;
+      unsubAbsensi();
+      window.removeEventListener('absensi-agenda-updated', handleLocalUpdate);
+    };
   }, []);
 
   // Placeholders for removed WebGIS logic
@@ -611,6 +657,13 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     });
   }, [customEvents, period, now]);
 
+  // 4B. Filter Absensi Kehadiran Kepala Lingkungan (berdasarkan Agenda Kelurahan) sesuai periode
+  const filteredAbsensiAgendaByPeriod = useMemo(() => {
+    return (absensiAgendaList || [])
+      .filter((rec) => rec && rec.tanggalKegiatan && checkDateInPeriod(rec.tanggalKegiatan, period, now))
+      .sort((a, b) => (b.tanggalKegiatan || '').localeCompare(a.tanggalKegiatan || ''));
+  }, [absensiAgendaList, period, now]);
+
   // Kepling specific reports
   const myReports = useMemo(() => {
     if (mode !== 'kepling') return [];
@@ -805,19 +858,50 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
       const uniqueDays = new Set(kReports.map((r) => r.createdAt?.split('T')[0] || r.tanggal));
 
-      // 1. KEHADIRAN KEGIATAN KHUSUS (Bobot 20%) - Dihitung murni dalam periode yang dipilih
+      // 1. KEHADIRAN KEPALA LINGKUNGAN BERDASARKAN AGENDA KELURAHAN (Bobot 20%)
+      let kehadiranHadir = 0;
+      let kehadiranTidakHadir = 0;
+      let kehadiranSakit = 0;
+      let kehadiranIzin = 0;
+
+      filteredAbsensiAgendaByPeriod.forEach((rec) => {
+        const directEntry = rec.entries?.[k.id];
+        const matchedEntry =
+          directEntry ||
+          Object.values(rec.entries || {}).find(
+            (e) =>
+              e.nomorLingkungan === k.nomorLingkungan ||
+              e.namaKepling?.trim().toLowerCase() === k.nama.trim().toLowerCase()
+          );
+        const st: StatusKehadiranKepling = matchedEntry?.status || 'Hadir';
+        if (st === 'Hadir') kehadiranHadir += 1;
+        else if (st === 'Tidak Hadir') kehadiranTidakHadir += 1;
+        else if (st === 'Sakit') kehadiranSakit += 1;
+        else if (st === 'Izin') kehadiranIzin += 1;
+      });
+
+      const kehadiranTotal = filteredAbsensiAgendaByPeriod.length;
+
+      // Fallback ke eventAttendanceList bila belum ada absensi agenda kelurahan
       const kEventRecords = filteredEventAttendanceByPeriod.filter(
         (e) =>
           e.accountId === k.id ||
           e.nomorLingkungan === k.nomorLingkungan ||
           e.namaKepling?.trim().toLowerCase() === k.nama.trim().toLowerCase()
       );
-      const kegiatanHadir = kEventRecords.filter((e) => e.status === 'Hadir' || e.status === 'Dinas Luar').length;
+      const legacyKegiatanHadir = kEventRecords.filter((e) => e.status === 'Hadir' || e.status === 'Dinas Luar').length;
       const relevantEvents = filteredCustomEventsByPeriod.filter(
         (ev) => ev.required || !ev.targetKeplingIds?.length || ev.targetKeplingIds.includes(k.id)
       );
+
+      const kegiatanHadir = kehadiranTotal > 0 ? kehadiranHadir : legacyKegiatanHadir;
       const kegiatanPercentage =
-        relevantEvents.length > 0 ? Math.min(100, Math.round((kegiatanHadir / relevantEvents.length) * 100)) : 100;
+        kehadiranTotal > 0
+          ? Math.min(100, Math.round((kehadiranHadir / kehadiranTotal) * 100))
+          : relevantEvents.length > 0
+          ? Math.min(100, Math.round((legacyKegiatanHadir / relevantEvents.length) * 100))
+          : 100;
+      const kehadiranPercentage = kegiatanPercentage;
 
       // 2. CAPAIAN PERLINSOS (Bobot 25%)
       const perlinsosPercentage =
@@ -858,9 +942,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
       // SKOR KOMPOSIT 6 KRITERIA TERPADU (Indeks Kinerja Kepling / IKKT - Skala 100 Poin)
       // Bobot Resmi:
-      // Kegiatan (20%) + Perlinsos (25%) + PBB (25%) + BPJS (10%) + Kunjungan (10%) + Poskamling (10%) = 100%
+      // Kehadiran Kepling (20%) + Perlinsos (25%) + PBB (25%) + BPJS (10%) + Kunjungan (10%) + Poskamling (10%) = 100%
       const compositeScoreRaw =
-        Math.min(100, kegiatanPercentage) * 0.20 +
+        Math.min(100, kehadiranPercentage) * 0.20 +
         Math.min(110, perlinsosPercentage) * 0.25 +
         Math.min(110, pbbPercentage) * 0.25 +
         Math.min(100, bpjsPercentage) * 0.10 +
@@ -888,9 +972,15 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         perlinsosPercentage,
         pbbPercentage,
         bpjsPercentage,
-        // Kriteria Kinerja
+        // Kriteria Kehadiran Kepala Lingkungan & Kinerja
+        kehadiranHadir,
+        kehadiranTidakHadir,
+        kehadiranSakit,
+        kehadiranIzin,
+        kehadiranTotal,
+        kehadiranPercentage,
         kegiatanHadir,
-        relevantEventsCount: relevantEvents.length,
+        relevantEventsCount: kehadiranTotal > 0 ? kehadiranTotal : relevantEvents.length,
         kegiatanPercentage,
         totalKunjungan,
         targetKunjunganHarian,
@@ -915,6 +1005,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     filteredReportsByPeriod,
     reportedStatsMap,
     targetsMap,
+    filteredAbsensiAgendaByPeriod,
     filteredEventAttendanceByPeriod,
     filteredCustomEventsByPeriod,
     filteredKunjunganByPeriod,
@@ -924,12 +1015,12 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     pbbOverview.lingkunganSummaries,
   ]);
 
-  // Sorted leaderboard - Mendukung Pengurutan Komposit 7 Kriteria & Kriteria Spesifik
+  // Sorted leaderboard - Mendukung Pengurutan Komposit 6 Kriteria & Kriteria Spesifik
   const sortedLeaderboard = useMemo(() => {
     return [...keplingSummaryList].sort((a, b) => {
-      if (leaderboardSort === 'KEGIATAN') {
-        if (b.kegiatanPercentage !== a.kegiatanPercentage) return b.kegiatanPercentage - a.kegiatanPercentage;
-        if (b.kegiatanHadir !== a.kegiatanHadir) return b.kegiatanHadir - a.kegiatanHadir;
+      if (leaderboardSort === 'KEHADIRAN' || leaderboardSort === 'KEGIATAN') {
+        if (b.kehadiranPercentage !== a.kehadiranPercentage) return b.kehadiranPercentage - a.kehadiranPercentage;
+        if (b.kehadiranHadir !== a.kehadiranHadir) return b.kehadiranHadir - a.kehadiranHadir;
       } else if (leaderboardSort === 'PERLINSOS') {
         if (b.perlinsosPercentage !== a.perlinsosPercentage) return b.perlinsosPercentage - a.perlinsosPercentage;
         if (b.perlinsos !== a.perlinsos) return b.perlinsos - a.perlinsos;
@@ -946,7 +1037,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         if (b.poskamlingCount !== a.poskamlingCount) return b.poskamlingCount - a.poskamlingCount;
         if (b.poskamlingPercentage !== a.poskamlingPercentage) return b.poskamlingPercentage - a.poskamlingPercentage;
       } else {
-        // 'KOMPOSIT' (Default: 7 Kriteria Terpadu)
+        // 'KOMPOSIT' (Default: 6 Kriteria Terpadu)
         if (b.compositeScoreDecimal !== a.compositeScoreDecimal) {
           return b.compositeScoreDecimal - a.compositeScoreDecimal;
         }
@@ -1049,6 +1140,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     let totalBpjs = 0;
     let totalTargetBpjs = 0;
     let totalKunjunganSum = 0;
+    let totalKeplingHadir = 0;
+    let totalKeplingTidakHadir = 0;
+    let totalKeplingSakitIzin = 0;
+    let totalSlotsKehadiran = 0;
     let totalReports = filteredReportsByPeriod.length;
 
     keplingSummaryList.forEach((item) => {
@@ -1059,7 +1154,17 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       totalBpjs += item.bpjs;
       totalTargetBpjs += item.targetBpjs;
       totalKunjunganSum += item.totalKunjungan;
+      totalKeplingHadir += item.kehadiranHadir;
+      totalKeplingTidakHadir += item.kehadiranTidakHadir;
+      totalKeplingSakitIzin += item.kehadiranSakit + item.kehadiranIzin;
+      totalSlotsKehadiran += item.kehadiranTotal;
     });
+
+    const totalAgendaTercatat = filteredAbsensiAgendaByPeriod.length;
+    const avgKehadiranRate =
+      totalSlotsKehadiran > 0
+        ? Math.round((totalKeplingHadir / totalSlotsKehadiran) * 100)
+        : 0;
 
     const allTimeKunjunganCount = effectiveKunjunganList.length;
     const periodKunjunganCount = filteredKunjunganByPeriod.length;
@@ -1095,15 +1200,46 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       totalReports,
       activeKeplingCount,
       kepatuhanRate,
+      totalAgendaTercatat,
+      totalKeplingHadir,
+      totalKeplingTidakHadir,
+      totalKeplingSakitIzin,
+      totalSlotsKehadiran,
+      avgKehadiranRate,
     };
   }, [
     filteredReportsByPeriod,
+    filteredAbsensiAgendaByPeriod,
     keplingSummaryList,
     effectiveKunjunganList,
     filteredKunjunganByPeriod,
     isCumulativePeriod,
     mode,
   ]);
+
+  // Rincian Riwayat Kehadiran Agenda Kelurahan milik Kepling aktif
+  const myRecentAgendaAttendance = useMemo(() => {
+    if (mode !== 'kepling') return [];
+    return filteredAbsensiAgendaByPeriod.slice(0, 6).map((rec) => {
+      const directEntry = rec.entries?.[activeAccount.id];
+      const matchedEntry =
+        directEntry ||
+        Object.values(rec.entries || {}).find(
+          (e) =>
+            e.nomorLingkungan === activeAccount.nomorLingkungan ||
+            e.namaKepling?.trim().toLowerCase() === activeAccount.nama.trim().toLowerCase()
+        );
+      return {
+        id: rec.id,
+        agendaId: rec.agendaId,
+        namaKegiatan: rec.namaKegiatan,
+        tanggalKegiatan: rec.tanggalKegiatan,
+        lokasi: rec.lokasi,
+        status: (matchedEntry?.status || 'Hadir') as StatusKehadiranKepling,
+        catatan: matchedEntry?.catatan || '',
+      };
+    });
+  }, [mode, filteredAbsensiAgendaByPeriod, activeAccount]);
 
   const handlePrint = () => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -1514,8 +1650,15 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   }`}
                 >
                   <div className="bg-black/20 p-2 rounded-xl text-center">
-                    <span className="block opacity-80 font-bold">👥 Kegiatan</span>
-                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.kegiatanPercentage}%</strong>
+                    <span className="block opacity-80 font-bold">👤 Kehadiran</span>
+                    <strong className="text-xs block mt-0.5">
+                      {myPerformanceData.item.kehadiranPercentage}%
+                      {myPerformanceData.item.kehadiranTotal > 0 && (
+                        <span className="font-normal opacity-80 ml-1">
+                          ({myPerformanceData.item.kehadiranHadir}/{myPerformanceData.item.kehadiranTotal})
+                        </span>
+                      )}
+                    </strong>
                   </div>
                   <div className="bg-black/20 p-2 rounded-xl text-center">
                     <span className="block opacity-80 font-bold">📋 Perlinsos</span>
@@ -1571,6 +1714,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             const sisaTargetPerlinsos = Math.max(0, activeTargetPerlinsos - effectiveMyKinerja.perlinsos);
 
             return (
+              <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* 1. Realisasi PBB (Terkoneksi Master SPPT) */}
                 <div
@@ -1756,6 +1900,118 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   </div>
                 </div>
               </div>
+
+              {/* 5. Indikator Kehadiran Kepala Lingkungan (Agenda Kelurahan) */}
+              {(() => {
+                const kh = myPerformanceData?.item;
+                const totalAg = kh?.kehadiranTotal || 0;
+                const hadirAg = kh?.kehadiranHadir || 0;
+                const alphaAg = kh?.kehadiranTidakHadir || 0;
+                const sakitAg = kh?.kehadiranSakit || 0;
+                const izinAg = kh?.kehadiranIzin || 0;
+                const pctAg = totalAg > 0 ? Math.round((hadirAg / totalAg) * 100) : 100;
+
+                return (
+                  <div className="bg-white rounded-2xl p-5 border-2 border-indigo-200 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-200">
+                          <UserCheck className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] font-black text-indigo-900 uppercase tracking-wider">
+                              5. Kehadiran Kepala Lingkungan
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black">
+                              Bobot 20% IKKT
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Rekap kehadiran resmi berdasarkan daftar hadir Agenda Kelurahan pada periode {getPeriodLabel(period, now)}.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 self-start sm:self-auto">
+                        <div className="text-right">
+                          <div className="text-2xl font-black text-indigo-950">
+                            {totalAg > 0 ? `${pctAg}%` : '—'}
+                          </div>
+                          <div className="text-[11px] font-bold text-slate-500">
+                            {totalAg > 0 ? `${hadirAg} dari ${totalAg} Agenda` : 'Belum ada agenda diabsen'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          pctAg >= 85 ? 'bg-emerald-500' : pctAg >= 65 ? 'bg-indigo-600' : 'bg-rose-500'
+                        }`}
+                        style={{ width: `${totalAg > 0 ? Math.min(100, pctAg) : 0}%` }}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold text-emerald-800">Hadir</span>
+                        <span className="font-black text-emerald-950">{hadirAg}</span>
+                      </div>
+                      <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold text-rose-800">Tidak Hadir</span>
+                        <span className="font-black text-rose-950">{alphaAg}</span>
+                      </div>
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold text-amber-800">Sakit</span>
+                        <span className="font-black text-amber-950">{sakitAg}</span>
+                      </div>
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold text-blue-800">Izin</span>
+                        <span className="font-black text-blue-950">{izinAg}</span>
+                      </div>
+                    </div>
+
+                    {myRecentAgendaAttendance.length > 0 && (
+                      <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                          Riwayat Absensi Agenda Terbaru
+                        </span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {myRecentAgendaAttendance.slice(0, 4).map((ag) => (
+                            <div
+                              key={ag.id}
+                              className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs"
+                            >
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-800 truncate">{ag.namaKegiatan}</p>
+                                <p className="text-[10px] text-slate-500">
+                                  {formatTanggalSingkatIndonesia(ag.tanggalKegiatan)}
+                                </p>
+                              </div>
+                              <span
+                                className={`px-2 py-0.5 rounded-lg text-[10px] font-black shrink-0 border ${
+                                  ag.status === 'Hadir'
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                    : ag.status === 'Tidak Hadir'
+                                    ? 'bg-rose-100 text-rose-800 border-rose-200'
+                                    : ag.status === 'Sakit'
+                                    ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                    : 'bg-blue-100 text-blue-800 border-blue-200'
+                                }`}
+                              >
+                                {ag.status}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              </>
             );
           })()}
 
@@ -1983,7 +2239,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       {mode === 'super_admin' && (
         <div className="space-y-6">
           {/* Kelurahan Aggregation Metric Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 sm:gap-4">
             {/* Total Laporan */}
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs">
               <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase block">
@@ -1995,6 +2251,42 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               </div>
               <p className="text-[11px] text-emerald-700 font-semibold mt-1">
                 {kelurahanTotals.activeKeplingCount} dari 24 Kepling aktif
+              </p>
+            </div>
+
+            {/* Kehadiran Kepala Lingkungan (Absensi Agenda Kelurahan) */}
+            <div
+              onClick={() => onOpenAbsensiKepling?.()}
+              className={`bg-white rounded-2xl p-4 sm:p-5 border-2 border-indigo-200 shadow-xs transition-all ${
+                onOpenAbsensiKepling ? 'cursor-pointer hover:border-indigo-400 hover:shadow-md group' : ''
+              }`}
+              title={
+                onOpenAbsensiKepling
+                  ? 'Klik untuk membuka Absensi Kepala Lingkungan (Agenda & Cetak PDF)'
+                  : 'Rata-rata kehadiran Kepala Lingkungan pada Agenda Kelurahan'
+              }
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] sm:text-[11px] font-black text-indigo-900 uppercase block group-hover:text-indigo-700 transition-colors">
+                  Kehadiran Kepling {onOpenAbsensiKepling ? '↗' : ''}
+                </span>
+                <span className="text-[10px] bg-indigo-100 text-indigo-900 font-black px-1.5 py-0.5 rounded">
+                  {kelurahanTotals.totalAgendaTercatat} Agenda
+                </span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-indigo-950 mt-1">
+                {kelurahanTotals.totalAgendaTercatat > 0 ? `${kelurahanTotals.avgKehadiranRate}%` : '—'}
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2">
+                <div
+                  className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, kelurahanTotals.avgKehadiranRate)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1 truncate">
+                {kelurahanTotals.totalAgendaTercatat > 0
+                  ? `${kelurahanTotals.totalKeplingHadir} Hadir · ${kelurahanTotals.totalKeplingTidakHadir} Alpha`
+                  : 'Belum ada absensi agenda'}
               </p>
             </div>
 
@@ -2212,7 +2504,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       }`}
                     >
                       {leaderboardSort === 'KOMPOSIT' && '⭐ 6 Kriteria Terpadu (Skor Komposit)'}
-                      {leaderboardSort === 'KEGIATAN' && '👥 Kehadiran Kegiatan (20%)'}
+                      {(leaderboardSort === 'KEHADIRAN' || leaderboardSort === 'KEGIATAN') && '👤 Kehadiran Kepling (20%)'}
                       {leaderboardSort === 'PERLINSOS' && '📋 Capaian Perlinsos (25%)'}
                       {leaderboardSort === 'PBB' && '💰 Realisasi PBB (25%)'}
                       {leaderboardSort === 'BPJS' && '🛡️ BPJS Ketenagakerjaan (10%)'}
@@ -2226,7 +2518,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">
-                    Peringkat resmi terpadu untuk periode <strong>{getPeriodLabel(period, now)}</strong> dihitung dari <strong>6 Kriteria Kinerja</strong> (Kegiatan 20%, Perlinsos 25%, PBB 25%, BPJS TK 10%, Kunjungan 10%, Poskamling 10%). 
+                    Peringkat resmi terpadu untuk periode <strong>{getPeriodLabel(period, now)}</strong> dihitung dari <strong>6 Kriteria Kinerja</strong> (Kehadiran Kepling 20%, Perlinsos 25%, PBB 25%, BPJS TK 10%, Kunjungan 10%, Poskamling 10%). 
                     {!isCumulativePeriod ? (
                       <span className="text-emerald-700 font-semibold block mt-0.5">
                         ⚡ Mode Bulanan Aktif: Akumulasi poin direset otomatis dari 0 pada tanggal 1 bulan berjalan (hanya menghitung transaksi & keaktifan bulan ini). Evaluasi total kumulatif setahun penuh dapat dilihat melalui filter "Tahun 2026".
@@ -2292,15 +2584,15 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
                 <button
                   type="button"
-                  onClick={() => setLeaderboardSort('KEGIATAN')}
+                  onClick={() => setLeaderboardSort('KEHADIRAN')}
                   className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
-                    leaderboardSort === 'KEGIATAN'
+                    leaderboardSort === 'KEHADIRAN' || leaderboardSort === 'KEGIATAN'
                       ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-300 scale-102'
                       : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                   }`}
                 >
-                  <CalendarCheck className="w-3.5 h-3.5" />
-                  <span>Kegiatan (20%)</span>
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Kehadiran Kepling (20%)</span>
                 </button>
 
                 <button
@@ -2402,11 +2694,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
                   <div className="mt-3 pt-2.5 border-t border-slate-200 grid grid-cols-2 gap-1.5 text-[10px] text-left">
                     <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
-
-                    </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
-                      <span className="text-slate-400 block font-medium">👥 Kegiatan</span>
-                      <strong className="text-indigo-700">{sortedLeaderboard[1].kegiatanPercentage}%</strong>
+                      <span className="text-slate-400 block font-medium">👤 Kehadiran</span>
+                      <strong className="text-indigo-700">{sortedLeaderboard[1].kehadiranPercentage}%</strong>
+                      {sortedLeaderboard[1].kehadiranTotal > 0 ? ` (${sortedLeaderboard[1].kehadiranHadir}/${sortedLeaderboard[1].kehadiranTotal})` : ''}
                     </div>
                     <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
                       <span className="text-slate-400 block font-medium">📋 Perlinsos</span>
@@ -2460,11 +2750,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
                   <div className="mt-3.5 pt-3 border-t border-amber-200 grid grid-cols-2 gap-1.5 text-[10px] text-left">
                     <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
-
-                    </div>
-                    <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
-                      <span className="text-amber-800 block font-medium">👥 Kegiatan</span>
-                      <strong className="text-indigo-700 font-bold">{sortedLeaderboard[0].kegiatanPercentage}%</strong>
+                      <span className="text-amber-800 block font-medium">👤 Kehadiran</span>
+                      <strong className="text-indigo-700 font-bold">{sortedLeaderboard[0].kehadiranPercentage}%</strong>
+                      {sortedLeaderboard[0].kehadiranTotal > 0 ? ` (${sortedLeaderboard[0].kehadiranHadir}/${sortedLeaderboard[0].kehadiranTotal})` : ''}
                     </div>
                     <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
                       <span className="text-amber-800 block font-medium">📋 Perlinsos</span>
@@ -2518,11 +2806,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
                   <div className="mt-3 pt-2.5 border-t border-amber-200 grid grid-cols-2 gap-1.5 text-[10px] text-left">
                     <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
-
-                    </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
-                      <span className="text-slate-400 block font-medium">👥 Kegiatan</span>
-                      <strong className="text-indigo-700">{sortedLeaderboard[2].kegiatanPercentage}%</strong>
+                      <span className="text-slate-400 block font-medium">👤 Kehadiran</span>
+                      <strong className="text-indigo-700">{sortedLeaderboard[2].kehadiranPercentage}%</strong>
+                      {sortedLeaderboard[2].kehadiranTotal > 0 ? ` (${sortedLeaderboard[2].kehadiranHadir}/${sortedLeaderboard[2].kehadiranTotal})` : ''}
                     </div>
                     <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
                       <span className="text-slate-400 block font-medium">📋 Perlinsos</span>
@@ -2560,7 +2846,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   Skor IKKT
                 </div>
 
-                <div className="col-span-1 text-center">👥 Giat (20%)</div>
+                <div className="col-span-1 text-center">👤 Hadir (20%)</div>
                 <div className="col-span-1 text-center">📋 Perlinsos (25%)</div>
                 {isPbbAllowed && (
                   <div className="col-span-1 text-center">💰 PBB (25%)</div>
@@ -2694,21 +2980,31 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
 
 
-                    {/* 2. Kegiatan Khusus */}
-                    <div className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg">
-                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">👥 Kegiatan (20%)</div>
+                    {/* 2. Kehadiran Kepala Lingkungan */}
+                    <div
+                      onClick={() => onOpenAbsensiKepling?.()}
+                      className={`col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg ${
+                        onOpenAbsensiKepling ? 'cursor-pointer hover:bg-indigo-50 transition-colors' : ''
+                      }`}
+                      title={`Hadir: ${item.kehadiranHadir}, Tidak Hadir: ${item.kehadiranTidakHadir}, Sakit: ${item.kehadiranSakit}, Izin: ${item.kehadiranIzin} (dari ${item.kehadiranTotal} Agenda)`}
+                    >
+                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">👤 Kehadiran (20%)</div>
                       <span
                         className={`inline-block font-black px-1.5 py-0.5 rounded text-[11px] ${
-                          item.kegiatanPercentage >= 90
+                          item.kehadiranPercentage >= 90
                             ? 'text-indigo-700 bg-indigo-50'
-                            : item.kegiatanPercentage >= 70
+                            : item.kehadiranPercentage >= 70
                             ? 'text-blue-700 bg-blue-50'
-                            : 'text-amber-700 bg-amber-50'
+                            : 'text-rose-700 bg-rose-50'
                         }`}
                       >
-                        {item.kegiatanPercentage}%
+                        {item.kehadiranPercentage}%
                       </span>
-                      <span className="text-[10px] text-slate-400 block">{item.kegiatanHadir} Hadir</span>
+                      <span className="text-[10px] text-slate-400 block">
+                        {item.kehadiranTotal > 0
+                          ? `${item.kehadiranHadir}/${item.kehadiranTotal} Hadir`
+                          : '0 Agenda'}
+                      </span>
                     </div>
 
                     {/* 3. Perlinsos */}
