@@ -14,6 +14,7 @@ import { MONITORING_INFRA_COLLECTION, MONITORING_INFRA_STORAGE_KEY } from './mon
 import { KUNJUNGAN_COLLECTION, KUNJUNGAN_STORAGE_KEY } from './kunjunganService';
 import { PEMBANGUNAN_STORAGE_KEY } from './pembangunanService';
 import { ABSENSI_COLLECTION, ABSENSI_STORAGE_KEY } from './absensiAgendaService';
+import { KEGIATAN_LURAH_COLLECTION, KEGIATAN_LURAH_STORAGE_KEY } from './kegiatanLurahService';
 
 async function getColDocs(colName: string) {
   const colRef = collection(db, colName);
@@ -160,11 +161,23 @@ export const pullAllDataFromFirestore = async (
       console.warn('Absensi Kepling pull error:', e);
     }
 
+    // 15. Kegiatan Lurah
+    onProgress('Mengambil Data Kegiatan Lurah...');
+    try {
+      const kegSnap = await getColDocs(KEGIATAN_LURAH_COLLECTION);
+      const kegList: any[] = [];
+      kegSnap.forEach((d) => kegList.push({ ...d.data(), id: d.id }));
+      safeSetLocalStorage(KEGIATAN_LURAH_STORAGE_KEY, JSON.stringify(kegList));
+    } catch (e) {
+      console.warn('Kegiatan Lurah pull error:', e);
+    }
+
     onProgress('Semua data berhasil ditarik dari Cloud!');
 
     // Trigger window events to notify UI to refresh
     window.dispatchEvent(new CustomEvent('agenda-data-updated'));
     window.dispatchEvent(new CustomEvent('absensi-agenda-updated'));
+    window.dispatchEvent(new CustomEvent('kegiatan-lurah-updated'));
     window.dispatchEvent(new CustomEvent('kunjungan-data-updated'));
     window.dispatchEvent(new CustomEvent('pembangunan-data-updated'));
     window.dispatchEvent(new CustomEvent('pbb-data-updated', { detail: { year: 2026 } }));

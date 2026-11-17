@@ -434,11 +434,11 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
         updatedAt: nowIso,
       };
 
-      await saveAbsensiAgendaRecord(record);
+      const saveResult = await saveAbsensiAgendaRecord(record);
       setAbsensiList(getLocalAbsensiAgendaList());
       setHasUnsavedChanges(false);
       notify(
-        `Daftar Hadir Kepala Lingkungan untuk "${activeAgenda.namaKegiatan}" berhasil disimpan!`,
+        `Daftar Hadir "${activeAgenda.namaKegiatan}" disimpan! ${saveResult.syncedHadir} Kepling Hadir otomatis tercatat ke Laporan Harian & Capaian Kinerja.`,
         'success'
       );
     } catch {
@@ -1229,9 +1229,16 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
               <div className="flex items-center gap-2.5">
                 <FileText className="w-5 h-5 text-emerald-400" />
                 <div>
-                  <h3 className="text-sm font-black">
-                    Pratinjau Dokumen Resmi PDF — Daftar Hadir Kepala Lingkungan
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black">
+                      Pratinjau Dokumen Resmi PDF — Daftar Hadir Kepala Lingkungan
+                    </h3>
+                    {periodMode === 'harian' && (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                        ✓ Format 1 Lembar A4 Presisi (Pas 1 Halaman)
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-300">
                     Periode: {pdfMeta.hariTanggal}
                   </p>
@@ -1358,7 +1365,9 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
             <div className="p-4 sm:p-8 overflow-y-auto flex-1 bg-slate-200 flex justify-center">
               <div
                 id="lembar-cetak-absensi-kepling"
-                className="bg-white w-full max-w-[820px] p-6 sm:p-10 shadow-xl border border-slate-300 text-black"
+                className={`bg-white w-full max-w-[820px] shadow-xl border border-slate-300 text-black print:p-0 ${
+                  periodMode === 'harian' ? 'p-3 sm:p-5' : 'p-6 sm:p-10'
+                }`}
                 style={{
                   fontFamily: "'Times New Roman', Times, serif",
                   color: '#000000',
@@ -1366,13 +1375,19 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                 }}
               >
                 {/* 1. KOP SURAT RESMI KELURAHAN MANGGA */}
-                <KopSuratResmi />
+                <KopSuratResmi compact={periodMode === 'harian'} />
 
                 {/* 2. JUDUL DOKUMEN */}
-                <div style={{ textAlign: 'center', marginTop: '10px', marginBottom: '14px' }}>
+                <div
+                  style={{
+                    textAlign: 'center',
+                    marginTop: periodMode === 'harian' ? '3px' : '10px',
+                    marginBottom: periodMode === 'harian' ? '6px' : '14px',
+                  }}
+                >
                   <div
                     style={{
-                      fontSize: '13.5pt',
+                      fontSize: periodMode === 'harian' ? '12pt' : '13.5pt',
                       fontWeight: 'bold',
                       textDecoration: 'underline',
                       letterSpacing: '0.04em',
@@ -1384,9 +1399,9 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                   {pdfMeta.subtitle && (
                     <div
                       style={{
-                        fontSize: '10.5pt',
+                        fontSize: periodMode === 'harian' ? '9pt' : '10.5pt',
                         fontWeight: 'bold',
-                        marginTop: '3px',
+                        marginTop: '2px',
                         textTransform: 'uppercase',
                       }}
                     >
@@ -1394,7 +1409,7 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                     </div>
                   )}
                   {signerConfig.nomorSurat.trim() && (
-                    <div style={{ fontSize: '9.5pt', marginTop: '2px' }}>
+                    <div style={{ fontSize: periodMode === 'harian' ? '8pt' : '9.5pt', marginTop: '1px' }}>
                       Nomor : {signerConfig.nomorSurat.trim()}
                     </div>
                   )}
@@ -1406,19 +1421,41 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                   style={{
                     width: '100%',
                     borderCollapse: 'collapse',
-                    marginBottom: '12px',
-                    fontSize: '10pt',
+                    marginBottom: periodMode === 'harian' ? '6px' : '12px',
+                    fontSize: periodMode === 'harian' ? '8.5pt' : '10pt',
                   }}
                 >
                   <tbody>
                     <tr>
-                      <td style={{ width: '165px', fontWeight: 'bold', padding: '2px 4px', verticalAlign: 'top', border: 'none' }}>
+                      <td
+                        style={{
+                          width: periodMode === 'harian' ? '145px' : '165px',
+                          fontWeight: 'bold',
+                          padding: periodMode === 'harian' ? '1px 3px' : '2px 4px',
+                          verticalAlign: 'top',
+                          border: 'none',
+                        }}
+                      >
                         HARI / TANGGAL
                       </td>
-                      <td style={{ width: '14px', padding: '2px 4px', verticalAlign: 'top', border: 'none' }}>
+                      <td
+                        style={{
+                          width: '12px',
+                          padding: periodMode === 'harian' ? '1px 3px' : '2px 4px',
+                          verticalAlign: 'top',
+                          border: 'none',
+                        }}
+                      >
                         :
                       </td>
-                      <td style={{ padding: '2px 4px', fontWeight: 'bold', verticalAlign: 'top', border: 'none' }}>
+                      <td
+                        style={{
+                          padding: periodMode === 'harian' ? '1px 3px' : '2px 4px',
+                          fontWeight: 'bold',
+                          verticalAlign: 'top',
+                          border: 'none',
+                        }}
+                      >
                         {pdfMeta.hariTanggal}
                       </td>
                     </tr>
@@ -1426,20 +1463,41 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                     {periodMode === 'harian' && activeAgenda ? (
                       <>
                         <tr>
-                          <td style={{ fontWeight: 'bold', padding: '2px 4px', verticalAlign: 'top', border: 'none' }}>
+                          <td
+                            style={{
+                              fontWeight: 'bold',
+                              padding: '1px 3px',
+                              verticalAlign: 'top',
+                              border: 'none',
+                            }}
+                          >
                             AGENDA / KEGIATAN
                           </td>
-                          <td style={{ padding: '2px 4px', verticalAlign: 'top', border: 'none' }}>:</td>
-                          <td style={{ padding: '2px 4px', fontWeight: 'bold', verticalAlign: 'top', border: 'none' }}>
+                          <td style={{ padding: '1px 3px', verticalAlign: 'top', border: 'none' }}>:</td>
+                          <td
+                            style={{
+                              padding: '1px 3px',
+                              fontWeight: 'bold',
+                              verticalAlign: 'top',
+                              border: 'none',
+                            }}
+                          >
                             {activeAgenda.namaKegiatan}
                           </td>
                         </tr>
                         <tr>
-                          <td style={{ fontWeight: 'bold', padding: '2px 4px', verticalAlign: 'top', border: 'none' }}>
+                          <td
+                            style={{
+                              fontWeight: 'bold',
+                              padding: '1px 3px',
+                              verticalAlign: 'top',
+                              border: 'none',
+                            }}
+                          >
                             WAKTU / TEMPAT
                           </td>
-                          <td style={{ padding: '2px 4px', verticalAlign: 'top', border: 'none' }}>:</td>
-                          <td style={{ padding: '2px 4px', verticalAlign: 'top', border: 'none' }}>
+                          <td style={{ padding: '1px 3px', verticalAlign: 'top', border: 'none' }}>:</td>
+                          <td style={{ padding: '1px 3px', verticalAlign: 'top', border: 'none' }}>
                             {activeAgenda.jamKegiatan ? `${activeAgenda.jamKegiatan} · ` : ''}
                             {activeAgenda.lokasi || 'Kantor Kelurahan Mangga'}
                           </td>
@@ -1447,7 +1505,14 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                       </>
                     ) : (
                       <tr>
-                        <td style={{ fontWeight: 'bold', padding: '2px 4px', verticalAlign: 'top', border: 'none' }}>
+                        <td
+                          style={{
+                            fontWeight: 'bold',
+                            padding: '2px 4px',
+                            verticalAlign: 'top',
+                            border: 'none',
+                          }}
+                        >
                           AGENDA KELURAHAN
                         </td>
                         <td style={{ padding: '2px 4px', verticalAlign: 'top', border: 'none' }}>:</td>
@@ -1461,28 +1526,60 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                   </tbody>
                 </table>
 
-                {/* 4A. TABEL DAFTAR HADIR HARIAN */}
+                {/* 4A. TABEL DAFTAR HADIR HARIAN (PRESISI 1 LEMBAR A4) */}
                 {periodMode === 'harian' && (
                   <>
                     <table
                       style={{
                         width: '100%',
                         borderCollapse: 'collapse',
-                        fontSize: '9.5pt',
+                        fontSize: '8pt',
+                        lineHeight: '1.15',
                       }}
                     >
                       <thead>
                         <tr>
-                          <th style={{ border: '1px solid #000', padding: '6px 5px', textAlign: 'center', width: '38px', backgroundColor: '#f1f5f9' }}>
+                          <th
+                            style={{
+                              border: '1px solid #000',
+                              padding: '3px 4px',
+                              textAlign: 'center',
+                              width: '32px',
+                              backgroundColor: '#f1f5f9',
+                            }}
+                          >
                             No.
                           </th>
-                          <th style={{ border: '1px solid #000', padding: '6px 8px', textAlign: 'left', backgroundColor: '#f1f5f9' }}>
+                          <th
+                            style={{
+                              border: '1px solid #000',
+                              padding: '3px 6px',
+                              textAlign: 'left',
+                              backgroundColor: '#f1f5f9',
+                            }}
+                          >
                             Nama
                           </th>
-                          <th style={{ border: '1px solid #000', padding: '6px 8px', textAlign: 'left', width: '190px', backgroundColor: '#f1f5f9' }}>
+                          <th
+                            style={{
+                              border: '1px solid #000',
+                              padding: '3px 6px',
+                              textAlign: 'left',
+                              width: '165px',
+                              backgroundColor: '#f1f5f9',
+                            }}
+                          >
                             Jabatan
                           </th>
-                          <th style={{ border: '1px solid #000', padding: '6px 8px', textAlign: 'center', width: '185px', backgroundColor: '#f1f5f9' }}>
+                          <th
+                            style={{
+                              border: '1px solid #000',
+                              padding: '3px 6px',
+                              textAlign: 'center',
+                              width: '145px',
+                              backgroundColor: '#f1f5f9',
+                            }}
+                          >
                             Keterangan
                           </th>
                         </tr>
@@ -1494,19 +1591,38 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                           const catatan = (entry?.catatan || '').trim();
                           return (
                             <tr key={k.keplingId}>
-                              <td style={{ border: '1px solid #000', padding: '4.5px 5px', textAlign: 'center' }}>
+                              <td
+                                style={{
+                                  border: '1px solid #000',
+                                  padding: '2px 4px',
+                                  textAlign: 'center',
+                                }}
+                              >
                                 {idx + 1}.
                               </td>
-                              <td style={{ border: '1px solid #000', padding: '4.5px 8px', fontWeight: 'bold' }}>
+                              <td
+                                style={{
+                                  border: '1px solid #000',
+                                  padding: '2px 6px',
+                                  fontWeight: 'bold',
+                                }}
+                              >
                                 {k.namaKepling}
                               </td>
-                              <td style={{ border: '1px solid #000', padding: '4.5px 8px' }}>
+                              <td style={{ border: '1px solid #000', padding: '2px 6px' }}>
                                 {k.jabatan}
                               </td>
-                              <td style={{ border: '1px solid #000', padding: '4.5px 8px', textAlign: 'center', fontWeight: 'bold' }}>
+                              <td
+                                style={{
+                                  border: '1px solid #000',
+                                  padding: '2px 6px',
+                                  textAlign: 'center',
+                                  fontWeight: 'bold',
+                                }}
+                              >
                                 {status}
                                 {catatan ? (
-                                  <span style={{ fontWeight: 'normal', fontSize: '8.5pt' }}>
+                                  <span style={{ fontWeight: 'normal', fontSize: '7.5pt' }}>
                                     {' '}
                                     ({catatan})
                                   </span>
@@ -1522,16 +1638,16 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                     <div
                       className="avoid-break"
                       style={{
-                        marginTop: '10px',
-                        padding: '7px 10px',
+                        marginTop: '5px',
+                        padding: '3px 6px',
                         border: '1px solid #000',
-                        fontSize: '9pt',
+                        fontSize: '7.5pt',
                         backgroundColor: '#f8fafc',
                       }}
                     >
                       <strong>Rekapitulasi Kehadiran:</strong> Hadir: <strong>{activeDailyStats.hadir}</strong> Orang &nbsp;|&nbsp; Tidak Hadir:{' '}
                       <strong>{activeDailyStats.tidakHadir}</strong> Orang &nbsp;|&nbsp; Sakit: <strong>{activeDailyStats.sakit}</strong> Orang &nbsp;|&nbsp; Izin:{' '}
-                      <strong>{activeDailyStats.izin}</strong> Orang &nbsp;|&nbsp; Total: <strong>{activeDailyStats.total}</strong> Kepala Lingkungan ({activeDailyStats.pct.toFixed(1)}%)
+                      <strong>{activeDailyStats.izin}</strong> Orang &nbsp;|&nbsp; Total: <strong>{activeDailyStats.total}</strong> Kepala Lingkungan ({activeDailyStats.pct.toFixed(0)}%)
                     </div>
                   </>
                 )}
@@ -1692,19 +1808,25 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                 <div
                   className="avoid-break"
                   style={{
-                    marginTop: '24px',
+                    marginTop: periodMode === 'harian' ? '8px' : '22px',
                     display: 'flex',
                     justifyContent: 'flex-end',
                   }}
                 >
-                  <div style={{ width: '270px', textAlign: 'center', fontSize: '10pt' }}>
+                  <div
+                    style={{
+                      width: periodMode === 'harian' ? '240px' : '270px',
+                      textAlign: 'center',
+                      fontSize: periodMode === 'harian' ? '8.5pt' : '10pt',
+                    }}
+                  >
                     <div>
                       Medan, {formatTanggalSingkatIndonesia(todayIso)}
                     </div>
-                    <div style={{ fontWeight: 'bold', marginTop: '2px' }}>
+                    <div style={{ fontWeight: 'bold', marginTop: '1px' }}>
                       {signerConfig.jabatan || DEFAULT_SIGNER_JABATAN}
                     </div>
-                    <div style={{ height: '62px' }} />
+                    <div style={{ height: periodMode === 'harian' ? '36px' : '62px' }} />
                     <div
                       style={{
                         fontWeight: 'bold',
@@ -1714,7 +1836,7 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                       {signerConfig.nama.trim() || DEFAULT_SIGNER_NAMA}
                     </div>
                     {signerConfig.nip.trim() && (
-                      <div style={{ fontSize: '9pt', marginTop: '2px' }}>
+                      <div style={{ fontSize: periodMode === 'harian' ? '8pt' : '9pt', marginTop: '1px' }}>
                         NIP. {signerConfig.nip.trim()}
                       </div>
                     )}

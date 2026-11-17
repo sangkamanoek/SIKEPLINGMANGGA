@@ -59,6 +59,12 @@ const RealisasiPembangunanView = React.lazy(() =>
 const AgendaKelurahanView = React.lazy(() =>
   import('./components/AgendaKelurahanView').then((m) => ({ default: m.AgendaKelurahanView }))
 );
+const JadwalPoskoView = React.lazy(() =>
+  import('./components/JadwalPoskoView').then((m) => ({ default: m.JadwalPoskoView }))
+);
+const KegiatanLurahView = React.lazy(() =>
+  import('./components/KegiatanLurahView').then((m) => ({ default: m.KegiatanLurahView }))
+);
 const AbsensiAgendaKeplingView = React.lazy(() =>
   import('./components/AbsensiAgendaKeplingView').then((m) => ({ default: m.AbsensiAgendaKeplingView }))
 );
@@ -352,10 +358,70 @@ export default function App() {
     };
     window.addEventListener('sikepling-sync-queue-updated', handleQueueUpdated);
 
+    const handleReportsUpdated = (ev: Event) => {
+      if (!isMounted) return;
+      const detail = (
+        ev as CustomEvent<{
+          upsertedReports?: LaporanHarianItem[];
+          deletedIds?: string[];
+          deletedKeplingIds?: string[];
+          stripDate?: string;
+          stripPrefix?: string;
+        }>
+      ).detail;
+      const upserted = Array.isArray(detail?.upsertedReports) ? detail.upsertedReports : [];
+      const deletedSet = new Set(Array.isArray(detail?.deletedIds) ? detail.deletedIds : []);
+      const deletedKeplingSet = new Set(
+        Array.isArray(detail?.deletedKeplingIds) ? detail.deletedKeplingIds : []
+      );
+      const stripDate = detail?.stripDate || '';
+      const stripPrefix = detail?.stripPrefix || '';
+
+      setReports((prev) => {
+        const filtered = prev
+          .filter((r) => r && r.id && !deletedSet.has(r.id))
+          .map((r) => {
+            if (
+              stripPrefix &&
+              deletedKeplingSet.has(r.keplingId || '') &&
+              (!stripDate || r.tanggal === stripDate || r.tanggalLaporan === stripDate) &&
+              r.kinerja?.kegiatanLainnya?.includes(stripPrefix)
+            ) {
+              const filteredLines = r.kinerja.kegiatanLainnya
+                .split('\n')
+                .filter((line) => !line.includes(stripPrefix))
+                .map((line) => line.replace(/^•\s*/, '').trim())
+                .filter(Boolean);
+              return {
+                ...r,
+                kinerja: {
+                  ...r.kinerja,
+                  kegiatanLainnya: filteredLines.join('\n• '),
+                },
+              };
+            }
+            return r;
+          });
+        const map = new Map<string, LaporanHarianItem>();
+        filtered.forEach((r) => map.set(r.id, r));
+        upserted.forEach((u) => {
+          if (u && u.id) {
+            const existing = map.get(u.id);
+            map.set(u.id, existing ? consolidateDailyReport(existing, u) : u);
+          }
+        });
+        const unified = consolidateAllReports(Array.from(map.values()));
+        safeSetLocalStorage(LAPORAN_LOCAL_KEY, JSON.stringify(unified));
+        return unified;
+      });
+    };
+    window.addEventListener('sikepling-reports-updated', handleReportsUpdated);
+
     return () => {
       isMounted = false;
       cleanupAutoSync();
       window.removeEventListener('sikepling-sync-queue-updated', handleQueueUpdated);
+      window.removeEventListener('sikepling-reports-updated', handleReportsUpdated);
       clearTimeout(reportsFallbackTimer);
       unsub();
       unsubKunjungan();
@@ -873,6 +939,22 @@ export default function App() {
         {/* TAB: Agenda Kelurahan */}
         {activeTab === 'agenda' && (
           <AgendaKelurahanView
+            currentUser={activeAccount}
+            onShowToast={showToast}
+          />
+        )}
+
+        {/* TAB: Jadwal Posko Trantibum & Banjir */}
+        {activeTab === 'jadwal_posko' && (
+          <JadwalPoskoView
+            currentUser={activeAccount}
+            onShowToast={showToast}
+          />
+        )}
+
+        {/* TAB: Kegiatan Lurah */}
+        {activeTab === 'kegiatan_lurah' && (
+          <KegiatanLurahView
             currentUser={activeAccount}
             onShowToast={showToast}
           />

@@ -33,8 +33,10 @@ import {
   exportAgendaToExcel,
 } from '../lib/agendaService';
 import { fileToCompressedBase64 } from '../utils/imageCompressor';
-import { Camera, Image as ImageIcon } from 'lucide-react';
+import { Camera, Image as ImageIcon, Briefcase, ShieldAlert } from 'lucide-react';
 import { AbsensiAgendaKeplingView } from './AbsensiAgendaKeplingView';
+import { KegiatanLurahView } from './KegiatanLurahView';
+import { JadwalPoskoView } from './JadwalPoskoView';
 
 interface AgendaKelurahanViewProps {
   currentUser: UserAccount;
@@ -46,9 +48,25 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
   onShowToast,
 }) => {
   const isKepling = currentUser?.role === 'kepling';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const canManageAgenda = isSuperAdmin;
   const canAccessAbsensiKepling =
     currentUser?.role === 'super_admin' || currentUser?.role === 'sekretaris';
-  const [activeSubTab, setActiveSubTab] = useState<'agenda' | 'absensi'>('agenda');
+  const [activeSubTab, setActiveSubTab] = useState<'agenda' | 'jadwal_posko' | 'absensi' | 'kegiatan_lurah'>('agenda');
+
+  // Listen to open-agenda-subtab custom event (e.g. from posko alert banner)
+  useEffect(() => {
+    const handleOpenSubtab = (e: any) => {
+      const tab = e?.detail;
+      if (tab === 'jadwal_posko' || tab === 'kegiatan_lurah' || tab === 'absensi' || tab === 'agenda') {
+        setActiveSubTab(tab);
+      }
+    };
+    window.addEventListener('open-agenda-subtab', handleOpenSubtab);
+    return () => {
+      window.removeEventListener('open-agenda-subtab', handleOpenSubtab);
+    };
+  }, []);
 
   const [agendaList, setAgendaList] = useState<AgendaKelurahanItem[]>(() => getLocalAgendaList());
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,8 +126,8 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
   };
 
   const handleOpenAddModal = () => {
-    if (isKepling) {
-      if (onShowToast) onShowToast('Akses Dibatasi: Kepala Lingkungan hanya dapat melihat agenda kelurahan.', 'info');
+    if (!canManageAgenda) {
+      if (onShowToast) onShowToast('Akses Dibatasi: Fitur tambah agenda hanya khusus untuk Super Admin.', 'error');
       return;
     }
     const today = new Date().toISOString().split('T')[0];
@@ -127,8 +145,8 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
   };
 
   const handleOpenEditModal = (item: AgendaKelurahanItem) => {
-    if (isKepling) {
-      if (onShowToast) onShowToast('Akses Dibatasi: Kepala Lingkungan hanya dapat melihat agenda kelurahan.', 'info');
+    if (!canManageAgenda) {
+      if (onShowToast) onShowToast('Akses Dibatasi: Fitur ubah agenda hanya khusus untuk Super Admin.', 'error');
       return;
     }
     setEditingItem(item);
@@ -146,8 +164,8 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isKepling) {
-      if (onShowToast) onShowToast('Akses Dibatasi: Kepala Lingkungan tidak berwenang memodifikasi agenda.', 'error');
+    if (!canManageAgenda) {
+      if (onShowToast) onShowToast('Akses Dibatasi: Hanya Super Admin yang berwenang menyimpan agenda.', 'error');
       return;
     }
     if (!formNama.trim() || !formTanggal || !formLokasi.trim() || !formPeserta.trim()) {
@@ -207,8 +225,8 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
   };
 
   const handleQuickStatusToggle = async (item: AgendaKelurahanItem, newStatus: StatusAgendaType) => {
-    if (isKepling) {
-      if (onShowToast) onShowToast('Akses Dibatasi: Kepala Lingkungan hanya dapat melihat agenda kelurahan.', 'info');
+    if (!canManageAgenda) {
+      if (onShowToast) onShowToast('Akses Dibatasi: Ubah status agenda hanya khusus untuk Super Admin.', 'error');
       return;
     }
     try {
@@ -231,8 +249,8 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
   };
 
   const handleDeleteConfirm = async () => {
-    if (isKepling) {
-      if (onShowToast) onShowToast('Akses Dibatasi: Kepala Lingkungan tidak berwenang menghapus agenda.', 'error');
+    if (!canManageAgenda) {
+      if (onShowToast) onShowToast('Akses Dibatasi: Hapus agenda kegiatan hanya khusus untuk Super Admin.', 'error');
       return;
     }
     if (!itemToDelete) return;
@@ -292,21 +310,49 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-1 sm:px-2 animate-fade-in">
-      {canAccessAbsensiKepling && (
-        <div className="bg-white rounded-2xl p-2 border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 print:hidden">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('agenda')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                activeSubTab === 'agenda'
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Daftar Agenda Kelurahan</span>
-            </button>
+      {/* Subtab Navigation Bar */}
+      <div className="bg-white rounded-2xl p-2 border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('agenda')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              activeSubTab === 'agenda'
+                ? 'bg-emerald-700 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Daftar Agenda Kelurahan</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('jadwal_posko')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              activeSubTab === 'jadwal_posko'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-amber-300" />
+            <span>Jadwal Posko (Trantib &amp; Banjir)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('kegiatan_lurah')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              activeSubTab === 'kegiatan_lurah'
+                ? 'bg-emerald-700 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <Briefcase className="w-4 h-4 text-amber-300" />
+            <span>Kegiatan Lurah</span>
+          </button>
+
+          {canAccessAbsensiKepling && (
             <button
               type="button"
               onClick={() => setActiveSubTab('absensi')}
@@ -319,18 +365,28 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
               <UserCheck className="w-4 h-4" />
               <span>Absensi Kepala Lingkungan (Cetak PDF)</span>
             </button>
-          </div>
-          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-teal-50 text-teal-800 border border-teal-200">
-            Akses Khusus Superadmin &amp; Seklur
-          </span>
+          )}
         </div>
-      )}
+        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
+          Kelurahan Mangga · SI-MANGGA
+        </span>
+      </div>
 
-      {canAccessAbsensiKepling && activeSubTab === 'absensi' ? (
+      {activeSubTab === 'absensi' && canAccessAbsensiKepling ? (
         <AbsensiAgendaKeplingView
           currentUser={currentUser}
           onShowToast={onShowToast}
           onGoToAgendaTab={() => setActiveSubTab('agenda')}
+        />
+      ) : activeSubTab === 'jadwal_posko' ? (
+        <JadwalPoskoView
+          currentUser={currentUser}
+          onShowToast={onShowToast}
+        />
+      ) : activeSubTab === 'kegiatan_lurah' ? (
+        <KegiatanLurahView
+          currentUser={currentUser}
+          onShowToast={onShowToast}
         />
       ) : (
         <>
@@ -356,7 +412,7 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap shrink-0">
-            {!isKepling && (
+            {canManageAgenda && (
               <button
                 type="button"
                 onClick={handleOpenAddModal}
@@ -696,7 +752,7 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
                   </div>
 
                   {/* Right Column: Quick Status & Actions */}
-                  {!isKepling ? (
+                  {canManageAgenda ? (
                     <div className="flex md:flex-col items-center md:items-end justify-between md:justify-start gap-2 shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
                       {/* Quick Status Buttons */}
                       <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">

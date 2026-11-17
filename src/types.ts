@@ -610,6 +610,19 @@ export interface AgendaKelurahanItem {
   updatedAt?: string;
 }
 
+export interface KegiatanLurahItem {
+  id: string;
+  namaKegiatan: string;
+  hariTanggal: string; // Hari / Tgl e.g. "Senin, 17 November 2026"
+  waktu: string; // Waktu e.g. "09:00 - 11:00 WIB"
+  lokasi: string;
+  fotoKehadiranUrl?: string; // Foto Kehadiran
+  catatan?: string;
+  createdByName?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export type StatusKehadiranKepling = 'Hadir' | 'Tidak Hadir' | 'Sakit' | 'Izin';
 
 export interface AbsensiKeplingEntry {
@@ -633,6 +646,44 @@ export interface AbsensiAgendaKepling {
   diinputOlehRole?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+// Jadwal Posko Trantibum & Posko Kewaspadaan Banjir
+export type JenisPosko = 'posko_trantibum' | 'posko_banjir';
+export type StatusPosko = 'TERJADWAL' | 'BERLANGSUNG' | 'SELESAI';
+
+export interface KeplingPetugasPosko {
+  keplingId: string;
+  nomorLingkungan: number;
+  namaKepling: string;
+  telepon?: string;
+  statusKehadiran: 'Hadir' | 'Belum Hadir' | 'Izin' | 'Sakit';
+  jamHadir?: string; // e.g. "21:10 WIB"
+  fotoKehadiranUrl?: string; // Base64 or image URL
+  waktuUploadFoto?: string; // ISO String
+  catatanSituasi?: string; // Laporan kondisi lapangan
+}
+
+export interface JadwalPoskoItem {
+  id: string;
+  jenisPosko: JenisPosko; // 'posko_trantibum' | 'posko_banjir'
+  namaPosko: string; // "Posko Trantibum" | "Posko Kewaspadaan Banjir"
+  tanggal: string; // YYYY-MM-DD
+  waktuMulai: string; // default "21.00 WIB s/d Selesai"
+  lokasiPosko: string; // cth: "Kantor Kelurahan Mangga"
+  arahanTugas?: string;
+  penanggungJawab: string; // cth: "Kasi Trantibum" / "Lurah Mangga"
+  status: StatusPosko; // 'TERJADWAL' | 'BERLANGSUNG' | 'SELESAI'
+  petugasKepling: KeplingPetugasPosko[];
+  createdById: string;
+  createdByName: string;
+  createdByRole: string;
+  createdAt: string;
+  updatedAt?: string;
+  selesaiAt?: string;
+  catatanSelesai?: string;
+  diverifikasiOlehNama?: string;
+  diverifikasiOlehRole?: string;
 }
 
 

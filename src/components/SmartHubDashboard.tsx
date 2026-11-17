@@ -28,6 +28,8 @@ import {
   Trash2,
   Baby,
   BookOpen,
+  ShieldAlert,
+  Briefcase,
 } from 'lucide-react';
 import { saveReportToFirestore } from '../lib/firestoreService';
 import { fetchAllReports } from '../lib/reportsApi';
@@ -55,6 +57,7 @@ import {
 } from '../lib/formatter';
 import { getLocalKunjunganList, subscribeKunjunganWarga } from '../lib/kunjunganService';
 import { getLocalAgendaList, subscribeAgendaFromFirestore } from '../lib/agendaService';
+import { getLocalJadwalPoskoList } from '../lib/jadwalPoskoService';
 import { getLocalPembangunanList, subscribeToPembangunan } from '../lib/pembangunanService';
 
 interface SmartHubDashboardProps {
@@ -380,6 +383,23 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         case 'agenda': {
           const count = getLocalAgendaList().length;
           return { num: count, label: `${count} Agenda` };
+        }
+        case 'jadwal_posko': {
+          const allPosko = getLocalJadwalPoskoList();
+          const count = isKepling
+            ? allPosko.filter((p) =>
+                p.petugasKepling?.some(
+                  (k) =>
+                    (activeAccount.id && k.keplingId === activeAccount.id) ||
+                    (activeAccount.nomorLingkungan &&
+                      Number(k.nomorLingkungan) === Number(activeAccount.nomorLingkungan))
+                )
+              ).length
+            : allPosko.length;
+          return {
+            num: count,
+            label: isKepling ? `${count} Jadwal Saya` : `${count} Jadwal`,
+          };
         }
         case 'absensi_kepling': {
           return { num: 24, label: `24 Kepling · PDF` };
@@ -719,21 +739,39 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         badgeColor: 'bg-emerald-100 text-emerald-800',
         action: () => onNavigate('kunjungan'),
       },
-      ...(!isKepling
-        ? [
-            {
-              id: 'agenda',
-              title: 'Agenda & Jadwal Kegiatan Kelurahan',
-              desc: 'Jadwal rapat, gotong royong, posyandu, dan agenda resmi kelurahan lengkap dengan status selesai, lokasi, peserta, & ekspor Excel.',
-              category: 'laporan',
-              icon: Calendar,
-              iconBg: 'bg-emerald-50 text-emerald-700',
-              badge: 'AGENDA RESMI',
-              badgeColor: 'bg-emerald-100 text-emerald-900',
-              action: () => onNavigate('agenda'),
-            },
-          ]
-        : []),
+      {
+        id: 'agenda',
+        title: 'Agenda & Jadwal Kegiatan Kelurahan',
+        desc: 'Jadwal rapat, gotong royong, posyandu, dan agenda resmi kelurahan lengkap dengan status selesai, lokasi, peserta, & ekspor Excel.',
+        category: 'laporan',
+        icon: Calendar,
+        iconBg: 'bg-emerald-50 text-emerald-700',
+        badge: 'AGENDA RESMI',
+        badgeColor: 'bg-emerald-100 text-emerald-900',
+        action: () => onNavigate('agenda'),
+      },
+      {
+        id: 'jadwal_posko',
+        title: 'Jadwal Posko (Trantibum & Kewaspadaan Banjir)',
+        desc: 'Jadwal piket malam pukul 21.00 WIB s/d selesai (Trantibum di Kantor Lurah & Siaga Banjir di Taman Segitiga Lk. 9), unggah foto hadir, & PDF.',
+        category: 'absen',
+        icon: ShieldAlert,
+        iconBg: 'bg-amber-50 text-amber-700',
+        badge: '21.00 WIB · POSKO',
+        badgeColor: 'bg-amber-100 text-amber-900',
+        action: () => onNavigate('jadwal_posko'),
+      },
+      {
+        id: 'kegiatan_lurah',
+        title: 'Kegiatan Lurah Kelurahan Mangga',
+        desc: 'Agenda & dokumentasi kegiatan resmi Lurah lengkap dengan nama kegiatan, hari/tanggal, waktu, lokasi, & foto kehadiran.',
+        category: 'laporan',
+        icon: Briefcase,
+        iconBg: 'bg-indigo-50 text-indigo-700',
+        badge: 'KEGIATAN LURAH',
+        badgeColor: 'bg-indigo-100 text-indigo-900',
+        action: () => onNavigate('kegiatan_lurah'),
+      },
       ...(activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris'
         ? [
             {
@@ -1025,6 +1063,80 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       {/* RENDER MODE A: MODERN CONSOLIDATED BENTO-GRID */}
       {dashboardStyle === 'consolidated' ? (
         <div className="space-y-6">
+          {/* Quick Access Agenda Kelurahan, Jadwal Posko & Kegiatan Lurah */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-emerald-700" />
+                <h3 className="text-xs sm:text-sm font-black uppercase text-slate-900 tracking-wider">
+                  Agenda Kelurahan, Kegiatan Lurah &amp; Jadwal Posko
+                </h3>
+              </div>
+              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900">
+                Posko Malam 21.00 WIB s/d Selesai
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <button
+                type="button"
+                onClick={() => onNavigate('agenda')}
+                className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/70 text-left transition-all cursor-pointer group flex items-center gap-3"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-black text-slate-900 truncate">Agenda Kelurahan</h4>
+                  <p className="text-[11px] text-slate-600 truncate">Daftar agenda resmi kelurahan</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onNavigate('jadwal_posko')}
+                className="p-3.5 rounded-xl border border-amber-300 bg-amber-50/70 hover:bg-amber-100 text-left transition-all cursor-pointer group flex items-center gap-3 shadow-2xs"
+              >
+                <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-black text-slate-900 truncate">Jadwal Posko</h4>
+                  <p className="text-[11px] text-amber-900 font-semibold truncate">Trantib (Kantor Lurah) &amp; Banjir (Taman Segitiga Lk.9)</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onNavigate('kegiatan_lurah')}
+                className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/70 text-left transition-all cursor-pointer group flex items-center gap-3"
+              >
+                <div className="w-10 h-10 rounded-xl bg-indigo-700 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-black text-slate-900 truncate">Kegiatan Lurah</h4>
+                  <p className="text-[11px] text-slate-600 truncate">Dokumentasi kegiatan &amp; foto</p>
+                </div>
+              </button>
+
+              {(activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris') && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('absensi_kepling')}
+                  className="p-3.5 rounded-xl border border-teal-200 bg-teal-50/50 hover:bg-teal-100/70 text-left transition-all cursor-pointer group flex items-center gap-3"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                    <UserCheck className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-black text-slate-900 truncate">Absensi Kepling (PDF)</h4>
+                    <p className="text-[11px] text-slate-600 truncate">Cetak 1 Lembar A4 Presisi</p>
+                  </div>
+                </button>
+              )}
+            </div>
+          </div>
           
           {/* Quick Stats Bento Row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

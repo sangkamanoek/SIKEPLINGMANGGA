@@ -38,6 +38,8 @@ export type AppTabType =
   | 'surat_kedinasan'
   | 'buku_pkk'
   | 'agenda'
+  | 'jadwal_posko'
+  | 'kegiatan_lurah'
   | 'absensi_kepling';
 
 

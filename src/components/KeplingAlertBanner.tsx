@@ -7,6 +7,7 @@ import {
   ArrowRight,
   ArrowRightLeft,
   Radio,
+  ShieldAlert,
 } from 'lucide-react';
 import { AlertNotificationItem } from '../hooks/useAgendaTugasRealtimeAlert';
 
@@ -26,31 +27,42 @@ export const KeplingAlertBanner: React.FC<KeplingAlertBannerProps> = ({
   if (!alert) return null;
 
   const isPbbPindah = alert.type === 'pbb_pindah';
+  const isPosko = alert.type === 'posko';
 
-  const containerClasses = isPbbPindah
+  const containerClasses = isPosko
+    ? 'bg-amber-600/95 text-white border-amber-300 shadow-amber-600/30 ring-4 ring-amber-500/20'
+    : isPbbPindah
     ? 'bg-indigo-600/95 text-white border-indigo-400 shadow-indigo-600/30 ring-4 ring-indigo-500/20'
     : 'bg-emerald-600/95 text-white border-emerald-400 shadow-emerald-600/30 ring-4 ring-emerald-500/20';
 
-  const iconBoxClasses = isPbbPindah
+  const iconBoxClasses = isPosko
+    ? 'bg-white text-amber-700'
+    : isPbbPindah
     ? 'bg-white text-indigo-700'
     : 'bg-white text-emerald-700';
 
   const titlePillClasses = 'bg-white/20 text-white backdrop-blur-xs';
 
-  const subPillClasses = isPbbPindah
+  const subPillClasses = isPosko
+    ? 'bg-amber-700/50 text-amber-100'
+    : isPbbPindah
     ? 'bg-indigo-700/50 text-indigo-100'
     : 'bg-emerald-700/50 text-emerald-100';
 
-  const primaryCtaClasses = isPbbPindah
+  const primaryCtaClasses = isPosko
+    ? 'bg-white hover:bg-slate-100 text-amber-900'
+    : isPbbPindah
     ? 'bg-white hover:bg-slate-100 text-indigo-800'
     : 'bg-white hover:bg-slate-100 text-emerald-800';
 
-  const soundBtnClasses = isPbbPindah
+  const soundBtnClasses = isPosko
+    ? 'bg-amber-700/40 hover:bg-amber-700/60 text-white'
+    : isPbbPindah
     ? 'bg-indigo-700/40 hover:bg-indigo-700/60 text-white'
     : 'bg-emerald-700/40 hover:bg-emerald-700/60 text-white';
 
   const targetTab = isPbbPindah ? 'rekap_pbb' : 'agenda';
-  const targetLabel = isPbbPindah ? 'Buka Data PBB' : 'Buka Agenda';
+  const targetLabel = isPosko ? 'Buka Jadwal Posko' : isPbbPindah ? 'Buka Data PBB' : 'Buka Agenda';
 
   return (
     <aside
@@ -66,7 +78,9 @@ export const KeplingAlertBanner: React.FC<KeplingAlertBannerProps> = ({
             <div
               className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-md ${iconBoxClasses}`}
             >
-              {isPbbPindah ? (
+              {isPosko ? (
+                <ShieldAlert className="w-6 h-6 animate-pulse" />
+              ) : isPbbPindah ? (
                 <ArrowRightLeft className="w-6 h-6 animate-pulse" />
               ) : (
                 <Calendar className="w-6 h-6 animate-pulse" />
@@ -108,7 +122,11 @@ export const KeplingAlertBanner: React.FC<KeplingAlertBannerProps> = ({
             {alert.detail && (
               <p
                 className={`text-xs mt-1 line-clamp-2 leading-relaxed ${
-                  isPbbPindah ? 'text-indigo-50' : 'text-emerald-50'
+                  isPosko
+                    ? 'text-amber-50'
+                    : isPbbPindah
+                    ? 'text-indigo-50'
+                    : 'text-emerald-50'
                 }`}
               >
                 {alert.detail}
@@ -120,7 +138,11 @@ export const KeplingAlertBanner: React.FC<KeplingAlertBannerProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  onNavigateTab(targetTab);
+                  if (isPosko) {
+                    onNavigateTab('jadwal_posko');
+                  } else {
+                    onNavigateTab(targetTab);
+                  }
                   onDismiss();
                 }}
                 className={`px-3.5 py-1.5 rounded-xl font-black text-xs inline-flex items-center gap-1.5 shadow-md cursor-pointer transition-all hover:scale-105 active:scale-95 ${primaryCtaClasses}`}

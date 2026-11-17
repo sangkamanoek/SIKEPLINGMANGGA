@@ -18,6 +18,8 @@ import {
   Award,
   Calendar,
   UserCheck,
+  ShieldAlert,
+  Briefcase,
 } from 'lucide-react';
 import { AppTabType } from './MobileBottomNav';
 import { UserAccount, isPkkRole } from '../types';
@@ -65,6 +67,8 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'monitoring', label: 'Monitoring Laporan', icon: ShieldCheck, badge: 'MONITORING', badgeVariant: 'mint' },
     { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
     { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
+    { id: 'jadwal_posko', label: 'Jadwal Posko', icon: ShieldAlert, badge: '21.00 WIB', badgeVariant: 'rose' },
+    { id: 'kegiatan_lurah', label: 'Kegiatan Lurah', icon: Briefcase, badge: 'LURAH', badgeVariant: 'mint' },
     { id: 'absensi_kepling', label: 'Absensi Kepling', icon: UserCheck, badge: 'PDF', badgeVariant: 'mint' },
     { id: 'capaian_admin', label: 'Capaian Target', icon: Trophy, badge: 'TARGET', badgeVariant: 'mint' },
     { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
@@ -83,6 +87,8 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'hub', label: 'Pusat Menu', icon: Compass },
     { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
     { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
+    { id: 'jadwal_posko', label: 'Jadwal Posko', icon: ShieldAlert, badge: '21.00 WIB', badgeVariant: 'rose' },
+    { id: 'kegiatan_lurah', label: 'Kegiatan Lurah', icon: Briefcase, badge: 'LURAH', badgeVariant: 'mint' },
     { id: 'capaian', label: 'Capaian Target', icon: Trophy },
     { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
     { id: 'form', label: 'Input Laporan', icon: FileText },
@@ -97,6 +103,8 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'monitoring', label: 'Monitoring Laporan', icon: ShieldCheck, badge: 'MONITORING', badgeVariant: 'mint' },
     { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
     { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
+    { id: 'jadwal_posko', label: 'Jadwal Posko', icon: ShieldAlert, badge: '21.00 WIB', badgeVariant: 'rose' },
+    { id: 'kegiatan_lurah', label: 'Kegiatan Lurah', icon: Briefcase, badge: 'LURAH', badgeVariant: 'mint' },
     ...(isSeklur
       ? [{ id: 'absensi_kepling' as AppTabType, label: 'Absensi Kepling', icon: UserCheck, badge: 'PDF', badgeVariant: 'mint' as const }]
       : []),

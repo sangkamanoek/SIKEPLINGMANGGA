@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Printer, Download, CreditCard, Layers, CheckCircle2 } from 'lucide-react';
-import { printOfficialDocument } from '../utils/printHelper';
+import { printOfficialDocument, downloadPdfDocument } from '../utils/printHelper';
 import { generateSinglePkkCardHtml, generateBatchPkkCardHtml } from '../utils/pkkCardGenerator';
 import { PKK_LOGO_BASE64 } from '../assets/logoPkkBase64';
 import { formatDateToIndonesianFull } from '../utils/dateFormatter';
@@ -151,6 +151,20 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
         setIsPrinting(false);
       }, 1000);
     }, 300);
+  };
+
+  const handleDownloadPdf = () => {
+    setIsPrinting(true);
+    const listToPrint = activeTab === 'batch' ? (allMembers.length > 0 ? allMembers : [member]) : [member];
+    const batchHtml = generateBatchPkkCardHtml(listToPrint, {
+      kelurahan: customKelurahan,
+      kecamatan: customKecamatan,
+      kota: customKota,
+      provinsi: customProvinsi,
+    });
+
+    downloadPdfDocument(batchHtml, `KTA_PKK_Kelurahan_${customKelurahan}.pdf`)
+      .finally(() => setIsPrinting(false));
   };
 
   return (
@@ -518,26 +532,35 @@ export const PkkCardModal: React.FC<PkkCardModalProps> = ({
                 type="button"
                 onClick={handlePrintSingle}
                 disabled={isPrinting}
-                className="px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
               >
                 <Printer className="w-4 h-4" />
-                <span>{isPrinting ? 'Menyiapkan CETAK...' : 'Cetak 1 Kartu Anggota'}</span>
+                <span>{isPrinting ? 'Menyiapkan CETAK...' : 'Cetak 1 Kartu'}</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handlePrintBatch}
                 disabled={isPrinting}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
               >
                 <Printer className="w-4 h-4" />
                 <span>
                   {isPrinting
-                    ? 'Menyiapkan Lembar A4...'
-                    : `Cetak Sheet A4 (${allMembers.length > 0 ? allMembers.length : 1} Kartu)`}
+                    ? 'Menyiapkan A4...'
+                    : `Cetak A4 (${allMembers.length > 0 ? allMembers.length : 1} Kartu)`}
                 </span>
               </button>
             )}
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isPrinting}
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              <span>{isPrinting ? 'PDF...' : 'Unduh PDF (A4)'}</span>
+            </button>
             <button
               type="button"
               onClick={onClose}

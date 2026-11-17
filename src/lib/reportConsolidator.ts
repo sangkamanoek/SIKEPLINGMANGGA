@@ -133,9 +133,19 @@ export function mergeFotoArraysPreservingUrls(
  * into one single unified daily report item.
  */
 export function consolidateDailyReport(
-  existing: LaporanHarianItem,
-  incoming: LaporanHarianItem
+  rawExisting: LaporanHarianItem,
+  rawIncoming: LaporanHarianItem
 ): LaporanHarianItem {
+  // Prefer manual report over auto-generated attendance reports (lap_ag_... / lap_pk_...) as primary base
+  const isAutoAttendance = (id?: string) => {
+    const s = String(id || '');
+    return s.startsWith('lap_ag_') || s.startsWith('lap_pk_');
+  };
+  const existingIsAuto = isAutoAttendance(rawExisting.id);
+  const incomingIsAuto = isAutoAttendance(rawIncoming.id);
+  const existing = existingIsAuto && !incomingIsAuto ? rawIncoming : rawExisting;
+  const incoming = existingIsAuto && !incomingIsAuto ? rawExisting : rawIncoming;
+
   // If the same object or identical ID, preserve valid photo URLs from either copy
   if (existing.id === incoming.id) {
     const mergedPhotos = mergeFotoArraysPreservingUrls(existing.dokumentasiFoto, incoming.dokumentasiFoto);
@@ -221,6 +231,7 @@ export function consolidateDailyReport(
   return {
     ...existing,
     kinerja: mergedKinerja,
+    uraianTugas: combineTextNotes(existing.uraianTugas, incoming.uraianTugas) || existing.uraianTugas,
     dokumentasiFoto: mergedPhotos,
     jumlahDokumentasi: mergedPhotos.length,
     createdAt: earliestCreatedAt || existing.createdAt || new Date().toISOString(),

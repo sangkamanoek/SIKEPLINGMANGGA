@@ -350,6 +350,10 @@
     "absensi_agenda_kepling/{docId}": {
       "schema": "AbsensiAgendaKepling",
       "description": "Koleksi daftar hadir 24 Kepala Lingkungan per Agenda Kelurahan (khusus Superadmin dan Seklur)."
+    },
+    "jadwal_posko_kelurahan/{docId}": {
+      "schema": "JadwalPosko",
+      "description": "Koleksi jadwal Posko Trantibum dan Posko Kewaspadaan Banjir serta daftar hadir dan foto kehadiran Kepling."
     }
   }
 }

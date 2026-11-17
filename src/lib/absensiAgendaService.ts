@@ -7,15 +7,24 @@ import {
   markFirestoreQuotaExhausted,
 } from './firebase';
 import { cleanFirestoreData } from './firestoreService';
-import { resilientSetDoc } from './firestoreWriteQueue';
+import { resilientDeleteDoc, resilientSetDoc } from './firestoreWriteQueue';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
+import {
+  deleteReportFromIndexedDB,
+  saveSingleReportToIndexedDB,
+} from './indexedDbStorage';
 import {
   AbsensiAgendaKepling,
   AbsensiKeplingEntry,
   AgendaKelurahanItem,
+  LaporanHarianItem,
   StatusKehadiranKepling,
 } from '../types';
-import { KEPLING_ACCOUNTS, getEffectiveProfile } from '../data/keplingList';
+import {
+  KEPLING_ACCOUNTS,
+  ROMAN_NUMERALS,
+  getEffectiveProfile,
+} from '../data/keplingList';
 
 export const ABSENSI_STORAGE_KEY = 'sikepling_absensi_agenda_kepling_v1';
 export const ABSENSI_COLLECTION = 'absensi_agenda_kepling';
@@ -202,21 +211,220 @@ export const subscribeAbsensiAgendaFromFirestore = (
   }
 };
 
+const sanitizeAgendaKey = (agendaId: string): string => {
+  const clean = String(agendaId || 'ag').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (clean.length <= 55) return clean;
+  let h = 0;
+  for (let i = 0; i < clean.length; i++) {
+    h = (h * 31 + clean.charCodeAt(i)) | 0;
+  }
+  return `${clean.slice(0, 35)}_${Math.abs(h).toString(36)}`;
+};
+
+export const buildAgendaAttendanceReportId = (
+  agendaId: string,
+  nomorLingkungan: number
+): string => `lap_ag_${sanitizeAgendaKey(agendaId)}_lk${nomorLingkungan}`;
+
+/**
+ * Otomatis mencatat Kepala Lingkungan yang berstatus "Hadir" pada Agenda Kelurahan
+ * ke dalam Laporan Harian Kepling (Firestore `reports`, IndexedDB, LocalStorage),
+ * serta membersihkan entri otomatis bila status diubah menjadi selain Hadir.
+ */
+export const syncAbsensiAgendaHadirToLaporanHarian = async (
+  record: AbsensiAgendaKepling,
+  previousRecord?: AbsensiAgendaKepling
+): Promise<{ syncedHadir: number; removedNonHadir: number }> => {
+  const LAPORAN_STORAGE_KEY = 'kepling_local_laporan_history_v2';
+  const nowIso = new Date().toISOString();
+  const parsedDate = parseIsoLocal(record.tanggalKegiatan);
+  const hari = HARI_ID[parsedDate.getDay()] || 'Senin';
+  const formattedTanggal = formatHariTanggalIndonesia(record.tanggalKegiatan);
+
+  const upsertedReports: LaporanHarianItem[] = [];
+  const deletedIds: string[] = [];
+  const deletedKeplingIds: string[] = [];
+
+  const agendaSummaryPrefix = `[Absensi Agenda Kelurahan] Hadir: ${record.namaKegiatan}`;
+  const agendaDetailText = `${agendaSummaryPrefix}${
+    record.jamKegiatan ? ` (${record.jamKegiatan})` : ''
+  }${record.lokasi ? ` di ${record.lokasi}` : ''}`;
+
+  const localReports = safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_STORAGE_KEY, []);
+  const localIdSet = new Set(localReports.map((r) => r?.id).filter(Boolean));
+
+  const entries = Object.values(record.entries || {});
+
+  for (const entry of entries) {
+    if (!entry || !entry.nomorLingkungan) continue;
+    const reportId = buildAgendaAttendanceReportId(record.agendaId, entry.nomorLingkungan);
+    const acc = KEPLING_ACCOUNTS.find(
+      (k) => k.nomorLingkungan === entry.nomorLingkungan || k.id === entry.keplingId
+    );
+    const profile = acc ? getEffectiveProfile(acc) : null;
+    const roman = ROMAN_NUMERALS[entry.nomorLingkungan - 1] || String(entry.nomorLingkungan);
+    const resolvedKeplingId = acc?.id || entry.keplingId || `kepling_${entry.nomorLingkungan}`;
+
+    if (entry.status === 'Hadir') {
+      const reportItem: LaporanHarianItem = {
+        id: reportId,
+        keplingId: resolvedKeplingId,
+        lingkungan: acc?.lingkungan || `Lingkungan ${roman}`,
+        namaKepling: profile?.nama || acc?.nama || entry.namaKepling,
+        jabatan: acc?.jabatan || entry.jabatan || `Kepala Lingkungan ${roman}`,
+        kelurahan: 'Kelurahan Mangga',
+        kecamatan: 'Kecamatan Medan Tuntungan',
+        hari,
+        tanggal: record.tanggalKegiatan,
+        tanggalLaporan: record.tanggalKegiatan,
+        kinerja: {
+          opsirPbbWp: 0,
+          perlinsosKk: 0,
+          ikdOrang: 0,
+          bpjsKetenagakerjaanOrang: 0,
+          kegiatanLainnya: entry.catatan?.trim()
+            ? `${agendaDetailText} — ${entry.catatan.trim()}`
+            : agendaDetailText,
+        },
+        jumlahDokumentasi: 0,
+        dokumentasiFoto: [],
+        petugasNama: record.diinputOlehNama || 'Admin Kelurahan',
+        petugasRole: record.diinputOlehRole || 'super_admin',
+        uraianTugas: `Kehadiran Agenda Kelurahan: ${record.namaKegiatan} (${formattedTanggal})`,
+        catatanUmum: entry.catatan?.trim()
+          ? `Catatan Absensi Agenda: ${entry.catatan.trim()}`
+          : 'Tercatat otomatis dari Absensi Kehadiran Agenda Kelurahan.',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      upsertedReports.push(reportItem);
+    } else {
+      const prevEntry =
+        previousRecord?.entries?.[entry.keplingId] ||
+        Object.values(previousRecord?.entries || {}).find(
+          (pe) => pe.nomorLingkungan === entry.nomorLingkungan
+        );
+      if (prevEntry?.status === 'Hadir' || localIdSet.has(reportId)) {
+        deletedIds.push(reportId);
+        deletedKeplingIds.push(resolvedKeplingId);
+      }
+    }
+  }
+
+  // 1. Update LocalStorage cache dalam satu kali proses (hemat memori)
+  try {
+    const deleteSet = new Set(deletedIds);
+    const deletedKeplingSet = new Set(deletedKeplingIds);
+    const upsertMap = new Map<string, LaporanHarianItem>(
+      upsertedReports.map((r) => [r.id, r])
+    );
+
+    const cleanedLocal = localReports
+      .filter((r) => r && r.id && !deleteSet.has(r.id))
+      .map((r) => {
+        if (upsertMap.has(r.id)) {
+          return upsertMap.get(r.id)!;
+        }
+        // Bersihkan baris agenda terkait hanya untuk Kepling yang statusnya diubah dari Hadir ke non-Hadir
+        const repKeplingId = r.keplingId || '';
+        const matchesDeletedTarget =
+          deletedKeplingSet.has(repKeplingId) &&
+          (r.tanggal === record.tanggalKegiatan || r.tanggalLaporan === record.tanggalKegiatan);
+        if (
+          matchesDeletedTarget &&
+          r.kinerja?.kegiatanLainnya?.includes(agendaSummaryPrefix)
+        ) {
+          const filteredLines = r.kinerja.kegiatanLainnya
+            .split('\n')
+            .filter((line) => !line.includes(agendaSummaryPrefix))
+            .map((line) => line.replace(/^•\s*/, '').trim())
+            .filter(Boolean);
+          return {
+            ...r,
+            kinerja: {
+              ...r.kinerja,
+              kegiatanLainnya: filteredLines.join('\n• '),
+            },
+          };
+        }
+        return r;
+      });
+
+    upsertedReports.forEach((u) => {
+      if (!cleanedLocal.some((r) => r.id === u.id)) {
+        cleanedLocal.unshift(u);
+      }
+    });
+
+    safeSetLocalStorage(LAPORAN_STORAGE_KEY, JSON.stringify(cleanedLocal), {
+      skipIdbMirror: true,
+    });
+  } catch {
+    // Non-blocking fallback
+  }
+
+  // 2. Beri tahu App.tsx agar state Laporan Harian & Capaian Kinerja langsung terbarui
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('sikepling-reports-updated', {
+        detail: {
+          upsertedReports,
+          deletedIds,
+          deletedKeplingIds,
+          stripDate: record.tanggalKegiatan,
+          stripPrefix: agendaSummaryPrefix,
+        },
+      })
+    );
+  }
+
+  // 3. Sinkronkan ke IndexedDB & Cloud Firestore dalam batch kecil (6 dok/batch) agar ringan & bebas OutOfMemory
+  const BATCH_SIZE = 6;
+  for (let i = 0; i < upsertedReports.length; i += BATCH_SIZE) {
+    const chunk = upsertedReports.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      chunk.map(async (item) => {
+        await saveSingleReportToIndexedDB(item).catch(() => {});
+        const cleaned = cleanFirestoreData(item);
+        await resilientSetDoc('reports', item.id, cleaned, { merge: true }).catch(() => {});
+      })
+    );
+  }
+
+  for (let i = 0; i < deletedIds.length; i += BATCH_SIZE) {
+    const chunk = deletedIds.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      chunk.map(async (id) => {
+        await deleteReportFromIndexedDB(id).catch(() => {});
+        await resilientDeleteDoc('reports', id).catch(() => {});
+      })
+    );
+  }
+
+  return {
+    syncedHadir: upsertedReports.length,
+    removedNonHadir: deletedIds.length,
+  };
+};
+
 export const saveAbsensiAgendaRecord = async (
   record: AbsensiAgendaKepling
-): Promise<boolean> => {
+): Promise<{ ok: boolean; syncedHadir: number }> => {
   const current = getLocalAbsensiAgendaList();
   const nowIso = new Date().toISOString();
+  const targetId = record.id || `abs_${record.agendaId}`;
+  const previousRecord = current.find((x) => x.id === targetId);
+
   const payload: AbsensiAgendaKepling = {
     ...record,
-    id: record.id || `abs_${record.agendaId}`,
+    id: targetId,
     namaKegiatan: String(record.namaKegiatan || '').slice(0, 300),
     tanggalKegiatan: String(record.tanggalKegiatan || '').slice(0, 20),
     createdAt: record.createdAt || nowIso,
     updatedAt: nowIso,
   };
 
-  const exists = current.some((x) => x.id === payload.id);
+  const exists = Boolean(previousRecord);
   const updated = exists
     ? current.map((x) => (x.id === payload.id ? payload : x))
     : [payload, ...current];
@@ -227,8 +435,18 @@ export const saveAbsensiAgendaRecord = async (
   }
 
   const cleaned = cleanFirestoreData(payload);
-  const res = await resilientSetDoc(ABSENSI_COLLECTION, payload.id, cleaned, { merge: true });
-  return res.synced || res.queued;
+  const [res, syncStats] = await Promise.all([
+    resilientSetDoc(ABSENSI_COLLECTION, payload.id, cleaned, { merge: true }),
+    syncAbsensiAgendaHadirToLaporanHarian(payload, previousRecord).catch(() => ({
+      syncedHadir: 0,
+      removedNonHadir: 0,
+    })),
+  ]);
+
+  return {
+    ok: res.synced || res.queued,
+    syncedHadir: syncStats.syncedHadir,
+  };
 };
 
 // =========================================================================

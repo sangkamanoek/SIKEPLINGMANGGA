@@ -14,14 +14,17 @@ import {
   triggerDeviceVibration,
 } from '../lib/soundVibrationService';
 import { safeGetLocalStorage, safeSetLocalStorage } from '../lib/safeStorage';
+import { subscribeJadwalPoskoFromFirestore, getLocalJadwalPoskoList } from '../lib/jadwalPoskoService';
+import { JadwalPoskoItem } from '../types';
 
 const SEEN_AGENDA_KEY = 'sikepling_alert_seen_agenda_ids_v1';
 const ALERTED_PBB_PINDAH_PREFIX = 'sikepling_alerted_pbb_pindah_v1_';
+const ALERTED_POSKO_PREFIX = 'sikepling_alerted_posko_v1_';
 const MAX_PBB_ALERT_AGE_MS = 14 * 24 * 60 * 60 * 1000; // 14 hari
 
 export interface AlertNotificationItem {
   id: string;
-  type: 'agenda' | 'pbb_pindah';
+  type: 'agenda' | 'pbb_pindah' | 'posko';
   title: string;
   subTitle: string;
   detail: string;
@@ -223,12 +226,77 @@ export function useAgendaTugasRealtimeAlert(currentUser: UserAccount | null) {
     };
   }, [userId, userRole, userLingkungan, currentUser, saveAlertedPbbIds]);
 
+  // Listen to Jadwal Posko for designated Kepling
+  useEffect(() => {
+    if (!userId || !currentUser || currentUser.role !== 'kepling') return;
+
+    const noLing = currentUser.nomorLingkungan;
+    const uid = currentUser.id;
+
+    const handlePoskoList = (items: JadwalPoskoItem[]) => {
+      if (!Array.isArray(items) || items.length === 0) return;
+
+      const alertedPosko = new Set(
+        safeGetLocalStorage<string[]>(`${ALERTED_POSKO_PREFIX}${uid}`, [])
+      );
+
+      // Cari posko aktif hari ini di mana Kepling ditugaskan & belum absen
+      const myActivePosko = items.find((p) => {
+        if (!p || p.status === 'SELESAI') return false;
+        if (alertedPosko.has(p.id)) return false;
+
+        const isAssigned = p.petugasKepling?.some(
+          (k) =>
+            (k.keplingId === uid || k.nomorLingkungan === noLing) &&
+            k.statusKehadiran === 'Belum Hadir'
+        );
+        return isAssigned;
+      });
+
+      if (myActivePosko) {
+        alertedPosko.add(myActivePosko.id);
+        safeSetLocalStorage(
+          `${ALERTED_POSKO_PREFIX}${uid}`,
+          JSON.stringify(Array.from(alertedPosko).slice(-100))
+        );
+
+        const subTitle = `${myActivePosko.namaPosko} (${myActivePosko.waktuMulai})`;
+        const detail = `Lokasi: ${myActivePosko.lokasiPosko} • Anda ditunjuk piket malam ini. Wajib unggah foto kehadiran!`;
+
+        notifyAgendaKelurahan('PENUGASAN PIKET POSKO KELURAHAN', subTitle);
+
+        setActiveAlert({
+          id: `alert_posko_${myActivePosko.id}`,
+          type: 'posko',
+          title: 'PENUGASAN PIKET POSKO KELURAHAN',
+          subTitle,
+          detail,
+          timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+          rawItem: myActivePosko,
+        });
+      }
+    };
+
+    // Pre-check local
+    const localPosko = getLocalJadwalPoskoList();
+    handlePoskoList(localPosko);
+
+    const unsubPosko = subscribeJadwalPoskoFromFirestore(handlePoskoList);
+    const handleLocalPoskoUpdate = () => handlePoskoList(getLocalJadwalPoskoList());
+    window.addEventListener('jadwal-posko-updated', handleLocalPoskoUpdate);
+
+    return () => {
+      if (typeof unsubPosko === 'function') unsubPosko();
+      window.removeEventListener('jadwal-posko-updated', handleLocalPoskoUpdate);
+    };
+  }, [userId, currentUser]);
+
   return {
     activeAlert,
     dismissAlert,
     testAlert,
     replayAlertSound: () => {
-      if (activeAlert?.type === 'agenda') {
+      if (activeAlert?.type === 'agenda' || activeAlert?.type === 'posko') {
         playAgendaKelurahanSound();
         triggerDeviceVibration([250, 100, 250, 100, 450]);
       } else if (activeAlert?.type === 'pbb_pindah') {
