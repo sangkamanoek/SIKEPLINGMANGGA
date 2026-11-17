@@ -339,18 +339,20 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
             <span>Jadwal Posko (Trantib &amp; Banjir)</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('kegiatan_lurah')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-              activeSubTab === 'kegiatan_lurah'
-                ? 'bg-emerald-700 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <Briefcase className="w-4 h-4 text-amber-300" />
-            <span>Kegiatan Lurah</span>
-          </button>
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('kegiatan_lurah')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                activeSubTab === 'kegiatan_lurah'
+                  ? 'bg-emerald-700 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <Briefcase className="w-4 h-4 text-amber-300" />
+              <span>Kegiatan Lurah</span>
+            </button>
+          )}
 
           {canAccessAbsensiKepling && (
             <button
@@ -383,7 +385,7 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
           currentUser={currentUser}
           onShowToast={onShowToast}
         />
-      ) : activeSubTab === 'kegiatan_lurah' ? (
+      ) : activeSubTab === 'kegiatan_lurah' && isSuperAdmin ? (
         <KegiatanLurahView
           currentUser={currentUser}
           onShowToast={onShowToast}

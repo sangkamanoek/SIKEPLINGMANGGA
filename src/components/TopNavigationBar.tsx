@@ -88,7 +88,6 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
     { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
     { id: 'jadwal_posko', label: 'Jadwal Posko', icon: ShieldAlert, badge: '21.00 WIB', badgeVariant: 'rose' },
-    { id: 'kegiatan_lurah', label: 'Kegiatan Lurah', icon: Briefcase, badge: 'LURAH', badgeVariant: 'mint' },
     { id: 'capaian', label: 'Capaian Target', icon: Trophy },
     { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
     { id: 'form', label: 'Input Laporan', icon: FileText },
@@ -104,7 +103,6 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
     { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
     { id: 'jadwal_posko', label: 'Jadwal Posko', icon: ShieldAlert, badge: '21.00 WIB', badgeVariant: 'rose' },
-    { id: 'kegiatan_lurah', label: 'Kegiatan Lurah', icon: Briefcase, badge: 'LURAH', badgeVariant: 'mint' },
     ...(isSeklur
       ? [{ id: 'absensi_kepling' as AppTabType, label: 'Absensi Kepling', icon: UserCheck, badge: 'PDF', badgeVariant: 'mint' as const }]
       : []),

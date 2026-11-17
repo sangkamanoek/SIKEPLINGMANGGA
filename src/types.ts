@@ -649,7 +649,7 @@ export interface AbsensiAgendaKepling {
 }
 
 // Jadwal Posko Trantibum & Posko Kewaspadaan Banjir
-export type JenisPosko = 'posko_trantibum' | 'posko_banjir';
+export type JenisPosko = 'posko_trantibum' | 'posko_banjir' | 'posko_bersih_sampah';
 export type StatusPosko = 'TERJADWAL' | 'BERLANGSUNG' | 'SELESAI';
 
 export interface KeplingPetugasPosko {

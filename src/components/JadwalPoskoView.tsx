@@ -206,19 +206,25 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
     setFormNama(
       presetJenis === 'posko_trantibum'
         ? 'Posko Trantibum (Ketenteraman & Ketertiban Umum)'
-        : 'Posko Kewaspadaan Banjir'
+        : presetJenis === 'posko_banjir'
+        ? 'Posko Kewaspadaan Banjir'
+        : 'Posko Bersih Sampah Malam Hari'
     );
     setFormTanggal(today);
-    setFormWaktu('Pukul 21.00 WIB s/d Selesai');
+    setFormWaktu(presetJenis === 'posko_bersih_sampah' ? 'Pukul 20.00 WIB s/d Selesai' : 'Pukul 21.00 WIB s/d Selesai');
     setFormLokasi(
       presetJenis === 'posko_trantibum'
         ? 'Kantor Lurah'
-        : 'Taman Segitiga Lk. 9'
+        : presetJenis === 'posko_banjir'
+        ? 'Taman Segitiga Lk. 9'
+        : 'Jalan Jamin Ginting'
     );
     setFormArahan(
       presetJenis === 'posko_trantibum'
         ? 'Lakukan apel malam pukul 21.00 WIB di Kantor Lurah, patroli wilayah siskamling, tertibkan potensi kerumunan remaja/balap liar, dan koordinasi dengan Babinsa/Bhabinkamtibmas.'
-        : 'Siaga di Taman Segitiga Lk. 9, pantau debit air saluran primer dan sekunder, cek potensi sumbatan sampah pada gorong-gorong drainase, laporkan ketinggian debit air berkala.'
+        : presetJenis === 'posko_banjir'
+        ? 'Siaga di Taman Segitiga Lk. 9, pantau debit air saluran primer dan sekunder, cek potensi sumbatan sampah pada gorong-gorong drainase, laporkan ketinggian debit air berkala.'
+        : 'Lakukan pemantauan kebersihan lingkungan dan penertiban sampah liar di sepanjang Jalan Jamin Ginting mulai pukul 20.00 WIB s/d selesai.'
     );
     setFormPenanggungJawab(
       isKasiTrantib
@@ -753,7 +759,11 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
                 <Waves className="w-3.5 h-3.5" />
-                Posko Kewaspadaan Banjir
+                Posko Banjir
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                <Trash2 className="w-3.5 h-3.5" />
+                Posko Bersih Sampah
               </span>
               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-300 bg-white/10 px-2.5 py-0.5 rounded-md">
                 <Clock className="w-3 h-3 text-amber-300" />
@@ -786,10 +796,18 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                 <button
                   type="button"
                   onClick={() => handleOpenAddModal('posko_banjir')}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs transition-all shadow-md cursor-pointer hover:scale-[1.02] active:scale-95"
+                  className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs transition-all shadow-md cursor-pointer hover:scale-[1.02] active:scale-95"
                 >
                   <Plus className="w-4 h-4" />
                   <span>+ Posko Banjir</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenAddModal('posko_bersih_sampah')}
+                  className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all shadow-md cursor-pointer hover:scale-[1.02] active:scale-95"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Posko Sampah</span>
                 </button>
               </div>
             ) : (
@@ -885,6 +903,18 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
               <Waves className="w-3.5 h-3.5" />
               <span>Posko Banjir</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setFilterJenis('posko_bersih_sampah')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                filterJenis === 'posko_bersih_sampah'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Posko Sampah</span>
+            </button>
           </div>
 
           {/* Search & Status Filters */}
@@ -963,6 +993,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
         <div className="grid grid-cols-1 gap-6">
           {filteredList.map((posko) => {
             const isTrantib = posko.jenisPosko === 'posko_trantibum';
+            const isSampah = posko.jenisPosko === 'posko_bersih_sampah';
             const totalPetugas = posko.petugasKepling?.length || 0;
             const totalHadir =
               posko.petugasKepling?.filter((k) => k.statusKehadiran === 'Hadir').length || 0;
@@ -987,6 +1018,8 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                 className={`bg-white rounded-2xl border transition-all shadow-xs hover:shadow-md overflow-hidden ${
                   isTrantib
                     ? 'border-amber-200/80 hover:border-amber-300'
+                    : isSampah
+                    ? 'border-emerald-200/80 hover:border-emerald-300'
                     : 'border-cyan-200/80 hover:border-cyan-300'
                 }`}
               >
@@ -995,6 +1028,8 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                   className={`p-4 sm:p-5 border-b flex flex-col md:flex-row md:items-center justify-between gap-3 ${
                     isTrantib
                       ? 'bg-amber-50/70 border-amber-100'
+                      : isSampah
+                      ? 'bg-emerald-50/70 border-emerald-100'
                       : 'bg-cyan-50/70 border-cyan-100'
                   }`}
                 >
@@ -1003,11 +1038,15 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                       className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
                         isTrantib
                           ? 'bg-amber-600 text-white'
+                          : isSampah
+                          ? 'bg-emerald-700 text-white'
                           : 'bg-cyan-700 text-white'
                       }`}
                     >
                       {isTrantib ? (
                         <ShieldAlert className="w-6 h-6" />
+                      ) : isSampah ? (
+                        <Trash2 className="w-6 h-6" />
                       ) : (
                         <Waves className="w-6 h-6" />
                       )}
@@ -1018,10 +1057,16 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                           className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
                             isTrantib
                               ? 'bg-amber-200 text-amber-900'
+                              : isSampah
+                              ? 'bg-emerald-200 text-emerald-900'
                               : 'bg-cyan-200 text-cyan-900'
                           }`}
                         >
-                          {isTrantib ? 'Posko Trantibum' : 'Posko Kewaspadaan Banjir'}
+                          {isTrantib
+                            ? 'Posko Trantibum'
+                            : isSampah
+                            ? 'Posko Bersih Sampah'
+                            : 'Posko Kewaspadaan Banjir'}
                         </span>
 
                         <span
@@ -1255,6 +1300,60 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                                 <span>{isHadir ? 'Perbarui Foto Kehadiran' : 'Unggah Kehadiran Sekarang'}</span>
                               </button>
                             )}
+
+                            {isSuperAdmin && (
+                              <div className="pt-2 mt-1 border-t border-slate-200/80 flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-bold text-indigo-900 uppercase">Verifikasi Admin:</span>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      const currentWibTime = new Intl.DateTimeFormat('id-ID', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        timeZone: 'Asia/Jakarta',
+                                      }).format(new Date()) + ' WIB (Verifikasi Admin)';
+                                      await updateKeplingPoskoKehadiran(posko.id, petugas.keplingId, {
+                                        statusKehadiran: 'Hadir',
+                                        jamHadir: petugas.jamHadir && !petugas.jamHadir.includes('Verifikasi') ? petugas.jamHadir : currentWibTime,
+                                        catatanSituasi: petugas.catatanSituasi || 'Kehadiran diverifikasi langsung oleh Super Admin.',
+                                      });
+                                      setPoskoList(getLocalJadwalPoskoList());
+                                      notify(`Kehadiran Lingkungan ${petugas.nomorLingkungan} (${petugas.namaKepling}) berhasil diverifikasi Hadir!`, 'success');
+                                    } catch {
+                                      notify('Gagal memverifikasi kehadiran kepling.', 'error');
+                                    }
+                                  }}
+                                  className={`px-2 py-1 rounded-md text-[10px] font-black cursor-pointer shadow-2xs ${
+                                    isHadir
+                                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                      : 'bg-indigo-700 text-white hover:bg-indigo-600'
+                                  }`}
+                                >
+                                  {isHadir ? '✓ Hadir (Terverifikasi)' : '⚡ Verifikasi Hadir'}
+                                </button>
+                                {!isHadir && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        await updateKeplingPoskoKehadiran(posko.id, petugas.keplingId, {
+                                          statusKehadiran: 'Belum Hadir',
+                                          jamHadir: '-',
+                                        });
+                                        setPoskoList(getLocalJadwalPoskoList());
+                                        notify(`Status Lingkungan ${petugas.nomorLingkungan} direset ke Belum Hadir.`, 'info');
+                                      } catch {
+                                        notify('Gagal mereset status kehadiran.', 'error');
+                                      }
+                                    }}
+                                    className="px-2 py-1 rounded-md text-[10px] font-bold bg-slate-200 text-slate-700 hover:bg-slate-300 cursor-pointer"
+                                  >
+                                    Reset
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1295,12 +1394,13 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                 <label className="text-[11px] font-black text-slate-700 uppercase block mb-1">
                   Pilih Jenis Posko
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       setFormJenis('posko_trantibum');
                       setFormNama('Posko Trantibum (Ketenteraman & Ketertiban Umum)');
+                      setFormWaktu('Pukul 21.00 WIB s/d Selesai');
                       setFormLokasi('Kantor Lurah');
                     }}
                     className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
@@ -1312,7 +1412,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                     <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
                     <div>
                       <div className="text-xs font-black">Posko Trantibum</div>
-                      <div className="text-[10px] text-slate-500 font-normal">Lokasi: Kantor Lurah</div>
+                      <div className="text-[10px] text-slate-500 font-normal">Kantor Lurah (21.00 WIB)</div>
                     </div>
                   </button>
 
@@ -1321,6 +1421,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                     onClick={() => {
                       setFormJenis('posko_banjir');
                       setFormNama('Posko Kewaspadaan Banjir');
+                      setFormWaktu('Pukul 21.00 WIB s/d Selesai');
                       setFormLokasi('Taman Segitiga Lk. 9');
                     }}
                     className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
@@ -1331,8 +1432,29 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                   >
                     <Waves className="w-5 h-5 text-cyan-700 shrink-0" />
                     <div>
-                      <div className="text-xs font-black">Posko Kewaspadaan Banjir</div>
-                      <div className="text-[10px] text-slate-500 font-normal">Lokasi: Taman Segitiga Lk. 9</div>
+                      <div className="text-xs font-black">Posko Banjir</div>
+                      <div className="text-[10px] text-slate-500 font-normal">Taman Segitiga Lk. 9</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormJenis('posko_bersih_sampah');
+                      setFormNama('Posko Bersih Sampah Malam Hari');
+                      setFormWaktu('Pukul 20.00 WIB s/d Selesai');
+                      setFormLokasi('Jalan Jamin Ginting');
+                    }}
+                    className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                      formJenis === 'posko_bersih_sampah'
+                        ? 'bg-emerald-50 border-emerald-400 text-emerald-950 font-black shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Trash2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <div className="text-xs font-black">Posko Bersih Sampah</div>
+                      <div className="text-[10px] text-slate-500 font-normal">Jl. Jamin Ginting (20.00)</div>
                     </div>
                   </button>
                 </div>

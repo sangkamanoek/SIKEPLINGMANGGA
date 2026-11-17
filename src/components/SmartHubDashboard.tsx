@@ -1106,19 +1106,21 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                 </div>
               </button>
 
-              <button
-                type="button"
-                onClick={() => onNavigate('kegiatan_lurah')}
-                className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/70 text-left transition-all cursor-pointer group flex items-center gap-3"
-              >
-                <div className="w-10 h-10 rounded-xl bg-indigo-700 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                  <Briefcase className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-black text-slate-900 truncate">Kegiatan Lurah</h4>
-                  <p className="text-[11px] text-slate-600 truncate">Dokumentasi kegiatan &amp; foto</p>
-                </div>
-              </button>
+              {activeAccount.role === 'super_admin' && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('kegiatan_lurah')}
+                  className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/70 text-left transition-all cursor-pointer group flex items-center gap-3"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-indigo-700 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                    <Briefcase className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-black text-slate-900 truncate">Kegiatan Lurah</h4>
+                    <p className="text-[11px] text-slate-600 truncate">Dokumentasi kegiatan &amp; foto</p>
+                  </div>
+                </button>
+              )}
 
               {(activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris') && (
                 <button

@@ -51,6 +51,15 @@ export const getInitialSampleJadwalPosko = (): JadwalPoskoItem[] => {
     statusKehadiran: 'Belum Hadir',
   }));
 
+  // Shift 3: Kepling Lingkungan 13 - 18 untuk Posko Bersih Sampah Malam Hari
+  const petugasSampah: KeplingPetugasPosko[] = KEPLING_DATA_RESMI.slice(12, 18).map((k) => ({
+    keplingId: `kepling_${k.nomor}`,
+    nomorLingkungan: k.nomor,
+    namaKepling: k.namaKepling,
+    telepon: k.telepon,
+    statusKehadiran: 'Belum Hadir',
+  }));
+
   const itemTrantibum: JadwalPoskoItem = {
     id: `posko_trantib_${today}`,
     jenisPosko: 'posko_trantibum',
@@ -87,7 +96,25 @@ export const getInitialSampleJadwalPosko = (): JadwalPoskoItem[] => {
     createdAt: new Date().toISOString(),
   };
 
-  return [itemTrantibum, itemBanjir];
+  const itemSampah: JadwalPoskoItem = {
+    id: `posko_sampah_${today}`,
+    jenisPosko: 'posko_bersih_sampah',
+    namaPosko: 'Posko Bersih Sampah Malam Hari',
+    tanggal: today,
+    waktuMulai: 'Pukul 20.00 WIB s/d Selesai',
+    lokasiPosko: 'Jalan Jamin Ginting',
+    arahanTugas:
+      'Lakukan pemantauan kebersihan lingkungan dan penertiban sampah liar di sepanjang Jalan Jamin Ginting mulai pukul 20.00 WIB s/d selesai.',
+    penanggungJawab: 'Kasi Pembangunan / Lurah Mangga',
+    status: 'TERJADWAL',
+    petugasKepling: petugasSampah,
+    createdById: 'super_admin',
+    createdByName: 'Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)',
+    createdByRole: 'super_admin',
+    createdAt: new Date().toISOString(),
+  };
+
+  return [itemTrantibum, itemBanjir, itemSampah];
 };
 
 const normalizeOfficialPoskoLocations = (items: JadwalPoskoItem[]): JadwalPoskoItem[] => {
