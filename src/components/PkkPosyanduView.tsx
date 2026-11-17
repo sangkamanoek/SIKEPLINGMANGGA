@@ -419,8 +419,8 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
             onClick={handleOpenAdd}
             className="px-4 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md active:scale-95"
           >
-            <Plus className="w-4 h-4" />
-            <span>+ Buat Laporan Posyandu</span>
+            <Plus className="w-4 h-4 shrink-0" />
+            <span>Buat Laporan Posyandu</span>
           </button>
         </div>
       </div>
@@ -430,8 +430,8 @@ export const PkkPosyanduView: React.FC<PkkPosyanduViewProps> = ({ currentUser, o
       {/* Filter Toolbar */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5 flex-1">
-            <div className="relative flex-1 min-w-[240px]">
+          <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+            <div className="relative w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-[240px]">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"

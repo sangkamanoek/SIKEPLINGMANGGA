@@ -596,13 +596,13 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto shrink-0">
             <button
               type="button"
               onClick={() => setIsPdfPreviewOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition-colors shadow-md cursor-pointer whitespace-nowrap"
+              className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition-colors shadow-md cursor-pointer whitespace-nowrap"
             >
-              <Printer className="w-4 h-4" />
+              <Printer className="w-4 h-4 shrink-0" />
               <span>
                 Cetak PDF ({periodMode === 'harian' ? 'Harian' : periodMode === 'mingguan' ? 'Mingguan' : 'Bulanan'})
               </span>
@@ -611,9 +611,9 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-bold transition-colors cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-bold transition-colors cursor-pointer whitespace-nowrap"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+              <FileSpreadsheet className="w-4 h-4 text-emerald-300 shrink-0" />
               <span>Ekspor Excel</span>
             </button>
 
@@ -622,9 +622,10 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
               onClick={handleSyncAll}
               disabled={isSyncing}
               title="Sinkronkan Data Agenda & Absensi dengan Firestore"
-              className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-emerald-400' : ''}`} />
+              <RefreshCw className={`w-4 h-4 shrink-0 ${isSyncing ? 'animate-spin text-emerald-400' : ''}`} />
+              <span className="sm:hidden">Sinkron</span>
             </button>
           </div>
         </div>
@@ -634,59 +635,62 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Segmented Period Tabs */}
-          <div className="inline-flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 self-start">
+          <div className="grid grid-cols-3 sm:inline-flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 w-full md:w-auto">
             <button
               type="button"
               onClick={() => setPeriodMode('harian')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-2 sm:px-3.5 py-2 rounded-lg text-[11px] sm:text-xs font-black transition-all cursor-pointer text-center ${
                 periodMode === 'harian'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Harian (Per Agenda)
+              <span className="sm:hidden">Harian</span>
+              <span className="hidden sm:inline">Harian (Per Agenda)</span>
             </button>
             <button
               type="button"
               onClick={() => setPeriodMode('mingguan')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-2 sm:px-3.5 py-2 rounded-lg text-[11px] sm:text-xs font-black transition-all cursor-pointer text-center ${
                 periodMode === 'mingguan'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Rekap Mingguan
+              <span className="sm:hidden">Mingguan</span>
+              <span className="hidden sm:inline">Rekap Mingguan</span>
             </button>
             <button
               type="button"
               onClick={() => setPeriodMode('bulanan')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-2 sm:px-3.5 py-2 rounded-lg text-[11px] sm:text-xs font-black transition-all cursor-pointer text-center ${
                 periodMode === 'bulanan'
                   ? 'bg-slate-900 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Rekap Bulanan
+              <span className="sm:hidden">Bulanan</span>
+              <span className="hidden sm:inline">Rekap Bulanan</span>
             </button>
           </div>
 
           {/* Dynamic Date Controls */}
           {periodMode === 'harian' && (
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <div className="inline-flex items-center gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200">
+            <div className="flex flex-wrap items-center gap-2 text-xs w-full md:w-auto">
+              <div className="grid grid-cols-2 sm:inline-flex items-center gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setShowAllDatesInHarian(true)}
-                  className={`px-2.5 py-1 rounded-md font-bold cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-md font-bold cursor-pointer text-center ${
                     showAllDatesInHarian ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
                   }`}
                 >
-                  Semua Tanggal ({sortedAgendas.length})
+                  Semua ({sortedAgendas.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAllDatesInHarian(false)}
-                  className={`px-2.5 py-1 rounded-md font-bold cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-md font-bold cursor-pointer text-center ${
                     !showAllDatesInHarian ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
                   }`}
                 >

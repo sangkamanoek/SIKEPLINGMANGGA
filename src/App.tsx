@@ -662,7 +662,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans pb-20 md:pb-8">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans pb-20 md:pb-8 overflow-x-clip">
       {/* Real-time Alert Banner with Sound and Mobile Vibration indicator */}
       <KeplingAlertBanner
         alert={activeAlert}
@@ -772,7 +772,7 @@ export default function App() {
       )}
 
       {/* Main View Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-4">
+      <main className="flex-1 max-w-7xl w-full min-w-0 mx-auto p-3 sm:p-6 space-y-4">
         <React.Suspense fallback={<ComponentLoader label="Memuat modul tampilan..." />}>
           {/* TAB 1: SmartHub Dashboard */}
         {activeTab === 'hub' && (

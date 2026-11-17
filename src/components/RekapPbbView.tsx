@@ -2014,8 +2014,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                   onClick={handleOpenAddModal}
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all shadow-md cursor-pointer border border-emerald-400/50"
                 >
-                  <UserPlus className="w-4 h-4" />
-                  <span>+ Tambah WP Baru</span>
+                  <UserPlus className="w-4 h-4 shrink-0" />
+                  <span>Tambah WP Baru</span>
                 </button>
               )}
 
@@ -3018,7 +3018,7 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
           {/* Search, Filter, and Mass Actions */}
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="relative flex-1 min-w-[240px]">
+              <div className="relative w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-[240px]">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
@@ -3161,8 +3161,8 @@ export const RekapPbbView: React.FC<RekapPbbViewProps> = ({ activeAccount, onSho
                     onClick={handleOpenAddModal}
                     className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>+ Tambah WP Baru</span>
+                    <Plus className="w-4 h-4 shrink-0" />
+                    <span>Tambah WP Baru</span>
                   </button>
                 )}
               </div>

@@ -173,13 +173,13 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
       aria-label={isPkk ? 'Navigasi Utama TP-PKK' : 'Navigasi Utama Aplikasi'}
       className="w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs print:hidden sticky top-0 z-30"
     >
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 flex items-center relative py-1.5">
-        {/* Scroll Left Button */}
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 flex items-center relative py-1.5 min-w-0">
+        {/* Scroll Left Button (Desktop & Tablet) */}
         <button
           type="button"
           onClick={() => scroll('left')}
           aria-label="Geser navigasi ke kiri"
-          className="flex items-center justify-center w-7 h-7 rounded-xl shrink-0 transition-colors cursor-pointer mr-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100"
+          className="hidden sm:flex items-center justify-center w-7 h-7 rounded-xl shrink-0 transition-colors cursor-pointer mr-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -187,7 +187,7 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
         {/* Scrollable Navigation List */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 flex items-center gap-2 overflow-x-auto py-1 no-scrollbar scroll-smooth"
+          className="flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-1 no-scrollbar scroll-smooth px-0.5"
         >
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -197,8 +197,8 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
 
             // Clean, professional styling
             const activeClass = isPkk
-              ? 'bg-pkk-teal text-white border-pkk-teal shadow-md font-bold'
-              : 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-2xs';
+              ? 'bg-pkk-teal text-white border-pkk-teal shadow-sm font-bold'
+              : 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-xs';
 
             const inactiveClass = 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border-slate-200 shadow-2xs';
 
@@ -207,12 +207,12 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
                 key={item.id}
                 type="button"
                 onClick={() => onNavigate(item.id)}
-                className={`group flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-[13px] font-bold whitespace-nowrap transition-all duration-150 cursor-pointer border ${
+                className={`group flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-bold whitespace-nowrap shrink-0 transition-all duration-150 cursor-pointer border ${
                   isActive ? activeClass : inactiveClass
                 }`}
               >
                 <Icon
-                  className={`w-4 h-4 shrink-0 transition-colors ${
+                  className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 transition-colors ${
                     isActive
                       ? 'text-white'
                       : 'text-slate-400 group-hover:text-slate-700'
@@ -232,7 +232,7 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
                   if (item.badge) {
                     return (
                       <span
-                        className={`text-[9px] font-black px-1.5 py-0.5 rounded-lg transition-colors border ${
+                        className={`hidden sm:inline-flex text-[9px] font-black px-1.5 py-0.5 rounded-lg transition-colors border ${
                           isActive
                             ? 'bg-white/20 text-white border-white/20'
                             : item.badgeVariant === 'rose'
@@ -253,12 +253,12 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
           })}
         </div>
 
-        {/* Scroll Right Button */}
+        {/* Scroll Right Button (Desktop & Tablet) */}
         <button
           type="button"
           onClick={() => scroll('right')}
           aria-label="Geser navigasi ke kanan"
-          className="flex items-center justify-center w-7 h-7 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-xl shrink-0 transition-colors cursor-pointer ml-1.5"
+          className="hidden sm:flex items-center justify-center w-7 h-7 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-xl shrink-0 transition-colors cursor-pointer ml-1.5"
         >
           <ChevronRight className="w-4 h-4" />
         </button>

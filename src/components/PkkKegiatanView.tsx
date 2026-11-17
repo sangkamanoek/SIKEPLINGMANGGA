@@ -506,8 +506,8 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser, o
             onClick={handleOpenAdd}
             className="px-4 py-2.5 rounded-xl bg-tosca-700 hover:bg-tosca-800 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md shadow-tosca-700/20"
           >
-            <Plus className="w-4 h-4" />
-            <span>+ Catat Kegiatan Baru</span>
+            <Plus className="w-4 h-4 shrink-0" />
+            <span>Catat Kegiatan Baru</span>
           </button>
         </div>
       </div>
@@ -516,7 +516,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser, o
 
       {/* Filter & Search Bar */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
           {/* Filter Pokja */}
           <select
             value={filterPokja}
@@ -548,7 +548,7 @@ export const PkkKegiatanView: React.FC<PkkKegiatanViewProps> = ({ currentUser, o
           </select>
 
           {/* Keyword Search */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative w-full sm:w-auto sm:flex-1 min-w-0 sm:min-w-[200px]">
             <input
               type="text"
               value={searchQuery}

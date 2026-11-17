@@ -221,7 +221,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
           </div>
 
           {/* Quick Saldo Card */}
-          <div className="bg-white/10 backdrop-blur-md border border-white/25 rounded-2xl p-5 shrink-0 shadow-lg min-w-[260px]">
+          <div className="bg-white/10 backdrop-blur-md border border-white/25 rounded-2xl p-5 shrink-0 shadow-lg w-full lg:w-auto min-w-0 lg:min-w-[260px]">
             <div className="flex items-center justify-between text-xs text-tosca-200 mb-1">
               <span className="font-semibold flex items-center gap-1.5">
                 <Wallet className="w-4 h-4 text-amber-300" />

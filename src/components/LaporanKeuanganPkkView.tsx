@@ -479,8 +479,8 @@ export const LaporanKeuanganPkkView: React.FC<LaporanKeuanganPkkViewProps> = ({ 
               onClick={handleOpenAdd}
               className="flex items-center gap-1.5 px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xs rounded-xl shadow-lg shadow-tosca-950/40 transition-all cursor-pointer active:scale-95 border border-emerald-300/30 whitespace-nowrap"
             >
-              <Plus className="w-4 h-4" />
-              <span>+ Catat Transaksi Baru</span>
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>Catat Transaksi Baru</span>
             </button>
           </div>
         </div>

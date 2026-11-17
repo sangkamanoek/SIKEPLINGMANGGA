@@ -750,11 +750,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
 
           {/* View Mode Toggle: Tabel | Kartu (HP) */}
           <div className="sm:col-span-2 flex items-center justify-end">
-            <div className="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200 text-xs font-bold">
+            <div className="grid grid-cols-2 sm:inline-flex w-full sm:w-auto rounded-xl p-1 bg-slate-100 border border-slate-200 text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setViewMode('table')}
-                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                className={`px-3 py-1.5 sm:py-1 rounded-lg transition-all cursor-pointer text-center ${
                   viewMode === 'table' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -763,7 +763,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               <button
                 type="button"
                 onClick={() => setViewMode('cards')}
-                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                className={`px-3 py-1.5 sm:py-1 rounded-lg transition-all cursor-pointer text-center ${
                   viewMode === 'cards' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >

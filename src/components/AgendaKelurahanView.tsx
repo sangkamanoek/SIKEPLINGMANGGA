@@ -309,47 +309,47 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
   }, [agendaList]);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-1 sm:px-2 animate-fade-in">
+    <div className="space-y-5 sm:space-y-6 max-w-7xl mx-auto min-w-0 animate-fade-in">
       {/* Subtab Navigation Bar */}
-      <div className="bg-white rounded-2xl p-2 border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <div className="flex flex-wrap items-center gap-1.5">
+      <div className="bg-white rounded-2xl p-2 border border-slate-200/90 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-2 print:hidden">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-1.5 w-full lg:w-auto">
           <button
             type="button"
             onClick={() => setActiveSubTab('agenda')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+            className={`flex items-center justify-center sm:justify-start gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer text-center ${
               activeSubTab === 'agenda'
                 ? 'bg-emerald-700 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 bg-slate-50/70 sm:bg-transparent'
             }`}
           >
-            <Calendar className="w-4 h-4" />
-            <span>Daftar Agenda Kelurahan</span>
+            <Calendar className="w-4 h-4 shrink-0" />
+            <span>Agenda Kelurahan</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubTab('jadwal_posko')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+            className={`flex items-center justify-center sm:justify-start gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer text-center ${
               activeSubTab === 'jadwal_posko'
                 ? 'bg-amber-600 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 bg-slate-50/70 sm:bg-transparent'
             }`}
           >
-            <ShieldAlert className="w-4 h-4 text-amber-300" />
-            <span>Jadwal Posko (Trantib &amp; Banjir)</span>
+            <ShieldAlert className={`w-4 h-4 shrink-0 ${activeSubTab === 'jadwal_posko' ? 'text-amber-100' : 'text-amber-500'}`} />
+            <span>Jadwal Posko Malam</span>
           </button>
 
           {isSuperAdmin && (
             <button
               type="button"
               onClick={() => setActiveSubTab('kegiatan_lurah')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              className={`flex items-center justify-center sm:justify-start gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer text-center ${
                 activeSubTab === 'kegiatan_lurah'
                   ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 bg-slate-50/70 sm:bg-transparent'
               }`}
             >
-              <Briefcase className="w-4 h-4 text-amber-300" />
+              <Briefcase className={`w-4 h-4 shrink-0 ${activeSubTab === 'kegiatan_lurah' ? 'text-amber-200' : 'text-indigo-500'}`} />
               <span>Kegiatan Lurah</span>
             </button>
           )}
@@ -358,18 +358,18 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
             <button
               type="button"
               onClick={() => setActiveSubTab('absensi')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              className={`flex items-center justify-center sm:justify-start gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer text-center ${
                 activeSubTab === 'absensi'
                   ? 'bg-teal-800 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 bg-slate-50/70 sm:bg-transparent'
               }`}
             >
-              <UserCheck className="w-4 h-4" />
-              <span>Absensi Kepala Lingkungan (Cetak PDF)</span>
+              <UserCheck className="w-4 h-4 shrink-0" />
+              <span>Absensi Kepling (PDF)</span>
             </button>
           )}
         </div>
-        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
+        <span className="hidden lg:inline-block text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
           Kelurahan Mangga · SI-MANGGA
         </span>
       </div>
@@ -413,12 +413,12 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full md:w-auto shrink-0">
             {canManageAgenda && (
               <button
                 type="button"
                 onClick={handleOpenAddModal}
-                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-all shadow-md cursor-pointer border border-emerald-400/40 active:scale-95"
+                className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-all shadow-md cursor-pointer border border-emerald-400/40 active:scale-95 whitespace-nowrap"
               >
                 <Plus className="w-4 h-4 stroke-[3]" />
                 <span>Tambah Agenda Baru</span>
@@ -428,10 +428,10 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
             <button
               type="button"
               onClick={handleExportExcel}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+              className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap"
               title="Unduh daftar agenda kegiatan ke format Excel"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>Unduh Excel</span>
             </button>
 
@@ -439,10 +439,11 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
               type="button"
               onClick={handleManualSync}
               disabled={isSyncing}
-              className="flex items-center justify-center p-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
               title="Sinkronkan dengan Firestore"
             >
-              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-emerald-400' : ''}`} />
+              <RefreshCw className={`w-4 h-4 shrink-0 ${isSyncing ? 'animate-spin text-emerald-400' : ''}`} />
+              <span className="sm:hidden">Sinkron</span>
             </button>
           </div>
         </div>
@@ -516,7 +517,7 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
           </div>
 
           {/* Status Filter Tabs */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 lg:pb-0 no-scrollbar">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => setStatusFilter('ALL')}

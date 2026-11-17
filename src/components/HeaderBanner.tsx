@@ -180,7 +180,7 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
         </div>
       )}
       {/* Top Banner with Medan Logo Replica and Tagline */}
-      <div className={`max-w-6xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b ${isPkk ? 'border-pkk-dark/40' : 'border-emerald-700/60'} text-xs`}>
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2.5 border-b ${isPkk ? 'border-pkk-dark/40' : 'border-emerald-700/60'} text-xs`}>
         {/* Official Slogan Badge */}
         <div className="flex items-center gap-2.5">
           <div className="inline-flex items-center rounded-md overflow-hidden shadow-xs text-[11px] font-black tracking-wider uppercase">
@@ -218,9 +218,9 @@ export const HeaderBanner: React.FC<HeaderBannerProps> = ({
       </div>
 
       {/* Main App Title in Professional Polish layout */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5 sm:gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
         {/* Brand & Identity (Left) */}
-        <div className="flex items-center gap-3.5 sm:gap-4 shrink-0 min-w-0">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
             <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1.5 shadow-xs shrink-0 border border-white/20 overflow-hidden">
               <img

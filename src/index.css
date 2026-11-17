@@ -20,11 +20,25 @@
 }
 
 @layer base {
+  html, body {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+
   body {
     color: #1e293b;
     background-color: #f8fafc;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Class CSS untuk modal/pop-up pratinjau */

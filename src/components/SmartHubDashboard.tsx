@@ -869,7 +869,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
               </span>
 
               {/* Layout Mode Toggler */}
-              <div className="inline-flex bg-slate-950 p-0.5 rounded border border-slate-800 text-[10px] font-bold ml-2">
+              <div className="inline-flex bg-slate-950 p-0.5 rounded border border-slate-800 text-[10px] font-bold sm:ml-2">
                 <button
                   type="button"
                   onClick={() => handleStyleChange('consolidated')}
@@ -908,15 +908,15 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 w-full md:w-auto shrink-0">
             {onOpenUpdateModal && (
               <button
                 type="button"
                 onClick={onOpenUpdateModal}
-                className="flex items-center gap-2 px-3.5 py-2 bg-slate-900/90 hover:bg-slate-800 border border-emerald-500/50 text-amber-300 text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer group"
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-900/90 hover:bg-slate-800 border border-emerald-500/50 text-amber-300 text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer group whitespace-nowrap"
                 title="Lihat informasi pembaruan versi & fitur terkini aplikasi"
               >
-                <Sparkles className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform" />
+                <Sparkles className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform shrink-0" />
                 <span>Info Update</span>
               </button>
             )}
@@ -924,27 +924,27 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
               type="button"
               onClick={handleSyncFirestore}
               disabled={isSyncingFirestore}
-              className="flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 whitespace-nowrap"
               title="Sinkronkan seluruh data laporan harian ke Cloud Firestore"
             >
-              <RefreshCw className={`w-4 h-4 text-indigo-200 ${isSyncingFirestore ? 'animate-spin' : ''}`} />
-              <span>{isSyncingFirestore ? 'Menyinkronkan...' : 'Sinkronkan Firestore'}</span>
+              <RefreshCw className={`w-4 h-4 text-indigo-200 shrink-0 ${isSyncingFirestore ? 'animate-spin' : ''}`} />
+              <span>{isSyncingFirestore ? 'Menyinkronkan...' : 'Sinkronkan'}</span>
             </button>
             <button
               type="button"
               onClick={handleCleanBrowserMemory}
               disabled={isCleaningMemory}
-              className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 hover:border-rose-500/50 text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 hover:border-rose-500/50 text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50 whitespace-nowrap"
               title="Bersihkan memori & cache sementara browser HP/komputer yang memperlambat sistem"
             >
-              <Trash2 className="w-4 h-4 text-rose-400" />
+              <Trash2 className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{isCleaningMemory ? 'Membersihkan...' : 'Bersihkan Memori'}</span>
             </button>
             <button
               onClick={onOpenPPTModal}
-              className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer"
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold rounded-xl transition-all shadow-md cursor-pointer whitespace-nowrap"
             >
-              <HelpCircle className="w-4 h-4" />
+              <HelpCircle className="w-4 h-4 shrink-0" />
               <span>Panduan</span>
             </button>
           </div>
@@ -1857,23 +1857,24 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         </div>
 
         {/* Beautifully Tidy Category Filter Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="grid grid-cols-3 sm:inline-flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 w-full sm:w-auto">
           {[
-            { id: 'all', label: '🌟 Semua Menu' },
-            { id: 'laporan', label: '📝 Pelaporan Harian' },
-            { id: 'capaian', label: '📊 Target & Kinerja' },
+            { id: 'all', label: 'Semua Menu', shortLabel: 'Semua' },
+            { id: 'laporan', label: 'Pelaporan Harian', shortLabel: 'Pelaporan' },
+            { id: 'capaian', label: 'Target & Kinerja', shortLabel: 'Target' },
           ].map((cat) => (
             <button
               key={cat.id}
               type="button"
               onClick={() => setSelectedCategory(cat.id as any)}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-2 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-extrabold transition-all cursor-pointer text-center ${
                 selectedCategory === cat.id
-                  ? 'bg-emerald-700 text-white shadow-xs scale-[1.02]'
-                  : 'bg-slate-50 text-slate-600 border border-slate-200/80 hover:bg-slate-100 hover:text-slate-800'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-white/70 hover:text-slate-900'
               }`}
             >
-              {cat.label}
+              <span className="sm:hidden">{cat.shortLabel}</span>
+              <span className="hidden sm:inline">{cat.label}</span>
             </button>
           ))}
         </div>

@@ -928,7 +928,7 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Status Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               id="filter-all-status"
               type="button"
@@ -951,8 +951,8 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
                   : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'
               }`}
             >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>🟢 Sudah Lapor ({stats.submittedCount})</span>
+              <CheckCircle2 className={`w-3.5 h-3.5 ${statusFilter === 'SUBMITTED' ? 'text-emerald-200' : 'text-emerald-600'}`} />
+              <span>Sudah Lapor ({stats.submittedCount})</span>
             </button>
             <button
               id="filter-waiting-status"
@@ -965,8 +965,8 @@ export const MonitoringSuperAdmin: React.FC<MonitoringSuperAdminProps> = React.m
               }`}
               title="Kepling yang belum mengirim laporan harian"
             >
-              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-              <span>🔴 Belum Melapor ({stats.pendingCount})</span>
+              <AlertCircle className={`w-3.5 h-3.5 ${statusFilter === 'WAITING' ? 'text-rose-100' : 'text-rose-600'}`} />
+              <span>Belum Lapor ({stats.pendingCount})</span>
             </button>
           </div>
 

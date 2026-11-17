@@ -241,7 +241,7 @@ export const KegiatanLurahView: React.FC<KegiatanLurahViewProps> = ({
 
       {/* Search & Filter Toolbar */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative w-full sm:flex-1 min-w-0 sm:min-w-[240px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"

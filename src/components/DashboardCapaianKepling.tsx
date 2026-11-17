@@ -1274,56 +1274,56 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
           {/* Period Filter Buttons - Perminggu, Perbulan, Pertahun, Hari Ini */}
           <div className="flex flex-col gap-2 bg-emerald-950/90 p-2 sm:p-2.5 rounded-2xl border border-emerald-600/60 w-full md:w-auto shrink-0 print:hidden shadow-lg max-w-full overflow-hidden">
             {/* Primary Category Selector */}
-            <div className="flex items-center gap-1 bg-emerald-900/90 p-1 rounded-xl border border-emerald-700/70 overflow-x-auto w-full no-scrollbar">
+            <div className="grid grid-cols-2 sm:flex items-center gap-1 bg-emerald-900/90 p-1 rounded-xl border border-emerald-700/70 w-full">
               <button
                 type="button"
                 onClick={() => setPeriod('THIS_WEEK')}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
                   period === 'THIS_WEEK' || period === 'LAST_WEEK' || period === '7_DAYS' || period.startsWith('WEEK_')
-                    ? 'bg-amber-400 text-slate-950 shadow-md scale-102'
+                    ? 'bg-amber-400 text-slate-950 shadow-md'
                     : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
                 }`}
               >
-                <Calendar className="w-3.5 h-3.5" />
+                <Calendar className="w-3.5 h-3.5 shrink-0" />
                 <span>Per Minggu</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setPeriod('THIS_MONTH')}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
                   period === 'THIS_MONTH' || period.startsWith('MONTH_')
-                    ? 'bg-amber-400 text-slate-950 shadow-md scale-102'
+                    ? 'bg-amber-400 text-slate-950 shadow-md'
                     : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
                 }`}
               >
-                <CalendarCheck className="w-3.5 h-3.5" />
+                <CalendarCheck className="w-3.5 h-3.5 shrink-0" />
                 <span>Per Bulan</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setPeriod('THIS_YEAR')}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
                   period === 'THIS_YEAR' || period.startsWith('YEAR_') || period === 'ALL'
-                    ? 'bg-amber-400 text-slate-950 shadow-md scale-102'
+                    ? 'bg-amber-400 text-slate-950 shadow-md'
                     : 'text-emerald-100 hover:text-white hover:bg-white/10 font-bold'
                 }`}
               >
-                <Trophy className="w-3.5 h-3.5" />
+                <Trophy className="w-3.5 h-3.5 shrink-0" />
                 <span>Per Tahun</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setPeriod('TODAY')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap shrink-0 ${
                   period === 'TODAY'
                     ? 'bg-white text-emerald-950 shadow-md'
                     : 'text-emerald-200 hover:text-white hover:bg-white/10 font-bold'
                 }`}
               >
-                <Sun className="w-3.5 h-3.5" />
+                <Sun className="w-3.5 h-3.5 shrink-0" />
                 <span>Hari Ini</span>
               </button>
             </div>

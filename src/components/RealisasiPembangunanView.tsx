@@ -1140,8 +1140,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               onClick={openAddModal}
               className="px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-2 cursor-pointer active:scale-95"
             >
-              <Plus className="w-4 h-4" />
-              <span>+ Input Realisasi Baru</span>
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>Input Realisasi Baru</span>
             </button>
             <button
               type="button"
@@ -1252,11 +1252,11 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
           </div>
 
           {/* View Switcher */}
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl shrink-0">
+          <div className="grid grid-cols-2 sm:flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl w-full sm:w-auto shrink-0">
             <button
               type="button"
               onClick={() => setViewMode('card')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
                 viewMode === 'card' ? 'bg-white text-blue-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -1265,7 +1265,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
             <button
               type="button"
               onClick={() => setViewMode('table')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
                 viewMode === 'table' ? 'bg-white text-blue-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -1358,8 +1358,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               onClick={openAddModal}
               className="px-4 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
             >
-              <Plus className="w-4 h-4" />
-              <span>+ Tambah Realisasi Baru</span>
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>Tambah Realisasi Baru</span>
             </button>
           </div>
         </div>
@@ -1875,8 +1875,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   onClick={handleOpenAddMonitoring}
                   className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-2 cursor-pointer active:scale-95"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>+ Buat Laporan Monitoring Baru</span>
+                  <Plus className="w-4 h-4 shrink-0" />
+                  <span>Buat Laporan Monitoring Baru</span>
                 </button>
                 <button
                   type="button"
@@ -2040,8 +2040,8 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                   onClick={handleOpenAddMonitoring}
                   className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>+ Buat Laporan Monitoring Baru</span>
+                  <Plus className="w-4 h-4 shrink-0" />
+                  <span>Buat Laporan Monitoring Baru</span>
                 </button>
               </div>
             </div>

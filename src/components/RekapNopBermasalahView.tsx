@@ -694,8 +694,8 @@ export const RekapNopBermasalahView: React.FC<RekapNopBermasalahViewProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[210px]">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-auto min-w-0 sm:min-w-[210px]">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -847,7 +847,7 @@ export const RekapNopBermasalahView: React.FC<RekapNopBermasalahViewProps> = ({
 
             {/* Popup Toolbar */}
             <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
-              <div className="relative flex-1 min-w-[200px]">
+              <div className="relative w-full sm:flex-1 min-w-0 sm:min-w-[200px]">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
