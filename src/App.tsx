@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { UserAccount, LaporanHarianItem, isPkkRole } from './types';
+import { canAccountAccessTab, getAccessDeniedMessage } from './lib/rolePermissions';
 import {
   SUPER_ADMIN_ACCOUNT,
   ALL_ACCOUNTS,
@@ -165,11 +166,13 @@ export default function App() {
     return getEffectiveProfile(SUPER_ADMIN_ACCOUNT);
   });
 
-  // Active Tab State
+  // Active Tab State (validated against activeAccount role)
   const [activeTab, setActiveTab] = useState<AppTabType>(() => {
     try {
       const savedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) as AppTabType;
-      if (savedTab) return savedTab;
+      if (savedTab && canAccountAccessTab(activeAccount?.role, savedTab)) {
+        return savedTab;
+      }
     } catch {}
     return 'hub';
   });
@@ -437,86 +440,28 @@ export default function App() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
-  // Strict role-based route access lists (Pure separation between Kelurahan and PKK)
-  const PKK_RESTRICTED_TABS: AppTabType[] = useMemo(() => [
-    'form',
-    'capaian',
-    'rekap_pbb',
-    'agenda',
-    'kunjungan',
-    'surat_kedinasan',
-    'capaian_admin',
-    'dashboard_kasi',
-    'riwayat',
-    'monitoring',
-    'realisasi_pembangunan',
-    'absensi_kepling',
-  ], []);
-
-  const KELURAHAN_RESTRICTED_TABS: AppTabType[] = useMemo(() => [
-    'keuangan_pkk',
-    'kegiatan_pkk',
-    'posyandu_pkk',
-    'dasa_wisma',
-    'buku_pkk',
-  ], []);
-
   const handleTabChange = useCallback((tab: AppTabType) => {
-    if (activeAccount && activeAccount.role !== 'super_admin') {
-      const isPkk = isPkkRole(activeAccount.role);
-      if (tab === 'absensi_kepling' && activeAccount.role !== 'sekretaris') {
-        showToast('Akses Dibatasi: Absensi Kepala Lingkungan hanya dapat diakses oleh Superadmin dan Seklur.', 'info');
-        setActiveTab('hub');
-        safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
-        return;
-      }
-      if (activeAccount.role === 'kepling' && tab === 'monitoring') {
-        showToast('Akses Dibatasi: Halaman Monitoring Laporan khusus untuk Pimpinan & Kasi Kelurahan.', 'info');
-        setActiveTab('hub');
-        safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
-        return;
-      }
-      if (isPkk && PKK_RESTRICTED_TABS.includes(tab)) {
-        showToast('Akses Dibatasi: Halaman ini khusus untuk Aparatur Kelurahan.', 'info');
-        setActiveTab('hub');
-        safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
-        return;
-      }
-      if (!isPkk && KELURAHAN_RESTRICTED_TABS.includes(tab)) {
-        showToast('Akses Dibatasi: Halaman ini khusus untuk Pengurus TP-PKK.', 'info');
-        setActiveTab('hub');
-        safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
-        return;
-      }
+    if (activeAccount && !canAccountAccessTab(activeAccount.role, tab)) {
+      showToast(getAccessDeniedMessage(activeAccount.role, tab), 'info');
+      setActiveTab('hub');
+      safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
+      return;
     }
     setActiveTab(tab);
     markFeatureAsSeen(tab);
     safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [activeAccount, markFeatureAsSeen, PKK_RESTRICTED_TABS, KELURAHAN_RESTRICTED_TABS, showToast]);
+  }, [activeAccount, markFeatureAsSeen, showToast]);
 
   // Reactive Route Guard Effect on Account or Tab change
   useEffect(() => {
-    if (!activeAccount || activeAccount.role === 'super_admin') return;
-    const isPkk = isPkkRole(activeAccount.role);
-
-    if (activeTab === 'absensi_kepling' && activeAccount.role !== 'sekretaris') {
-      showToast('Akses Dibatasi: Absensi Kepala Lingkungan khusus Superadmin & Seklur.', 'info');
-      setActiveTab('hub');
-      safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
-    } else if (activeAccount.role === 'kepling' && activeTab === 'monitoring') {
-      setActiveTab('hub');
-      safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
-    } else if (isPkk && PKK_RESTRICTED_TABS.includes(activeTab)) {
-      showToast('Akses Dibatasi: Dialihkan ke Pusat Menu PKK.', 'info');
-      setActiveTab('hub');
-      safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
-    } else if (!isPkk && KELURAHAN_RESTRICTED_TABS.includes(activeTab)) {
-      showToast('Akses Dibatasi: Dialihkan ke Pusat Menu Kelurahan.', 'info');
+    if (!activeAccount) return;
+    if (!canAccountAccessTab(activeAccount.role, activeTab)) {
+      showToast(getAccessDeniedMessage(activeAccount.role, activeTab), 'info');
       setActiveTab('hub');
       safeSetLocalStorage(ACTIVE_TAB_STORAGE_KEY, 'hub');
     }
-  }, [activeAccount, activeTab, PKK_RESTRICTED_TABS, KELURAHAN_RESTRICTED_TABS, showToast]);
+  }, [activeAccount, activeTab, showToast]);
 
   const handleAccountSelect = useCallback((acc: UserAccount) => {
     const effective = getEffectiveProfile(acc);
@@ -850,7 +795,7 @@ export default function App() {
         )}
 
         {/* TAB 2: Form Laporan Harian */}
-        {activeTab === 'form' && (
+        {activeTab === 'form' && canAccountAccessTab(activeAccount.role, 'form') && (
           <FormLaporan
             onSaveReport={handleSaveReport}
             isSaving={false}
@@ -862,8 +807,8 @@ export default function App() {
           />
         )}
 
-        {/* TAB 3: Monitoring Super Admin / Lurah */}
-        {activeTab === 'monitoring' && (
+        {/* TAB 3: Monitoring Super Admin / Seklur */}
+        {activeTab === 'monitoring' && canAccountAccessTab(activeAccount.role, 'monitoring') && (
           <MonitoringSuperAdmin
             reports={reports}
             onSelectReport={handleSelectReport}
@@ -876,7 +821,7 @@ export default function App() {
         )}
 
         {/* TAB 4: Riwayat Laporan Harian */}
-        {activeTab === 'riwayat' && (
+        {activeTab === 'riwayat' && canAccountAccessTab(activeAccount.role, 'riwayat') && (
           <RiwayatLaporan
             items={reports}
             isLoading={false}
@@ -895,7 +840,7 @@ export default function App() {
         )}
 
         {/* TAB 5: Rekapitulasi PBB-P2 24 Lingkungan */}
-        {activeTab === 'rekap_pbb' && (
+        {activeTab === 'rekap_pbb' && canAccountAccessTab(activeAccount.role, 'rekap_pbb') && (
           <RekapPbbView
             activeAccount={activeAccount}
             onShowToast={showToast}
@@ -903,7 +848,8 @@ export default function App() {
         )}
 
         {/* TAB 6: Capaian & Rekap Absensi */}
-        {(activeTab === 'capaian' || activeTab === 'capaian_admin') && (
+        {(activeTab === 'capaian' || activeTab === 'capaian_admin') &&
+          canAccountAccessTab(activeAccount.role, activeTab) && (
           <DashboardCapaianKepling
             reports={reports}
             activeAccount={activeAccount}
@@ -922,7 +868,7 @@ export default function App() {
         )}
 
         {/* TAB 7: Surat Kedinasan */}
-        {activeTab === 'surat_kedinasan' && (
+        {activeTab === 'surat_kedinasan' && canAccountAccessTab(activeAccount.role, 'surat_kedinasan') && (
           <SuratKedinasanView
             currentUser={activeAccount}
             onShowToast={showToast}
@@ -930,30 +876,30 @@ export default function App() {
         )}
 
         {/* TAB 9: Realisasi Pembangunan */}
-        {activeTab === 'realisasi_pembangunan' && (
+        {activeTab === 'realisasi_pembangunan' && canAccountAccessTab(activeAccount.role, 'realisasi_pembangunan') && (
           <RealisasiPembangunanView
             currentUser={activeAccount}
           />
         )}
 
         {/* TAB: Agenda Kelurahan */}
-        {activeTab === 'agenda' && (
+        {activeTab === 'agenda' && canAccountAccessTab(activeAccount.role, 'agenda') && (
           <AgendaKelurahanView
             currentUser={activeAccount}
             onShowToast={showToast}
           />
         )}
 
-        {/* TAB: Jadwal Posko Trantibum & Banjir */}
-        {activeTab === 'jadwal_posko' && (
+        {/* TAB: Jadwal Posko Trantibum, Banjir & Kebersihan Malam */}
+        {activeTab === 'jadwal_posko' && canAccountAccessTab(activeAccount.role, 'jadwal_posko') && (
           <JadwalPoskoView
             currentUser={activeAccount}
             onShowToast={showToast}
           />
         )}
 
-        {/* TAB: Kegiatan Lurah */}
-        {activeTab === 'kegiatan_lurah' && (
+        {/* TAB: Kegiatan Lurah (Hanya Super Admin) */}
+        {activeTab === 'kegiatan_lurah' && canAccountAccessTab(activeAccount.role, 'kegiatan_lurah') && (
           <KegiatanLurahView
             currentUser={activeAccount}
             onShowToast={showToast}
@@ -962,7 +908,7 @@ export default function App() {
 
         {/* TAB: Absensi Kepala Lingkungan (Hanya Superadmin & Seklur) */}
         {activeTab === 'absensi_kepling' &&
-          (activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris') && (
+          canAccountAccessTab(activeAccount.role, 'absensi_kepling') && (
             <AbsensiAgendaKeplingView
               currentUser={activeAccount}
               onShowToast={showToast}
@@ -971,7 +917,7 @@ export default function App() {
           )}
 
         {/* TAB 11: Kunjungan Warga */}
-        {activeTab === 'kunjungan' && (
+        {activeTab === 'kunjungan' && canAccountAccessTab(activeAccount.role, 'kunjungan') && (
           <KunjunganHarianView
             currentUser={activeAccount}
             kunjunganList={kunjunganList}
@@ -979,13 +925,14 @@ export default function App() {
         )}
 
         {/* TAB 12: Dashboard Kasi */}
-        {activeTab === 'dashboard_kasi' && (
+        {activeTab === 'dashboard_kasi' && canAccountAccessTab(activeAccount.role, 'dashboard_kasi') && (
           activeAccount.role === 'kasi_pemerintahan' ? (
             <DashboardPbbKasi
               reports={reports}
               targetsMap={targetsMap}
               currentUser={activeAccount}
               onOpenRekapPbb={() => handleTabChange('rekap_pbb')}
+              onSelectKeplingRiwayat={handleSwitchToRiwayat}
             />
           ) : activeAccount.role === 'kasi_pembangunan' ? (
             <DashboardPerlinsosKasi
@@ -993,11 +940,13 @@ export default function App() {
               targetsMap={targetsMap}
               currentUser={activeAccount}
               onOpenKunjunganWarga={() => handleTabChange('kunjungan')}
+              onSelectKeplingRiwayat={handleSwitchToRiwayat}
             />
           ) : (
             <DashboardTrantibumKasi
               reports={reports}
               currentUser={activeAccount}
+              onSelectKeplingRiwayat={handleSwitchToRiwayat}
             />
           )
         )}

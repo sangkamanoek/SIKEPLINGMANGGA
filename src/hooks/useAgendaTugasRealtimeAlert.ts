@@ -98,9 +98,10 @@ export function useAgendaTugasRealtimeAlert(currentUser: UserAccount | null) {
     });
   }, []);
 
-  // Listen to Agenda Kelurahan updates
+  // Listen to Agenda Kelurahan updates (hanya untuk Superadmin, Seklur & Kepling)
   useEffect(() => {
     if (!userId) return;
+    if (userRole !== 'super_admin' && userRole !== 'sekretaris' && userRole !== 'kepling') return;
 
     const handleAgendaList = (items: AgendaKelurahanItem[]) => {
       if (!Array.isArray(items)) return;

@@ -1,14 +1,17 @@
 import {
   collection,
-  doc,
   getDocs,
-  setDoc,
-  deleteDoc,
+  getDocsFromServer,
   onSnapshot,
   query,
   orderBy,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import {
+  db,
+  isFirestoreQuotaCooldownActive,
+  isQuotaExhaustedError,
+  markFirestoreQuotaExhausted,
+} from './firebase';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import { cleanFirestoreData } from './firestoreService';
 import { resilientDeleteDoc, resilientSetDoc } from './firestoreWriteQueue';
@@ -25,7 +28,24 @@ import {
 } from '../data/keplingList';
 
 export const JADWAL_POSKO_STORAGE_KEY = 'sikepling_jadwal_posko_v1';
+export const JADWAL_POSKO_DELETED_KEY = 'sikepling_jadwal_posko_deleted_v1';
 export const JADWAL_POSKO_COLLECTION = 'jadwal_posko_kelurahan';
+
+let deletedPoskoIdsCache: string[] = safeGetLocalStorage<string[]>(JADWAL_POSKO_DELETED_KEY, []);
+
+const getDeletedPoskoIds = (): string[] => {
+  if (!Array.isArray(deletedPoskoIdsCache)) deletedPoskoIdsCache = [];
+  return deletedPoskoIdsCache;
+};
+
+const markPoskoDeleted = (id: string): void => {
+  const current = getDeletedPoskoIds();
+  if (!current.includes(id)) {
+    current.push(id);
+    deletedPoskoIdsCache = current;
+    safeSetLocalStorage(JADWAL_POSKO_DELETED_KEY, JSON.stringify(current.slice(-200)));
+  }
+};
 
 /**
  * Buat seed awal jadwal posko harian jika belum ada
@@ -136,61 +156,142 @@ const normalizeOfficialPoskoLocations = (items: JadwalPoskoItem[]): JadwalPoskoI
 };
 
 export const getLocalJadwalPoskoList = (): JadwalPoskoItem[] => {
+  const deletedSet = new Set(getDeletedPoskoIds());
   const local = safeGetLocalStorage<JadwalPoskoItem[]>(JADWAL_POSKO_STORAGE_KEY, []);
   if (Array.isArray(local) && local.length > 0) {
-    return normalizeOfficialPoskoLocations(local);
+    return normalizeOfficialPoskoLocations(local).filter((x) => x && x.id && !deletedSet.has(x.id));
   }
-  const initial = getInitialSampleJadwalPosko();
+  const hasStoredKey = (() => {
+    try {
+      return typeof localStorage !== 'undefined' && localStorage.getItem(JADWAL_POSKO_STORAGE_KEY) !== null;
+    } catch {
+      return false;
+    }
+  })();
+  if (hasStoredKey) return [];
+
+  const initial = getInitialSampleJadwalPosko().filter((x) => !deletedSet.has(x.id));
   saveLocalJadwalPoskoList(initial);
   return initial;
 };
 
 export const saveLocalJadwalPoskoList = (items: JadwalPoskoItem[]): void => {
-  safeSetLocalStorage(JADWAL_POSKO_STORAGE_KEY, JSON.stringify(items));
+  safeSetLocalStorage(JADWAL_POSKO_STORAGE_KEY, JSON.stringify(items), { skipIdbMirror: true });
 };
 
 export const fetchJadwalPoskoFromFirestore = async (): Promise<JadwalPoskoItem[]> => {
+  const local = getLocalJadwalPoskoList();
+  if (!db || isFirestoreQuotaCooldownActive()) return local;
+
   try {
+    const deletedSet = new Set(getDeletedPoskoIds());
     const q = query(collection(db, JADWAL_POSKO_COLLECTION), orderBy('tanggal', 'desc'));
-    const snap = await getDocs(q);
+    let snap;
+    try {
+      snap = await getDocsFromServer(q);
+    } catch (serverErr) {
+      if (isQuotaExhaustedError(serverErr)) throw serverErr;
+      snap = await getDocs(q);
+    }
     const list: JadwalPoskoItem[] = [];
     snap.forEach((d) => {
-      list.push({ ...(d.data() as JadwalPoskoItem), id: d.id });
+      const data = d.data() as JadwalPoskoItem;
+      if (data && d.id && !deletedSet.has(d.id)) {
+        list.push({ ...data, id: d.id });
+      }
     });
-    if (list.length > 0) {
+    if (list.length > 0 || !snap.metadata.fromCache) {
       const normalized = normalizeOfficialPoskoLocations(list);
       saveLocalJadwalPoskoList(normalized);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('jadwal-posko-updated', { detail: normalized }));
+      }
       return normalized;
     }
   } catch (err) {
-    console.warn('Failed to fetch jadwal posko from Firestore, using local cache:', err);
+    if (isQuotaExhaustedError(err)) {
+      markFirestoreQuotaExhausted(err);
+    } else {
+      console.warn('Failed to fetch jadwal posko from Firestore, using local cache:', err);
+    }
   }
-  return getLocalJadwalPoskoList();
+  return local;
 };
 
 export const subscribeJadwalPoskoFromFirestore = (cb: (items: JadwalPoskoItem[]) => void) => {
+  const initialLocal = getLocalJadwalPoskoList();
+  if (initialLocal.length > 0) {
+    cb(initialLocal);
+  }
+
+  if (!db || isFirestoreQuotaCooldownActive()) {
+    if (initialLocal.length === 0) cb([]);
+    return () => {};
+  }
+
+  let isActive = true;
+  let receivedServerSnapshot = false;
+  let fallbackTimer: any = null;
+
   try {
     const q = query(collection(db, JADWAL_POSKO_COLLECTION), orderBy('tanggal', 'desc'));
-    return onSnapshot(
+    const unsub = onSnapshot(
       q,
       (snap) => {
+        if (!isActive) return;
+        const deletedSet = new Set(getDeletedPoskoIds());
         const list: JadwalPoskoItem[] = [];
         snap.forEach((d) => {
-          list.push({ ...(d.data() as JadwalPoskoItem), id: d.id });
+          const data = d.data() as JadwalPoskoItem;
+          if (data && d.id && !deletedSet.has(d.id)) {
+            list.push({ ...data, id: d.id });
+          }
         });
-        if (list.length > 0) {
-          const normalized = normalizeOfficialPoskoLocations(list);
+        const normalized = normalizeOfficialPoskoLocations(list);
+        if (!snap.metadata.fromCache) {
+          receivedServerSnapshot = true;
+          saveLocalJadwalPoskoList(normalized);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('jadwal-posko-updated', { detail: normalized }));
+          }
+          cb(normalized);
+        } else if (normalized.length > 0) {
           saveLocalJadwalPoskoList(normalized);
           cb(normalized);
-        } else {
-          cb(getLocalJadwalPoskoList());
         }
       },
       (err) => {
+        if (isQuotaExhaustedError(err)) {
+          markFirestoreQuotaExhausted(err);
+          isActive = false;
+          if (fallbackTimer) clearTimeout(fallbackTimer);
+          try { unsub(); } catch {}
+          return;
+        }
         console.warn('Jadwal posko snapshot error:', err);
-        cb(getLocalJadwalPoskoList());
+        if (!isFirestoreQuotaCooldownActive()) {
+          fetchJadwalPoskoFromFirestore().then((items) => {
+            if (isActive) cb(items);
+          });
+        }
       }
     );
+
+    fallbackTimer = setTimeout(() => {
+      if (isActive && !receivedServerSnapshot && !isFirestoreQuotaCooldownActive()) {
+        fetchJadwalPoskoFromFirestore().then((items) => {
+          if (isActive && !receivedServerSnapshot) {
+            cb(items);
+          }
+        });
+      }
+    }, 4500);
+
+    return () => {
+      isActive = false;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      try { unsub(); } catch {}
+    };
   } catch (e) {
     console.warn('Jadwal posko subscribe error:', e);
     cb(getLocalJadwalPoskoList());
@@ -198,7 +299,7 @@ export const subscribeJadwalPoskoFromFirestore = (cb: (items: JadwalPoskoItem[])
   }
 };
 
-export const saveJadwalPoskoItem = async (item: JadwalPoskoItem): Promise<void> => {
+export const saveJadwalPoskoItem = async (item: JadwalPoskoItem): Promise<boolean> => {
   const current = getLocalJadwalPoskoList();
   const idx = current.findIndex((x) => x.id === item.id);
   const now = new Date().toISOString();
@@ -216,26 +317,30 @@ export const saveJadwalPoskoItem = async (item: JadwalPoskoItem): Promise<void> 
   }
 
   saveLocalJadwalPoskoList(updatedList);
-  window.dispatchEvent(new CustomEvent('jadwal-posko-updated', { detail: updatedList }));
-
-  try {
-    await setDoc(doc(db, JADWAL_POSKO_COLLECTION, item.id), updatedItem);
-  } catch (err) {
-    console.warn('Firestore setDoc failed for jadwal posko, saved locally:', err);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('jadwal-posko-updated', { detail: updatedList }));
   }
+
+  if (!item.id) return true;
+
+  const cleaned = cleanFirestoreData(updatedItem);
+  const res = await resilientSetDoc(JADWAL_POSKO_COLLECTION, item.id, cleaned, { merge: true });
+  return res.synced || res.queued;
 };
 
-export const deleteJadwalPoskoItem = async (id: string): Promise<void> => {
+export const deleteJadwalPoskoItem = async (id: string): Promise<boolean> => {
+  markPoskoDeleted(id);
   const current = getLocalJadwalPoskoList();
   const filtered = current.filter((x) => x.id !== id);
   saveLocalJadwalPoskoList(filtered);
-  window.dispatchEvent(new CustomEvent('jadwal-posko-updated', { detail: filtered }));
-
-  try {
-    await deleteDoc(doc(db, JADWAL_POSKO_COLLECTION, id));
-  } catch (err) {
-    console.warn('Firestore deleteDoc failed for jadwal posko, removed locally:', err);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('jadwal-posko-updated', { detail: filtered }));
   }
+
+  if (!id) return true;
+
+  const res = await resilientDeleteDoc(JADWAL_POSKO_COLLECTION, id);
+  return res.synced || res.queued;
 };
 
 const HARI_POSKO_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];

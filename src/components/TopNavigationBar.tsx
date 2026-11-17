@@ -95,26 +95,71 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
   ];
 
-  // Standard Kelurahan Kasi / Seklur Navigation Menu Items
-  const isSeklur = activeAccount?.role === 'sekretaris';
-  const standardMenuItems: MenuItemConfig[] = [
+  // Dedicated Kasi Tata Pemerintahan Navigation Menu Items (PBB-P2, IKD, Arsip Pemerintahan)
+  const kasiPemMenuItems: MenuItemConfig[] = [
+    { id: 'hub', label: 'Pusat Menu', icon: Compass },
+    { id: 'dashboard_kasi', label: 'Dashboard Pemerintahan', icon: Award, badge: 'PBB & IKD', badgeVariant: 'mint' },
+    { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
+    { id: 'riwayat', label: 'Arsip Pemerintahan', icon: History },
+  ];
+
+  // Dedicated Kasi Pembangunan & Kesos Navigation Menu Items (Perlinsos, Posyandu, Sarpras, Kunjungan Warga)
+  const kasiBangMenuItems: MenuItemConfig[] = [
+    { id: 'hub', label: 'Pusat Menu', icon: Compass },
+    { id: 'dashboard_kasi', label: 'Dashboard Kesos', icon: Award, badge: 'PERLINSOS', badgeVariant: 'mint' },
+    { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
+    { id: 'kunjungan', label: 'Kunjungan Warga', icon: Users },
+    { id: 'riwayat', label: 'Arsip Pembangunan', icon: History },
+  ];
+
+  // Dedicated Kasi Trantibum & Linmas Navigation Menu Items (7 Bidang Trantibum, Jadwal Posko, Arsip Trantibum)
+  const kasiTrantibMenuItems: MenuItemConfig[] = [
+    { id: 'hub', label: 'Pusat Menu', icon: Compass },
+    { id: 'dashboard_kasi', label: 'Dashboard Trantibum', icon: Award, badge: '7 BIDANG', badgeVariant: 'rose' },
+    { id: 'jadwal_posko', label: 'Jadwal Posko', icon: ShieldAlert, badge: 'POSKO MALAM', badgeVariant: 'rose' },
+    { id: 'riwayat', label: 'Arsip Trantibum', icon: History },
+  ];
+
+  // Dedicated Petugas Bapenda Navigation Menu Items (Read-Only PBB)
+  const bapendaMenuItems: MenuItemConfig[] = [
+    { id: 'hub', label: 'Pusat Menu', icon: Compass },
+    { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
+  ];
+
+  // Sekretaris Kelurahan (Seklur) Navigation Menu Items (Excludes Kegiatan Lurah & Input Laporan Kepling)
+  const seklurMenuItems: MenuItemConfig[] = [
     { id: 'hub', label: 'Pusat Menu', icon: Compass },
     { id: 'monitoring', label: 'Monitoring Laporan', icon: ShieldCheck, badge: 'MONITORING', badgeVariant: 'mint' },
     { id: 'realisasi_pembangunan', label: 'Realisasi Pembangunan', icon: Wrench, badge: 'SARPRAS', badgeVariant: 'rose' },
     { id: 'agenda', label: 'Agenda Kelurahan', icon: Calendar, badge: 'AGENDA', badgeVariant: 'mint' },
-    { id: 'jadwal_posko', label: 'Jadwal Posko', icon: ShieldAlert, badge: '21.00 WIB', badgeVariant: 'rose' },
-    ...(isSeklur
-      ? [{ id: 'absensi_kepling' as AppTabType, label: 'Absensi Kepling', icon: UserCheck, badge: 'PDF', badgeVariant: 'mint' as const }]
-      : []),
-    { id: 'capaian', label: 'Capaian Target', icon: Trophy },
+    { id: 'jadwal_posko', label: 'Jadwal Posko', icon: ShieldAlert, badge: 'POSKO MALAM', badgeVariant: 'rose' },
+    { id: 'absensi_kepling', label: 'Absensi Kepling', icon: UserCheck, badge: 'PDF', badgeVariant: 'mint' },
+    { id: 'capaian_admin', label: 'Capaian Target', icon: Trophy },
     { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
-    { id: 'form', label: 'Input Laporan', icon: FileText },
+    { id: 'surat_kedinasan', label: 'Surat Kedinasan', icon: Mail, badge: 'SURAT', badgeVariant: 'mint' },
     { id: 'kunjungan', label: 'Kunjungan Warga', icon: Users },
     { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
   ];
 
-  const isSuperAdmin = activeAccount?.role === 'super_admin';
-  const menuItems = isSuperAdmin ? superAdminMenuItems : isPkk ? pkkMenuItems : isKepling ? keplingMenuItems : standardMenuItems;
+  const role = activeAccount?.role;
+  const menuItems =
+    role === 'super_admin'
+      ? superAdminMenuItems
+      : isPkk
+      ? pkkMenuItems
+      : isKepling
+      ? keplingMenuItems
+      : role === 'kasi_pemerintahan'
+      ? kasiPemMenuItems
+      : role === 'kasi_pembangunan'
+      ? kasiBangMenuItems
+      : role === 'kasi_trantibum'
+      ? kasiTrantibMenuItems
+      : role === 'petugas_bapenda'
+      ? bapendaMenuItems
+      : role === 'sekretaris'
+      ? seklurMenuItems
+      : keplingMenuItems;
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {

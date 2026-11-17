@@ -35,6 +35,7 @@ import { saveReportToFirestore } from '../lib/firestoreService';
 import { fetchAllReports } from '../lib/reportsApi';
 import { optimizeAndCleanBrowserMemory } from '../lib/safeStorage';
 import { UserAccount, LaporanHarianItem, isPkkRole } from '../types';
+import { canAccountAccessTab } from '../lib/rolePermissions';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { SpptPbbItem } from '../data/pbbSampleData';
 import { AgendaKelurahanBanner } from './AgendaKelurahanBanner';
@@ -360,6 +361,7 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
   const isPbbAllowed =
     isKepling ||
     isAdmin ||
+    activeAccount.role === 'sekretaris' ||
     activeAccount.role === 'kasi_pemerintahan' ||
     activeAccount.role === 'petugas_bapenda';
 
@@ -601,7 +603,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           badgeColor: 'bg-indigo-100 text-indigo-900',
           action: () => onNavigate('realisasi_pembangunan'),
         },
-
         {
           id: 'kunjungan',
           title: 'Kunjungan Harian Warga & Posyandu',
@@ -612,17 +613,6 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           badge: 'KESEJAHTERAAN SOSIAL',
           badgeColor: 'bg-emerald-100 text-emerald-800',
           action: () => onNavigate('kunjungan'),
-        },
-        {
-          id: 'kegiatan_khusus',
-          title: 'Absensi Kegiatan Kelurahan',
-          desc: 'Absensi check-in kegiatan sosial, penimbangan stunting posyandu, dan gotong royong warga.',
-          category: 'absen',
-          icon: UserCheck,
-          iconBg: 'bg-emerald-50 text-emerald-600',
-          badge: 'GPS ABSEN',
-          badgeColor: 'bg-teal-100 text-teal-800',
-          action: () => onNavigate('kegiatan_khusus'),
         },
         {
           id: 'riwayat',
@@ -654,15 +644,15 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
           action: () => onNavigate('dashboard_kasi'),
         },
         {
-          id: 'kegiatan_khusus',
-          title: 'Absensi Kegiatan Kelurahan & Linmas',
-          desc: 'Absensi check-in patroli gabungan Tiga Pilar, penertiban sampah liar, dan apel siaga trantibum.',
+          id: 'jadwal_posko',
+          title: 'Jadwal Posko (Trantibum, Banjir & Bersih Sampah)',
+          desc: 'Kelola jadwal piket malam Kepling, penugasan personil, verifikasi foto kamera hadir, dan cetak PDF daftar hadir posko.',
           category: 'absen',
-          icon: UserCheck,
-          iconBg: 'bg-emerald-50 text-emerald-600',
-          badge: 'GPS ABSEN',
-          badgeColor: 'bg-teal-100 text-teal-800',
-          action: () => onNavigate('kegiatan_khusus'),
+          icon: ShieldAlert,
+          iconBg: 'bg-amber-50 text-amber-700',
+          badge: 'POSKO MALAM',
+          badgeColor: 'bg-amber-100 text-amber-900',
+          action: () => onNavigate('jadwal_posko'),
         },
         {
           id: 'riwayat',
@@ -752,26 +742,30 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
       },
       {
         id: 'jadwal_posko',
-        title: 'Jadwal Posko (Trantibum & Kewaspadaan Banjir)',
-        desc: 'Jadwal piket malam pukul 21.00 WIB s/d selesai (Trantibum di Kantor Lurah & Siaga Banjir di Taman Segitiga Lk. 9), unggah foto hadir, & PDF.',
+        title: 'Jadwal Posko (Trantibum, Banjir & Bersih Sampah)',
+        desc: 'Jadwal piket malam Trantibum (Kantor Lurah), Siaga Banjir (Taman Segitiga Lk. 9), & Bersih Sampah Malam (Jl. Jamin Ginting), unggah foto kamera, & PDF.',
         category: 'absen',
         icon: ShieldAlert,
         iconBg: 'bg-amber-50 text-amber-700',
-        badge: '21.00 WIB · POSKO',
+        badge: 'POSKO MALAM',
         badgeColor: 'bg-amber-100 text-amber-900',
         action: () => onNavigate('jadwal_posko'),
       },
-      {
-        id: 'kegiatan_lurah',
-        title: 'Kegiatan Lurah Kelurahan Mangga',
-        desc: 'Agenda & dokumentasi kegiatan resmi Lurah lengkap dengan nama kegiatan, hari/tanggal, waktu, lokasi, & foto kehadiran.',
-        category: 'laporan',
-        icon: Briefcase,
-        iconBg: 'bg-indigo-50 text-indigo-700',
-        badge: 'KEGIATAN LURAH',
-        badgeColor: 'bg-indigo-100 text-indigo-900',
-        action: () => onNavigate('kegiatan_lurah'),
-      },
+      ...(isAdmin
+        ? [
+            {
+              id: 'kegiatan_lurah',
+              title: 'Kegiatan Lurah Kelurahan Mangga',
+              desc: 'Agenda & dokumentasi kegiatan resmi Lurah lengkap dengan nama kegiatan, hari/tanggal, waktu, lokasi, & foto kehadiran.',
+              category: 'laporan',
+              icon: Briefcase,
+              iconBg: 'bg-indigo-50 text-indigo-700',
+              badge: 'KHUSUS SUPER ADMIN',
+              badgeColor: 'bg-indigo-100 text-indigo-900',
+              action: () => onNavigate('kegiatan_lurah'),
+            },
+          ]
+        : []),
       ...(activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris'
         ? [
             {
@@ -984,161 +978,184 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
         onForceSyncAll={onForceSyncAll}
       />
 
-      {/* Agenda Kelurahan Banner for Kepling */}
-      <AgendaKelurahanBanner activeAccount={activeAccount} />
+      {/* Agenda Kelurahan Banner (Hanya Superadmin, Seklur & Kepling) */}
+      {canAccountAccessTab(activeAccount.role, 'agenda') && (
+        <AgendaKelurahanBanner activeAccount={activeAccount} />
+      )}
 
-      {/* 3 Pilar Utama SI-MANGGA Banner Quick Navigation */}
-      <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-2xs">
-        <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-700" />
-            <h3 className="text-xs sm:text-sm font-bold uppercase text-slate-900 tracking-wider">
-              3 Pilar Layanan Utama SI-MANGGA
-            </h3>
+      {/* 3 Pilar Utama SI-MANGGA Banner Quick Navigation (Khusus Superadmin, Seklur & Kepling) */}
+      {(isAdmin || activeAccount.role === 'sekretaris' || isKepling) && (
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-2xs">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-emerald-700" />
+              <h3 className="text-xs sm:text-sm font-bold uppercase text-slate-900 tracking-wider">
+                3 Pilar Layanan Utama SI-MANGGA
+              </h3>
+            </div>
+            <span className="text-[11px] font-medium text-slate-500 hidden sm:inline">
+              Kelurahan Mangga · Medan Tuntungan
+            </span>
           </div>
-          <span className="text-[11px] font-medium text-slate-500 hidden sm:inline">
-            Kelurahan Mangga · Medan Tuntungan
-          </span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Pilar 1 */}
+            <div 
+              onClick={() => onNavigate(isKepling ? 'form' : isAdmin ? 'dashboard_kasi' : 'monitoring')}
+              className="p-3.5 bg-slate-50/80 hover:bg-emerald-50/60 border border-slate-200/90 hover:border-emerald-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
+            >
+              <div className="w-10 h-10 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-102">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-emerald-800 uppercase block tracking-wider">Pilar 1</span>
+                <h4 className="text-xs font-bold text-slate-900 truncate">
+                  {isKepling ? 'Laporan Harian & Kinerja' : 'Kinerja Kepling & Layanan'}
+                </h4>
+                <p className="text-[11px] text-slate-500 truncate">
+                  {isKepling ? 'Input Laporan & Target' : 'Monitoring & Evaluasi Wilayah'}
+                </p>
+              </div>
+            </div>
+
+            {/* Pilar 2 */}
+            <div 
+              onClick={() => {
+                if (isAdmin) {
+                  onNavigate('kegiatan_pkk');
+                } else if (isKepling) {
+                  onNavigate('kunjungan');
+                } else {
+                  onNavigate('absensi_kepling');
+                }
+              }}
+              className="p-3.5 bg-slate-50/80 hover:bg-teal-50/60 border border-slate-200/90 hover:border-teal-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
+            >
+              <div className="w-10 h-10 rounded-lg bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-102">
+                <Users className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-teal-800 uppercase block tracking-wider">Pilar 2</span>
+                <h4 className="text-xs font-bold text-slate-900 truncate">
+                  {isKepling ? 'Buku Kunjungan Warga' : isAdmin ? 'Kegiatan TP-PKK' : 'Absensi Kepling'}
+                </h4>
+                <p className="text-[11px] text-slate-500 truncate">
+                  {isKepling ? 'Sambang Door-to-Door Wilayah' : isAdmin ? 'Pusat Menu & Laporan PKK' : 'Daftar Hadir & Cetak PDF A4'}
+                </p>
+              </div>
+            </div>
+
+            {/* Pilar 3 */}
+            <div 
+              onClick={() => onNavigate(isKepling ? 'rekap_pbb' : 'surat_kedinasan')}
+              className="p-3.5 bg-slate-50/80 hover:bg-blue-50/60 border border-slate-200/90 hover:border-blue-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
+            >
+              <div className="w-10 h-10 rounded-lg bg-blue-700 text-white flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-102">
+                <Database className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-blue-800 uppercase block tracking-wider">Pilar 3</span>
+                <h4 className="text-xs font-bold text-slate-900 truncate">
+                  {isKepling ? `Realisasi PBB ${pbbYear}` : 'Surat Kedinasan'}
+                </h4>
+                <p className="text-[11px] text-slate-500 truncate">
+                  {isKepling ? 'Cek SPPT & Pemetaan WP' : 'Arsip Surat Masuk, Keluar & SK'}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Pilar 1 */}
-          <div 
-            onClick={() => onNavigate(isKepling ? 'form' : 'dashboard_kasi')}
-            className="p-3.5 bg-slate-50/80 hover:bg-emerald-50/60 border border-slate-200/90 hover:border-emerald-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
-          >
-            <div className="w-10 h-10 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-102">
-              <FileText className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold text-emerald-800 uppercase block tracking-wider">Pilar 1</span>
-              <h4 className="text-xs font-bold text-slate-900 truncate">Kinerja Kepling & Layanan</h4>
-              <p className="text-[11px] text-slate-500 truncate">Laporan Harian & PBB</p>
-            </div>
-          </div>
-
-          {/* Pilar 2 */}
-          <div 
-            onClick={() => {
-              if (isPkkRole(activeAccount.role) || activeAccount.role === 'super_admin') {
-                onNavigate('kegiatan_pkk');
-              } else if (isKepling) {
-                onNavigate('kunjungan');
-              } else {
-                onNavigate('monitoring');
-              }
-            }}
-            className="p-3.5 bg-slate-50/80 hover:bg-teal-50/60 border border-slate-200/90 hover:border-teal-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
-          >
-            <div className="w-10 h-10 rounded-lg bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-102">
-              <Users className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold text-teal-800 uppercase block tracking-wider">Pilar 2</span>
-              <h4 className="text-xs font-bold text-slate-900 truncate">
-                {isKepling ? 'Buku Kunjungan Warga' : 'Kegiatan TP-PKK'}
-              </h4>
-              <p className="text-[11px] text-slate-500 truncate">
-                {isKepling ? 'Sambang Door-to-Door Wilayah' : 'Pusat Menu & Laporan PKK'}
-              </p>
-            </div>
-          </div>
-
-          {/* Pilar 3 */}
-          <div 
-            onClick={() => onNavigate('surat_kedinasan')}
-            className="p-3.5 bg-slate-50/80 hover:bg-blue-50/60 border border-slate-200/90 hover:border-blue-300 rounded-xl transition-all cursor-pointer group flex items-center gap-3.5"
-          >
-            <div className="w-10 h-10 rounded-lg bg-blue-700 text-white flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-102">
-              <Database className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold text-blue-800 uppercase block tracking-wider">Pilar 3</span>
-              <h4 className="text-xs font-bold text-slate-900 truncate">Surat Kedinasan</h4>
-              <p className="text-[11px] text-slate-500 truncate">Arsip Surat Masuk, Keluar & SK</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* RENDER MODE A: MODERN CONSOLIDATED BENTO-GRID */}
       {dashboardStyle === 'consolidated' ? (
         <div className="space-y-6">
-          {/* Quick Access Agenda Kelurahan, Jadwal Posko & Kegiatan Lurah */}
-          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-emerald-700" />
-                <h3 className="text-xs sm:text-sm font-black uppercase text-slate-900 tracking-wider">
-                  Agenda Kelurahan, Kegiatan Lurah &amp; Jadwal Posko
-                </h3>
+          {/* Quick Access Agenda Kelurahan, Jadwal Posko & Kegiatan Lurah (Filtered Strict by Role) */}
+          {(canAccountAccessTab(activeAccount.role, 'agenda') ||
+            canAccountAccessTab(activeAccount.role, 'jadwal_posko')) && (
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-emerald-700" />
+                  <h3 className="text-xs sm:text-sm font-black uppercase text-slate-900 tracking-wider">
+                    {activeAccount.role === 'kasi_trantibum'
+                      ? 'Jadwal Posko Malam (Trantibum, Banjir & Kebersihan)'
+                      : 'Agenda Kelurahan & Jadwal Posko'}
+                  </h3>
+                </div>
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900">
+                  Posko Malam 20.00 / 21.00 WIB s/d Selesai
+                </span>
               </div>
-              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900">
-                Posko Malam 21.00 WIB s/d Selesai
-              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {canAccountAccessTab(activeAccount.role, 'agenda') && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('agenda')}
+                    className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/70 text-left transition-all cursor-pointer group flex items-center gap-3"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-black text-slate-900 truncate">Agenda Kelurahan</h4>
+                      <p className="text-[11px] text-slate-600 truncate">Daftar agenda resmi kelurahan</p>
+                    </div>
+                  </button>
+                )}
+
+                {canAccountAccessTab(activeAccount.role, 'jadwal_posko') && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('jadwal_posko')}
+                    className="p-3.5 rounded-xl border border-amber-300 bg-amber-50/70 hover:bg-amber-100 text-left transition-all cursor-pointer group flex items-center gap-3 shadow-2xs"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                      <ShieldAlert className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-black text-slate-900 truncate">Jadwal Posko</h4>
+                      <p className="text-[11px] text-amber-900 font-semibold truncate">
+                        Trantibum, Siaga Banjir &amp; Bersih Sampah Malam
+                      </p>
+                    </div>
+                  </button>
+                )}
+
+                {canAccountAccessTab(activeAccount.role, 'kegiatan_lurah') && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('kegiatan_lurah')}
+                    className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/70 text-left transition-all cursor-pointer group flex items-center gap-3"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-indigo-700 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                      <Briefcase className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-black text-slate-900 truncate">Kegiatan Lurah</h4>
+                      <p className="text-[11px] text-slate-600 truncate">Dokumentasi kegiatan &amp; foto</p>
+                    </div>
+                  </button>
+                )}
+
+                {canAccountAccessTab(activeAccount.role, 'absensi_kepling') && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('absensi_kepling')}
+                    className="p-3.5 rounded-xl border border-teal-200 bg-teal-50/50 hover:bg-teal-100/70 text-left transition-all cursor-pointer group flex items-center gap-3"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                      <UserCheck className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-black text-slate-900 truncate">Absensi Kepling (PDF)</h4>
+                      <p className="text-[11px] text-slate-600 truncate">Cetak 1 Lembar A4 Presisi</p>
+                    </div>
+                  </button>
+                )}
+              </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <button
-                type="button"
-                onClick={() => onNavigate('agenda')}
-                className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/70 text-left transition-all cursor-pointer group flex items-center gap-3"
-              >
-                <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-black text-slate-900 truncate">Agenda Kelurahan</h4>
-                  <p className="text-[11px] text-slate-600 truncate">Daftar agenda resmi kelurahan</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigate('jadwal_posko')}
-                className="p-3.5 rounded-xl border border-amber-300 bg-amber-50/70 hover:bg-amber-100 text-left transition-all cursor-pointer group flex items-center gap-3 shadow-2xs"
-              >
-                <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                  <ShieldAlert className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs font-black text-slate-900 truncate">Jadwal Posko</h4>
-                  <p className="text-[11px] text-amber-900 font-semibold truncate">Trantib (Kantor Lurah) &amp; Banjir (Taman Segitiga Lk.9)</p>
-                </div>
-              </button>
-
-              {activeAccount.role === 'super_admin' && (
-                <button
-                  type="button"
-                  onClick={() => onNavigate('kegiatan_lurah')}
-                  className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/70 text-left transition-all cursor-pointer group flex items-center gap-3"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-indigo-700 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                    <Briefcase className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-black text-slate-900 truncate">Kegiatan Lurah</h4>
-                    <p className="text-[11px] text-slate-600 truncate">Dokumentasi kegiatan &amp; foto</p>
-                  </div>
-                </button>
-              )}
-
-              {(activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris') && (
-                <button
-                  type="button"
-                  onClick={() => onNavigate('absensi_kepling')}
-                  className="p-3.5 rounded-xl border border-teal-200 bg-teal-50/50 hover:bg-teal-100/70 text-left transition-all cursor-pointer group flex items-center gap-3"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                    <UserCheck className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-black text-slate-900 truncate">Absensi Kepling (PDF)</h4>
-                    <p className="text-[11px] text-slate-600 truncate">Cetak 1 Lembar A4 Presisi</p>
-                  </div>
-                </button>
-              )}
-            </div>
-          </div>
+          )}
           
           {/* Quick Stats Bento Row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1220,26 +1237,26 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                 </div>
 
                 <div 
-                  onClick={() => onNavigate('database_keluarga')}
+                  onClick={() => onNavigate('riwayat')}
                   className="bg-white border border-slate-200 hover:border-blue-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
                 >
                   <div className="space-y-1.5">
                     <span className="text-[9px] uppercase font-black tracking-widest text-blue-800 bg-blue-100 px-2 py-0.5 rounded border border-blue-200">
-                      👥 Kependudukan & Administrasi
+                      📜 Arsip Pemerintahan
                     </span>
                     <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
-                      Master Data Keluarga & KK
+                      Riwayat Laporan Pemerintahan
                     </h3>
                     <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
-                      Pencarian NIK, struktur keluarga, register domisili, dan verifikasi kependudukan 24 Lingkungan.
+                      Pusat arsip laporan harian Kepling bidang PBB-P2, akselerasi IKD, kependudukan, dan ketatawilayahan 24 Lingkungan.
                     </p>
                     <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-100 mt-2">
-                      <p className="text-[10px] text-blue-700 font-bold">Register Kependudukan Online</p>
-                      <p className="text-xs font-black text-blue-900 mt-0.5">Siap Verifikasi & Validasi</p>
+                      <p className="text-[10px] text-blue-700 font-bold">Laporan Disaring Khusus</p>
+                      <p className="text-xs font-black text-blue-900 mt-0.5">Seksi Tata Pemerintahan</p>
                     </div>
                   </div>
                   <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-blue-700 group-hover:text-blue-600">
-                    <span>Buka Database Keluarga →</span>
+                    <span>Buka Arsip Pemerintahan →</span>
                   </div>
                 </div>
               </>
@@ -1374,29 +1391,29 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                 </div>
 
                 <div 
-                  onClick={() => onNavigate('kegiatan_khusus')}
+                  onClick={() => onNavigate('jadwal_posko')}
                   className="bg-white border border-slate-200 hover:border-amber-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[220px]"
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[9px] uppercase font-black tracking-widest text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
-                        🛡️ Patroli &amp; Apel
+                        🛡️ Jadwal Posko Malam
                       </span>
-                      <span className="text-[10px] text-slate-400 font-bold">Linmas</span>
+                      <span className="text-[10px] text-slate-400 font-bold">Trantibum</span>
                     </div>
                     <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
-                      Absensi Patroli &amp; Apel Linmas
+                      Jadwal Posko &amp; Piket Kepling
                     </h3>
                     <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
-                      Check-in GPS patroli gabungan Tiga Pilar, penertiban keamanan lingkungan, dan apel siaga kamtibmas.
+                      Kelola Posko Trantibum (Kantor Lurah), Siaga Banjir (Taman Segitiga Lk. 9), &amp; Bersih Sampah Malam (Jl. Jamin Ginting).
                     </p>
                     <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100 mt-2">
-                      <p className="text-[10px] text-amber-800 font-bold">Kesiapsiagaan Trantibum</p>
-                      <p className="text-xs font-black text-amber-950 mt-0.5">Petugas &amp; Linmas Aktif</p>
+                      <p className="text-[10px] text-amber-800 font-bold">Penugasan &amp; PDF Daftar Hadir</p>
+                      <p className="text-xs font-black text-amber-950 mt-0.5">Pukul 20.00 / 21.00 WIB s/d Selesai</p>
                     </div>
                   </div>
                   <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-amber-700 group-hover:text-amber-600">
-                    <span>Buka Absensi Linmas →</span>
+                    <span>Kelola Jadwal Posko →</span>
                   </div>
                 </div>
 
@@ -1426,10 +1443,34 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
               </>
             )}
 
-            {/* 4. SUPER ADMIN & KEPLING BENTO ROW (DEFAULT) */}
+            {/* 4. PETUGAS BAPENDA BENTO CARD */}
+            {activeAccount.role === 'petugas_bapenda' && (
+              <div
+                onClick={() => onNavigate('rekap_pbb')}
+                className="md:col-span-3 bg-white border border-emerald-200 hover:border-emerald-500 p-5 rounded-2xl shadow-sm transition-all cursor-pointer group flex flex-col justify-between min-h-[180px]"
+              >
+                <div className="space-y-1.5">
+                  <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
+                    📊 Petugas Bapenda · Read-Only
+                  </span>
+                  <h3 className="text-lg font-black tracking-tight mt-2 text-slate-900">
+                    Rekapitulasi Realisasi PBB-P2 {pbbYear} (24 Lingkungan)
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Pantau target nominal, status lunas Wajib Pajak, dan realisasi penerimaan PBB-P2 Kelurahan Mangga secara real-time.
+                  </p>
+                </div>
+                <div className="pt-3 border-t border-slate-100 mt-4 flex items-center justify-between text-xs font-black text-emerald-700">
+                  <span>Buka Rekapitulasi PBB {pbbYear} →</span>
+                </div>
+              </div>
+            )}
+
+            {/* 5. SUPER ADMIN, SEKRETARIS & KEPLING BENTO ROW (DEFAULT) */}
             {activeAccount.role !== 'kasi_pemerintahan' &&
              activeAccount.role !== 'kasi_pembangunan' &&
-             activeAccount.role !== 'kasi_trantibum' && (
+             activeAccount.role !== 'kasi_trantibum' &&
+             activeAccount.role !== 'petugas_bapenda' && (
               <>
                 {/* Bento Card 1: Buku Kunjungan Warga Door-to-Door (Kiri / Utama) */}
                 <div 

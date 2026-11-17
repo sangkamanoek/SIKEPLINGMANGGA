@@ -7,38 +7,29 @@ import {
   Presentation,
   CheckCircle2,
   FileSpreadsheet,
-  Smartphone,
-  Lock,
   FileText,
   Share2,
   Printer,
   Sparkles,
-  HelpCircle,
-  MapPin,
-  Clock,
   ShieldCheck,
   Award,
   Users,
-  Layers,
-  Zap,
-  Globe,
   Camera,
   Activity,
   Calendar,
   AlertTriangle,
-  RefreshCw,
-  Building2,
-  Trash2,
   Edit3,
-  Hammer,
-  Database,
-  HeartPulse,
+  Wrench,
   Flower2,
   BookOpen,
   Wallet,
-  ArrowRight,
   KeyRound,
-  Check,
+  ShieldAlert,
+  Briefcase,
+  UserCheck,
+  Eye,
+  Bell,
+  Lock,
 } from 'lucide-react';
 import pptxgen from 'pptxgenjs';
 import { CURRENT_APP_VERSION, CURRENT_RELEASE_DATE } from '../lib/appVersionService';
@@ -50,7 +41,6 @@ interface PanduanPPTModalProps {
 
 const BANNER_IMAGE_PATH = '/assets/aistudio/image_d160190c.png';
 
-// Helper to convert image URL to base64 Data URL for robust PPTX embedding
 const getImageBase64 = async (url: string): Promise<string> => {
   try {
     const res = await fetch(url);
@@ -76,573 +66,673 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
 
   const slidesData = [
     {
-      title: 'SI-MANGGA',
+      title: 'SI-MANGGA — Panduan Lengkap Semua Jenis Akun',
       subtitle: `Sistem Informasi & Administrasi Kelurahan Mangga (${CURRENT_APP_VERSION})`,
-      category: 'Buku Panduan Resmi Operasional',
+      category: 'Buku Panduan Operasional Resmi',
       color: 'from-emerald-900 via-teal-950 to-slate-950',
       content: (
-        <div className="flex flex-col items-center text-center space-y-4 py-2">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-500/20 rounded-3xl flex items-center justify-center text-emerald-700 shadow-xl border border-emerald-400/40">
-            <Presentation className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-800 animate-pulse" />
+        <div className="flex flex-col items-center text-center space-y-4 py-1">
+          <div className="w-16 h-16 bg-emerald-500/20 rounded-3xl flex items-center justify-center text-emerald-800 shadow-lg border border-emerald-400/40">
+            <Presentation className="w-8 h-8 text-emerald-800" />
           </div>
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-950 text-xs font-black mb-1.5 border border-emerald-300 shadow-xs">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-950 text-xs font-black mb-1.5 border border-emerald-300">
               <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
               <span>Pemerintah Kota Medan • Kecamatan Medan Tuntungan</span>
             </div>
             <h3 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tight">
               Kelurahan Mangga
             </h3>
-            <p className="text-emerald-800 font-bold text-xs sm:text-sm mt-1 max-w-xl mx-auto leading-relaxed">
-              Panduan Langkah Demi Langkah Penggunaan Seluruh Fitur Aplikasi Bagi 24 Kepala Lingkungan &amp; Pengurus PKK Lingkungan
+            <p className="text-emerald-800 font-bold text-xs sm:text-sm mt-1 max-w-2xl mx-auto leading-relaxed">
+              Petunjuk Teknis Lengkap &amp; Terperinci Penggunaan Aplikasi Berdasarkan Segregasi Tupoksi untuk Setiap Jenis Akun Pengguna
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full max-w-xl text-left text-xs bg-slate-50 p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
-              <div>
-                <p className="text-[10px] text-slate-500 font-medium">Versi Resmi</p>
-                <p className="font-bold text-slate-900 text-xs">{CURRENT_APP_VERSION}</p>
-              </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full max-w-3xl text-left text-xs bg-slate-50 p-3 rounded-2xl border border-slate-200">
+            <div className="bg-white p-2 rounded-xl border border-emerald-200">
+              <p className="text-[10px] text-emerald-700 font-black uppercase">Pimpinan</p>
+              <p className="font-bold text-slate-900 text-[11px]">Lurah (Super Admin) &amp; Seklur</p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"></span>
-              <div>
-                <p className="text-[10px] text-slate-500 font-medium">Cakupan Pengguna</p>
-                <p className="font-bold text-slate-900 text-xs">24 Kepling &amp; PKK</p>
-              </div>
+            <div className="bg-white p-2 rounded-xl border border-teal-200">
+              <p className="text-[10px] text-teal-700 font-black uppercase">3 Kasi Tersekat</p>
+              <p className="font-bold text-slate-900 text-[11px]">Pemerintahan, Pemb., Trantib</p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
-              <div>
-                <p className="text-[10px] text-slate-500 font-medium">Mode Penyimpanan</p>
-                <p className="font-bold text-slate-900 text-xs">IndexedDB Cache Live</p>
-              </div>
+            <div className="bg-white p-2 rounded-xl border border-amber-200">
+              <p className="text-[10px] text-amber-700 font-black uppercase">Kewilayahan &amp; Mitra</p>
+              <p className="font-bold text-slate-900 text-[11px]">24 Kepling &amp; Bapenda</p>
             </div>
+            <div className="bg-white p-2 rounded-xl border border-rose-200">
+              <p className="text-[10px] text-rose-700 font-black uppercase">Pemberdayaan</p>
+              <p className="font-bold text-slate-900 text-[11px]">TP-PKK Kel, Pokja &amp; 24 Lingk.</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-slate-600 font-semibold">
+            <span className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200">
+              Versi: <strong className="text-slate-900">{CURRENT_APP_VERSION}</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200">
+              Pembaruan: <strong className="text-slate-900">{CURRENT_RELEASE_DATE}</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
+              Sinkronisasi Cloud Real-Time + Offline Cache
+            </span>
           </div>
         </div>
       ),
     },
     {
-      title: '1. Struktur Akun, Prosedur Login & Ubah Sandi',
-      subtitle: 'Tata cara autentikasi pengguna dan pembaruan kata sandi akun di HP',
-      category: 'Akun & Autentikasi',
+      title: '1. Peta Segregasi Akun, Login & Keamanan Sandi',
+      subtitle: 'Daftar lengkap 8 kelompok akun resmi beserta aturan batas akses menu masing-masing',
+      category: 'Struktur Akun & Autentikasi',
       color: 'from-slate-950 via-emerald-950 to-teal-950',
       content: (
-        <div className="space-y-3 py-1 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-slate-700">
-            <div className="bg-emerald-50 p-2.5 rounded-2xl border border-emerald-200">
-              <div className="flex items-center gap-1.5 font-black text-emerald-950 text-xs mb-1">
+        <div className="space-y-2.5 py-1 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-slate-700">
+            <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+              <p className="font-black text-emerald-950 text-[11px] flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                <span>Super Admin</span>
-              </div>
-              <p className="text-[10.5px] text-slate-600 leading-relaxed">
-                Akses Lurah / Seklur untuk radar 24 Kepling, validasi apel, ekspor Excel, &amp; arsip surat.
+                <span>Super Admin (Lurah)</span>
+              </p>
+              <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
+                ID: <code className="font-mono font-bold text-emerald-900">super_admin</code>. Akses penuh Kelurahan + PKK + menu eksklusif <strong>Kegiatan Lurah</strong> &amp; verifikasi Posko.
               </p>
             </div>
 
-            <div className="bg-teal-50 p-2.5 rounded-2xl border border-teal-200">
-              <div className="flex items-center gap-1.5 font-black text-teal-950 text-xs mb-1">
-                <Award className="w-3.5 h-3.5 text-teal-700 shrink-0" />
-                <span>3 Kepala Seksi</span>
-              </div>
-              <p className="text-[10.5px] text-slate-600 leading-relaxed">
-                Kasi Pem (PBB/IKD), Kasi Bang (Fisik/Bansos), Kasi Trantib (Ronda &amp; Siskamling).
+            <div className="bg-sky-50 p-2.5 rounded-xl border border-sky-200">
+              <p className="font-black text-sky-950 text-[11px] flex items-center gap-1">
+                <Briefcase className="w-3.5 h-3.5 text-sky-700 shrink-0" />
+                <span>Sekretaris Lurah</span>
+              </p>
+              <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
+                ID: <code className="font-mono font-bold text-sky-900">sekretaris</code>. Koordinasi Monitoring, Agenda, Posko, Absensi PDF A4, Surat, PBB, Pembangunan (tanpa Kegiatan Lurah).
               </p>
             </div>
 
-            <div className="bg-amber-50 p-2.5 rounded-2xl border border-amber-200">
-              <div className="flex items-center gap-1.5 font-black text-amber-950 text-xs mb-1">
+            <div className="bg-teal-50 p-2.5 rounded-xl border border-teal-200">
+              <p className="font-black text-teal-950 text-[11px] flex items-center gap-1">
+                <Lock className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span>3 Kasi (Tersekat Ketat)</span>
+              </p>
+              <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
+                <code className="font-mono font-bold">kasi_pemerintahan</code>, <code className="font-mono font-bold">kasi_pembangunan</code>, <code className="font-mono font-bold">kasi_trantibum</code>. Hanya buka menu tupoksi bidangnya.
+              </p>
+            </div>
+
+            <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+              <p className="font-black text-amber-950 text-[11px] flex items-center gap-1">
                 <Users className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                 <span>24 Kepling</span>
-              </div>
-              <p className="text-[10.5px] text-slate-600 leading-relaxed">
-                Apel berfoto &amp; GPS, laporan harian, sambang warga, &amp; PBB Lunas.
               </p>
-            </div>
-
-            <div className="bg-rose-50 p-2.5 rounded-2xl border border-rose-200">
-              <div className="flex items-center gap-1.5 font-black text-rose-950 text-xs mb-1">
-                <Flower2 className="w-3.5 h-3.5 text-rose-700 shrink-0" />
-                <span>PKK Lingkungan</span>
-              </div>
-              <p className="text-[10.5px] text-slate-600 leading-relaxed">
-                Kegiatan Pokja I-IV, Dasa Wisma 24 Lingkungan, Buku Kas Umum, &amp; 6 Buku Wajib.
+              <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
+                ID: <code className="font-mono font-bold text-amber-900">kepling_1</code>–<code className="font-mono font-bold">24</code>. Sandi awal: <code className="font-mono bg-white px-1 rounded">mangga01</code>–<code className="font-mono bg-white px-1 rounded">mangga24</code>.
               </p>
             </div>
           </div>
 
-          <div className="bg-slate-900 text-white p-3 rounded-2xl border border-emerald-500/40 space-y-2">
-            <p className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
-              <KeyRound className="w-4 h-4 text-amber-400" />
-              <span>Langkah-Langkah Login &amp; Ubah Kata Sandi Akun:</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="bg-indigo-50 p-2.5 rounded-xl border border-indigo-200">
+              <p className="font-black text-indigo-950 text-[11px] flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5 text-indigo-700 shrink-0" />
+                <span>Petugas Bapenda (Pengawas Pajak)</span>
+              </p>
+              <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
+                ID: <code className="font-mono font-bold text-indigo-900">petugas_bapenda</code>. Akses khusus Read-Only (Lihat Saja) pada Realisasi PBB-P2 24 Lingkungan.
+              </p>
+            </div>
+
+            <div className="bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+              <p className="font-black text-rose-950 text-[11px] flex items-center gap-1.5">
+                <Flower2 className="w-3.5 h-3.5 text-rose-700 shrink-0" />
+                <span>Tim Penggerak PKK (Kelurahan, Pokja &amp; Lingkungan)</span>
+              </p>
+              <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
+                ID: <code className="font-mono font-bold">ketua_pkk</code>, <code className="font-mono font-bold">sekretaris_pkk</code>, <code className="font-mono font-bold">pokja_1..4</code>, &amp; <code className="font-mono font-bold">pkk_lingkungan_1..24</code> (sandi awal <code className="font-mono bg-white px-1 rounded">pkkmangga01</code>–<code className="font-mono bg-white px-1 rounded">24</code>).
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 text-white p-2.5 rounded-xl border border-emerald-500/40 space-y-1">
+            <p className="font-bold text-amber-300 text-[11px] flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>Prosedur Login &amp; Ganti Kata Sandi:</span>
             </p>
-            <ol className="text-[11px] text-slate-200 space-y-1 list-decimal pl-4 leading-relaxed">
-              <li>
-                <strong>Pilih Akun</strong>: Buka aplikasi &gt; Pilih nama Lingkungan Anda pada layar login/pemilih akun.
-              </li>
-              <li>
-                <strong>Kata Sandi Bawaan</strong>: Masukkan password <code className="bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-mono">mangga[no_lingkungan]</code> (Kepling) atau <code className="bg-slate-800 text-rose-300 px-1.5 py-0.5 rounded font-mono">pkkmangga[no_lingkungan]</code> (PKK). Contoh: <code className="text-emerald-300 font-mono">mangga21</code>.
-              </li>
-              <li>
-                <strong>Ubah Sandi</strong>: Klik tombol profil nama Anda di pojok kanan atas &gt; Pilih <strong>"Ubah Kata Sandi"</strong> &gt; Masukkan sandi baru &gt; Simpan.
-              </li>
+            <p className="text-[10.5px] text-slate-200 leading-relaxed">
+              1) Pilih kelompok/nama akun di halaman Login &rarr; masukkan kata sandi resmi (hubungi Super Admin/Seklur untuk kredensial struktural). 2) Setelah masuk, klik profil di kanan atas &rarr; <strong>"Ubah Kata Sandi"</strong> untuk mengganti sandi bawaan agar akun aman.
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: '2. Panduan Akun Super Admin (Lurah) & Sekretaris Lurah',
+      subtitle: 'Kontrol eksekutif kelurahan, Kegiatan Lurah eksklusif, Absensi Agenda A4 & Verifikasi Posko',
+      category: 'Akun Pimpinan Kelurahan',
+      color: 'from-emerald-950 via-slate-900 to-teal-950',
+      content: (
+        <div className="space-y-2.5 py-1 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-200 space-y-1.5">
+              <p className="font-black text-emerald-950 text-xs flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span>Super Admin / Lurah (Akses Penuh + Eksklusif)</span>
+              </p>
+              <ul className="text-[10.5px] text-slate-700 space-y-1 list-disc pl-4 leading-relaxed">
+                <li><strong>Kegiatan Lurah (Eksklusif):</strong> Hanya terlihat &amp; bisa dikelola Super Admin untuk mencatat agenda kedinasan Lurah berfoto.</li>
+                <li><strong>Verifikasi Kehadiran Posko:</strong> Pada menu <em>Jadwal Posko</em>, Lurah dapat memverifikasi status hadir Kepling yang bertugas (jika Kepling hadir di lapangan namun lupa absen HP) &rarr; otomatis masuk Laporan Harian Kepling.</li>
+                <li><strong>Monitoring &amp; Capaian Target:</strong> Pantau kepatuhan 24 Kepling, ekspor Excel, atur target, &amp; akses penuh modul TP-PKK.</li>
+              </ul>
+            </div>
+
+            <div className="bg-sky-50 p-3 rounded-2xl border border-sky-200 space-y-1.5">
+              <p className="font-black text-sky-950 text-xs flex items-center gap-1.5">
+                <Briefcase className="w-4 h-4 text-sky-700 shrink-0" />
+                <span>Sekretaris Kelurahan / Seklur (Koordinasi)</span>
+              </p>
+              <ul className="text-[10.5px] text-slate-700 space-y-1 list-disc pl-4 leading-relaxed">
+                <li><strong>Menu Aktif:</strong> Monitoring Laporan, Realisasi Pembangunan, Agenda Kelurahan, Jadwal Posko, Absensi Kepling, Capaian Target, Realisasi PBB, Surat Kedinasan, Kunjungan Warga, &amp; Arsip Riwayat.</li>
+                <li><strong>Batasan Keamanan:</strong> Menu <em>Kegiatan Lurah</em> dan <em>Input Laporan Kepling</em> disembunyikan otomatis.</li>
+                <li><strong>Surat Kedinasan:</strong> Kelola agenda surat masuk/keluar, undangan resmi, &amp; nomor register kelurahan.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 text-white p-2.5 rounded-xl border border-emerald-500/40 flex items-start gap-2 text-[10.5px]">
+            <UserCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <p className="leading-relaxed text-slate-200">
+              <strong className="text-emerald-300">Agenda Kelurahan &amp; Absensi Kepling (Auto-Sync &amp; PDF 1 Lembar A4):</strong> Buat jadwal di <em>Agenda Kelurahan</em> &rarr; buka <em>Absensi Kepling</em> &rarr; tandai status <strong>Hadir / Izin / Sakit / Tidak Hadir</strong>. Kepling yang ditandai <strong>Hadir</strong> otomatis masuk ke <em>Laporan Harian</em> &amp; <em>Capaian Kinerja</em>. Klik Cetak PDF untuk mencetak 24 baris presisi <strong>1 lembar A4</strong>.
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: '3. Panduan Akun Kasi Tata Pemerintahan',
+      subtitle: 'Segregasi tupoksi khusus bidang Pemerintahan, Pajak PBB-P2, IKD & Arsip Pemerintahan',
+      category: 'Akun Kasi Tata Pemerintahan',
+      color: 'from-blue-950 via-slate-900 to-emerald-950',
+      content: (
+        <div className="space-y-2.5 py-1 text-xs">
+          <div className="bg-blue-50 p-2.5 rounded-xl border border-blue-200 flex items-center justify-between gap-2">
+            <div>
+              <p className="font-black text-blue-950 text-xs">Menu Yang Dapat Diakses (4 Menu Tersekat)</p>
+              <p className="text-[10.5px] text-blue-800 mt-0.5">
+                Pusat Menu • Dashboard Pemerintahan • Realisasi PBB • Arsip Pemerintahan
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-lg bg-blue-700 text-white font-mono text-[10px] font-bold shrink-0">
+              kasi_pemerintahan
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+              <p className="font-black text-slate-900 text-xs flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>1. Dashboard Pemerintahan</span>
+              </p>
+              <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                Pantau peringkat (leaderboard) realisasi PBB per lingkungan, capaian aktivasi Identitas Kependudukan Digital (IKD), dan indikator administrasi pertanahan/kependudukan.
+              </p>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+              <p className="font-black text-slate-900 text-xs flex items-center gap-1.5">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>2. Realisasi PBB-P2</span>
+              </p>
+              <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                Filter SPPT per Lingkungan I–XXIV (tahun 2024–2026), verifikasi SPPT Lunas vs Piutang, kelola pindah NOP antar lingkungan, serta ekspor rekapitulasi PBB ke Excel.
+              </p>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+              <p className="font-black text-slate-900 text-xs flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>3. Arsip Pemerintahan</span>
+              </p>
+              <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                Tinjau laporan Kepling yang relevan dengan urusan Pemerintahan &amp; Administrasi Warga, cetak dokumen PDF, atau unduh arsip kegiatan bidang Pemerintahan.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 text-white p-2.5 rounded-xl border border-blue-500/40 text-[10.5px] leading-relaxed">
+            <strong className="text-amber-300">Catatan Segregasi:</strong> Menu non-tupoksi seperti <em>Jadwal Posko</em>, <em>Realisasi Pembangunan</em>, <em>Kunjungan Warga</em>, <em>Kegiatan Lurah</em>, dan <em>Monitoring Umum</em> otomatis disembunyikan agar fokus kerja Kasi Tata Pemerintahan terjaga.
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: '4. Panduan Akun Kasi Pembangunan & Kesos',
+      subtitle: 'Segregasi tupoksi khusus Perlinsos, Sarpras Infrastruktur 0%-100% & Kunjungan Warga',
+      category: 'Akun Kasi Pembangunan & Kesos',
+      color: 'from-indigo-950 via-slate-900 to-teal-950',
+      content: (
+        <div className="space-y-2.5 py-1 text-xs">
+          <div className="bg-indigo-50 p-2.5 rounded-xl border border-indigo-200 flex items-center justify-between gap-2">
+            <div>
+              <p className="font-black text-indigo-950 text-xs">Menu Yang Dapat Diakses (5 Menu Tersekat)</p>
+              <p className="text-[10.5px] text-indigo-800 mt-0.5">
+                Pusat Menu • Dashboard Kesos • Realisasi Pembangunan • Kunjungan Warga • Arsip Pembangunan
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-lg bg-indigo-700 text-white font-mono text-[10px] font-bold shrink-0">
+              kasi_pembangunan
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+              <p className="font-black text-slate-900 text-xs flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>1. Dashboard Kesos</span>
+              </p>
+              <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                Pantau ringkasan Perlinsos (429 KK/DTKS), progres Posyandu &amp; balita risiko stunting, serta pendataan kepesertaan BPJS Ketenagakerjaan pekerja rentan.
+              </p>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+              <p className="font-black text-slate-900 text-xs flex items-center gap-1.5">
+                <Wrench className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>2. Realisasi Pembangunan</span>
+              </p>
+              <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                Tambah/evaluasi proyek fisik (jalan, drainase u-ditch, paving, LPJU) dengan komparasi foto tahap <strong>0% (Awal)</strong>, <strong>50% (Proses)</strong>, dan <strong>100% (Selesai)</strong> plus cetak rekapitulasi APBD.
+              </p>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+              <p className="font-black text-slate-900 text-xs flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>3. Kunjungan Warga &amp; Arsip</span>
+              </p>
+              <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                Verifikasi data sambang warga door-to-door dari 24 Kepling (status <strong>Sudah Bansos</strong>, <strong>Belum Bansos</strong>, <strong>Menolak</strong>) &amp; kelola Arsip Pembangunan.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 text-white p-2.5 rounded-xl border border-indigo-500/40 text-[10.5px] leading-relaxed">
+            <strong className="text-amber-300">Catatan Segregasi:</strong> Akun Kasi Pembangunan tidak menampilkan menu PBB-P2, Jadwal Posko Trantib, Kegiatan Lurah, maupun laporan di luar bidang Pembangunan/Kesos.
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: '5. Panduan Akun Kasi Trantibum & Linmas',
+      subtitle: 'Segregasi tupoksi khusus 7 Bidang Trantibum, Jadwal Posko Malam & Arsip Keamanan',
+      category: 'Akun Kasi Trantibum',
+      color: 'from-rose-950 via-slate-900 to-amber-950',
+      content: (
+        <div className="space-y-2.5 py-1 text-xs">
+          <div className="bg-rose-50 p-2.5 rounded-xl border border-rose-200 flex items-center justify-between gap-2">
+            <div>
+              <p className="font-black text-rose-950 text-xs">Menu Yang Dapat Diakses (4 Menu Tersekat)</p>
+              <p className="text-[10.5px] text-rose-800 mt-0.5">
+                Pusat Menu • Dashboard Trantibum • Jadwal Posko • Arsip Trantibum
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-lg bg-rose-700 text-white font-mono text-[10px] font-bold shrink-0">
+              kasi_trantibum
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="bg-white p-2.5 rounded-xl border border-rose-200">
+              <p className="font-black text-rose-900 text-[11px]">Posko Trantibum</p>
+              <p className="text-[10px] text-slate-600 mt-0.5">
+                <strong>21.00 WIB – Selesai</strong><br />Lokasi: <strong>Kantor Lurah</strong>
+              </p>
+            </div>
+            <div className="bg-white p-2.5 rounded-xl border border-blue-200">
+              <p className="font-black text-blue-900 text-[11px]">Posko Kewaspadaan Banjir</p>
+              <p className="text-[10px] text-slate-600 mt-0.5">
+                <strong>21.00 WIB – Selesai</strong><br />Lokasi: <strong>Taman Segitiga Lk. 9</strong>
+              </p>
+            </div>
+            <div className="bg-white p-2.5 rounded-xl border border-emerald-200">
+              <p className="font-black text-emerald-900 text-[11px]">Posko Bersih Sampah Malam</p>
+              <p className="text-[10px] text-slate-600 mt-0.5">
+                <strong>20.00 WIB – Selesai</strong><br />Lokasi: <strong>Jalan Jamin Ginting</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1">
+            <p className="font-black text-slate-900 text-[11px] flex items-center gap-1.5">
+              <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>Cara Mengelola Jadwal Posko &amp; 7 Bidang Trantibum:</span>
+            </p>
+            <ol className="text-[10.5px] text-slate-600 space-y-0.5 list-decimal pl-4 leading-relaxed">
+              <li>Buka menu <strong>Jadwal Posko</strong> &rarr; klik <strong>Buat Jadwal Posko</strong> &rarr; pilih jenis Posko &amp; tanggal.</li>
+              <li>Centang <strong>Kepling bertugas secara manual</strong> (bebas pilih nomor lingkungan) &rarr; Simpan. Kepling ditunjuk langsung menerima <strong>Notifikasi Khusus</strong> di akunnya.</li>
+              <li>Setelah posko selesai, klik <strong>Cetak PDF Daftar Hadir Posko</strong> resmi. Pantau juga <em>Dashboard Trantibum</em> (7 Bidang: Poskamling, Infra Publik, Mediasi, Posko, Bersemi, Sampah Liar, Faktor 74) &amp; <em>Arsip Trantibum</em>.</li>
             </ol>
           </div>
         </div>
       ),
     },
     {
-      title: '2. Formulir Laporan Harian Berfoto & GPS',
-      subtitle: 'Pengisian laporan kerja lapangan dengan bukti foto, GPS, & auto alamat',
-      category: 'Formulir Laporan',
+      title: '6. Panduan Akun 24 Kepling (Bagian 1): Harian, Agenda & Posko',
+      subtitle: 'Tugas pelaporan harian GPS sebelum 23.30 WIB, Auto-Sync Agenda & Absen Posko Kamera Langsung',
+      category: 'Akun Kepala Lingkungan (I - XXIV)',
       color: 'from-emerald-900 to-teal-950',
       content: (
-        <div className="space-y-3 py-1 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-            <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs space-y-1 text-center">
-              <div className="w-7 h-7 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 mx-auto font-black text-xs">
-                1
-              </div>
-              <p className="font-bold text-slate-900 text-[11px]">Buka Formulir</p>
-              <p className="text-[10px] text-slate-500">Pilih menu Formulir Laporan di bagian nav bawah/samping.</p>
+        <div className="space-y-2.5 py-1 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="bg-white p-3 rounded-2xl border border-emerald-200 space-y-1">
+              <p className="font-black text-emerald-950 text-xs flex items-center gap-1.5">
+                <Camera className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>1. Input Laporan Harian</span>
+              </p>
+              <p className="text-[10px] text-slate-600 leading-relaxed">
+                Buka <strong>Input Laporan</strong> &rarr; pilih Bidang Tugas &rarr; unggah s/d 8 foto &rarr; tekan <strong>Deteksi Lokasi GPS</strong> untuk isi jalan otomatis &rarr; isi uraian &rarr; Kirim sebelum <strong>23.30 WIB</strong>.
+              </p>
             </div>
 
-            <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs space-y-1 text-center">
-              <div className="w-7 h-7 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 mx-auto font-black text-xs">
-                2
-              </div>
-              <p className="font-bold text-slate-900 text-[11px]">Upload Multi-Foto</p>
-              <p className="text-[10px] text-slate-500">Ambil s/d 8 foto bukti kerja. Otomatis dikompres hemat kuota.</p>
+            <div className="bg-white p-3 rounded-2xl border border-teal-200 space-y-1">
+              <p className="font-black text-teal-950 text-xs flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-teal-600 shrink-0" />
+                <span>2. Agenda Kelurahan</span>
+              </p>
+              <p className="text-[10px] text-slate-600 leading-relaxed">
+                Lihat jadwal apel/rapat/gotong royong resmi. Ketika Lurah atau Seklur mencatat Anda <strong>Hadir</strong>, sistem <strong>otomatis menginput ke Laporan Harian &amp; Capaian Kinerja</strong> Anda.
+              </p>
             </div>
 
-            <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs space-y-1 text-center">
-              <div className="w-7 h-7 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 mx-auto font-black text-xs">
-                3
-              </div>
-              <p className="font-bold text-slate-900 text-[11px]">Deteksi GPS Alamat</p>
-              <p className="text-[10px] text-slate-500">Klik 'Deteksi Lokasi GPS' untuk mengisi nama jalan otomatis.</p>
-            </div>
-
-            <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs space-y-1 text-center">
-              <div className="w-7 h-7 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 mx-auto font-black text-xs">
-                4
-              </div>
-              <p className="font-bold text-slate-900 text-[11px]">Kirim Laporan</p>
-              <p className="text-[10px] text-slate-500">Pilih bidang (Trantib/Kebersihan/Ronda) &gt; Klik Kirim.</p>
+            <div className="bg-white p-3 rounded-2xl border border-rose-200 space-y-1">
+              <p className="font-black text-rose-950 text-xs flex items-center gap-1.5">
+                <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>3. Absensi Jadwal Posko</span>
+              </p>
+              <p className="text-[10px] text-slate-600 leading-relaxed">
+                Anda <strong>hanya melihat jadwal akun sendiri</strong>. Terima notifikasi tugas &rarr; buka <strong>Jadwal Posko</strong> &rarr; klik Hadir &rarr; ambil <strong>Foto Kamera Langsung</strong> (anti-galeri) + jam HP otomatis!
+              </p>
             </div>
           </div>
 
-          <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-200 flex items-start gap-2 text-[11px] text-emerald-950">
-            <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-            <p className="leading-relaxed">
-              <strong>Batas Waktu Pengiriman:</strong> Laporan harian wajib dikirim sebelum pukul <strong>23.30 WIB</strong> setiap hari. Laporan otomatis tersimpan di HP walau sinyal internet lambat.
+          <div className="bg-slate-900 text-white p-2.5 rounded-xl border border-emerald-500/40 space-y-1 text-[10.5px]">
+            <p className="font-bold text-amber-300 flex items-center gap-1.5">
+              <Bell className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>Ketentuan Penting Absensi Posko Anti-Manipulasi:</span>
+            </p>
+            <p className="text-slate-200 leading-relaxed">
+              • Unggah dari galeri dinonaktifkan — foto wajib diambil langsung dari kamera saat piket dan otomatis diberi watermark tanggal, jam HP, &amp; nama Posko.<br />
+              • Kehadiran Posko (baik absen mandiri maupun verifikasi Lurah/Super Admin) otomatis tercatat sebagai <strong>Laporan Harian Kepling</strong>.
             </p>
           </div>
         </div>
       ),
     },
     {
-      title: '3. Sambang Warga Door-to-Door & Edit Kunjungan',
-      subtitle: 'Pencatatan interaksi warga, status Bansos Perlinsos, & tombol koreksi edit',
-      category: 'Kunjungan & Perlinsos',
+      title: '7. Panduan Akun 24 Kepling (Bagian 2): Warga, PBB & Sarpras',
+      subtitle: 'Penggunaan Kunjungan Warga (termasuk Edit & Menolak), Realisasi PBB, Pembangunan & Capaian',
+      category: 'Akun Kepala Lingkungan (I - XXIV)',
       color: 'from-teal-900 via-emerald-950 to-slate-900',
       content: (
-        <div className="space-y-3 py-1 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-300">
-              <span className="px-2 py-0.5 rounded bg-emerald-600 text-white font-black text-[9px] uppercase">
-                SUDAH BANSOS
-              </span>
-              <p className="text-[11px] text-emerald-950 font-bold mt-1.5">Terdata DTKS / Penerima</p>
-              <p className="text-[10px] text-slate-600 mt-0.5 leading-relaxed">
-                Warga telah terdaftar dalam DTKS / menerima bansos PKH, BPNT, atau Bantuan Pangan.
-              </p>
-            </div>
-
-            <div className="bg-amber-50 p-3 rounded-2xl border border-amber-300">
-              <span className="px-2 py-0.5 rounded bg-amber-600 text-white font-black text-[9px] uppercase">
-                BELUM BANSOS
-              </span>
-              <p className="text-[11px] text-amber-950 font-bold mt-1.5">Usulan Bansos Baru</p>
-              <p className="text-[10px] text-slate-600 mt-0.5 leading-relaxed">
-                Warga belum menerima bantuan sosial dan membutuhkan usulan verifikasi kelayakan.
-              </p>
-            </div>
-
-            <div className="bg-rose-50 p-3 rounded-2xl border border-rose-300">
-              <span className="px-2 py-0.5 rounded bg-rose-600 text-white font-black text-[9px] uppercase">
-                MENOLAK BANSOS
-              </span>
-              <p className="text-[11px] text-rose-950 font-bold mt-1.5">Status Menolak (Baru)</p>
-              <p className="text-[10px] text-slate-600 mt-0.5 leading-relaxed">
-                Warga secara sadar menolak bansos / merasa sudah mampu. Kepling mendokumentasikan identitasnya.
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-white p-3 rounded-2xl border border-amber-300 shadow-2xs space-y-1">
-            <p className="font-bold text-amber-900 text-xs flex items-center gap-1.5">
-              <Edit3 className="w-4 h-4 text-amber-600" />
-              <span>Fitur Baru: Tombol Edit / Koreksi Entri Kunjungan</span>
-            </p>
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Jika terjadi kesalahan ketik pada nama warga, alamat, atau status bansos, Kepling dapat mengklik tombol <strong>"Edit (Kuning)"</strong> pada kartu/baris kunjungan untuk mengoreksi data secara langsung tanpa menghapus dari awal.
-            </p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: '4. Realisasi Pembangunan Fisik (Infrastruktur)',
-      subtitle: 'Dokumentasi komparasi progres fisik proyek (0%, 50%, 100%)',
-      category: 'Realisasi Pembangunan',
-      color: 'from-indigo-950 via-slate-900 to-teal-950',
-      content: (
-        <div className="space-y-3 py-1 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
-              <span className="px-2 py-0.5 rounded bg-amber-500 text-white font-bold text-[9px]">TAHAP 1</span>
-              <p className="font-bold text-slate-900 text-xs mt-1">Kondisi Awal (0%)</p>
-              <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
-                Foto kondisi awal jalan berlubang, parit tersumbat, atau gang becek sebelum proyek dimulai.
-              </p>
-            </div>
-
-            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
-              <span className="px-2 py-0.5 rounded bg-blue-500 text-white font-bold text-[9px]">TAHAP 2</span>
-              <p className="font-bold text-slate-900 text-xs mt-1">Sedang Proses (50%)</p>
-              <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
-                Foto proses pengerjaan aspal hotmix, pasang u-ditch drainase, atau pengerjaan paving block.
-              </p>
-            </div>
-
-            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
-              <span className="px-2 py-0.5 rounded bg-emerald-600 text-white font-bold text-[9px]">TAHAP 3</span>
-              <p className="font-bold text-slate-900 text-xs mt-1">Selesai Tuntas (100%)</p>
-              <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
-                Foto hasil akhir fisik mulus, rapi, dan siap dimanfaatkan oleh seluruh masyarakat.
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-200 space-y-1">
-            <p className="font-bold text-emerald-950 text-xs">Kegunaan &amp; Cara Cetak Rekapitulasi Pembangunan:</p>
-            <p className="text-[11px] text-slate-700 leading-relaxed">
-              Kepling dan Kasi Pembangunan dapat memfilter data proyek berdasarkan tahun anggaran, jenis pekerjaan, dan mendownload lembar rekapitulasi pembangunan fisik lengkap dengan anggaran APBD dan foto komparasi.
-            </p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: '5. Peta Spasial WebGIS 24 Lingkungan',
-      subtitle: 'Visualisasi poligon batas lingkungan, rumah warga, WRS, & faskes',
-      category: 'WebGIS Spasial',
-      color: 'from-blue-950 via-emerald-950 to-slate-900',
-      content: (
-        <div className="space-y-3 py-1 text-xs">
+        <div className="space-y-2.5 py-1 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
-              <div className="flex items-center gap-2 font-black text-slate-900 text-xs">
-                <MapPin className="w-4 h-4 text-blue-600" />
-                <span>Poligon 24 Lingkungan</span>
-              </div>
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                Visualisasi garis batas wilayah resmi Lingkungan I s/d XXIV dengan navigasi peta interaktif dan deteksi titik lokasi HP.
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 space-y-1.5">
+              <p className="font-black text-slate-900 text-xs flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>4. Kunjungan Warga Door-to-Door</span>
+              </p>
+              <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                Catat nama KK, alamat GPS, foto, dan status Perlinsos: <strong>SUDAH BANSOS</strong> (DTKS/PKH/BPNT), <strong>BELUM BANSOS</strong> (layak usul), atau <strong>MENOLAK BANSOS</strong> (menolak sadar).
+              </p>
+              <p className="text-[10px] text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 flex items-center gap-1 font-semibold">
+                <Edit3 className="w-3 h-3 shrink-0" />
+                <span>Salah ketik? Klik tombol <strong>Edit (Kuning)</strong> pada kartu untuk koreksi tanpa hapus ulang.</span>
               </p>
             </div>
 
-            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
-              <div className="flex items-center gap-2 font-black text-slate-900 text-xs">
-                <Layers className="w-4 h-4 text-emerald-600" />
-                <span>Rumah Warga &amp; WRS Sampah</span>
-              </div>
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                Plotting titik rumah warga, status Wajib Retribusi Sampah (WRS aktif/non-aktif), dan pemisahan faskes kesehatan vs sekolah secara akurat.
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 space-y-1.5">
+              <p className="font-black text-slate-900 text-xs flex items-center gap-1.5">
+                <FileSpreadsheet className="w-4 h-4 text-teal-600 shrink-0" />
+                <span>5. Realisasi Pajak PBB-P2 Lingkungan</span>
+              </p>
+              <p className="text-[10.5px] text-slate-600 leading-relaxed">
+                Buka <strong>Realisasi PBB</strong> &rarr; cari NOP atau Nama Wajib Pajak &rarr; klik tanda <strong>Lunas</strong> saat warga membayar. Jika objek pajak salah masuk lingkungan, gunakan fitur <strong>Pindah NOP</strong>.
+              </p>
+              <p className="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 font-semibold">
+                Progres nominal &amp; persentase lingkungan Anda langsung terhubung ke dashboard Pimpinan.
               </p>
             </div>
           </div>
 
-          <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-200 flex items-start gap-2.5 text-[11px] text-emerald-950">
-            <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold">Langkah Menavigasi Peta WebGIS:</p>
-              <p className="text-slate-600 mt-0.5 leading-relaxed">
-                Buka tab <strong>"Peta WebGIS"</strong> &gt; Aktifkan layer yang diinginkan (Poligon / Titik Rumah / Faskes Kesehatan / Jalan) &gt; Klik pada penanda lokasi untuk membuka kartu informasi detail.
-              </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 text-[10.5px]">
+              <strong className="text-emerald-950">6. Realisasi Pembangunan:</strong> Pantau &amp; unggah foto progres proyek fisik di lingkungan Anda pada tahap <strong>0%</strong>, <strong>50%</strong>, hingga <strong>100%</strong> selesai.
+            </div>
+            <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-[10.5px]">
+              <strong className="text-amber-950">7. Capaian Target &amp; Arsip Riwayat:</strong> Cek poin kinerja bulanan (termasuk auto-sync Agenda &amp; Posko) dan cetak PDF/WA laporan Anda di <em>Arsip Riwayat</em>.
             </div>
           </div>
         </div>
       ),
     },
     {
-      title: '6. Manajemen Realisasi Pajak PBB-P2',
-      subtitle: 'Monitoring target vs realisasi penerimaan PBB & tanda lunas di HP',
-      category: 'Pendapatan Daerah (PBB)',
-      color: 'from-emerald-950 via-teal-950 to-slate-900',
+      title: '8. Panduan Akun Petugas Bapenda & Tim Penggerak PKK',
+      subtitle: 'Pengawasan pajak daerah (Read-Only) & Portal mandiri 10 Program Pokok TP-PKK',
+      category: 'Akun Bapenda & TP-PKK',
+      color: 'from-rose-950 via-slate-900 to-indigo-950',
       content: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-1 text-xs">
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-1.5">
-            <p className="font-black text-slate-900 text-xs flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              Rekapitulasi Target &amp; Realisasi
+        <div className="space-y-2.5 py-1 text-xs">
+          <div className="bg-indigo-50 p-3 rounded-2xl border border-indigo-200 space-y-1">
+            <p className="font-black text-indigo-950 text-xs flex items-center gap-1.5">
+              <Eye className="w-4 h-4 text-indigo-700 shrink-0" />
+              <span>Akun Petugas Bapenda Kota Medan (petugas_bapenda) — Mode Lihat Saja</span>
             </p>
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Memantau target nominal PBB, total SPPT Wajib Pajak, jumlah SPPT lunas, dan persentase capaian per-lingkungan maupun agregat kelurahan.
+            <p className="text-[10.5px] text-slate-700 leading-relaxed">
+              Hanya membuka <strong>Pusat Menu</strong> &amp; <strong>Realisasi PBB</strong>. Petugas dapat memantau realisasi SPPT Lunas, piutang PBB per Lingkungan I–XXIV, tahun pajak 2024–2026, serta mengunduh rekap Excel tanpa risiko mengubah data operasional kelurahan.
             </p>
           </div>
 
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-1.5">
-            <p className="font-black text-slate-900 text-xs flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-teal-600" />
-              Penandaan SPPT Lunas Real-Time
-            </p>
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Kepling dapat mencari SPPT berdasarkan NOP atau Nama Wajib Pajak, lalu menandai status lunas saat warga melakukan pembayaran.
-            </p>
-          </div>
-
-          <div className="sm:col-span-2 bg-slate-900 text-white p-3 rounded-2xl border border-slate-700 flex items-center justify-between text-[11px]">
-            <span>
-              📊 <strong>Cara Tandai Lunas:</strong> Buka tab PBB &gt; Ketik NOP/Nama Wajib Pajak &gt; Klik tombol status lunas. Data otomatis tersinkronisasi ke server!
-            </span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: '7. Portal & Administrasi TP-PKK Terpadu',
-      subtitle: 'Pusat kegiatan Pokja I-IV, Dasa Wisma 24 lingkungan, kas umum, & 6 buku wajib',
-      category: 'Pemberdayaan PKK Lingkungan',
-      color: 'from-rose-950 via-slate-900 to-teal-950',
-      content: (
-        <div className="space-y-3 py-1 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-            <div className="bg-rose-50 p-2.5 rounded-2xl border border-rose-200">
-              <div className="flex items-center gap-1.5 font-bold text-rose-950 text-xs mb-1">
-                <Activity className="w-3.5 h-3.5 text-rose-600" />
-                <span>Kegiatan Pokja I - IV</span>
-              </div>
-              <p className="text-[10px] text-slate-600 leading-relaxed">
-                Dokumentasi foto &amp; laporan pembinaan moral, gotong royong, pendidikan, dan kesehatan.
+            <div className="bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+              <p className="font-bold text-rose-950 text-[11px] flex items-center gap-1">
+                <Activity className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                <span>Kegiatan PKK</span>
+              </p>
+              <p className="text-[10px] text-slate-600 mt-1">
+                Input laporan kegiatan berfoto &amp; GPS untuk Pokja I–IV serta PKK Lingkungan.
               </p>
             </div>
 
-            <div className="bg-teal-50 p-2.5 rounded-2xl border border-teal-200">
-              <div className="flex items-center gap-1.5 font-bold text-teal-950 text-xs mb-1">
-                <Users className="w-3.5 h-3.5 text-teal-600" />
-                <span>Dasa Wisma 24 Lingk</span>
-              </div>
-              <p className="text-[10px] text-slate-600 leading-relaxed">
-                Rekapitulasi data ibu hamil, menyusui, balita, lansia, &amp; jamban sehat se-Kelurahan.
+            <div className="bg-teal-50 p-2.5 rounded-xl border border-teal-200">
+              <p className="font-bold text-teal-950 text-[11px] flex items-center gap-1">
+                <Users className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                <span>Dasa Wisma &amp; Posyandu</span>
+              </p>
+              <p className="text-[10px] text-slate-600 mt-1">
+                Rekap ibu hamil, balita, lansia, jamban sehat 24 Lingk. &amp; laporan Posyandu (Pokja IV).
               </p>
             </div>
 
-            <div className="bg-emerald-50 p-2.5 rounded-2xl border border-emerald-200">
-              <div className="flex items-center gap-1.5 font-bold text-emerald-950 text-xs mb-1">
-                <Wallet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Buku Kas Keuangan</span>
-              </div>
-              <p className="text-[10px] text-slate-600 leading-relaxed">
-                Pencatatan kas masuk &amp; kas keluar dengan kalkulasi saldo otomatis &amp; cetak BKU.
+            <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+              <p className="font-bold text-emerald-950 text-[11px] flex items-center gap-1">
+                <Wallet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Keuangan BKU</span>
+              </p>
+              <p className="text-[10px] text-slate-600 mt-1">
+                Catat kas masuk/keluar, hitung saldo otomatis, &amp; cetak Buku Kas Umum resmi.
               </p>
             </div>
 
-            <div className="bg-indigo-50 p-2.5 rounded-2xl border border-indigo-200">
-              <div className="flex items-center gap-1.5 font-bold text-indigo-950 text-xs mb-1">
-                <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
-                <span>6 Buku Wajib PKK</span>
-              </div>
-              <p className="text-[10px] text-slate-600 leading-relaxed">
-                Buku Susunan Pengurus, Data Anggota, Agenda Surat, Notulen, Keuangan, &amp; Inventaris.
+            <div className="bg-purple-50 p-2.5 rounded-xl border border-purple-200">
+              <p className="font-bold text-purple-950 text-[11px] flex items-center gap-1">
+                <BookOpen className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                <span>6 Buku Wajib &amp; KTA</span>
+              </p>
+              <p className="text-[10px] text-slate-600 mt-1">
+                Buku Pengurus, Anggota, Agenda Surat, Notulen, Kas, Inventaris, &amp; Cetak KTA PKK.
               </p>
             </div>
           </div>
 
-          <div className="bg-slate-900 text-white p-3 rounded-2xl border border-rose-500/40 flex items-center justify-between text-[11px]">
-            <span>
-              🌸 <strong>Cara Akses Portal PKK:</strong> Klik tombol mode portal <strong>"PKK"</strong> pada pojok kanan atas aplikasi untuk berpindah tampilan khusus Pengurus PKK Lingkungan.
-            </span>
+          <div className="bg-slate-900 text-white p-2.5 rounded-xl border border-rose-500/40 text-[10.5px]">
+            🌸 <strong className="text-rose-300">Portal Mandiri PKK:</strong> Akun PKK otomatis masuk ke mode Portal PKK bebas menu aparatur kelurahan; Super Admin dapat berpindah mode lewat tombol <strong>"PKK"</strong> di header atas.
           </div>
         </div>
       ),
     },
     {
-      title: '8. Cetak Laporan PDF Resmi & Ekspor Excel',
-      subtitle: 'Format Kop Surat Resmi Pemko Medan, cetak PDF rapi, & ekspor spreadsheet',
-      category: 'Dokumentasi & Pelaporan',
+      title: '9. Cetak PDF Resmi A4, Ekspor Excel & WhatsApp Share',
+      subtitle: 'Standar cetak Kop Surat Pemko Medan, Absensi 1 Lembar A4, Daftar Hadir Posko & Laporan',
+      category: 'Cetak & Pelaporan Resmi',
       color: 'from-indigo-950 via-slate-900 to-emerald-950',
       content: (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-1 text-xs">
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-1.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 py-1 text-xs">
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1.5">
             <p className="font-black text-slate-900 text-xs flex items-center gap-2">
-              <Printer className="w-4 h-4 text-indigo-600" />
-              Cetak PDF Format Resmi
+              <Printer className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>Cetak PDF Presisi Standar Dinas</span>
             </p>
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Dokumen tersusun standar dengan Kop Surat Resmi Kelurahan Mangga, tata letak foto 2 kolom presisi, rincian kegiatan, dan tanda tangan Kepling / Ketua PKK.
-            </p>
+            <ul className="text-[10.5px] text-slate-600 space-y-1 list-disc pl-4 leading-relaxed">
+              <li><strong>Absensi Kepling (1 Lembar A4):</strong> Tabel 24 Kepling tersusun padat &amp; pas tepat 1 halaman A4 lengkap Kop Pemko Medan &amp; tanda tangan Lurah/Seklur.</li>
+              <li><strong>Daftar Hadir Posko Malam:</strong> Mencantumkan nama Posko, jam hadir otomatis HP, bukti foto kamera ber-watermark, &amp; status verifikasi.</li>
+              <li><strong>Laporan Harian &amp; KTA PKK:</strong> Tata letak foto 2 kolom rapi &amp; Kartu Tanda Anggota PKK presisi.</li>
+            </ul>
           </div>
 
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-1.5">
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-1.5">
             <p className="font-black text-slate-900 text-xs flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              Ekspor Buku Rekap Excel (.xlsx)
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Ekspor Excel (.xlsx) &amp; Salin WA Pimpinan</span>
             </p>
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Unduh rekapitulasi kehadiran apel (harian, mingguan, bulanan), database laporan, data keluarga, dan status PBB ke file Excel 1-klik.
-            </p>
+            <ul className="text-[10.5px] text-slate-600 space-y-1 list-disc pl-4 leading-relaxed">
+              <li><strong>Rekap Excel 1-Klik:</strong> Tersedia di menu Monitoring, Realisasi PBB, Absensi Kepling, Kunjungan Warga, &amp; Pembangunan.</li>
+              <li><strong>Salin Rekap WhatsApp:</strong> Gunakan tombol <em>Salin Rekap WA</em> pada Arsip/Laporan untuk mengirim teks terformat ke grup Pimpinan.</li>
+              <li><strong>Notifikasi Tugas Real-Time:</strong> Alert suara &amp; banner khusus muncul otomatis saat Kepling ditunjuk pada Agenda atau Jadwal Posko.</li>
+            </ul>
           </div>
 
-          <div className="sm:col-span-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 flex items-center gap-2 text-[11px] text-emerald-950">
+          <div className="sm:col-span-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 flex items-center gap-2 text-[10.5px] text-emerald-950">
             <Share2 className="w-4 h-4 text-emerald-700 shrink-0" />
             <span>
-              <strong>Kirim WhatsApp Pimpinan:</strong> Gunakan tombol "Salin Rekap WA" untuk membagikan format teks ringkasan kegiatan langsung ke grup WhatsApp Pimpinan.
+              <strong>Tips Cetak Rapi:</strong> Gunakan tombol <em>Unduh PDF</em> bawaan aplikasi agar ukuran margin A4, kop surat, dan tabel 24 Kepling langsung tercetak 1 halaman utuh tanpa terpotong.
             </span>
           </div>
         </div>
       ),
     },
     {
-      title: '9. SOP Alur Kerja Harian & PWA Mobile App',
-      subtitle: 'Ringkasan panduan operasional dari pagi hingga malam hari & instalasi HP',
-      category: 'SOP Operasional Kepling',
+      title: '10. SOP Harian Terpadu, Mode Offline & Penutup',
+      subtitle: 'Alur operasional pagi hingga malam hari & komitmen pelayanan Kelurahan Mangga',
+      category: 'SOP Operasional & Penutup',
       color: 'from-emerald-900 via-teal-950 to-slate-950',
       content: (
-        <div className="space-y-3 py-1 text-xs">
+        <div className="space-y-2.5 py-1 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-200">
-              <p className="font-black text-emerald-950 text-xs">🌅 PAGI HARI (07.30 - 08.30)</p>
-              <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
-                Presensi Apel Pagi berfoto selfie &amp; GPS di Kantor Kelurahan Mangga.
+              <p className="font-black text-emerald-950 text-xs">🌅 PAGI – SIANG (08.00–16.00)</p>
+              <p className="text-[10.5px] text-slate-600 mt-1 leading-relaxed">
+                Agenda Kelurahan &amp; pengisian Absensi oleh Lurah/Seklur (auto-sync), sambang warga door-to-door, update SPPT PBB, &amp; dokumentasi pembangunan.
               </p>
             </div>
 
-            <div className="bg-teal-50 p-3 rounded-2xl border border-teal-200">
-              <p className="font-black text-teal-950 text-xs">☀️ SIANG HARI (09.00 - 15.00)</p>
-              <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
-                Pelayanan warga, update database keluarga (edit/hapus), sambang warga door-to-door, &amp; monitoring SPPT PBB.
+            <div className="bg-amber-50 p-3 rounded-2xl border border-amber-200">
+              <p className="font-black text-amber-950 text-xs">🌙 PIKET POSKO (20.00 / 21.00)</p>
+              <p className="text-[10.5px] text-slate-600 mt-1 leading-relaxed">
+                <strong>20.00:</strong> Posko Bersih Sampah (Jl. Jamin Ginting).<br />
+                <strong>21.00:</strong> Posko Trantibum (Kantor Lurah) &amp; Posko Banjir (Taman Segitiga Lk. 9). Foto kamera langsung!
               </p>
             </div>
 
             <div className="bg-indigo-50 p-3 rounded-2xl border border-indigo-200">
-              <p className="font-black text-indigo-950 text-xs">🌙 SORE/MALAM (s/d 23.30)</p>
-              <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
-                Pengisian laporan harian berfoto dan pengawasan ronda malam/Siskamling.
+              <p className="font-black text-indigo-950 text-xs">🕛 BATAS HARIAN (s/d 23.30)</p>
+              <p className="text-[10.5px] text-slate-600 mt-1 leading-relaxed">
+                Pastikan seluruh Laporan Harian terunggah sebelum 23.30 WIB. Data tetap tersimpan aman di memori HP (IndexedDB) saat sinyal lemah &amp; tersinkron otomatis.
               </p>
             </div>
           </div>
 
-          <div className="bg-slate-900 text-white p-3 rounded-2xl border border-emerald-500/40 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px]">
-            <span className="font-bold text-emerald-300">"Satu Laporan Nyata untuk Pelayanan Masyarakat Kelurahan Mangga"</span>
-            <div className="flex gap-1.5">
-              <span className="bg-emerald-800 text-white px-2 py-0.5 rounded text-[9px] font-bold">#SIKEPLINGMANGGA</span>
-              <span className="bg-blue-800 text-white px-2 py-0.5 rounded text-[9px] font-bold">#KELURAHANMANGGA</span>
+          <div className="bg-slate-900 text-white p-3 rounded-2xl border border-emerald-500/40 space-y-1.5 text-[11px]">
+            <p className="font-bold text-amber-300 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Ringkasan Dukungan &amp; Penggunaan:</span>
+            </p>
+            <p className="text-slate-300 text-[10.5px] leading-relaxed">
+              • Unduh file PowerPoint (<strong>.pptx</strong>) resmi kapan saja melalui tombol di bawah untuk bahan rapat, sosialisasi Kepling, maupun bimbingan teknis TP-PKK.<br />
+              • Hubungi <strong>Super Admin (Lurah)</strong> atau <strong>Sekretaris Kelurahan</strong> apabila memerlukan reset kata sandi akun atau penyesuaian jadwal posko/agenda.
+            </p>
+            <div className="pt-1 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800">
+              <span className="font-bold text-emerald-300 italic">
+                "Satu Laporan Nyata untuk Pelayanan Masyarakat Kelurahan Mangga"
+              </span>
+              <div className="flex gap-1.5">
+                <span className="bg-emerald-800 text-white px-2 py-0.5 rounded text-[9px] font-bold">#SIKEPLINGMANGGA</span>
+                <span className="bg-teal-800 text-white px-2 py-0.5 rounded text-[9px] font-bold">#KELURAHANMANGGA</span>
+              </div>
             </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: '10. Rangkuman Penutup & Kontak Dukungan',
-      subtitle: 'Komitmen pelayanan digital terpadu Kelurahan Mangga',
-      category: 'Penutup & Layanan',
-      color: 'from-teal-950 via-emerald-950 to-slate-950',
-      content: (
-        <div className="flex flex-col items-center text-center space-y-3.5 py-2">
-          <div className="w-14 h-14 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-700 shadow-lg border border-emerald-300">
-            <Award className="w-8 h-8 text-emerald-800" />
-          </div>
-          <div>
-            <h3 className="text-lg sm:text-xl font-black text-slate-900 uppercase tracking-tight">
-              Aplikasi SI-MANGGA Siap Operasional
-            </h3>
-            <p className="text-emerald-800 font-bold text-xs sm:text-sm mt-1 max-w-lg mx-auto leading-relaxed">
-              Mewujudkan Tata Kelola Pemerintahan Kelurahan Mangga yang Akuntabel, Transparan, Cepat, dan Berbasis Digital.
-            </p>
-          </div>
-
-          <div className="bg-slate-900 text-white p-3.5 rounded-2xl border border-emerald-500/40 w-full max-w-lg text-left text-xs space-y-1">
-            <p className="font-bold text-amber-300 text-xs">Penting Untuk Diingat:</p>
-            <p className="text-slate-300 text-[11px] leading-relaxed">
-              • Seluruh data tersimpan otomatis di HP (IndexedDB Cache Live).<br />
-              • Unduh berkas PowerPoint (.pptx) ini kapan saja melalui tombol di bawah untuk keperluan rapat / bimbingan teknis.<br />
-              • Hubungi Seklur / Super Admin jika membutuhkan bantuan reset kata sandi atau kendala aplikasi.
-            </p>
           </div>
         </div>
       ),
     },
   ];
 
-  // Function to generate and download comprehensive professional PPTX file with embedded footer banner
   const handleDownloadPPT = async () => {
     try {
       setDownloadError(null);
       setIsGenerating(true);
 
-      // Pre-load official "MEDAN UNTUK SEMUA" banner image as base64 for embedding in PPTX
       const bannerBase64 = await getImageBase64(BANNER_IMAGE_PATH);
 
       const pptx = new pptxgen();
-
       pptx.author = 'Kelurahan Mangga, Kota Medan';
       pptx.company = 'Pemerintah Kota Medan';
       pptx.title = `Panduan Penggunaan SI-MANGGA ${CURRENT_APP_VERSION}`;
-      pptx.subject = 'Buku Panduan Operasional Resmi 24 Kepala Lingkungan & TP-PKK';
+      pptx.subject = 'Panduan Lengkap Penggunaan Aplikasi Bagi Seluruh Jenis Akun SI-MANGGA';
 
-      // 16:9 Modern Widescreen Layout
       pptx.defineLayout({ name: 'WIDESCREEN', width: 13.33, height: 7.5 });
       pptx.layout = 'WIDESCREEN';
 
-      // Helper for adding slide header and official banner footer to EVERY PPTX slide
       const addStandardSlideHeader = (
-        slide: any,
+        slide: pptxgen.Slide,
         slideNumber: string,
         title: string,
         subtitle: string,
         category: string
       ) => {
-        // Dark top header bar
-        slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 1.15, fill: { color: '0F172A' } });
-        slide.addShape(pptx.ShapeType.rect, { x: 0, y: 1.15, w: 13.33, h: 0.05, fill: { color: '10B981' } });
+        slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 1.12, fill: { color: '0F172A' } });
+        slide.addShape(pptx.ShapeType.rect, { x: 0, y: 1.12, w: 13.33, h: 0.05, fill: { color: '10B981' } });
 
         slide.addText(category.toUpperCase(), {
-          x: 0.8,
-          y: 0.15,
-          w: 9.0,
-          h: 0.25,
-          fontSize: 10,
+          x: 0.7,
+          y: 0.14,
+          w: 9.5,
+          h: 0.24,
+          fontSize: 9.5,
           bold: true,
           color: '34D399',
           charSpacing: 1.5,
         });
 
         slide.addText(title, {
-          x: 0.8,
-          y: 0.4,
-          w: 10.5,
-          h: 0.4,
-          fontSize: 20,
+          x: 0.7,
+          y: 0.38,
+          w: 10.6,
+          h: 0.38,
+          fontSize: 19,
           bold: true,
           color: 'FFFFFF',
         });
 
         slide.addText(subtitle, {
-          x: 0.8,
-          y: 0.8,
-          w: 10.5,
+          x: 0.7,
+          y: 0.77,
+          w: 10.6,
           h: 0.25,
-          fontSize: 11,
+          fontSize: 10.5,
           color: '94A3B8',
         });
 
         slide.addText(slideNumber, {
-          x: 11.5,
-          y: 0.3,
-          w: 1.2,
+          x: 11.4,
+          y: 0.26,
+          w: 1.25,
           h: 0.6,
           fontSize: 26,
           bold: true,
@@ -650,10 +740,8 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
           align: 'right',
         });
 
-        // Bottom footer container
         slide.addShape(pptx.ShapeType.rect, { x: 0, y: 6.75, w: 13.33, h: 0.75, fill: { color: '022C22' } });
 
-        // Embed Official MEDAN UNTUK SEMUA Footer Banner Image
         if (bannerBase64) {
           slide.addImage({ data: bannerBase64, x: 4.66, y: 6.82, w: 4.0, h: 0.6 });
         } else {
@@ -670,9 +758,9 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
         }
 
         slide.addText('SI-MANGGA • KELURAHAN MANGGA', {
-          x: 0.8,
+          x: 0.7,
           y: 6.95,
-          w: 3.5,
+          w: 3.6,
           h: 0.35,
           fontSize: 9,
           bold: true,
@@ -681,7 +769,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
         slide.addText('#SIKEPLINGMANGGA  #KELURAHANMANGGA', {
           x: 9.0,
           y: 6.95,
-          w: 3.5,
+          w: 3.6,
           h: 0.35,
           fontSize: 9,
           bold: true,
@@ -691,19 +779,18 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
       };
 
       // ==========================================
-      // SLIDE 1: Cover Slide
+      // SLIDE 1: Cover Resmi
       // ==========================================
       const s1 = pptx.addSlide();
       s1.background = { color: '064E3B' };
-
       s1.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.15, fill: { color: '10B981' } });
 
       s1.addText('PEMERINTAH KOTA MEDAN • KECAMATAN MEDAN TUNTUNGAN', {
-        x: 1.0,
-        y: 0.8,
-        w: 11.33,
+        x: 0.8,
+        y: 0.65,
+        w: 11.73,
         h: 0.4,
-        fontSize: 14,
+        fontSize: 13,
         bold: true,
         color: '6EE7B7',
         align: 'center',
@@ -711,11 +798,11 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
       });
 
       s1.addText('KELURAHAN MANGGA', {
-        x: 1.0,
-        y: 1.3,
-        w: 11.33,
-        h: 0.6,
-        fontSize: 24,
+        x: 0.8,
+        y: 1.15,
+        w: 11.73,
+        h: 0.55,
+        fontSize: 23,
         bold: true,
         color: 'ECFDF5',
         align: 'center',
@@ -723,10 +810,10 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
       });
 
       s1.addText('SI-MANGGA', {
-        x: 1.0,
-        y: 2.1,
-        w: 11.33,
-        h: 1.0,
+        x: 0.8,
+        y: 1.85,
+        w: 11.73,
+        h: 0.9,
         fontSize: 44,
         bold: true,
         color: 'FFFFFF',
@@ -734,51 +821,55 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
       });
 
       s1.addText(`Sistem Informasi & Administrasi Kelurahan Mangga (${CURRENT_APP_VERSION})`, {
-        x: 1.0,
-        y: 3.2,
-        w: 11.33,
-        h: 0.6,
-        fontSize: 18,
-        bold: false,
+        x: 0.8,
+        y: 2.8,
+        w: 11.73,
+        h: 0.5,
+        fontSize: 16,
         color: 'A7F3D0',
         align: 'center',
       });
 
-      // Bottom info card
       s1.addShape(pptx.ShapeType.roundRect, {
-        x: 2.5,
-        y: 4.1,
-        w: 8.33,
-        h: 1.4,
+        x: 1.6,
+        y: 3.55,
+        w: 10.13,
+        h: 1.9,
         fill: { color: '022C22' },
         line: { color: '10B981', width: 1.5 },
-        rectRadius: 0.2,
+        rectRadius: 0.18,
       });
 
       s1.addText(
         [
-          { text: 'PANDUAN OPERASIONAL RESMI APLIKASI\n', options: { fontSize: 13, bold: true, color: 'FCD34D' } },
           {
-            text: 'Bagi Seluruh Kepala Lingkungan (Kepling I - XXIV), Perangkat Kelurahan, & TP-PKK\n',
-            options: { fontSize: 11, color: 'E2E8F0' },
+            text: 'PANDUAN OPERASIONAL LENGKAP UNTUK SETIAP JENIS AKUN\n',
+            options: { fontSize: 13, bold: true, color: 'FCD34D' },
           },
           {
-            text: `Rilis Pembaruan: ${CURRENT_RELEASE_DATE} • Edisi Terpadu Modern Digital`,
+            text: 'Super Admin (Lurah) • Sekretaris Kelurahan • Kasi Tata Pemerintahan • Kasi Pembangunan & Kesos\n',
+            options: { fontSize: 11, color: 'FFFFFF' },
+          },
+          {
+            text: 'Kasi Trantibum & Linmas • 24 Kepala Lingkungan • Petugas Bapenda • Tim Penggerak PKK\n\n',
+            options: { fontSize: 11, color: 'FFFFFF' },
+          },
+          {
+            text: `Pembaruan Resmi: ${CURRENT_RELEASE_DATE} • Segregasi Tupoksi, Jadwal Posko Malam & Auto-Sync`,
             options: { fontSize: 10, italic: true, color: '94A3B8' },
           },
         ],
-        { x: 2.6, y: 4.2, w: 8.13, h: 1.2, align: 'center' }
+        { x: 1.8, y: 3.7, w: 9.73, h: 1.6, align: 'center', lineSpacing: 16 }
       );
 
-      // Embed Official MEDAN UNTUK SEMUA Footer Banner on Cover
       if (bannerBase64) {
         s1.addImage({ data: bannerBase64, x: 4.66, y: 5.75, w: 4.0, h: 0.65 });
       }
 
       s1.addText('#SIKEPLINGMANGGA  •  #KELURAHANMANGGA', {
-        x: 1.0,
+        x: 0.8,
         y: 6.6,
-        w: 11.33,
+        w: 11.73,
         h: 0.4,
         fontSize: 12,
         bold: true,
@@ -788,956 +879,936 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
       });
 
       // ==========================================
-      // SLIDE 2: Multi-Role System & Login
+      // SLIDE 2: Peta Segregasi Akun & Login
       // ==========================================
       const s2 = pptx.addSlide();
       addStandardSlideHeader(
         s2,
         '02',
-        '1. Struktur Multi-Role & Pembagian Tugas Akun',
-        'Hak akses bertingkat dan prosedur autentikasi pengguna',
-        'Struktur Akun & Login'
+        '1. Peta Segregasi Akun, Format Login & Keamanan Sandi',
+        'Setiap peran hanya mengakses menu sesuai tupoksi resmi Kelurahan Mangga',
+        'Struktur Akun & Autentikasi'
       );
 
-      s2.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 1.5,
-        w: 2.7,
-        h: 3.6,
-        fill: { color: 'ECFDF5' },
-        line: { color: '10B981', width: 1.2 },
-        rectRadius: 0.15,
+      const roleCards = [
+        {
+          x: 0.7,
+          y: 1.38,
+          fill: 'ECFDF5',
+          line: '10B981',
+          titleColor: '065F46',
+          title: 'SUPER ADMIN (LURAH)',
+          body: 'ID: super_admin\nAkses penuh seluruh menu Kelurahan & PKK + menu eksklusif Kegiatan Lurah + Verifikasi Posko.',
+        },
+        {
+          x: 3.75,
+          y: 1.38,
+          fill: 'F0F9FF',
+          line: '0284C7',
+          titleColor: '075985',
+          title: 'SEKRETARIS LURAH',
+          body: 'ID: sekretaris\nKoordinasi Monitoring, Agenda, Posko, Absensi A4, Surat, PBB, Pembangunan (tanpa Kegiatan Lurah).',
+        },
+        {
+          x: 6.8,
+          y: 1.38,
+          fill: 'F0FDFA',
+          line: '14B8A6',
+          titleColor: '115E59',
+          title: '3 KASI (TERSEKAT KETAT)',
+          body: 'ID: kasi_pemerintahan, kasi_pembangunan, kasi_trantibum.\nMenu tersekat ketat sesuai tupoksi.',
+        },
+        {
+          x: 9.85,
+          y: 1.38,
+          fill: 'FFFBEB',
+          line: 'F59E0B',
+          titleColor: '92400E',
+          title: '24 KEPLING (I - XXIV)',
+          body: 'ID: kepling_1 s/d kepling_24\nSandi awal: mangga01 – mangga24.\nLaporan, Agenda, Posko, Warga, PBB.',
+        },
+      ];
+
+      roleCards.forEach((c) => {
+        s2.addShape(pptx.ShapeType.roundRect, {
+          x: c.x,
+          y: c.y,
+          w: 2.8,
+          h: 2.3,
+          fill: { color: c.fill },
+          line: { color: c.line, width: 1.2 },
+          rectRadius: 0.12,
+        });
+        s2.addText(c.title, {
+          x: c.x + 0.14,
+          y: c.y + 0.15,
+          w: 2.52,
+          h: 0.35,
+          fontSize: 10.5,
+          bold: true,
+          color: c.titleColor,
+        });
+        s2.addText(c.body, {
+          x: c.x + 0.14,
+          y: c.y + 0.55,
+          w: 2.52,
+          h: 1.6,
+          fontSize: 9.5,
+          color: '1E293B',
+          lineSpacing: 14,
+        });
       });
-      s2.addText('SUPER ADMIN', { x: 0.9, y: 1.7, w: 2.5, h: 0.35, fontSize: 11, bold: true, color: '065F46' });
-      s2.addText(
-        [
-          { text: '• Monitoring 24 Kepling\n', options: { bold: true } },
-          { text: '• Rekap Presensi Apel\n' },
-          { text: '• Manajemen Target PBB\n' },
-          { text: '• Ekspor Excel & PDF\n' },
-          { text: '• Manajemen Akun User' },
-        ],
-        { x: 0.9, y: 2.15, w: 2.5, h: 2.7, fontSize: 10, color: '1E293B', lineSpacing: 16 }
-      );
 
       s2.addShape(pptx.ShapeType.roundRect, {
-        x: 3.75,
-        y: 1.5,
-        w: 2.7,
-        h: 3.6,
-        fill: { color: 'F0FDFA' },
-        line: { color: '14B8A6', width: 1.2 },
-        rectRadius: 0.15,
+        x: 0.7,
+        y: 3.85,
+        w: 5.85,
+        h: 1.45,
+        fill: { color: 'EEF2FF' },
+        line: { color: '6366F1', width: 1.2 },
+        rectRadius: 0.12,
       });
-      s2.addText('3 KEPALA SEKSI (KASI)', {
-        x: 3.85,
-        y: 1.7,
-        w: 2.5,
-        h: 0.35,
-        fontSize: 11,
+      s2.addText('PETUGAS BAPENDA KOTA MEDAN (READ-ONLY)', {
+        x: 0.88,
+        y: 3.98,
+        w: 5.5,
+        h: 0.3,
+        fontSize: 10.5,
         bold: true,
-        color: '115E59',
+        color: '3730A3',
       });
       s2.addText(
-        [
-          { text: '• Trantibum: Ronda/Linmas\n', options: { bold: true } },
-          { text: '• Pembangunan: Fisik/Bansos\n' },
-          { text: '• Pemerintahan: PBB & IKD\n' },
-          { text: '• Tersekat sesuai bidang\n' },
-          { text: '• Evaluasi Kinerja Kepling' },
-        ],
-        { x: 3.85, y: 2.15, w: 2.5, h: 2.7, fontSize: 10, color: '1E293B', lineSpacing: 16 }
+        'ID: petugas_bapenda • Hanya mengakses Pusat Menu & Realisasi PBB-P2 secara Lihat Saja (tanpa ubah data operasional kelurahan) untuk monitoring dan unduh rekap pajak.',
+        { x: 0.88, y: 4.32, w: 5.5, h: 0.85, fontSize: 9.5, color: '1E293B', lineSpacing: 14 }
       );
 
       s2.addShape(pptx.ShapeType.roundRect, {
-        x: 6.7,
-        y: 1.5,
-        w: 2.7,
-        h: 3.6,
-        fill: { color: 'FFFBEB' },
-        line: { color: 'F59E0B', width: 1.2 },
-        rectRadius: 0.15,
-      });
-      s2.addText('24 KEPLING', { x: 6.8, y: 1.7, w: 2.5, h: 0.35, fontSize: 11, bold: true, color: '92400E' });
-      s2.addText(
-        [
-          { text: '• Apel Geotagged (07.30)\n', options: { bold: true } },
-          { text: '• Laporan Kerja Lapangan\n' },
-          { text: '• Database Keluarga\n' },
-          { text: '• Sambang Warga Door-to-Door\n' },
-          { text: '• Tanda Lunas SPPT PBB' },
-        ],
-        { x: 6.8, y: 2.15, w: 2.5, h: 2.7, fontSize: 10, color: '1E293B', lineSpacing: 16 }
-      );
-
-      s2.addShape(pptx.ShapeType.roundRect, {
-        x: 9.65,
-        y: 1.5,
-        w: 2.7,
-        h: 3.6,
+        x: 6.8,
+        y: 3.85,
+        w: 5.85,
+        h: 1.45,
         fill: { color: 'FFF1F2' },
         line: { color: 'F43F5E', width: 1.2 },
-        rectRadius: 0.15,
+        rectRadius: 0.12,
       });
-      s2.addText('TIM PENGGERAK PKK', {
-        x: 9.75,
-        y: 1.7,
-        w: 2.5,
-        h: 0.35,
-        fontSize: 11,
+      s2.addText('TIM PENGGERAK PKK (PORTAL MANDIRI)', {
+        x: 6.98,
+        y: 3.98,
+        w: 5.5,
+        h: 0.3,
+        fontSize: 10.5,
         bold: true,
         color: '9F1239',
       });
       s2.addText(
-        [
-          { text: '• Kegiatan Pokja I - IV\n', options: { bold: true } },
-          { text: '• Dasa Wisma 24 Lingkungan\n' },
-          { text: '• 6 Buku Wajib PKK\n' },
-          { text: '• Kas Keuangan Real-Time\n' },
-          { text: '• Rekapitulasi Posyandu' },
-        ],
-        { x: 9.75, y: 2.15, w: 2.5, h: 2.7, fontSize: 10, color: '1E293B', lineSpacing: 16 }
+        'ID: ketua_pkk, sekretaris_pkk, pokja_1..4, pkk_lingkungan_1..24 (sandi awal pkkmangga01–24). Portal khusus Pokja I-IV, Dasa Wisma 24 Lingk., Posyandu, BKU & 6 Buku Wajib.',
+        { x: 6.98, y: 4.32, w: 5.5, h: 0.85, fontSize: 9.5, color: '1E293B', lineSpacing: 14 }
       );
 
-      // Bottom Credentials Box
       s2.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 5.25,
-        w: 11.6,
-        h: 1.35,
+        x: 0.7,
+        y: 5.45,
+        w: 11.95,
+        h: 1.1,
         fill: { color: '0F172A' },
         line: { color: '334155', width: 1 },
-        rectRadius: 0.15,
+        rectRadius: 0.12,
       });
       s2.addText(
         [
-          { text: 'PANDUAN CARA LOGIN: ', options: { bold: true, color: 'FCD34D', fontSize: 12 } },
+          { text: 'CARA LOGIN & UBAH SANDI: ', options: { bold: true, color: 'FCD34D', fontSize: 11 } },
           {
-            text: 'Buka web aplikasi -> Pilih Nama Lingkungan Anda -> Masukkan kata sandi bawaan: ',
-            options: { color: 'FFFFFF', fontSize: 11 },
-          },
-          { text: 'mangga[nomor_lingkungan] ', options: { bold: true, color: '34D399', fontSize: 12 } },
-          {
-            text: '(Contoh: mangga21). Disarankan segera ubah kata sandi melalui menu profil akun.',
-            options: { color: 'CBD5E1', fontSize: 11 },
+            text: '1) Pilih nama akun pada layar Login -> masukkan kata sandi (hubungi Super Admin/Seklur untuk kredensial struktural). 2) Setelah masuk, klik nama profil di pojok kanan atas -> pilih "Ubah Kata Sandi" untuk mengamankan akun Anda.',
+            options: { color: 'E2E8F0', fontSize: 10.5 },
           },
         ],
-        { x: 1.0, y: 5.35, w: 11.2, h: 1.15 }
+        { x: 0.9, y: 5.58, w: 11.55, h: 0.85, lineSpacing: 15 }
       );
 
       // ==========================================
-      // SLIDE 3: Form Laporan Harian
+      // SLIDE 3: Super Admin (Lurah) & Sekretaris
       // ==========================================
-      const s3_form = pptx.addSlide();
+      const s3 = pptx.addSlide();
       addStandardSlideHeader(
-        s3_form,
+        s3,
         '03',
-        '2. Pengisian Formulir Laporan Harian',
-        'Pelaporan kegiatan berbasis bukti visual, geotagging, dan klasifikasi tugas',
-        'Formulir Laporan'
+        '2. Panduan Akun Super Admin (Lurah) & Sekretaris Lurah',
+        'Pengawasan 24 Kepling, Kegiatan Lurah eksklusif, Absensi Agenda A4 & Verifikasi Posko',
+        'Akun Pimpinan Kelurahan'
       );
 
-      const formSteps = [
-        {
-          num: '1',
-          title: 'Tanggal & Petugas',
-          desc: 'Tanggal otomatis hari ini (dapat disesuaikan) dan nama Kepling terkunci sesuai akun aktif.',
-        },
-        {
-          num: '2',
-          title: 'Upload Hingga 8 Foto',
-          desc: 'Kompresi cerdas otomatis di browser. Foto beresolusi tinggi dikompres cepat tanpa beban kuota.',
-        },
-        {
-          num: '3',
-          title: 'GPS & Deteksi Alamat',
-          desc: 'Sistem membaca koordinat GPS dan otomatis mengisi nama jalan (reverse geocoding) di lapangan.',
-        },
-        {
-          num: '4',
-          title: 'Kategori & Deskripsi',
-          desc: 'Pilih bidang: Kebersihan/Sampah, Trantibum, Gotong Royong, Sosialisasi, atau Ronda Malam/Siskamling.',
-        },
-      ];
-
-      formSteps.forEach((st, idx) => {
-        const xPos = 0.8 + idx * 2.95;
-        s3_form.addShape(pptx.ShapeType.roundRect, {
-          x: xPos,
-          y: 1.6,
-          w: 2.8,
-          h: 3.6,
-          fill: { color: 'F8FAFC' },
-          line: { color: '10B981', width: 1.2 },
-          rectRadius: 0.15,
-        });
-        s3_form.addShape(pptx.ShapeType.ellipse, {
-          x: xPos + 1.05,
-          y: 1.8,
-          w: 0.7,
-          h: 0.7,
-          fill: { color: '059669' },
-        });
-        s3_form.addText(st.num, {
-          x: xPos + 1.05,
-          y: 1.8,
-          w: 0.7,
-          h: 0.7,
-          fontSize: 16,
-          bold: true,
-          color: 'FFFFFF',
-          align: 'center',
-        });
-        s3_form.addText(st.title, {
-          x: xPos + 0.15,
-          y: 2.6,
-          w: 2.5,
-          h: 0.4,
-          fontSize: 12,
-          bold: true,
-          color: '0F172A',
-          align: 'center',
-        });
-        s3_form.addText(st.desc, {
-          x: xPos + 0.15,
-          y: 3.05,
-          w: 2.5,
-          h: 2.0,
-          fontSize: 10,
-          color: '475569',
-          align: 'center',
-          lineSpacing: 15,
-        });
-      });
-
-      s3_form.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 5.4,
-        w: 11.6,
-        h: 1.1,
+      s3.addShape(pptx.ShapeType.roundRect, {
+        x: 0.7,
+        y: 1.4,
+        w: 5.8,
+        h: 3.7,
         fill: { color: 'ECFDF5' },
-        line: { color: '059669', width: 1 },
-        rectRadius: 0.15,
+        line: { color: '10B981', width: 1.4 },
+        rectRadius: 0.14,
       });
-      s3_form.addText(
-        [
-          { text: 'CARA PENGGUNAAN: ', options: { bold: true, color: '065F46', fontSize: 11 } },
-          {
-            text: 'Klik tab "Formulir" -> Pilih Kategori -> Ambil foto di lokasi -> Pastikan titik GPS terbaca -> Tulis uraian singkat -> Klik Kirim Laporan sebelum pukul 23.30 WIB.',
-            options: { color: '1E293B', fontSize: 11 },
-          },
-        ],
-        { x: 1.0, y: 5.55, w: 11.2, h: 0.8 }
-      );
-
-      // ==========================================
-      // SLIDE 4: Kunjungan Warga & Edit Kunjungan
-      // ==========================================
-      const s4_kunjungan = pptx.addSlide();
-      addStandardSlideHeader(
-        s4_kunjungan,
-        '04',
-        '3. Sambang Warga Door-to-Door & Fitur Edit Kunjungan',
-        'Pencatatan interaksi warga, opsi Perlinsos, & tombol koreksi edit',
-        'Kunjungan & Perlinsos'
-      );
-
-      s4_kunjungan.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 1.5,
-        w: 3.6,
-        h: 3.6,
-        fill: { color: 'ECFDF5' },
-        line: { color: '10B981', width: 1.2 },
-        rectRadius: 0.15,
-      });
-      s4_kunjungan.addText('STATUS BANSOS & PERLINSOS', {
-        x: 1.0,
-        y: 1.7,
-        w: 3.2,
+      s3.addText('SUPER ADMIN / LURAH (AKSES PENUH + EKSKLUSIF)', {
+        x: 0.9,
+        y: 1.58,
+        w: 5.4,
         h: 0.35,
-        fontSize: 13,
+        fontSize: 11.5,
         bold: true,
         color: '065F46',
       });
-      s4_kunjungan.addText(
+      s3.addText(
         [
-          { text: '• Sudah Bansos:\n', options: { bold: true, color: '059669' } },
-          { text: 'Warga terdaftar DTKS / penerima PKH, BPNT, atau Bantuan Pangan.\n\n' },
-          { text: '• Belum Bansos:\n', options: { bold: true, color: 'D97706' } },
-          { text: 'Warga belum menerima bansos dan layak diajukan verifikasi.\n\n' },
-          { text: '• Menolak Bansos:\n', options: { bold: true, color: 'DC2626' } },
-          { text: 'Warga secara sadar menolak bansos karena sudah mampu.' },
+          { text: '• Menu Eksklusif Kegiatan Lurah:\n', options: { bold: true, color: '047857' } },
+          { text: 'Hanya terlihat & dapat dikelola oleh Super Admin untuk mendokumentasikan agenda resmi Lurah beserta foto lapangan.\n\n' },
+          { text: '• Verifikasi Kehadiran Jadwal Posko:\n', options: { bold: true, color: '047857' } },
+          { text: 'Lurah dapat memverifikasi hadir Kepling di menu Jadwal Posko jika Kepling bertugas hadir namun lupa absen HP (otomatis masuk Laporan Harian).\n\n' },
+          { text: '• Kendali Penuh Kelurahan & PKK:\n', options: { bold: true, color: '047857' } },
+          { text: 'Akses Monitoring 24 Lingkungan, Capaian Target, Realisasi PBB, Pembangunan, Surat Kedinasan, & Portal TP-PKK.' },
         ],
-        { x: 1.0, y: 2.15, w: 3.2, h: 2.8, fontSize: 10, color: '1E293B', lineSpacing: 15 }
+        { x: 0.9, y: 2.0, w: 5.4, h: 2.95, fontSize: 10, color: '1E293B', lineSpacing: 14 }
       );
 
-      s4_kunjungan.addShape(pptx.ShapeType.roundRect, {
-        x: 4.8,
-        y: 1.5,
-        w: 3.6,
-        h: 3.6,
-        fill: { color: 'FFFBEB' },
-        line: { color: 'F59E0B', width: 1.2 },
-        rectRadius: 0.15,
+      s3.addShape(pptx.ShapeType.roundRect, {
+        x: 6.83,
+        y: 1.4,
+        w: 5.8,
+        h: 3.7,
+        fill: { color: 'F0F9FF' },
+        line: { color: '0284C7', width: 1.4 },
+        rectRadius: 0.14,
       });
-      s4_kunjungan.addText('FITUR EDIT & KOREKSI DATA', {
-        x: 5.0,
-        y: 1.7,
-        w: 3.2,
+      s3.addText('SEKRETARIS KELURAHAN / SEKLUR (KOORDINASI)', {
+        x: 7.03,
+        y: 1.58,
+        w: 5.4,
         h: 0.35,
-        fontSize: 13,
+        fontSize: 11.5,
         bold: true,
-        color: '92400E',
+        color: '075985',
       });
-      s4_kunjungan.addText(
+      s3.addText(
         [
-          { text: '• Koreksi Cepat Langsung:\n', options: { bold: true, color: 'B45309' } },
-          { text: 'Jika salah ketik nama warga, alamat, atau status bansos, klik tombol edit warna kuning.\n\n' },
-          { text: '• Tanpa Hapus Ulang:\n', options: { bold: true, color: 'B45309' } },
-          { text: 'Data langsung terbarui di perangkat dan otomatis tersinkron ke Firebase tanpa membuat data ganda.' },
+          { text: '• Menu Koordinasi Administrasi Lengkap:\n', options: { bold: true, color: '0369A1' } },
+          { text: 'Monitoring Laporan, Realisasi Pembangunan, Agenda Kelurahan, Jadwal Posko, Absensi Kepling, Capaian Target, PBB, Surat Kedinasan, Kunjungan Warga, & Arsip.\n\n' },
+          { text: '• Pembatasan Khusus:\n', options: { bold: true, color: '0369A1' } },
+          { text: 'Tidak menampilkan menu Kegiatan Lurah (khusus Super Admin) maupun Formulir Input Laporan Kepling.\n\n' },
+          { text: '• Tata Naskah Surat Kedinasan:\n', options: { bold: true, color: '0369A1' } },
+          { text: 'Kelola penomoran surat, disposisi kegiatan, serta validasi rekap administrasi kelurahan.' },
         ],
-        { x: 5.0, y: 2.15, w: 3.2, h: 2.8, fontSize: 10, color: '1E293B', lineSpacing: 16 }
+        { x: 7.03, y: 2.0, w: 5.4, h: 2.95, fontSize: 10, color: '1E293B', lineSpacing: 14 }
       );
 
-      s4_kunjungan.addShape(pptx.ShapeType.roundRect, {
-        x: 8.8,
-        y: 1.5,
-        w: 3.6,
-        h: 3.6,
-        fill: { color: 'EFF6FF' },
-        line: { color: '3B82F6', width: 1.2 },
-        rectRadius: 0.15,
-      });
-      s4_kunjungan.addText('GEOTAGGING & SEBARAN', {
-        x: 9.0,
-        y: 1.7,
-        w: 3.2,
-        h: 0.35,
-        fontSize: 13,
-        bold: true,
-        color: '1E40AF',
-      });
-      s4_kunjungan.addText(
-        [
-          { text: '• Koordinat GPS Rumah:\n', options: { bold: true, color: '2563EB' } },
-          { text: 'Mencatat titik koordinat rumah warga yang dikunjungi Kepling.\n\n' },
-          { text: '• Rekapitulasi Lingkungan:\n', options: { bold: true, color: '2563EB' } },
-          { text: 'Setiap Kepling memantau jumlah warga yang sudah dan belum disapa door-to-door.' },
-        ],
-        { x: 9.0, y: 2.15, w: 3.2, h: 2.8, fontSize: 10, color: '1E293B', lineSpacing: 16 }
-      );
-
-      s4_kunjungan.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 5.3,
-        w: 11.6,
-        h: 1.2,
+      s3.addShape(pptx.ShapeType.roundRect, {
+        x: 0.7,
+        y: 5.25,
+        w: 11.93,
+        h: 1.3,
         fill: { color: '0F172A' },
-        line: { color: '334155', width: 1 },
-        rectRadius: 0.15,
+        line: { color: '10B981', width: 1 },
+        rectRadius: 0.12,
       });
-      s4_kunjungan.addText(
+      s3.addText(
         [
-          { text: 'CARA PENGGUNAAN SAMBANG WARGA: ', options: { bold: true, color: 'FCD34D', fontSize: 11 } },
+          { text: 'AGENDA KELURAHAN & ABSENSI KEPLING (AUTO-SYNC + PDF 1 LEMBAR A4): ', options: { bold: true, color: '34D399', fontSize: 10.5 } },
           {
-            text: 'Buka menu "Kunjungan Warga" -> Klik tombol Tambah Kunjungan -> Masukkan nama KK, alamat, status bansos, dan foto kunjungan -> Simpan. Data otomatis tersimpan di HP dan database.',
-            options: { color: 'CBD5E1', fontSize: 11 },
+            text: 'Buat agenda di menu "Agenda Kelurahan" -> buka "Absensi Kepling" -> isi status Hadir/Izin/Sakit/Alpha. Setiap Kepling yang ditandai HADIR otomatis tercetak ke Laporan Harian & Capaian Kinerja Kepling. Klik "Unduh PDF" untuk mencetak tabel 24 Lingkungan tepat dalam 1 halaman A4 resmi.',
+            options: { color: 'E2E8F0', fontSize: 10 },
           },
         ],
-        { x: 1.0, y: 5.45, w: 11.2, h: 0.9 }
+        { x: 0.9, y: 5.38, w: 11.53, h: 1.05, lineSpacing: 15 }
       );
 
+      // ==========================================
+      // SLIDE 4: Kasi Tata Pemerintahan
+      // ==========================================
+      const s4 = pptx.addSlide();
+      addStandardSlideHeader(
+        s4,
+        '04',
+        '3. Panduan Akun Kasi Tata Pemerintahan',
+        'Segregasi tupoksi khusus Dashboard Pemerintahan, Realisasi PBB-P2, IKD & Arsip Pemerintahan',
+        'Akun Kasi Tata Pemerintahan'
+      );
+
+      s4.addShape(pptx.ShapeType.roundRect, {
+        x: 0.7,
+        y: 1.38,
+        w: 11.93,
+        h: 0.75,
+        fill: { color: 'EFF6FF' },
+        line: { color: '3B82F6', width: 1.2 },
+        rectRadius: 0.12,
+      });
+      s4.addText(
+        'MENU AKTIF KASI TATA PEMERINTAHAN (4 MENU TERSEKAT):  Pusat Menu  •  Dashboard Pemerintahan  •  Realisasi PBB  •  Arsip Pemerintahan',
+        { x: 0.9, y: 1.55, w: 11.53, h: 0.4, fontSize: 11, bold: true, color: '1E3A8A' }
+      );
+
+      const pemCards = [
+        {
+          x: 0.7,
+          title: '1. DASHBOARD PEMERINTAHAN',
+          color: '1D4ED8',
+          fill: 'F8FAFC',
+          text: '• Leaderboard Opsir PBB:\nPantau peringkat capaian pajak 24 Lingkungan secara real-time.\n\n• Kependudukan & IKD:\nMonitoring progres aktivasi Identitas Kependudukan Digital (IKD) & tertib administrasi wilayah.',
+        },
+        {
+          x: 4.78,
+          title: '2. REALISASI PBB-P2',
+          color: '047857',
+          fill: 'ECFDF5',
+          text: '• Filter Tahun & Lingkungan:\nCek target vs realisasi per Lingkungan I–XXIV (tahun pajak 2024–2026).\n\n• Pindah NOP & Ekspor:\nVerifikasi perpindahan NOP antar lingkungan dan unduh buku rekap Excel PBB.',
+        },
+        {
+          x: 8.86,
+          title: '3. ARSIP PEMERINTAHAN',
+          color: '4338CA',
+          fill: 'EEF2FF',
+          text: '• Arsip Laporan Bidang:\nAkses laporan Kepling terkait pelayanan surat pengantar, kependudukan, & pertanahan.\n\n• Cetak PDF / Rekap:\nUnduh dokumentasi kegiatan bidang Tata Pemerintahan.',
+        },
+      ];
+
+      pemCards.forEach((card) => {
+        s4.addShape(pptx.ShapeType.roundRect, {
+          x: card.x,
+          y: 2.3,
+          w: 3.77,
+          h: 3.1,
+          fill: { color: card.fill },
+          line: { color: 'CBD5E1', width: 1.2 },
+          rectRadius: 0.12,
+        });
+        s4.addText(card.title, {
+          x: card.x + 0.18,
+          y: 2.48,
+          w: 3.4,
+          h: 0.35,
+          fontSize: 11,
+          bold: true,
+          color: card.color,
+        });
+        s4.addText(card.text, {
+          x: card.x + 0.18,
+          y: 2.9,
+          w: 3.4,
+          h: 2.35,
+          fontSize: 10,
+          color: '1E293B',
+          lineSpacing: 14.5,
+        });
+      });
+
+      s4.addShape(pptx.ShapeType.roundRect, {
+        x: 0.7,
+        y: 5.55,
+        w: 11.93,
+        h: 0.98,
+        fill: { color: '0F172A' },
+        line: { color: '3B82F6', width: 1 },
+        rectRadius: 0.12,
+      });
+      s4.addText(
+        [
+          { text: 'BATASAN HAK AKSES (SEGREGASI TUPOKSI): ', options: { bold: true, color: 'FCD34D', fontSize: 10.5 } },
+          {
+            text: 'Akun Kasi Tata Pemerintahan (kasi_pemerintahan) tidak dapat membuka menu Jadwal Posko Trantibum, Realisasi Pembangunan fisik, Kunjungan Warga Bansos, maupun Kegiatan Lurah.',
+            options: { color: 'E2E8F0', fontSize: 10.5 },
+          },
+        ],
+        { x: 0.9, y: 5.68, w: 11.53, h: 0.75, lineSpacing: 14 }
+      );
 
       // ==========================================
-      // SLIDE 7: Realisasi Pembangunan Infrastruktur
+      // SLIDE 5: Kasi Pembangunan & Kesos
+      // ==========================================
+      const s5 = pptx.addSlide();
+      addStandardSlideHeader(
+        s5,
+        '05',
+        '4. Panduan Akun Kasi Pembangunan & Kesos',
+        'Segregasi tupoksi khusus Perlinsos, Pembangunan Fisik 0%-50%-100%, & Kunjungan Warga',
+        'Akun Kasi Pembangunan & Kesos'
+      );
+
+      s5.addShape(pptx.ShapeType.roundRect, {
+        x: 0.7,
+        y: 1.38,
+        w: 11.93,
+        h: 0.75,
+        fill: { color: 'EEF2FF' },
+        line: { color: '6366F1', width: 1.2 },
+        rectRadius: 0.12,
+      });
+      s5.addText(
+        'MENU AKTIF (5 MENU TERSEKAT):  Pusat Menu  •  Dashboard Kesos  •  Realisasi Pembangunan  •  Kunjungan Warga  •  Arsip Pembangunan',
+        { x: 0.9, y: 1.55, w: 11.53, h: 0.4, fontSize: 11, bold: true, color: '312E81' }
+      );
+
+      const bangCards = [
+        {
+          x: 0.7,
+          title: '1. DASHBOARD KESOS & PERLINSOS',
+          color: 'BE123C',
+          fill: 'FFF1F2',
+          text: '• Data Perlinsos & DTKS:\nPantau verifikasi 429 KK penerima bantuan sosial.\n\n• Posyandu, Stunting & BPJS TK:\nRekap pemantauan gizi balita & kepesertaan BPJS Ketenagakerjaan pekerja rentan.',
+        },
+        {
+          x: 4.78,
+          title: '2. REALISASI PEMBANGUNAN',
+          color: 'B45309',
+          fill: 'FFFBEB',
+          text: '• Komparasi Fisik 0% - 50% - 100%:\nKelola proyek jalan, drainase u-ditch, paving block, & LPJU beserta foto progres.\n\n• Rekap Anggaran APBD:\nFilter per tahun/lingkungan dan cetak laporan komparasi pembangunan.',
+        },
+        {
+          x: 8.86,
+          title: '3. KUNJUNGAN WARGA & ARSIP',
+          color: '047857',
+          fill: 'ECFDF5',
+          text: '• Evaluasi Door-to-Door:\nTinjau hasil kunjungan Kepling (Sudah Bansos, Belum Bansos, Menolak Bansos).\n\n• Arsip Pembangunan:\nCek laporan kerja Kepling khusus bidang Fisik, Drainase, & Sosial.',
+        },
+      ];
+
+      bangCards.forEach((card) => {
+        s5.addShape(pptx.ShapeType.roundRect, {
+          x: card.x,
+          y: 2.3,
+          w: 3.77,
+          h: 3.1,
+          fill: { color: card.fill },
+          line: { color: 'CBD5E1', width: 1.2 },
+          rectRadius: 0.12,
+        });
+        s5.addText(card.title, {
+          x: card.x + 0.18,
+          y: 2.48,
+          w: 3.4,
+          h: 0.35,
+          fontSize: 11,
+          bold: true,
+          color: card.color,
+        });
+        s5.addText(card.text, {
+          x: card.x + 0.18,
+          y: 2.9,
+          w: 3.4,
+          h: 2.35,
+          fontSize: 10,
+          color: '1E293B',
+          lineSpacing: 14.5,
+        });
+      });
+
+      s5.addShape(pptx.ShapeType.roundRect, {
+        x: 0.7,
+        y: 5.55,
+        w: 11.93,
+        h: 0.98,
+        fill: { color: '0F172A' },
+        line: { color: '6366F1', width: 1 },
+        rectRadius: 0.12,
+      });
+      s5.addText(
+        [
+          { text: 'BATASAN HAK AKSES (SEGREGASI TUPOKSI): ', options: { bold: true, color: 'FCD34D', fontSize: 10.5 } },
+          {
+            text: 'Akun Kasi Pembangunan (kasi_pembangunan) difokuskan pada Perlinsos & Sarpras; menu Realisasi PBB, Jadwal Posko Trantibum, Kegiatan Lurah, & Monitoring umum dinonaktifkan.',
+            options: { color: 'E2E8F0', fontSize: 10.5 },
+          },
+        ],
+        { x: 0.9, y: 5.68, w: 11.53, h: 0.75, lineSpacing: 14 }
+      );
+
+      // ==========================================
+      // SLIDE 6: Kasi Trantibum & Jadwal Posko
+      // ==========================================
+      const s6 = pptx.addSlide();
+      addStandardSlideHeader(
+        s6,
+        '06',
+        '5. Panduan Akun Kasi Trantibum & Linmas',
+        'Segregasi tupoksi khusus 7 Bidang Trantibum, Jadwal Posko Malam & Arsip Trantibum',
+        'Akun Kasi Trantibum'
+      );
+
+      s6.addShape(pptx.ShapeType.roundRect, {
+        x: 0.7,
+        y: 1.35,
+        w: 11.93,
+        h: 0.65,
+        fill: { color: 'FFF1F2' },
+        line: { color: 'F43F5E', width: 1.2 },
+        rectRadius: 0.12,
+      });
+      s6.addText(
+        'MENU AKTIF (4 MENU TERSEKAT):  Pusat Menu  •  Dashboard Trantibum (7 Bidang)  •  Jadwal Posko Malam  •  Arsip Trantibum',
+        { x: 0.9, y: 1.48, w: 11.53, h: 0.38, fontSize: 11, bold: true, color: '9F1239' }
+      );
+
+      const poskoCards = [
+        {
+          x: 0.7,
+          fill: 'FFF1F2',
+          line: 'E11D48',
+          title: 'POSKO TRANTIBUM',
+          jam: 'Mulai Pukul 21.00 WIB s/d Selesai',
+          lokasi: 'Lokasi: Kantor Lurah',
+          ket: 'Apel malam, patroli siskamling, cegah kerumunan remaja/balap liar.',
+        },
+        {
+          x: 4.78,
+          fill: 'EFF6FF',
+          line: '2563EB',
+          title: 'POSKO KEWASPADAAN BANJIR',
+          jam: 'Mulai Pukul 21.00 WIB s/d Selesai',
+          lokasi: 'Lokasi: Taman Segitiga Lk. 9',
+          ket: 'Pantau debit drainase, gorong-gorong, & kesiapsiagaan evakuasi.',
+        },
+        {
+          x: 8.86,
+          fill: 'ECFDF5',
+          line: '059669',
+          title: 'POSKO BERSIH SAMPAH MALAM',
+          jam: 'Mulai Pukul 20.00 WIB s/d Selesai',
+          lokasi: 'Lokasi: Jalan Jamin Ginting',
+          ket: 'Pengawasan kebersihan & penertiban pembuangan sampah liar malam hari.',
+        },
+      ];
+
+      poskoCards.forEach((p) => {
+        s6.addShape(pptx.ShapeType.roundRect, {
+          x: p.x,
+          y: 2.15,
+          w: 3.77,
+          h: 2.15,
+          fill: { color: p.fill },
+          line: { color: p.line, width: 1.3 },
+          rectRadius: 0.12,
+        });
+        s6.addText(p.title, { x: p.x + 0.16, y: 2.28, w: 3.45, h: 0.32, fontSize: 10.5, bold: true, color: '0F172A' });
+        s6.addText(`${p.jam}\n${p.lokasi}\n\n${p.ket}`, {
+          x: p.x + 0.16,
+          y: 2.65,
+          w: 3.45,
+          h: 1.55,
+          fontSize: 9.8,
+          color: '334155',
+          lineSpacing: 13.5,
+        });
+      });
+
+      s6.addShape(pptx.ShapeType.roundRect, {
+        x: 0.7,
+        y: 4.45,
+        w: 11.93,
+        h: 2.1,
+        fill: { color: '0F172A' },
+        line: { color: 'F43F5E', width: 1 },
+        rectRadius: 0.12,
+      });
+      s6.addText(
+        [
+          { text: 'LANGKAH PENGGUNAAN AKUN KASI TRANTIBUM:\n', options: { bold: true, color: 'FCD34D', fontSize: 11 } },
+          {
+            text: '1. Buat Jadwal Posko: Buka menu "Jadwal Posko" -> klik Buat Jadwal -> pilih Jenis Posko & tanggal -> centang Kepling bertugas secara MANUAL (tanpa preset shift) -> Simpan untuk mengirim notifikasi khusus ke HP Kepling ditunjuk.\n',
+            options: { color: 'E2E8F0', fontSize: 10 },
+          },
+          {
+            text: '2. Cetak Daftar Hadir Posko: Setelah posko selesai, klik "Cetak PDF Daftar Hadir Posko" lengkap dengan foto kamera langsung & jam hadir HP.\n',
+            options: { color: 'E2E8F0', fontSize: 10 },
+          },
+          {
+            text: '3. Segregasi Ketat: Menu Monitoring umum, Pembangunan, Capaian, PBB, Input Laporan, & Kunjungan Warga tidak tersedia bagi Kasi Trantibum.',
+            options: { color: 'FDA4AF', fontSize: 10 },
+          },
+        ],
+        { x: 0.9, y: 4.58, w: 11.53, h: 1.85, lineSpacing: 15 }
+      );
+
+      // ==========================================
+      // SLIDE 7: 24 Kepling Bagian 1
       // ==========================================
       const s7 = pptx.addSlide();
       addStandardSlideHeader(
         s7,
         '07',
-        '6. Realisasi Pembangunan Fisik (Infrastruktur)',
-        'Dokumentasi komparasi progres pengerjaan fisik (0%, 50%, 100%)',
-        'Realisasi Pembangunan'
+        '6. Panduan Akun 24 Kepling (Bag. 1): Laporan, Agenda & Posko',
+        'Alur harian laporan GPS sebelum 23.30 WIB, Auto-Sync Agenda & Absen Posko Kamera Langsung',
+        'Akun Kepala Lingkungan (I - XXIV)'
       );
 
-      s7.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 1.5,
-        w: 3.6,
-        h: 3.6,
-        fill: { color: 'FFFBEB' },
-        line: { color: 'F59E0B', width: 1.2 },
-        rectRadius: 0.15,
+      const kepCards1 = [
+        {
+          x: 0.7,
+          fill: 'ECFDF5',
+          line: '10B981',
+          title: '1. INPUT LAPORAN HARIAN',
+          body: '• Buka menu "Input Laporan".\n• Pilih kategori kegiatan.\n• Unggah s/d 8 foto (kompresi otomatis hemat kuota).\n• Tekan "Deteksi Lokasi GPS" agar nama jalan terisi otomatis.\n• Kirim sebelum pukul 23.30 WIB.',
+        },
+        {
+          x: 4.78,
+          fill: 'F0FDFA',
+          line: '14B8A6',
+          title: '2. AGENDA KELURAHAN',
+          body: '• Buka menu "Agenda Kelurahan" untuk cek undangan rapat/apel/gotong royong.\n• AUTO-SYNC: Saat Lurah/Seklur menandai Anda HADIR di Absensi Agenda, laporan otomatis masuk ke Laporan Harian & Capaian Kinerja Anda!',
+        },
+        {
+          x: 8.86,
+          fill: 'FFF1F2',
+          line: 'F43F5E',
+          title: '3. ABSEN JADWAL POSKO',
+          body: '• Kepling hanya melihat jadwal tugas akunnya sendiri + menerima notifikasi khusus.\n• Jam Kehadiran otomatis mengikuti WAKTU HP.\n• Foto Kehadiran wajib dari KAMERA LANGSUNG (anti-galeri) + watermark.\n• Otomatis masuk Laporan Harian.',
+        },
+      ];
+
+      kepCards1.forEach((c) => {
+        s7.addShape(pptx.ShapeType.roundRect, {
+          x: c.x,
+          y: 1.4,
+          w: 3.77,
+          h: 3.8,
+          fill: { color: c.fill },
+          line: { color: c.line, width: 1.3 },
+          rectRadius: 0.14,
+        });
+        s7.addText(c.title, { x: c.x + 0.16, y: 1.58, w: 3.45, h: 0.35, fontSize: 11, bold: true, color: '0F172A' });
+        s7.addText(c.body, {
+          x: c.x + 0.16,
+          y: 2.0,
+          w: 3.45,
+          h: 3.05,
+          fontSize: 10,
+          color: '1E293B',
+          lineSpacing: 15,
+        });
       });
-      s7.addText('TAHAP AWAL (0%)', { x: 1.0, y: 1.7, w: 3.2, h: 0.35, fontSize: 13, bold: true, color: 'B45309' });
-      s7.addText(
-        [
-          { text: '• Dokumentasi Pra-Pekerjaan:\n', options: { bold: true } },
-          { text: 'Foto kondisi awal jalan rusak, parit/drainase tersumbat, atau gang tanah becek sebelum proyek dimulai.\n\n' },
-          { text: '• Dasar penentuan prioritas pengerjaan APBD.' },
-        ],
-        { x: 1.0, y: 2.15, w: 3.2, h: 2.8, fontSize: 11, color: '1E293B', lineSpacing: 16 }
-      );
 
       s7.addShape(pptx.ShapeType.roundRect, {
-        x: 4.8,
-        y: 1.5,
-        w: 3.6,
-        h: 3.6,
-        fill: { color: 'EFF6FF' },
-        line: { color: '3B82F6', width: 1.2 },
-        rectRadius: 0.15,
-      });
-      s7.addText('SEDANG PROSES (50%)', {
-        x: 5.0,
-        y: 1.7,
-        w: 3.2,
-        h: 0.35,
-        fontSize: 13,
-        bold: true,
-        color: '1D4ED8',
-      });
-      s7.addText(
-        [
-          { text: '• Dokumentasi Lapangan:\n', options: { bold: true } },
-          {
-            text: 'Proses penghamparan aspal hotmix roller, pemasangan beton drainase u-ditch, instalasi tiang LPJU, atau susun paving block.\n\n',
-          },
-          { text: '• Pemantauan waktu pengerjaan.' },
-        ],
-        { x: 5.0, y: 2.15, w: 3.2, h: 2.8, fontSize: 11, color: '1E293B', lineSpacing: 16 }
-      );
-
-      s7.addShape(pptx.ShapeType.roundRect, {
-        x: 8.8,
-        y: 1.5,
-        w: 3.6,
-        h: 3.6,
-        fill: { color: 'ECFDF5' },
-        line: { color: '10B981', width: 1.2 },
-        rectRadius: 0.15,
-      });
-      s7.addText('SELESAI TUNTAS (100%)', {
-        x: 9.0,
-        y: 1.7,
-        w: 3.2,
-        h: 0.35,
-        fontSize: 13,
-        bold: true,
-        color: '047857',
-      });
-      s7.addText(
-        [
-          { text: '• Dokumentasi Pasca-Pekerjaan:\n', options: { bold: true } },
-          { text: 'Hasil fisik rapi, jalan mulus, drainase lancar mengalir, paving kuat, dan lampu jalan terang benderang.\n\n' },
-          { text: '• Siap cetak laporan dan audit pimpinan.' },
-        ],
-        { x: 9.0, y: 2.15, w: 3.2, h: 2.8, fontSize: 11, color: '1E293B', lineSpacing: 16 }
-      );
-
-      s7.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 5.3,
-        w: 11.6,
-        h: 1.2,
+        x: 0.7,
+        y: 5.35,
+        w: 11.93,
+        h: 1.18,
         fill: { color: '0F172A' },
-        line: { color: '334155', width: 1 },
-        rectRadius: 0.15,
+        line: { color: '10B981', width: 1 },
+        rectRadius: 0.12,
       });
       s7.addText(
         [
-          { text: 'KEGUNAAN & CETAK REKAP: ', options: { bold: true, color: 'FCD34D', fontSize: 11 } },
+          { text: 'PENGAWASAN KETUA & ANTI-MANIPULASI: ', options: { bold: true, color: 'FCD34D', fontSize: 10.5 } },
           {
-            text: 'Kepling dan Seksi Pembangunan dapat memfilter data per-lingkungan serta mengunduh format cetak rekapitulasi pembangunan fisik lengkap dengan anggaran APBD dan kontraktor pelaksana.',
-            options: { color: 'CBD5E1', fontSize: 11 },
+            text: 'Jika Kepling hadir piket Posko malam namun lupa melakukan absen mandiri di aplikasi, Super Admin (Lurah) dapat melakukan Verifikasi Kehadiran dari akunnya sehingga tetap tercatat sah pada Laporan Harian & PDF Daftar Hadir Posko.',
+            options: { color: 'E2E8F0', fontSize: 10.5 },
           },
         ],
-        { x: 1.0, y: 5.45, w: 11.2, h: 0.9 }
+        { x: 0.9, y: 5.5, w: 11.53, h: 0.9, lineSpacing: 14.5 }
       );
 
       // ==========================================
-      // SLIDE 8: WebGIS 24 Lingkungan
+      // SLIDE 8: 24 Kepling Bagian 2
       // ==========================================
       const s8 = pptx.addSlide();
       addStandardSlideHeader(
         s8,
         '08',
-        '7. Peta Spasial WebGIS 24 Lingkungan',
-        'Pemetaan batas wilayah, sebaran rumah warga, WRS, dan klasifikasi faskes',
-        'WebGIS Spasial'
+        '7. Panduan Akun 24 Kepling (Bag. 2): Warga, PBB & Pembangunan',
+        'Sambang warga door-to-door, tanda lunas SPPT PBB, dokumentasi fisik 0%-100% & Capaian',
+        'Akun Kepala Lingkungan (I - XXIV)'
       );
 
       s8.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 1.5,
-        w: 5.6,
-        h: 5.0,
-        fill: { color: 'F0FDF4' },
-        line: { color: '10B981', width: 1.2 },
-        rectRadius: 0.15,
+        x: 0.7,
+        y: 1.4,
+        w: 5.8,
+        h: 3.7,
+        fill: { color: 'ECFDF5' },
+        line: { color: '10B981', width: 1.3 },
+        rectRadius: 0.14,
       });
-      s8.addText('KEMAMPUAN MODUL WEBGIS', {
-        x: 1.1,
-        y: 1.75,
-        w: 5.0,
+      s8.addText('4. KUNJUNGAN WARGA DOOR-TO-DOOR (PERLINSOS)', {
+        x: 0.9,
+        y: 1.58,
+        w: 5.4,
         h: 0.35,
-        fontSize: 13,
+        fontSize: 11,
         bold: true,
         color: '065F46',
       });
       s8.addText(
         [
-          { text: '1. Batas Poligon 24 Lingkungan:\n', options: { bold: true, color: '047857' } },
-          { text: 'Visualisasi garis batas resmi Lingkungan I s/d XXIV dengan navigasi interaktif.\n\n' },
-          { text: '2. Penanda Titik Rumah Warga:\n', options: { bold: true, color: '047857' } },
-          { text: 'Plotting titik koordinat rumah warga, nama kepala keluarga, dan jumlah jiwa.\n\n' },
-          { text: '3. Wajib Retribusi Sampah (WRS):\n', options: { bold: true, color: '047857' } },
-          { text: 'Tandai rumah yang telah/belum berlangganan angkutan sampah kelurahan.' },
+          { text: '• Catat Kunjungan: ', options: { bold: true } },
+          { text: 'Masukkan nama KK, alamat GPS rumah, foto kunjungan, dan pilih status Perlinsos:\n' },
+          { text: '  - SUDAH BANSOS (terdata DTKS/PKH/BPNT)\n', options: { color: '047857', bold: true } },
+          { text: '  - BELUM BANSOS (usulan layak)\n', options: { color: 'B45309', bold: true } },
+          { text: '  - MENOLAK BANSOS (menolak secara sadar)\n\n', options: { color: 'BE123C', bold: true } },
+          { text: '• Tombol Edit (Kuning): ', options: { bold: true, color: '92400E' } },
+          { text: 'Klik tombol Edit pada daftar kunjungan jika ada salah ketik nama/alamat/status tanpa perlu menghapus data.' },
         ],
-        { x: 1.1, y: 2.2, w: 5.0, h: 4.1, fontSize: 11, color: '1E293B', lineSpacing: 16 }
+        { x: 0.9, y: 2.0, w: 5.4, h: 2.95, fontSize: 10, color: '1E293B', lineSpacing: 14.5 }
       );
 
       s8.addShape(pptx.ShapeType.roundRect, {
-        x: 6.8,
-        y: 1.5,
-        w: 5.6,
-        h: 5.0,
+        x: 6.83,
+        y: 1.4,
+        w: 5.8,
+        h: 3.7,
         fill: { color: 'F8FAFC' },
-        line: { color: '3B82F6', width: 1.2 },
-        rectRadius: 0.15,
+        line: { color: '0D9488', width: 1.3 },
+        rectRadius: 0.14,
       });
-      s8.addText('PEMISAHAN FASILITAS AKURAT', {
-        x: 7.1,
-        y: 1.75,
-        w: 5.0,
+      s8.addText('5. REALISASI PBB-P2 & PEMBANGUNAN WILAYAH', {
+        x: 7.03,
+        y: 1.58,
+        w: 5.4,
         h: 0.35,
-        fontSize: 13,
+        fontSize: 11,
         bold: true,
-        color: '1E40AF',
+        color: '115E59',
       });
       s8.addText(
         [
-          { text: '• Fasilitas Kesehatan (Faskes):\n', options: { bold: true, color: '0284C7' } },
-          {
-            text: 'Puskesmas, Puskesmas Pembantu (Pustu), Posyandu, Klinik, dan Apotek dikelompokkan presisi pada kategori Kesehatan.\n\n',
-          },
-          { text: '• Fasilitas Pendidikan (Sekolah):\n', options: { bold: true, color: '4F46E5' } },
-          { text: 'PAUD, TK, SD, SMP, SMA, SMK, dan Kampus terpisah secara mandiri.\n\n' },
-          { text: '• Cara Penggunaan:\n', options: { bold: true, color: '0D9488' } },
-          { text: 'Buka menu Peta WebGIS -> Pilih layer lingkungan Anda -> Klik penanda untuk melihat kartu profil.' },
+          { text: '• Tandai SPPT PBB Lunas Real-Time:\n', options: { bold: true, color: '0F766E' } },
+          { text: 'Buka menu Realisasi PBB -> ketik NOP atau Nama Wajib Pajak -> klik tombol Lunas saat warga membayar.\n\n' },
+          { text: '• Fitur Pindah NOP Lingkungan:\n', options: { bold: true, color: '0F766E' } },
+          { text: 'Pindahkan data SPPT yang alamat fisiknya berada di lingkungan lain secara tertib.\n\n' },
+          { text: '• Realisasi Pembangunan (0% - 50% - 100%):\n', options: { bold: true, color: '0F766E' } },
+          { text: 'Dokumentasikan proyek infrastruktur di lingkungan Anda mulai tahap awal hingga tuntas.' },
         ],
-        { x: 7.1, y: 2.2, w: 5.0, h: 4.1, fontSize: 11, color: '1E293B', lineSpacing: 16 }
+        { x: 7.03, y: 2.0, w: 5.4, h: 2.95, fontSize: 10, color: '1E293B', lineSpacing: 14.5 }
+      );
+
+      s8.addShape(pptx.ShapeType.roundRect, {
+        x: 0.7,
+        y: 5.25,
+        w: 11.93,
+        h: 1.25,
+        fill: { color: '0F172A' },
+        line: { color: '334155', width: 1 },
+        rectRadius: 0.12,
+      });
+      s8.addText(
+        [
+          { text: 'CAPAIAN TARGET & ARSIP RIWAYAT KEPLING: ', options: { bold: true, color: 'FCD34D', fontSize: 10.5 } },
+          {
+            text: 'Pantau poin kinerja pribadi di menu "Capaian Target" (termasuk sinkronisasi otomatis Agenda & Posko), serta cetak laporan bulanan PDF atau bagikan rekap teks WhatsApp lewat menu "Arsip Riwayat".',
+            options: { color: 'E2E8F0', fontSize: 10.5 },
+          },
+        ],
+        { x: 0.9, y: 5.42, w: 11.53, h: 0.9, lineSpacing: 15 }
       );
 
       // ==========================================
-      // SLIDE 9: PBB-P2 Realisasi & Tanda Lunas
+      // SLIDE 9: Petugas Bapenda & TP-PKK
       // ==========================================
       const s9 = pptx.addSlide();
       addStandardSlideHeader(
         s9,
         '09',
-        '8. Rekapitulasi Realisasi Pajak PBB-P2',
-        'Monitoring penerimaan daerah, target SPPT, dan penandaan lunas real-time',
-        'Pendapatan Daerah (PBB)'
+        '8. Panduan Akun Petugas Bapenda & Tim Penggerak PKK',
+        'Pengawasan pajak daerah (Read-Only) serta portal mandiri 10 Program Pokok TP-PKK',
+        'Akun Bapenda & TP-PKK'
       );
 
       s9.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 1.5,
-        w: 5.6,
-        h: 5.0,
-        fill: { color: 'F8FAFC' },
-        line: { color: 'CBD5E1', width: 1 },
-        rectRadius: 0.15,
-      });
-      s9.addText('REKAPITULASI TARGET & REALISASI', {
-        x: 1.1,
-        y: 1.75,
-        w: 5.0,
-        h: 0.35,
-        fontSize: 13,
-        bold: true,
-        color: '0F172A',
-      });
-      s9.addText(
-        [
-          { text: '• Target Nominal PBB:\n', options: { bold: true, color: '059669' } },
-          { text: 'Menampilkan pagu target rupiah per-lingkungan dan total Kelurahan Mangga.\n\n' },
-          { text: '• Realisasi Penerimaan:\n', options: { bold: true, color: '0D9488' } },
-          { text: 'Kalkulasi otomatis persentase capaian (%) dan total uang pajak yang telah disetor.\n\n' },
-          { text: '• Rekapitulasi 24 Lingkungan:\n', options: { bold: true, color: '4F46E5' } },
-          { text: 'Tabel perbandingan capaian tertinggi hingga terendah untuk evaluasi mingguan.' },
-        ],
-        { x: 1.1, y: 2.2, w: 5.0, h: 4.1, fontSize: 11, color: '334155', lineSpacing: 16 }
-      );
-
-      s9.addShape(pptx.ShapeType.roundRect, {
-        x: 6.8,
-        y: 1.5,
-        w: 5.6,
-        h: 5.0,
-        fill: { color: 'ECFDF5' },
-        line: { color: '059669', width: 1.5 },
-        rectRadius: 0.15,
-      });
-      s9.addText('PENCARIAN & TANDAI SPPT LUNAS', {
-        x: 7.1,
-        y: 1.75,
-        w: 5.0,
-        h: 0.35,
-        fontSize: 13,
-        bold: true,
-        color: '065F46',
-      });
-      s9.addText(
-        [
-          { text: '1. Pencarian Cepat SPPT:\n', options: { bold: true, color: '047857' } },
-          { text: 'Cari Wajib Pajak berdasarkan NOP (Nomor Objek Pajak), Nama Wajib Pajak, atau Alamat Rumah.\n\n' },
-          { text: '2. Tombol Verifikasi Lunas:\n', options: { bold: true, color: '047857' } },
-          { text: 'Saat warga membayar, Kepling langsung menandai status lunas di HP.\n\n' },
-          { text: '3. Multi-Tahun Pajak (2024 - 2026):\n', options: { bold: true, color: '047857' } },
-          { text: 'Mendukung peralihan tahun pajak untuk pemantauan tunggakan piutang PBB.' },
-        ],
-        { x: 7.1, y: 2.2, w: 5.0, h: 4.1, fontSize: 11, color: '1E293B', lineSpacing: 16 }
-      );
-
-      // ==========================================
-      // SLIDE 8: Modul TP-PKK Terpadu (Fitur Baru)
-      // ==========================================
-      const s8_pkk = pptx.addSlide();
-      addStandardSlideHeader(
-        s8_pkk,
-        '08',
-        '7. Pilar Kegiatan & Administrasi TP-PKK Terpadu',
-        'Pusat kegiatan Pokja I-IV, Dasa Wisma, buku kas umum, & 6 buku administrasi wajib',
-        'Pemberdayaan PKK Lingkungan'
-      );
-
-      s8_pkk.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 1.5,
-        w: 2.7,
-        h: 3.6,
-        fill: { color: 'FFF1F2' },
-        line: { color: 'F43F5E', width: 1.2 },
-        rectRadius: 0.15,
-      });
-      s8_pkk.addText('POKJA I - IV', { x: 0.9, y: 1.7, w: 2.5, h: 0.35, fontSize: 12, bold: true, color: '9F1239' });
-      s8_pkk.addText(
-        [
-          { text: '• Pokja I: Moral/Gotong Royong\n', options: { bold: true } },
-          { text: '• Pokja II: Pendidikan/UP2K\n' },
-          { text: '• Pokja III: Sandang/Pangan/Tata Laksana\n' },
-          { text: '• Pokja IV: Kesehatan/LH\n' },
-          { text: '• Upload foto kegiatan' },
-        ],
-        { x: 0.9, y: 2.15, w: 2.5, h: 2.7, fontSize: 10, color: '1E293B', lineSpacing: 16 }
-      );
-
-      s8_pkk.addShape(pptx.ShapeType.roundRect, {
-        x: 3.75,
-        y: 1.5,
-        w: 2.7,
-        h: 3.6,
-        fill: { color: 'F0FDFA' },
-        line: { color: '14B8A6', width: 1.2 },
-        rectRadius: 0.15,
-      });
-      s8_pkk.addText('DASA WISMA 24 LINGKUNGAN', {
-        x: 3.85,
-        y: 1.7,
-        w: 2.5,
-        h: 0.35,
-        fontSize: 12,
-        bold: true,
-        color: '115E59',
-      });
-      s8_pkk.addText(
-        [
-          { text: '• Ibu Hamil & Menyusui\n', options: { bold: true } },
-          { text: '• Balita & Bayi Stunting\n' },
-          { text: '• Warga Lansia & Disabilitas\n' },
-          { text: '• Sanitasi Jamban Sehat\n' },
-          { text: '• Rekapitulasi Posyandu' },
-        ],
-        { x: 3.85, y: 2.15, w: 2.5, h: 2.7, fontSize: 10, color: '1E293B', lineSpacing: 16 }
-      );
-
-      s8_pkk.addShape(pptx.ShapeType.roundRect, {
-        x: 6.7,
-        y: 1.5,
-        w: 2.7,
-        h: 3.6,
-        fill: { color: 'ECFDF5' },
-        line: { color: '10B981', width: 1.2 },
-        rectRadius: 0.15,
-      });
-      s8_pkk.addText('KAS UMUM KEUANGAN', {
-        x: 6.8,
-        y: 1.7,
-        w: 2.5,
-        h: 0.35,
-        fontSize: 12,
-        bold: true,
-        color: '065F46',
-      });
-      s8_pkk.addText(
-        [
-          { text: '• Pencatatan Kas Masuk\n', options: { bold: true } },
-          { text: '• Pencatatan Kas Keluar\n' },
-          { text: '• Hitung Saldo Otomatis\n' },
-          { text: '• Cetak Buku Kas Umum (BKU)\n' },
-          { text: '• Akuntabilitas Keuangan' },
-        ],
-        { x: 6.8, y: 2.15, w: 2.5, h: 2.7, fontSize: 10, color: '1E293B', lineSpacing: 16 }
-      );
-
-      s8_pkk.addShape(pptx.ShapeType.roundRect, {
-        x: 9.65,
-        y: 1.5,
-        w: 2.7,
-        h: 3.6,
+        x: 0.7,
+        y: 1.35,
+        w: 11.93,
+        h: 1.1,
         fill: { color: 'EEF2FF' },
-        line: { color: '6366F1', width: 1.2 },
-        rectRadius: 0.15,
+        line: { color: '6366F1', width: 1.3 },
+        rectRadius: 0.12,
       });
-      s8_pkk.addText('6 BUKU WAJIB PKK', {
-        x: 9.75,
-        y: 1.7,
-        w: 2.5,
-        h: 0.35,
-        fontSize: 12,
+      s9.addText('AKUN PETUGAS BAPENDA KOTA MEDAN (petugas_bapenda — READ-ONLY)', {
+        x: 0.9,
+        y: 1.46,
+        w: 11.53,
+        h: 0.28,
+        fontSize: 11,
         bold: true,
         color: '3730A3',
       });
-      s8_pkk.addText(
-        [
-          { text: '1. Susunan Pengurus\n', options: { bold: true } },
-          { text: '2. Data Anggota/Kader\n' },
-          { text: '3. Agenda Surat Masuk/Keluar\n' },
-          { text: '4. Buku Notulen Rapat\n' },
-          { text: '5. Buku Keuangan Kas\n' },
-          { text: '6. Buku Inventaris Barang' },
-        ],
-        { x: 9.75, y: 2.15, w: 2.5, h: 2.7, fontSize: 10, color: '1E293B', lineSpacing: 15 }
+      s9.addText(
+        'Hanya memiliki akses Pusat Menu & Realisasi PBB. Digunakan untuk memantau target nominal, SPPT lunas vs piutang 24 Lingkungan (tahun 2024–2026), dan ekspor Excel PBB tanpa mengubah data kelurahan.',
+        { x: 0.9, y: 1.78, w: 11.53, h: 0.55, fontSize: 10, color: '1E293B', lineSpacing: 14 }
       );
 
-      s8_pkk.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 5.3,
-        w: 11.6,
-        h: 1.2,
+      const pkkCards = [
+        {
+          x: 0.7,
+          fill: 'FFF1F2',
+          line: 'F43F5E',
+          title: 'KEGIATAN POKJA I - IV',
+          body: '• Input foto & GPS kegiatan pembinaan moral, pendidikan/UP2K, pangan/sandang, & kesehatan.\n• Berlaku untuk akun Pokja I-IV & PKK Lingkungan.',
+        },
+        {
+          x: 3.75,
+          fill: 'F0FDFA',
+          line: '14B8A6',
+          title: 'DASA WISMA & POSYANDU',
+          body: '• Rekap data ibu hamil, menyusui, balita, lansia, & jamban sehat 24 Lingk.\n• Laporan Posyandu khusus Pokja IV terintegrasi.',
+        },
+        {
+          x: 6.8,
+          fill: 'ECFDF5',
+          line: '10B981',
+          title: 'KEUANGAN PKK (BKU)',
+          body: '• Pencatatan kas masuk & kas keluar dengan kalkulasi saldo otomatis.\n• Cetak Buku Kas Umum (BKU) standar pembukuan PKK.',
+        },
+        {
+          x: 9.85,
+          fill: 'F5F3FF',
+          line: '8B5CF6',
+          title: '6 BUKU WAJIB & KTA',
+          body: '• Pengurus, Anggota, Agenda Surat, Notulen, Kas, & Inventaris.\n• Cetak Kartu Tanda Anggota (KTA) PKK format PDF presisi.',
+        },
+      ];
+
+      pkkCards.forEach((c) => {
+        s9.addShape(pptx.ShapeType.roundRect, {
+          x: c.x,
+          y: 2.65,
+          w: 2.8,
+          h: 2.75,
+          fill: { color: c.fill },
+          line: { color: c.line, width: 1.2 },
+          rectRadius: 0.12,
+        });
+        s9.addText(c.title, { x: c.x + 0.14, y: 2.8, w: 2.52, h: 0.35, fontSize: 10.5, bold: true, color: '0F172A' });
+        s9.addText(c.body, {
+          x: c.x + 0.14,
+          y: 3.22,
+          w: 2.52,
+          h: 2.05,
+          fontSize: 9.5,
+          color: '1E293B',
+          lineSpacing: 14,
+        });
+      });
+
+      s9.addShape(pptx.ShapeType.roundRect, {
+        x: 0.7,
+        y: 5.55,
+        w: 11.93,
+        h: 0.98,
         fill: { color: '0F172A' },
-        line: { color: '334155', width: 1 },
-        rectRadius: 0.15,
+        line: { color: 'F43F5E', width: 1 },
+        rectRadius: 0.12,
       });
-      s8_pkk.addText(
+      s9.addText(
         [
-          { text: 'PORTAL KHUSUS PENGURUS PKK: ', options: { bold: true, color: 'FCD34D', fontSize: 12 } },
+          { text: 'PORTAL MANDIRI TP-PKK: ', options: { bold: true, color: 'FDA4AF', fontSize: 10.5 } },
           {
-            text: 'Super Admin dan Tim Penggerak PKK dapat mengakses menu ini melalui tombol mode portal "PKK" di pojok atas aplikasi, mempermudah koordinasi 10 Program Pokok PKK secara digital.',
-            options: { color: 'CBD5E1', fontSize: 11 },
+            text: 'Akun Ketua/Sekretaris PKK, Ketua Pokja I–IV, dan 24 Ketua PKK Lingkungan otomatis masuk ke Portal PKK bebas menu aparatur kelurahan. Super Admin dapat berganti mode lewat tombol "PKK" di kanan atas.',
+            options: { color: 'E2E8F0', fontSize: 10.5 },
           },
         ],
-        { x: 1.0, y: 5.45, w: 11.2, h: 0.9 }
+        { x: 0.9, y: 5.68, w: 11.53, h: 0.75, lineSpacing: 14 }
       );
 
       // ==========================================
-      // SLIDE 9: Cetak PDF & Ekspor Excel
+      // SLIDE 10: Cetak PDF A4, Excel, SOP & Penutup
       // ==========================================
-      const s9_cetak = pptx.addSlide();
-      addStandardSlideHeader(
-        s9_cetak,
-        '09',
-        '8. Cetak Laporan PDF Resmi & Ekspor Excel',
-        'Standar format Pemko Medan, Kop Surat Kelurahan, & spreadsheet',
-        'Dokumentasi Resmi'
-      );
+      const s10 = pptx.addSlide();
+      s10.background = { color: '064E3B' };
+      s10.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.15, fill: { color: '10B981' } });
 
-      s9_cetak.addShape(pptx.ShapeType.roundRect, {
-        x: 0.8,
-        y: 1.5,
-        w: 5.6,
-        h: 5.0,
-        fill: { color: 'EEF2FF' },
-        line: { color: '6366F1', width: 1.2 },
-        rectRadius: 0.15,
-      });
-      s9_cetak.addText('CETAK DOKUMEN LAPORAN PDF', {
-        x: 1.1,
-        y: 1.75,
-        w: 5.0,
-        h: 0.35,
-        fontSize: 13,
-        bold: true,
-        color: '3730A3',
-      });
-      s9_cetak.addText(
-        [
-          { text: '• Kop Surat Resmi Pemko Medan:\n', options: { bold: true, color: '4338CA' } },
-          { text: 'Lengkap dengan lambang Pemko Medan dan alamat Kantor Kelurahan Mangga.\n\n' },
-          { text: '• Tata Letak Foto 2 Kolom Presisi:\n', options: { bold: true, color: '4338CA' } },
-          { text: 'Foto dokumentasi tersusun rapi otomatis dengan keterangan kegiatan.\n\n' },
-          { text: '• Tanda Tangan Sah Kepling / PKK:\n', options: { bold: true, color: '4338CA' } },
-          { text: 'Dilengkapi kolom tanda tangan resmi untuk arsip fisik dan audit inspektorat.' },
-        ],
-        { x: 1.1, y: 2.2, w: 5.0, h: 4.1, fontSize: 11, color: '1E293B', lineSpacing: 16 }
-      );
-
-      s9_cetak.addShape(pptx.ShapeType.roundRect, {
-        x: 6.8,
-        y: 1.5,
-        w: 5.6,
-        h: 5.0,
-        fill: { color: 'F0FDF4' },
-        line: { color: '16A34A', width: 1.2 },
-        rectRadius: 0.15,
-      });
-      s9_cetak.addText('EKSPOR EXCEL & WHATSAPP SHARE', {
-        x: 7.1,
-        y: 1.75,
-        w: 5.0,
-        h: 0.35,
-        fontSize: 13,
-        bold: true,
-        color: '166534',
-      });
-      s9_cetak.addText(
-        [
-          { text: '• Ekspor Spreadsheet (.xlsx):\n', options: { bold: true, color: '15803D' } },
-          {
-            text: 'Unduh rekapitulasi laporan harian, rekapitulasi PBB, data kunjungan, dan realisasi pembangunan ke format Microsoft Excel.\n\n',
-          },
-          { text: '• Berbagi Format WhatsApp Resmi:\n', options: { bold: true, color: '15803D' } },
-          {
-            text: 'Satu klik tombol share untuk mengirim rangkuman kegiatan berformat rapi langsung ke grup WhatsApp Pimpinan.\n\n',
-          },
-          { text: '• Integrasi Google Drive / Sheets:\n', options: { bold: true, color: '15803D' } },
-          { text: 'Sinkronisasi otomatis ke Google Workspace Kelurahan.' },
-        ],
-        { x: 7.1, y: 2.2, w: 5.0, h: 4.1, fontSize: 11, color: '1E293B', lineSpacing: 16 }
-      );
-
-      // ==========================================
-      // SLIDE 10: SOP & Penutup
-      // ==========================================
-      const s10_sop = pptx.addSlide();
-      s10_sop.background = { color: '064E3B' };
-
-      s10_sop.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.15, fill: { color: '10B981' } });
-
-      s10_sop.addText('10. SOP ALUR KERJA HARIAN & PENUTUP', {
-        x: 1.0,
-        y: 0.8,
-        w: 11.33,
-        h: 0.5,
-        fontSize: 22,
+      s10.addText('9 & 10. CETAK PDF RESMI A4, EKSPOR EXCEL & SOP HARIAN', {
+        x: 0.7,
+        y: 0.45,
+        w: 11.93,
+        h: 0.45,
+        fontSize: 20,
         bold: true,
         color: 'FFFFFF',
         align: 'center',
       });
 
-      // 3 Timeline cards
-      s10_sop.addShape(pptx.ShapeType.roundRect, {
-        x: 1.0,
-        y: 1.5,
-        w: 3.5,
-        h: 3.2,
-        fill: { color: '022C22' },
-        line: { color: '10B981', width: 1.2 },
-        rectRadius: 0.15,
+      s10.addText('Standar dokumen dinas Pemko Medan, mode offline IndexedDB & alur kerja aparatur', {
+        x: 0.7,
+        y: 0.9,
+        w: 11.93,
+        h: 0.3,
+        fontSize: 11,
+        color: 'A7F3D0',
+        align: 'center',
       });
-      s10_sop.addText('07.30 - 08.30 WIB', { x: 1.2, y: 1.7, w: 3.1, h: 0.35, fontSize: 13, bold: true, color: '34D399' });
-      s10_sop.addText(
-        'KOORDINASI PAGI & MONITORING\n\nKoordinasi kerja harian aparatur kelurahan, penyampaian arahan Lurah, dan pengecekan agenda lapangan.',
-        {
-          x: 1.2,
-          y: 2.15,
-          w: 3.1,
-          h: 2.3,
-          fontSize: 11,
-          color: 'E2E8F0',
-          lineSpacing: 16,
-        }
-      );
 
-      s10_sop.addShape(pptx.ShapeType.roundRect, {
-        x: 4.9,
-        y: 1.5,
-        w: 3.5,
-        h: 3.2,
-        fill: { color: '022C22' },
-        line: { color: '14B8A6', width: 1.2 },
-        rectRadius: 0.15,
+      const sopBoxes = [
+        {
+          x: 0.7,
+          title: 'PAGI – SIANG (08.00–16.00)',
+          color: '34D399',
+          text: '• Agenda Kelurahan & Absensi Kepling (Auto-Sync).\n• Cetak Absensi 1 Lembar A4.\n• Sambang Warga, Update PBB & Progres Pembangunan.',
+        },
+        {
+          x: 4.78,
+          title: 'PIKET POSKO MALAM',
+          color: 'FCD34D',
+          text: '• 20.00 WIB: Posko Bersih Sampah (Jl. Jamin Ginting).\n• 21.00 WIB: Posko Trantibum (Kantor Lurah) & Banjir (Taman Segitiga Lk. 9).\n• Foto kamera langsung + jam HP!',
+        },
+        {
+          x: 8.86,
+          title: 'CETAK, EKSPOR & BATAS 23.30',
+          color: '93C5FD',
+          text: '• Laporan harian s/d 23.30 WIB.\n• Cetak PDF Kop Pemko Medan (Posko, Laporan, KTA PKK).\n• Ekspor Excel (.xlsx) & Salin WA Pimpinan. Data aman di IndexedDB.',
+        },
+      ];
+
+      sopBoxes.forEach((b) => {
+        s10.addShape(pptx.ShapeType.roundRect, {
+          x: b.x,
+          y: 1.4,
+          w: 3.77,
+          h: 3.15,
+          fill: { color: '022C22' },
+          line: { color: '10B981', width: 1.2 },
+          rectRadius: 0.14,
+        });
+        s10.addText(b.title, {
+          x: b.x + 0.18,
+          y: 1.58,
+          w: 3.4,
+          h: 0.35,
+          fontSize: 11.5,
+          bold: true,
+          color: b.color,
+        });
+        s10.addText(b.text, {
+          x: b.x + 0.18,
+          y: 2.02,
+          w: 3.4,
+          h: 2.35,
+          fontSize: 10.5,
+          color: 'E2E8F0',
+          lineSpacing: 15,
+        });
       });
-      s10_sop.addText('09.00 - 15.00 WIB', { x: 5.1, y: 1.7, w: 3.1, h: 0.35, fontSize: 13, bold: true, color: '2DD4BF' });
-      s10_sop.addText(
-        'SAMBANG WARGA & PBB\n\nPelayanan warga, silaturahmi door-to-door, pembaruan database keluarga (edit/hapus), & update SPPT PBB.',
-        {
-          x: 5.1,
-          y: 2.15,
-          w: 3.1,
-          h: 2.3,
-          fontSize: 11,
-          color: 'E2E8F0',
-          lineSpacing: 16,
-        }
-      );
 
-      s10_sop.addShape(pptx.ShapeType.roundRect, {
-        x: 8.8,
-        y: 1.5,
-        w: 3.5,
-        h: 3.2,
-        fill: { color: '022C22' },
-        line: { color: 'F59E0B', width: 1.2 },
-        rectRadius: 0.15,
-      });
-      s10_sop.addText('s/d 23.30 WIB', { x: 9.0, y: 1.7, w: 3.1, h: 0.35, fontSize: 13, bold: true, color: 'FCD34D' });
-      s10_sop.addText(
-        'LAPORAN & SISKAMLING\n\nPengisian laporan harian berfoto dan pemantauan ronda malam sebelum batas deadline harian.',
-        {
-          x: 9.0,
-          y: 2.15,
-          w: 3.1,
-          h: 2.3,
-          fontSize: 11,
-          color: 'E2E8F0',
-          lineSpacing: 16,
-        }
-      );
-
-      s10_sop.addText('"Satu Laporan Nyata untuk Pelayanan Masyarakat Kelurahan Mangga"', {
-        x: 1.0,
-        y: 4.95,
-        w: 11.33,
-        h: 0.5,
-        fontSize: 18,
+      s10.addText('"Satu Laporan Nyata untuk Pelayanan Masyarakat Kelurahan Mangga"', {
+        x: 0.8,
+        y: 4.82,
+        w: 11.73,
+        h: 0.45,
+        fontSize: 17,
         italic: true,
         bold: true,
         color: 'A7F3D0',
         align: 'center',
       });
 
-      // Embed Official MEDAN UNTUK SEMUA Footer Banner on Closing Slide
       if (bannerBase64) {
-        s10_sop.addImage({ data: bannerBase64, x: 4.66, y: 5.65, w: 4.0, h: 0.65 });
+        s10.addImage({ data: bannerBase64, x: 4.66, y: 5.5, w: 4.0, h: 0.65 });
       }
 
-      s10_sop.addText('#SIKEPLINGMANGGA  •  #KELURAHANMANGGA', {
-        x: 1.0,
-        y: 6.5,
-        w: 11.33,
+      s10.addText('#SIKEPLINGMANGGA  •  #KELURAHANMANGGA', {
+        x: 0.8,
+        y: 6.45,
+        w: 11.73,
         h: 0.4,
-        fontSize: 14,
+        fontSize: 13,
         bold: true,
         color: 'FFFFFF',
         align: 'center',
         charSpacing: 2,
       });
 
-      // Download file
       await pptx.writeFile({ fileName: `Panduan_Penggunaan_SI_MANGGA_${CURRENT_APP_VERSION}.pptx` });
     } catch (err) {
       console.error('Error generating PPTX:', err);
@@ -1755,20 +1826,20 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
         {/* Header Modal */}
         <div className="bg-gradient-to-r from-slate-950 via-emerald-950 to-slate-900 px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between text-white border-b border-emerald-800/60 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shadow-inner">
-              <Presentation className="w-5 h-5 animate-pulse" />
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shadow-inner shrink-0">
+              <Presentation className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-black text-sm sm:text-base tracking-wide text-white">
                   Slide Panduan Presentasi (PPT)
                 </h3>
-                <span className="px-2 py-0.2 rounded-full bg-emerald-400/20 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-400/30">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-400/30">
                   {CURRENT_APP_VERSION}
                 </span>
               </div>
               <p className="text-[11px] text-slate-300 font-normal">
-                Panduan Lengkap Fitur, Kegunaan &amp; Cara Penggunaan Bagi 24 Kepling &amp; PKK Lingkungan
+                Panduan Lengkap Semua Jenis Akun: Lurah, Seklur, 3 Kasi, 24 Kepling, Bapenda &amp; TP-PKK
               </p>
             </div>
           </div>
@@ -1812,6 +1883,26 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
           </div>
         )}
 
+        {/* Quick Slide Selector Bar */}
+        <div className="bg-slate-900 px-3 sm:px-5 py-2 border-b border-slate-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+          {slidesData.map((s, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => setCurrentSlide(idx)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all cursor-pointer border ${
+                currentSlide === idx
+                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-xs'
+                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-800 hover:text-white'
+              }`}
+              title={s.title}
+            >
+              {String(idx + 1).padStart(2, '0')} • {s.category.split(' ')[0]}
+              {s.category.split(' ')[1] ? ` ${s.category.split(' ')[1]}` : ''}
+            </button>
+          ))}
+        </div>
+
         {/* Slide Viewer Screen */}
         <div className="p-3 sm:p-5 overflow-y-auto flex-1 bg-slate-100 flex flex-col justify-center custom-scrollbar">
           <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg border border-slate-200/90 overflow-hidden flex flex-col min-h-[380px] sm:min-h-[420px]">
@@ -1823,7 +1914,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-400/40 inline-block mb-1 font-mono">
                   {slide.category}
                 </span>
-                <h2 className="text-lg sm:text-xl font-black mt-0.5 leading-tight tracking-tight text-white">
+                <h2 className="text-base sm:text-xl font-black mt-0.5 leading-tight tracking-tight text-white">
                   {slide.title}
                 </h2>
                 <p className="text-[11px] sm:text-xs text-slate-200/90 mt-0.5 font-medium">{slide.subtitle}</p>
@@ -1834,12 +1925,12 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
             </div>
 
             {/* Slide Main Content */}
-            <div className="p-4 sm:p-6 flex-1 flex flex-col justify-center overflow-y-auto">
+            <div className="p-4 sm:p-5 flex-1 flex flex-col justify-center overflow-y-auto">
               {slide.content}
             </div>
 
-            {/* Slide Sub-Footer with Official MEDAN UNTUK SEMUA Banner */}
-            <div className="bg-slate-900 border-t border-slate-800 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-[11px] text-slate-300 shrink-0">
+            {/* Slide Sub-Footer */}
+            <div className="bg-slate-900 border-t border-slate-800 px-4 py-2 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-300 shrink-0">
               <div className="flex items-center gap-2">
                 <span className="font-bold uppercase tracking-tight text-[10px] text-emerald-400">
                   SI-MANGGA • KELURAHAN MANGGA
@@ -1848,7 +1939,6 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
                 <span className="text-emerald-300 font-bold text-[10px] hidden sm:inline">#SIKEPLINGMANGGA</span>
               </div>
 
-              {/* Official Banner Image */}
               <div className="h-7 sm:h-8 flex items-center justify-center overflow-hidden rounded-lg shadow-xs border border-emerald-500/40 bg-emerald-950/80 px-2 py-0.5 shrink-0">
                 <img
                   src={BANNER_IMAGE_PATH}
@@ -1865,7 +1955,7 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
         </div>
 
         {/* Footer Slide Controls */}
-        <div className="bg-white px-4 sm:px-6 py-3.5 border-t border-slate-200 flex items-center justify-between shrink-0">
+        <div className="bg-white px-4 sm:px-6 py-3 border-t border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => setCurrentSlide((prev) => Math.max(0, prev - 1))}
@@ -1892,10 +1982,10 @@ export const PanduanPPTModal: React.FC<PanduanPPTModalProps> = ({ isOpen, onClos
             <button
               onClick={handleDownloadPPT}
               disabled={isGenerating}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
               <Download className="w-4 h-4" />
-              <span>Unduh PowerPoint (.pptx)</span>
+              <span>{isGenerating ? 'Membuat PPTX...' : 'Unduh PowerPoint (.pptx)'}</span>
             </button>
           </div>
         </div>

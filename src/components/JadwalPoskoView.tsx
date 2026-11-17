@@ -489,7 +489,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
     }
 
     const captureDate = new Date();
-    const maxDim = 900;
+    const maxDim = 640;
     let width = video.videoWidth;
     let height = video.videoHeight;
 
@@ -513,7 +513,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
     ctx.drawImage(video, 0, 0, width, height);
     stampCameraWatermark(ctx, width, height, captureDate);
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.68);
     const capturedTime = formatDeviceClock(captureDate);
 
     setUploadFotoBase64(dataUrl);
@@ -573,7 +573,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
 
     setIsCompressingFoto(true);
     try {
-      const compressed = await fileToCompressedBase64(file, 900, 900, 0.75);
+      const compressed = await fileToCompressedBase64(file, 640, 640, 0.68);
       const captureDate = new Date();
       // Tempel stempel waktu HP pada gambar hasil kamera
       const stamped = await new Promise<string>((resolve) => {
@@ -586,7 +586,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
           if (!ctx) return resolve(compressed);
           ctx.drawImage(img, 0, 0);
           stampCameraWatermark(ctx, img.width, img.height, captureDate);
-          resolve(canvas.toDataURL('image/jpeg', 0.78));
+          resolve(canvas.toDataURL('image/jpeg', 0.68));
         };
         img.onerror = () => resolve(compressed);
         img.src = compressed;

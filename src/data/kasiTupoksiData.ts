@@ -306,12 +306,12 @@ export const DEFAULT_KASI_TRANTIBUM: KepalaSeksiProfile = {
       kegunaan: 'Monitoring 7 bidang kerja: Poskamling, Infra, Mediasi, Posko Trantib, Bersemi, Sampah, Faktor 74.',
     },
     {
-      namaFitur: 'Peta Spasial Poskamling',
-      kegunaan: 'Visualisasi lokasi pos ronda, nomor kontak petugas jaga, dan status keaktifan.',
+      namaFitur: 'Jadwal Posko Malam (Trantib, Banjir & Kebersihan)',
+      kegunaan: 'Penjadwalan piket Kepling malam hari, verifikasi foto kamera hadir, dan cetak PDF daftar hadir.',
     },
     {
-      namaFitur: 'Log Mediasi & Insiden Darurat',
-      kegunaan: 'Pencatatan sengketa warga, berita acara kesepakatan damai, dan dokumentasi foto.',
+      namaFitur: 'Arsip Laporan Ketentraman & Trantibum',
+      kegunaan: 'Pusat riwayat laporan ronda malam, penertiban sampah liar, mediasi sengketa, dan situasi kamtibmas.',
     },
     {
       namaFitur: 'Cetak Rekap 7 Bidang Trantibum',

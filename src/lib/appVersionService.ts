@@ -11,15 +11,45 @@ export interface VersionRelease {
   }[];
 }
 
-export const CURRENT_APP_VERSION = 'v2.5.1';
-export const CURRENT_RELEASE_DATE = '31 Oktober 2026';
+export const CURRENT_APP_VERSION = 'v2.6.0';
+export const CURRENT_RELEASE_DATE = '17 November 2026';
 
 export const APP_VERSION_HISTORY: VersionRelease[] = [
+  {
+    version: 'v2.6.0',
+    releaseDate: '17 November 2026',
+    title: 'Jadwal Posko Malam, Auto-Sync Agenda/Posko, Segregasi Tupoksi Kasi & Panduan PPT Semua Akun',
+    badge: 'TERBARU',
+    isImportant: true,
+    highlights: [
+      'Jadwal Posko Malam (Trantibum 21.00, Banjir 21.00, Bersih Sampah 20.00 WIB) dengan Kamera Langsung & Jam Otomatis HP',
+      'Segregasi Ketat Hak Akses Menu Sesuai Tupoksi Masing-Masing Akun (Lurah, Seklur, 3 Kasi, 24 Kepling, Bapenda, PKK)',
+      'Auto-Sync Kehadiran Agenda & Posko ke Laporan Harian serta Cetak PDF Absensi Kepling 1 Lembar A4',
+      'Pembaruan Lengkap Slide & Unduhan PPTX Panduan Penggunaan Aplikasi untuk Setiap Jenis Akun'
+    ],
+    changes: [
+      {
+        category: 'FITUR BARU',
+        description: 'Modul Jadwal Posko Trantibum (Kantor Lurah, 21.00 WIB), Kewaspadaan Banjir (Taman Segitiga Lk. 9, 21.00 WIB), & Bersih Sampah Malam Hari (Jl. Jamin Ginting, 20.00 WIB) dengan verifikasi Super Admin dan PDF Daftar Hadir.'
+      },
+      {
+        category: 'FITUR BARU',
+        description: 'Menu Kegiatan Lurah eksklusif Super Admin serta fitur sinkronisasi otomatis kehadiran Agenda Kelurahan & Posko ke Laporan Harian dan Capaian Kinerja Kepling.'
+      },
+      {
+        category: 'PENINGKATAN',
+        description: 'Segregasi tupoksi ketat bagi Kasi Tata Pemerintahan, Kasi Pembangunan & Kesos, Kasi Trantibum, Sekretaris Kelurahan, Petugas Bapenda, Kepling, dan TP-PKK.'
+      },
+      {
+        category: 'PENINGKATAN',
+        description: 'Pembaruan total Panduan Presentasi (PPT/PPTX) SI-MANGGA berisi petunjuk langkah demi langkah untuk setiap jenis akun.'
+      }
+    ]
+  },
   {
     version: 'v2.5.1',
     releaseDate: '31 Oktober 2026',
     title: 'Pembaruan Lambang Resmi TP-PKK: Lis Emas Murni & Transparansi Sempurna Tanpa Latar Gelap',
-    badge: 'TERBARU',
     isImportant: true,
     highlights: [
       'Pembaruan Lambang Resmi TP-PKK dengan Latar Belakang Transparan Penuh',

@@ -60,6 +60,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 }) => {
   const isKepling = activeAccount.role === 'kepling';
   const isAdmin = activeAccount.role === 'super_admin';
+  const isSeklur = activeAccount.role === 'sekretaris';
   const isKasiPem = activeAccount.role === 'kasi_pemerintahan';
   const isKasiBang = activeAccount.role === 'kasi_pembangunan';
   const isKasiTrantib = activeAccount.role === 'kasi_trantibum';
@@ -329,38 +330,23 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               <span className="text-[10px] mt-0.5 tracking-tight">7 Bidang</span>
             </button>
 
-            {/* Center Action Button: Kegiatan Patroli & Trantib */}
+            {/* Center Action Button: Jadwal Posko Trantibum, Banjir & Bersih Sampah */}
             <div className="flex-1 flex justify-center -mt-4">
               <button
-                id="btn-mobile-nav-kegiatan-center"
+                id="btn-mobile-nav-posko-center"
                 type="button"
-                onClick={() => onSelectTab('kegiatan_khusus')}
+                onClick={() => onSelectTab('jadwal_posko')}
                 className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer border-2 border-white ${
-                  activeTab === 'kegiatan_khusus'
+                  activeTab === 'jadwal_posko'
                     ? 'bg-gradient-to-tr from-amber-700 to-orange-600 text-white ring-2 ring-amber-500 ring-offset-2'
                     : 'bg-gradient-to-tr from-amber-600 to-orange-500 text-white hover:brightness-105'
                 }`}
-                title="Patroli Trantibum & Poskamling"
+                title="Jadwal Posko Trantibum, Banjir & Kebersihan"
               >
-                <ShieldCheck className="w-5 h-5 stroke-[2.5]" />
-                <span className="sr-only">Patroli</span>
+                <ShieldAlert className="w-5 h-5 stroke-[2.5]" />
+                <span className="sr-only">Jadwal Posko</span>
               </button>
             </div>
-
-            <button
-              id="btn-mobile-nav-kunjungan-trantib"
-              type="button"
-              onClick={() => onSelectTab('kunjungan')}
-              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-                activeTab === 'kunjungan' ? 'text-emerald-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <div className="relative">
-                <Users className={`w-5 h-5 ${activeTab === 'kunjungan' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
-                {renderBadge('kunjungan')}
-              </div>
-              <span className="text-[10px] mt-0.5 tracking-tight">Kunjungan</span>
-            </button>
 
             <button
               id="btn-mobile-nav-riwayat-trantib"
@@ -374,13 +360,74 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 <FileText className={`w-5 h-5 ${activeTab === 'riwayat' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
                 {renderBadge('riwayat')}
               </div>
-              <span className="text-[10px] mt-0.5 tracking-tight">Riwayat</span>
+              <span className="text-[10px] mt-0.5 tracking-tight">Arsip</span>
             </button>
           </>
         )}
 
-        {/* 4. SUPER ADMIN & KEPLING (DEFAULT) */}
-        {!isKasiPem && !isKasiBang && !isKasiTrantib && (
+        {/* 4. SEKRETARIS KELURAHAN (SEKLUR) */}
+        {isSeklur && (
+          <>
+            <button
+              id="btn-mobile-nav-monitoring-seklur"
+              type="button"
+              onClick={() => onSelectTab('monitoring')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+                activeTab === 'monitoring' ? 'text-amber-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <div className="relative">
+                <ShieldCheck className={`w-5 h-5 ${activeTab === 'monitoring' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+                {renderBadge('monitoring')}
+              </div>
+              <span className="text-[10px] mt-0.5 tracking-tight">Monitoring</span>
+            </button>
+
+            <div className="flex-1 flex justify-center -mt-4">
+              <button
+                id="btn-mobile-nav-absensi-center"
+                type="button"
+                onClick={() => onSelectTab('absensi_kepling')}
+                className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer border-2 border-white ${
+                  activeTab === 'absensi_kepling'
+                    ? 'bg-gradient-to-tr from-teal-800 to-emerald-700 text-white ring-2 ring-teal-500 ring-offset-2'
+                    : 'bg-gradient-to-tr from-teal-700 to-emerald-600 text-white hover:brightness-105'
+                }`}
+                title="Absensi Kepala Lingkungan (PDF)"
+              >
+                <UserCheck className="w-5 h-5 stroke-[2.5]" />
+                <span className="sr-only">Absensi</span>
+              </button>
+            </div>
+
+            <button
+              id="btn-mobile-nav-pbb-seklur"
+              type="button"
+              onClick={() => onSelectTab('rekap_pbb')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+                activeTab === 'rekap_pbb' ? 'text-emerald-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Landmark className={`w-5 h-5 ${activeTab === 'rekap_pbb' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              <span className="text-[10px] mt-0.5 tracking-tight">PBB</span>
+            </button>
+
+            <button
+              id="btn-mobile-nav-capaian-seklur"
+              type="button"
+              onClick={() => onSelectTab('capaian_admin')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+                activeTab === 'capaian_admin' ? 'text-amber-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Trophy className={`w-5 h-5 ${activeTab === 'capaian_admin' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              <span className="text-[10px] mt-0.5 tracking-tight">Capaian</span>
+            </button>
+          </>
+        )}
+
+        {/* 5. SUPER ADMIN & KEPLING (DEFAULT) */}
+        {!isKasiPem && !isKasiBang && !isKasiTrantib && !isSeklur && (
           <>
             {isKepling && (
               <button
