@@ -287,7 +287,8 @@ export async function getPbbFromIndexedDB(): Promise<SpptPbbItem[] | null> {
 }
 
 /**
- * Save all visits to IndexedDB
+ * Save all visits to IndexedDB while preserving existing valid photo URLs
+ * so lightweight/stripped localStorage payloads never erase existing offline images.
  */
 export async function saveVisitsToIndexedDB(data: any[]): Promise<boolean> {
   if (!Array.isArray(data)) return false;
@@ -297,17 +298,50 @@ export async function saveVisitsToIndexedDB(data: any[]): Promise<boolean> {
       const tx = db.transaction(STORE_VISITS, 'readwrite');
       const store = tx.objectStore(STORE_VISITS);
 
-      store.clear();
-      if (data.length > 0) {
+      const hasValidStr = (v: unknown): boolean =>
+        typeof v === 'string' && v.trim().length > 20;
+
+      const incomingIds = new Set(data.filter((x) => x && x.id).map((x) => String(x.id)));
+      const keysReq = store.getAllKeys();
+
+      keysReq.onsuccess = () => {
+        const existingKeys = Array.isArray(keysReq.result) ? keysReq.result : [];
+        existingKeys.forEach((k) => {
+          if (!incomingIds.has(String(k))) {
+            store.delete(k);
+          }
+        });
+
         data.forEach((item) => {
-          if (item && item.id) {
+          if (!item || !item.id) return;
+          const missingPhoto =
+            !hasValidStr(item.fotoUrl) && !hasValidStr(item.fotoDokumentasi);
+
+          if (missingPhoto) {
+            const getReq = store.get(item.id);
+            getReq.onsuccess = () => {
+              const prev = getReq.result as any;
+              if (prev && (hasValidStr(prev.fotoUrl) || hasValidStr(prev.fotoDokumentasi))) {
+                store.put({
+                  ...item,
+                  fotoUrl: hasValidStr(item.fotoUrl) ? item.fotoUrl : prev.fotoUrl || '',
+                  fotoDokumentasi: hasValidStr(item.fotoDokumentasi)
+                    ? item.fotoDokumentasi
+                    : prev.fotoDokumentasi,
+                });
+              } else {
+                store.put(item);
+              }
+            };
+          } else {
             store.put(item);
           }
         });
-      }
+      };
 
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
     });
   } catch (err) {
     console.warn('[IndexedDB] Error saving visits:', err);

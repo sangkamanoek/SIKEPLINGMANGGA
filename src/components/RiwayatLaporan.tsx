@@ -29,7 +29,14 @@ import {
 } from 'lucide-react';
 import { LaporanHarianItem, SheetMetadata, UserAccount, KinerjaHarian } from '../types';
 import { KEPLING_ACCOUNTS, SUPER_ADMIN_ACCOUNT } from '../data/keplingList';
-import { isReportMatchingKepling, isReportMatchingDate, getReportIsoDate, getTodayLocalIso, getDirectImageUrl } from '../lib/formatter';
+import {
+  isReportMatchingKepling,
+  isReportMatchingDate,
+  getReportIsoDate,
+  getTodayLocalIso,
+  getDirectImageUrl,
+  formatTanggalIndonesia,
+} from '../lib/formatter';
 import { VirtualList } from './VirtualList';
 
 interface RiwayatLaporanProps {
@@ -318,8 +325,8 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
 
       if (!matchesKeyword) return false;
 
-      // 2. Filter by Petugas (Ketat, mencegah kesalahan laporan antar-kepling)
-      if (selectedPetugas !== 'ALL') {
+      // 2. Filter by Petugas (Hanya untuk non-kepling; akun Kepling sudah difilter ketat oleh domainScopedItems)
+      if (!isKepling && selectedPetugas !== 'ALL') {
         const targetKepling = KEPLING_ACCOUNTS.find(
           (k) => k.nama.trim().toLowerCase() === selectedPetugas.trim().toLowerCase()
         );
@@ -461,7 +468,9 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
   }, [
     domainScopedItems,
     searchTerm,
+    isKepling,
     selectedPetugas,
+    selectedMonthFilter,
     dateFilterMode,
     startDate,
     endDate,
@@ -1168,13 +1177,20 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded bg-emerald-700 text-white shadow-2xs">
                       {item.hari}
                     </span>
                     <span className="text-xs font-bold text-slate-800">
-                      {item.tanggal}
+                      {/^\d{4}-\d{2}-\d{2}$/.test(String(item.tanggal || '').trim())
+                        ? formatTanggalIndonesia(item.tanggal).toUpperCase()
+                        : item.tanggal}
                     </span>
+                    {(item.id?.startsWith('lap_kj_') || item.kinerja?.kegiatanLainnya?.includes('[Kunjungan Warga]')) && (
+                      <span className="text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded">
+                        🏠 Kunjungan Warga
+                      </span>
+                    )}
                     {item.jumlahDokumentasi > 0 && (
                       <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                         📷 {item.jumlahDokumentasi} Foto

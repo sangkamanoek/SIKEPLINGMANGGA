@@ -19,7 +19,10 @@ import {
   saveVisitsToIndexedDB,
   saveSingleReportToIndexedDB,
   deleteReportFromIndexedDB,
+  getReportsFromIndexedDB,
+  getSingleReportFromIndexedDB,
 } from './indexedDbStorage';
+import { mergeFotoArraysPreservingUrls } from './reportConsolidator';
 import { LaporanHarianItem, FotoDokumentasi, UserAccount } from '../types';
 import { KEPLING_ACCOUNTS, ROMAN_NUMERALS, getEffectiveProfile } from '../data/keplingList';
 import {
@@ -64,6 +67,62 @@ export interface KunjunganWargaData {
 let memoryKunjungan: KunjunganWargaData[] = [];
 let deletedKunjunganIdsCache: string[] = safeGetLocalStorage<string[]>(KUNJUNGAN_DELETED_KEY, []);
 
+export const hasValidVisitPhoto = (val?: unknown): boolean =>
+  typeof val === 'string' && val.trim().length > 20;
+
+export const getVisitPhotoSrc = (v?: Partial<KunjunganWargaData> | null): string => {
+  if (!v) return '';
+  const candidates = [
+    v.fotoUrl,
+    typeof v.fotoDokumentasi === 'string' ? v.fotoDokumentasi : '',
+    (v as any).foto,
+    (v as any).photoUrl,
+  ];
+  for (const c of candidates) {
+    if (hasValidVisitPhoto(c)) return String(c).trim();
+  }
+  return '';
+};
+
+export const mergeVisitWithPreservedPhoto = (
+  incoming: KunjunganWargaData,
+  existing?: KunjunganWargaData | null
+): KunjunganWargaData => {
+  if (!existing) return incoming;
+  const incPhoto = getVisitPhotoSrc(incoming);
+  const exPhoto = getVisitPhotoSrc(existing);
+  if (incPhoto) {
+    return incoming;
+  }
+  if (exPhoto) {
+    return {
+      ...incoming,
+      fotoUrl: hasValidVisitPhoto(existing.fotoUrl) ? existing.fotoUrl : exPhoto,
+      ...(hasValidVisitPhoto(existing.fotoDokumentasi)
+        ? { fotoDokumentasi: existing.fotoDokumentasi }
+        : {}),
+    };
+  }
+  return incoming;
+};
+
+export const mergeVisitListPreservingPhotos = (
+  incomingList: KunjunganWargaData[],
+  fallbackList?: KunjunganWargaData[]
+): KunjunganWargaData[] => {
+  if (!Array.isArray(incomingList)) return Array.isArray(fallbackList) ? fallbackList : [];
+  const fallbackMap = new Map<string, KunjunganWargaData>();
+  if (Array.isArray(fallbackList)) {
+    fallbackList.forEach((f) => {
+      if (f && f.id) fallbackMap.set(f.id, f);
+    });
+  }
+  return incomingList.map((item) => {
+    if (!item || !item.id) return item;
+    return mergeVisitWithPreservedPhoto(item, fallbackMap.get(item.id));
+  });
+};
+
 export const getDeletedKunjunganIds = (): string[] => {
   if (!Array.isArray(deletedKunjunganIdsCache)) deletedKunjunganIdsCache = [];
   return deletedKunjunganIdsCache;
@@ -80,13 +139,17 @@ export const markKunjunganDeleted = (id: string): void => {
 
 export const getLocalKunjunganList = (): KunjunganWargaData[] => {
   const deletedSet = new Set(getDeletedKunjunganIds());
+  const memValid = memoryKunjungan.filter((x) => x && x.id && !deletedSet.has(x.id));
   const stored = safeGetLocalStorage<KunjunganWargaData[]>(KUNJUNGAN_STORAGE_KEY, []);
-  if (Array.isArray(stored)) {
+  if (Array.isArray(stored) && stored.length > 0) {
     const cleaned = stored.filter((x) => x && x.id && !deletedSet.has(x.id));
-    memoryKunjungan = cleaned;
-    return cleaned;
+    // safeSetLocalStorage strips base64 fotoUrl when payload > 250KB; always preserve full photos from memoryKunjungan
+    const merged = mergeVisitListPreservingPhotos(cleaned, memValid);
+    memoryKunjungan = merged;
+    return merged;
   }
-  return memoryKunjungan.filter((x) => x && x.id && !deletedSet.has(x.id));
+  if (memValid.length > 0) return memValid;
+  return [];
 };
 
 function stripKunjunganMediaForBroadcast(items: KunjunganWargaData[]): KunjunganWargaData[] {
@@ -103,15 +166,16 @@ function stripKunjunganMediaForBroadcast(items: KunjunganWargaData[]): Kunjungan
 export const setLocalKunjunganList = (items: KunjunganWargaData[]): void => {
   const deletedSet = new Set(getDeletedKunjunganIds());
   const cleaned = items.filter((x) => x && x.id && !deletedSet.has(x.id));
-  memoryKunjungan = cleaned;
-  safeSetLocalStorage(KUNJUNGAN_STORAGE_KEY, JSON.stringify(cleaned), { skipIdbMirror: true });
+  const preserved = mergeVisitListPreservingPhotos(cleaned, memoryKunjungan);
+  memoryKunjungan = preserved;
+  safeSetLocalStorage(KUNJUNGAN_STORAGE_KEY, JSON.stringify(preserved), { skipIdbMirror: true });
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('kunjungan-data-updated'));
   }
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(KUNJUNGAN_CHANNEL);
-      bc.postMessage({ type: 'SYNC_KUNJUNGAN', items: stripKunjunganMediaForBroadcast(cleaned) });
+      bc.postMessage({ type: 'SYNC_KUNJUNGAN', items: stripKunjunganMediaForBroadcast(preserved) });
       bc.close();
     }
   } catch (e) {}
@@ -151,16 +215,16 @@ const resolveKeplingTargetForVisit = (params: {
   const resolvedNama = profile?.nama || acc?.nama || params.namaKepling || `Kepling Lingkungan ${roman}`;
   const resolvedJabatan = acc?.jabatan || `Kepala Lingkungan ${roman}`;
 
-  const matchAccount: UserAccount =
-    acc ||
-    ({
-      id: resolvedKeplingId,
-      nama: resolvedNama,
-      jabatan: resolvedJabatan,
-      role: 'kepling',
-      lingkungan: resolvedLingkungan,
-      nomorLingkungan,
-    } as UserAccount);
+  const matchAccount: UserAccount = acc
+    ? { ...acc, nama: resolvedNama }
+    : ({
+        id: resolvedKeplingId,
+        nama: resolvedNama,
+        jabatan: resolvedJabatan,
+        role: 'kepling',
+        lingkungan: resolvedLingkungan,
+        nomorLingkungan,
+      } as UserAccount);
 
   return {
     resolvedKeplingId,
@@ -176,6 +240,211 @@ export const buildKunjunganReportId = (keplingId: string, tanggalIso: string): s
   const cleanId = String(keplingId || 'kepling_1').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
   const cleanDate = String(tanggalIso || getTodayLocalIso()).replace(/[^0-9-]/g, '').slice(0, 15);
   return `lap_kj_${cleanId}_${cleanDate}`;
+};
+
+export const getExpectedKunjunganReportIds = (visits: KunjunganWargaData[]): Set<string> => {
+  const ids = new Set<string>();
+  if (!Array.isArray(visits)) return ids;
+  for (const v of visits) {
+    if (!v || !v.id) continue;
+    const tanggalIso = getVisitIsoDate(v);
+    const resolved = resolveKeplingTargetForVisit(v);
+    ids.add(buildKunjunganReportId(resolved.resolvedKeplingId, tanggalIso));
+  }
+  return ids;
+};
+
+interface ComputedKunjunganDaily {
+  reportItem: LaporanHarianItem;
+  signature: string;
+}
+
+const computeKunjunganDailyReport = (
+  resolved: ReturnType<typeof resolveKeplingTargetForVisit>,
+  tanggalIso: string,
+  dayVisits: KunjunganWargaData[],
+  existingReport?: LaporanHarianItem
+): ComputedKunjunganDaily => {
+  const reportId = buildKunjunganReportId(resolved.resolvedKeplingId, tanggalIso);
+
+  let perlinsosSudahCount = 0;
+  let perlinsosMenolakCount = 0;
+  let ikdCount = 0;
+  let bpjsCount = 0;
+  let pbbCount = 0;
+
+  const wargaNames: string[] = [];
+  const menolakDetails: string[] = [];
+  const pbbDetails: string[] = [];
+  const ikdDetails: string[] = [];
+  const bpjsDetails: string[] = [];
+
+  const fotos: FotoDokumentasi[] = [];
+  let totalFotoUrlChars = 0;
+  let totalVisitsWithPhoto = 0;
+  const MAX_SYNCED_PHOTOS = 4;
+  const MAX_TOTAL_PHOTO_CHARS = 360_000;
+
+  let earliestCreatedAt = dayVisits[0]?.createdAt || new Date().toISOString();
+
+  const sortedVisits = [...dayVisits].sort((a, b) =>
+    String(a.id || '').localeCompare(String(b.id || ''))
+  );
+
+  sortedVisits.forEach((v, idx) => {
+    if (v.createdAt && v.createdAt < earliestCreatedAt) {
+      earliestCreatedAt = v.createdAt;
+    }
+
+    const wargaLabel = `${v.namaWarga}${v.alamat ? ` (${v.alamat})` : ''}`;
+    if (wargaNames.length < 15) {
+      wargaNames.push(wargaLabel);
+    }
+
+    // 1. Perlinsos: prioritaskan pilihan dropdown perlinsos; fallback ke statusBansos hanya jika perlinsos kosong
+    const rawPerlinsos = (v.perlinsos || v.statusBansos || '').trim().toLowerCase();
+    if (rawPerlinsos === 'sudah' || rawPerlinsos === 'layak') {
+      perlinsosSudahCount += 1;
+    } else if (rawPerlinsos === 'menolak') {
+      perlinsosMenolakCount += 1;
+      if (menolakDetails.length < 10) menolakDetails.push(wargaLabel);
+    }
+
+    // 2. PBB
+    const rawPbb = (v.pbb || '').trim().toLowerCase();
+    if (rawPbb === 'sudah' || rawPbb === 'lunas') {
+      pbbCount += 1;
+      if (pbbDetails.length < 10) pbbDetails.push(v.namaWarga);
+    }
+
+    // 3. IKD
+    const rawIkd = (v.ikd || '').trim().toLowerCase();
+    if (rawIkd === 'sudah') {
+      ikdCount += 1;
+      if (ikdDetails.length < 10) ikdDetails.push(v.namaWarga);
+    }
+
+    // 4. BPJS Ketenagakerjaan
+    const rawBpjs = (v.bpjsTk || '').trim().toLowerCase();
+    if (
+      rawBpjs.includes('perisai') ||
+      rawBpjs.includes('sudah') ||
+      (rawBpjs.includes('aktif') && !rawBpjs.includes('non-aktif'))
+    ) {
+      bpjsCount += 1;
+      if (bpjsDetails.length < 10) bpjsDetails.push(v.namaWarga);
+    }
+
+    // 5. Dokumentasi Foto (dibatasi agar ukuran dokumen Firestore aman < 1 MB)
+    const directFoto = getVisitPhotoSrc(v);
+    const fotoId = `foto_kj_${v.id || idx}`;
+    const existingMatchedFoto =
+      !directFoto && Array.isArray(existingReport?.dokumentasiFoto)
+        ? existingReport!.dokumentasiFoto.find(
+            (ef) =>
+              ef &&
+              hasValidVisitPhoto(ef.url) &&
+              (ef.id === fotoId || (v.namaWarga && ef.name?.includes(v.namaWarga)))
+          )?.url || ''
+        : '';
+    const rawFoto = directFoto || existingMatchedFoto;
+    if (hasValidVisitPhoto(rawFoto)) {
+      totalVisitsWithPhoto += 1;
+      if (
+        fotos.length < MAX_SYNCED_PHOTOS &&
+        totalFotoUrlChars + rawFoto.length <= MAX_TOTAL_PHOTO_CHARS
+      ) {
+        totalFotoUrlChars += rawFoto.length;
+        fotos.push({
+          id: fotoId,
+          url: rawFoto,
+          name: `[KUNJUNGAN] ${v.namaWarga} - ${v.alamat || resolved.resolvedLingkungan}`,
+          timestamp: v.updatedAt || v.createdAt || new Date().toISOString(),
+          kategori: 'perlinsos',
+          keterangan: `Kunjungan Warga: ${v.namaWarga}`,
+        });
+      }
+    }
+  });
+
+  // Preserve valid photos from existingReport if local visit entries were stripped of base64 data
+  const existingValidFotos = Array.isArray(existingReport?.dokumentasiFoto)
+    ? existingReport!.dokumentasiFoto.filter((f) => f && hasValidVisitPhoto(f.url))
+    : [];
+  const effectiveFotos =
+    fotos.length > 0
+      ? mergeFotoArraysPreservingUrls(existingReport?.dokumentasiFoto, fotos)
+      : existingValidFotos.length > 0
+      ? existingValidFotos
+      : [];
+
+  const validFotoCount = effectiveFotos.filter((f) => f && hasValidVisitPhoto(f.url)).length;
+
+  const summaryListText =
+    sortedVisits.length > 15
+      ? `${wargaNames.join(', ')}, dan ${sortedVisits.length - 15} warga lainnya`
+      : wargaNames.join(', ');
+
+  const nowIso = new Date().toISOString();
+  const reportItem: LaporanHarianItem = {
+    id: reportId,
+    keplingId: resolved.resolvedKeplingId,
+    lingkungan: resolved.resolvedLingkungan,
+    namaKepling: resolved.resolvedNama,
+    jabatan: resolved.resolvedJabatan,
+    kelurahan: 'Kelurahan Mangga',
+    kecamatan: 'Kecamatan Medan Tuntungan',
+    hari: getNamaHariIndonesia(tanggalIso),
+    tanggal: tanggalIso,
+    tanggalLaporan: tanggalIso,
+    kinerja: {
+      opsirPbbWp: pbbCount,
+      opsirPbbKeterangan:
+        pbbCount > 0 ? `Terdata lunas saat Kunjungan Warga: ${pbbDetails.join(', ')}` : '',
+      perlinsosKk: perlinsosSudahCount,
+      perlinsosKeterangan: `Kunjungan Warga Door-to-Door (${sortedVisits.length} warga dikunjungi): ${summaryListText}`,
+      perlinsosMenolakKk: perlinsosMenolakCount,
+      perlinsosMenolakRincian:
+        menolakDetails.length > 0 ? `Menolak Perlinsos: ${menolakDetails.join(', ')}` : '',
+      ikdOrang: ikdCount,
+      ikdKeterangan:
+        ikdCount > 0 ? `Sudah aktivasi IKD saat kunjungan: ${ikdDetails.join(', ')}` : '',
+      bpjsKetenagakerjaanOrang: bpjsCount,
+      bpjsKetenagakerjaanKeterangan:
+        bpjsCount > 0 ? `BPJS TK Aktif/Terdaftar: ${bpjsDetails.join(', ')}` : '',
+      kegiatanLainnya: `${KUNJUNGAN_LAPORAN_PREFIX} ${sortedVisits.length} Warga Dikunjungi: ${summaryListText}`,
+    },
+    jumlahDokumentasi: Math.max(effectiveFotos.length, totalVisitsWithPhoto, Number(existingReport?.jumlahDokumentasi || 0)),
+    dokumentasiFoto: effectiveFotos,
+    petugasNama: resolved.resolvedNama,
+    petugasRole: 'kepling',
+    uraianTugas: `Kunjungan Warga Door-to-Door (${sortedVisits.length} Rumah): ${summaryListText}`,
+    catatanUmum: `Tercatat otomatis dari ${sortedVisits.length} data Kunjungan Warga (Door-to-Door) pada ${tanggalIso}.`,
+    createdAt: existingReport?.createdAt || earliestCreatedAt,
+    updatedAt: nowIso,
+  };
+
+  const signature = `${sortedVisits.length}|${pbbCount}|${perlinsosSudahCount}|${perlinsosMenolakCount}|${ikdCount}|${bpjsCount}|${validFotoCount}|${sortedVisits
+    .map((v) => `${v.id}:${v.updatedAt || ''}:${v.namaWarga || ''}:${getVisitPhotoSrc(v) ? 1 : 0}`)
+    .join(',')}`;
+
+  return { reportItem, signature };
+};
+
+const lastReconciledKunjunganSignatures = new Map<string, string>();
+
+const persistReportRemoteAndIdb = async (reportItem: LaporanHarianItem): Promise<void> => {
+  await Promise.allSettled([
+    saveSingleReportToIndexedDB(reportItem).catch(() => {}),
+    resilientSetDoc('reports', reportItem.id, cleanFirestoreData(reportItem), {
+      merge: true,
+    }).catch(() => {}),
+    fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reportItem),
+    }).catch(() => {}),
+  ]);
 };
 
 /**
@@ -197,149 +466,56 @@ export const syncKunjunganToLaporanHarian = async (
   const tanggalIso = getVisitIsoDate(target);
   const resolved = resolveKeplingTargetForVisit(target);
   const reportId = buildKunjunganReportId(resolved.resolvedKeplingId, tanggalIso);
-  const allVisits = Array.isArray(visitsOverride) ? visitsOverride : getLocalKunjunganList();
+  let allVisits = Array.isArray(visitsOverride) ? visitsOverride : getLocalKunjunganList();
 
-  const dayVisits = allVisits.filter(
+  let dayVisits = allVisits.filter(
     (v) =>
       v &&
       getVisitIsoDate(v) === tanggalIso &&
       isKunjunganMatchingKepling(v, resolved.matchAccount)
   );
 
+  // Hydrate missing visit photos from IndexedDB so earlier visits on the same day keep their photos
+  if (dayVisits.some((v) => !getVisitPhotoSrc(v))) {
+    try {
+      const idbVisits = await getVisitsFromIndexedDB();
+      if (Array.isArray(idbVisits) && idbVisits.length > 0) {
+        dayVisits = mergeVisitListPreservingPhotos(dayVisits, idbVisits);
+      }
+    } catch {}
+  }
+
   const localReports = safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_STORAGE_KEY, []);
 
   if (dayVisits.length > 0) {
-    let perlinsosSudahCount = 0;
-    let perlinsosMenolakCount = 0;
-    let ikdCount = 0;
-    let bpjsCount = 0;
-    let pbbCount = 0;
-
-    const wargaNames: string[] = [];
-    const menolakDetails: string[] = [];
-    const pbbDetails: string[] = [];
-    const ikdDetails: string[] = [];
-    const bpjsDetails: string[] = [];
-
-    const fotos: FotoDokumentasi[] = [];
-    let totalFotoUrlChars = 0;
-    let totalVisitsWithPhoto = 0;
-    const MAX_SYNCED_PHOTOS = 4;
-    const MAX_TOTAL_PHOTO_CHARS = 360_000;
-
-    let earliestCreatedAt = dayVisits[0]?.createdAt || new Date().toISOString();
-
-    dayVisits.forEach((v, idx) => {
-      if (v.createdAt && v.createdAt < earliestCreatedAt) {
-        earliestCreatedAt = v.createdAt;
-      }
-
-      const wargaLabel = `${v.namaWarga}${v.alamat ? ` (${v.alamat})` : ''}`;
-      if (wargaNames.length < 15) {
-        wargaNames.push(wargaLabel);
-      }
-
-      // 1. Perlinsos: prioritaskan pilihan dropdown perlinsos; fallback ke statusBansos hanya jika perlinsos kosong
-      const rawPerlinsos = (v.perlinsos || v.statusBansos || '').trim().toLowerCase();
-      if (rawPerlinsos === 'sudah' || rawPerlinsos === 'layak') {
-        perlinsosSudahCount += 1;
-      } else if (rawPerlinsos === 'menolak') {
-        perlinsosMenolakCount += 1;
-        if (menolakDetails.length < 10) menolakDetails.push(wargaLabel);
-      }
-
-      // 2. PBB
-      const rawPbb = (v.pbb || '').trim().toLowerCase();
-      if (rawPbb === 'sudah' || rawPbb === 'lunas') {
-        pbbCount += 1;
-        if (pbbDetails.length < 10) pbbDetails.push(v.namaWarga);
-      }
-
-      // 3. IKD
-      const rawIkd = (v.ikd || '').trim().toLowerCase();
-      if (rawIkd === 'sudah') {
-        ikdCount += 1;
-        if (ikdDetails.length < 10) ikdDetails.push(v.namaWarga);
-      }
-
-      // 4. BPJS Ketenagakerjaan
-      const rawBpjs = (v.bpjsTk || '').trim().toLowerCase();
-      if (
-        rawBpjs.includes('perisai') ||
-        rawBpjs.includes('sudah') ||
-        (rawBpjs.includes('aktif') && !rawBpjs.includes('non-aktif'))
-      ) {
-        bpjsCount += 1;
-        if (bpjsDetails.length < 10) bpjsDetails.push(v.namaWarga);
-      }
-
-      // 5. Dokumentasi Foto (dibatasi agar ukuran dokumen Firestore aman < 1 MB)
-      const rawFoto =
-        (typeof v.fotoUrl === 'string' && v.fotoUrl.trim()) ||
-        (typeof v.fotoDokumentasi === 'string' && v.fotoDokumentasi.trim()) ||
-        '';
-      if (rawFoto.length > 20) {
-        totalVisitsWithPhoto += 1;
-        if (
-          fotos.length < MAX_SYNCED_PHOTOS &&
-          totalFotoUrlChars + rawFoto.length <= MAX_TOTAL_PHOTO_CHARS
-        ) {
-          totalFotoUrlChars += rawFoto.length;
-          fotos.push({
-            id: `foto_kj_${v.id || idx}`,
-            url: rawFoto,
-            name: `[KUNJUNGAN] ${v.namaWarga} - ${v.alamat || resolved.resolvedLingkungan}`,
-            timestamp: v.updatedAt || v.createdAt || new Date().toISOString(),
-            kategori: 'perlinsos',
-            keterangan: `Kunjungan Warga: ${v.namaWarga}`,
-          });
+    let existingReport = localReports.find((r) => r?.id === reportId);
+    const existingHasValid = Boolean(
+      existingReport?.dokumentasiFoto?.some((f) => f && hasValidVisitPhoto(f.url))
+    );
+    if (!existingHasValid) {
+      try {
+        const idbReport = await getSingleReportFromIndexedDB(reportId);
+        if (idbReport) {
+          existingReport = existingReport
+            ? {
+                ...existingReport,
+                dokumentasiFoto: mergeFotoArraysPreservingUrls(
+                  idbReport.dokumentasiFoto,
+                  existingReport.dokumentasiFoto
+                ),
+              }
+            : idbReport;
         }
-      }
-    });
+      } catch {}
+    }
 
-    const summaryListText =
-      dayVisits.length > 15
-        ? `${wargaNames.join(', ')}, dan ${dayVisits.length - 15} warga lainnya`
-        : wargaNames.join(', ');
-
-    const nowIso = new Date().toISOString();
-    const reportItem: LaporanHarianItem = {
-      id: reportId,
-      keplingId: resolved.resolvedKeplingId,
-      lingkungan: resolved.resolvedLingkungan,
-      namaKepling: resolved.resolvedNama,
-      jabatan: resolved.resolvedJabatan,
-      kelurahan: 'Kelurahan Mangga',
-      kecamatan: 'Kecamatan Medan Tuntungan',
-      hari: getNamaHariIndonesia(tanggalIso),
-      tanggal: tanggalIso,
-      tanggalLaporan: tanggalIso,
-      kinerja: {
-        opsirPbbWp: pbbCount,
-        opsirPbbKeterangan:
-          pbbCount > 0 ? `Terdata lunas saat Kunjungan Warga: ${pbbDetails.join(', ')}` : '',
-        perlinsosKk: perlinsosSudahCount,
-        perlinsosKeterangan: `Kunjungan Warga Door-to-Door (${dayVisits.length} warga dikunjungi): ${summaryListText}`,
-        perlinsosMenolakKk: perlinsosMenolakCount,
-        perlinsosMenolakRincian:
-          menolakDetails.length > 0 ? `Menolak Perlinsos: ${menolakDetails.join(', ')}` : '',
-        ikdOrang: ikdCount,
-        ikdKeterangan:
-          ikdCount > 0 ? `Sudah aktivasi IKD saat kunjungan: ${ikdDetails.join(', ')}` : '',
-        bpjsKetenagakerjaanOrang: bpjsCount,
-        bpjsKetenagakerjaanKeterangan:
-          bpjsCount > 0 ? `BPJS TK Aktif/Terdaftar: ${bpjsDetails.join(', ')}` : '',
-        kegiatanLainnya: `${KUNJUNGAN_LAPORAN_PREFIX} ${dayVisits.length} Warga Dikunjungi: ${summaryListText}`,
-      },
-      jumlahDokumentasi: Math.max(fotos.length, totalVisitsWithPhoto),
-      dokumentasiFoto: fotos,
-      petugasNama: resolved.resolvedNama,
-      petugasRole: 'kepling',
-      uraianTugas: `Kunjungan Warga Door-to-Door (${dayVisits.length} Rumah): ${summaryListText}`,
-      catatanUmum: `Tercatat otomatis dari ${dayVisits.length} data Kunjungan Warga (Door-to-Door) pada ${tanggalIso}.`,
-      createdAt: earliestCreatedAt,
-      updatedAt: nowIso,
-    };
+    const { reportItem, signature } = computeKunjunganDailyReport(
+      resolved,
+      tanggalIso,
+      dayVisits,
+      existingReport
+    );
+    lastReconciledKunjunganSignatures.set(reportId, signature);
 
     try {
       const idx = localReports.findIndex((r) => r?.id === reportId);
@@ -360,11 +536,9 @@ export const syncKunjunganToLaporanHarian = async (
       );
     }
 
-    await saveSingleReportToIndexedDB(reportItem).catch(() => {});
-    await resilientSetDoc('reports', reportItem.id, cleanFirestoreData(reportItem), {
-      merge: true,
-    }).catch(() => {});
+    await persistReportRemoteAndIdb(reportItem);
   } else {
+    lastReconciledKunjunganSignatures.delete(reportId);
     try {
       const cleanedLocal = localReports
         .filter((r) => r && r.id && r.id !== reportId)
@@ -408,8 +582,172 @@ export const syncKunjunganToLaporanHarian = async (
       );
     }
 
-    await deleteReportFromIndexedDB(reportId).catch(() => {});
-    await resilientDeleteDoc('reports', reportId).catch(() => {});
+    await Promise.allSettled([
+      deleteReportFromIndexedDB(reportId).catch(() => {}),
+      resilientDeleteDoc('reports', reportId).catch(() => {}),
+      fetch(`/api/reports/${encodeURIComponent(reportId)}`, { method: 'DELETE' }).catch(() => {}),
+    ]);
+  }
+};
+
+let isSyncingAllKunjungan = false;
+
+/**
+ * Menyelaraskan SELURUH data Kunjungan Warga (termasuk data lama yang sudah tersimpan di Firestore/IDB)
+ * agar setiap tanggal & Kepling otomatis memiliki dokumen arsip laporan harian (`lap_kj_...`).
+ */
+export const syncAllKunjunganToLaporanHarian = async (
+  visits: KunjunganWargaData[],
+  currentRawReports: LaporanHarianItem[],
+  deletedIdsSet?: Set<string>
+): Promise<number> => {
+  if (!Array.isArray(visits) || visits.length === 0 || isSyncingAllKunjungan) return 0;
+  isSyncingAllKunjungan = true;
+
+  try {
+    // Hydrate any stripped visit photos from memoryKunjungan & IndexedDB before building daily reports
+    let hydratedVisits = mergeVisitListPreservingPhotos(visits, memoryKunjungan);
+    if (hydratedVisits.some((v) => v && v.id && !getVisitPhotoSrc(v))) {
+      try {
+        const idbVisits = await getVisitsFromIndexedDB();
+        if (Array.isArray(idbVisits) && idbVisits.length > 0) {
+          hydratedVisits = mergeVisitListPreservingPhotos(hydratedVisits, idbVisits);
+        }
+      } catch {}
+    }
+
+    const groups = new Map<
+      string,
+      {
+        resolved: ReturnType<typeof resolveKeplingTargetForVisit>;
+        tanggalIso: string;
+        visits: KunjunganWargaData[];
+      }
+    >();
+
+    for (const v of hydratedVisits) {
+      if (!v || !v.id) continue;
+      const tanggalIso = getVisitIsoDate(v);
+      const resolved = resolveKeplingTargetForVisit(v);
+      const key = `${resolved.resolvedKeplingId}::${tanggalIso}`;
+      const bucket = groups.get(key);
+      if (bucket) {
+        bucket.visits.push(v);
+      } else {
+        groups.set(key, { resolved, tanggalIso, visits: [v] });
+      }
+    }
+
+    const rawById = new Map<string, LaporanHarianItem>();
+    currentRawReports.forEach((r) => {
+      if (r && r.id) rawById.set(r.id, r);
+    });
+
+    // Also enrich rawById with any intact photos from IndexedDB reports store
+    try {
+      const idbReports = await getReportsFromIndexedDB();
+      if (Array.isArray(idbReports)) {
+        idbReports.forEach((ir) => {
+          if (!ir || !ir.id || !ir.id.startsWith('lap_kj_')) return;
+          const cur = rawById.get(ir.id);
+          if (cur) {
+            const merged = mergeFotoArraysPreservingUrls(ir.dokumentasiFoto, cur.dokumentasiFoto);
+            rawById.set(ir.id, { ...cur, dokumentasiFoto: merged });
+          } else {
+            rawById.set(ir.id, ir);
+          }
+        });
+      }
+    } catch {}
+
+    const countValidFotos = (list?: FotoDokumentasi[]): number =>
+      Array.isArray(list) ? list.filter((f) => f && hasValidVisitPhoto(f.url)).length : 0;
+
+    const toUpsert: LaporanHarianItem[] = [];
+
+    for (const group of groups.values()) {
+      const reportId = buildKunjunganReportId(group.resolved.resolvedKeplingId, group.tanggalIso);
+      if (deletedIdsSet?.has(reportId)) continue;
+
+      const existing = rawById.get(reportId);
+      const { reportItem, signature } = computeKunjunganDailyReport(
+        group.resolved,
+        group.tanggalIso,
+        group.visits,
+        existing
+      );
+
+      if (existing && lastReconciledKunjunganSignatures.get(reportId) === signature) {
+        continue;
+      }
+
+      const existingValidFotos = countValidFotos(existing?.dokumentasiFoto);
+      const nextValidFotos = countValidFotos(reportItem.dokumentasiFoto);
+
+      // Guard: if existing already has valid photos and computed report somehow has fewer valid photos
+      // despite visits having no new photo edits, keep existing photos intact
+      const finalReportItem =
+        existingValidFotos > 0 && nextValidFotos === 0
+          ? {
+              ...reportItem,
+              dokumentasiFoto: existing!.dokumentasiFoto,
+              jumlahDokumentasi: Math.max(
+                Number(reportItem.jumlahDokumentasi || 0),
+                existing!.dokumentasiFoto.length
+              ),
+            }
+          : reportItem;
+
+      const needsUpsert =
+        !existing ||
+        Number(existing.kinerja?.opsirPbbWp || 0) !== Number(finalReportItem.kinerja.opsirPbbWp || 0) ||
+        Number(existing.kinerja?.perlinsosKk || 0) !== Number(finalReportItem.kinerja.perlinsosKk || 0) ||
+        Number(existing.kinerja?.perlinsosMenolakKk || 0) !==
+          Number(finalReportItem.kinerja.perlinsosMenolakKk || 0) ||
+        Number(existing.kinerja?.ikdOrang || 0) !== Number(finalReportItem.kinerja.ikdOrang || 0) ||
+        Number(existing.kinerja?.bpjsKetenagakerjaanOrang || 0) !==
+          Number(finalReportItem.kinerja.bpjsKetenagakerjaanOrang || 0) ||
+        !String(existing.kinerja?.kegiatanLainnya || '').includes(
+          `${group.visits.length} Warga Dikunjungi`
+        ) ||
+        nextValidFotos > existingValidFotos;
+
+      lastReconciledKunjunganSignatures.set(reportId, signature);
+      if (needsUpsert) {
+        toUpsert.push(finalReportItem);
+      }
+    }
+
+    if (toUpsert.length === 0) return 0;
+
+    // 1. Update LocalStorage & UI state atomically in one dispatch (0ms)
+    try {
+      const localReports = safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_STORAGE_KEY, []);
+      const upsertMap = new Map<string, LaporanHarianItem>(toUpsert.map((r) => [r.id, r]));
+      const nextLocal = localReports.filter((r) => r && r.id && !upsertMap.has(r.id));
+      safeSetLocalStorage(LAPORAN_STORAGE_KEY, JSON.stringify([...toUpsert, ...nextLocal]), {
+        skipIdbMirror: true,
+      });
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('sikepling-reports-updated', {
+          detail: { upsertedReports: toUpsert, deletedIds: [] },
+        })
+      );
+    }
+
+    // 2. Persist in small batches (5 at a time) to IDB, Firestore, and /api/reports
+    const BATCH = 5;
+    for (let i = 0; i < toUpsert.length; i += BATCH) {
+      const slice = toUpsert.slice(i, i + BATCH);
+      await Promise.allSettled(slice.map((item) => persistReportRemoteAndIdb(item)));
+    }
+
+    return toUpsert.length;
+  } finally {
+    isSyncingAllKunjungan = false;
   }
 };
 
@@ -421,7 +759,7 @@ export const saveKunjunganWargaToFirestore = async (item: KunjunganWargaData): P
     updatedAt: new Date().toISOString(),
   };
 
-  // 1. Update local state & IndexedDB
+  // 1. Update local state & IndexedDB immediately
   const current = getLocalKunjunganList();
   const idx = current.findIndex((p) => p.id === dataToSave.id);
   const previousVisit = idx >= 0 ? current[idx] : undefined;
@@ -434,30 +772,30 @@ export const saveKunjunganWargaToFirestore = async (item: KunjunganWargaData): P
   setLocalKunjunganList(updatedList);
   saveVisitsToIndexedDB(updatedList).catch(() => {});
 
-  // 2. Save to Firestore via resilient write queue
-  await resilientSetDoc(KUNJUNGAN_COLLECTION, dataToSave.id, cleanFirestoreData(dataToSave), { merge: true });
-
-  // 3. Save to server API buffer
-  try {
-    await fetch('/api/kunjungan', {
+  // 2. Run Laporan Harian auto-sync (dispatches instant 0ms UI update first), Firestore visit save, & /api/kunjungan concurrently
+  const syncTasks: Promise<any>[] = [
+    resilientSetDoc(KUNJUNGAN_COLLECTION, dataToSave.id, cleanFirestoreData(dataToSave), { merge: true }).catch(
+      () => {}
+    ),
+    fetch('/api/kunjungan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dataToSave),
-    });
-  } catch (e) {}
+    }).catch(() => {}),
+    syncKunjunganToLaporanHarian(dataToSave, updatedList).catch(() => {}),
+  ];
 
-  // 4. Otomatis catatkan ke Laporan Harian Kepling & Capaian Kinerja
-  await syncKunjunganToLaporanHarian(dataToSave, updatedList).catch(() => {});
   if (previousVisit) {
     const prevDate = getVisitIsoDate(previousVisit);
     const nextDate = getVisitIsoDate(dataToSave);
     const prevRes = resolveKeplingTargetForVisit(previousVisit);
     const nextRes = resolveKeplingTargetForVisit(dataToSave);
     if (prevDate !== nextDate || prevRes.resolvedKeplingId !== nextRes.resolvedKeplingId) {
-      await syncKunjunganToLaporanHarian(previousVisit, updatedList).catch(() => {});
+      syncTasks.push(syncKunjunganToLaporanHarian(previousVisit, updatedList).catch(() => {}));
     }
   }
 
+  await Promise.allSettled(syncTasks);
   return dataToSave;
 };
 
@@ -470,16 +808,13 @@ export const deleteKunjunganWargaFromFirestore = async (id: string): Promise<voi
   setLocalKunjunganList(filtered);
   saveVisitsToIndexedDB(filtered).catch(() => {});
 
-  await resilientDeleteDoc(KUNJUNGAN_COLLECTION, id);
-
-  try {
-    await fetch(`/api/kunjungan/${id}`, { method: 'DELETE' });
-  } catch (e) {}
-
-  // Perbarui / bersihkan entri otomatis pada Laporan Harian Kepling & Capaian Kinerja
-  if (targetVisit) {
-    await syncKunjunganToLaporanHarian(targetVisit, filtered).catch(() => {});
-  }
+  await Promise.allSettled([
+    resilientDeleteDoc(KUNJUNGAN_COLLECTION, id).catch(() => {}),
+    fetch(`/api/kunjungan/${id}`, { method: 'DELETE' }).catch(() => {}),
+    targetVisit
+      ? syncKunjunganToLaporanHarian(targetVisit, filtered).catch(() => {})
+      : Promise.resolve(),
+  ]);
 };
 
 function sortKunjunganDesc(items: KunjunganWargaData[]): KunjunganWargaData[] {
@@ -509,7 +844,7 @@ export const fetchKunjunganFromFirestore = async (): Promise<KunjunganWargaData[
         remoteItems.push({ ...dat, id: docId });
       }
     });
-    const sorted = sortKunjunganDesc(remoteItems);
+    const sorted = sortKunjunganDesc(mergeVisitListPreservingPhotos(remoteItems, memoryKunjungan));
     if (sorted.length > 0 || !snap.metadata.fromCache) {
       setLocalKunjunganList(sorted);
       saveVisitsToIndexedDB(sorted).catch(() => {});
@@ -533,35 +868,66 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
   const initialLocal = getLocalKunjunganList();
   cb(initialLocal);
 
-  // 2. Fast IndexedDB restore (10ms) if live Firestore hasn't arrived yet
+  // 2. Fast IndexedDB restore (10ms) — always hydrate missing photos AND missing visits even when lengths match
   getVisitsFromIndexedDB()
     .then((idb) => {
-      if (!isActive || hasLiveFirestore) return;
-      if (Array.isArray(idb) && idb.length > initialLocal.length) {
-        const deletedSet = new Set(getDeletedKunjunganIds());
-        const cleaned = sortKunjunganDesc(idb.filter((x) => x && x.id && !deletedSet.has(x.id)));
-        setLocalKunjunganList(cleaned);
-        cb(cleaned);
+      if (!isActive || !Array.isArray(idb) || idb.length === 0) return;
+      const deletedSet = new Set(getDeletedKunjunganIds());
+      const cleanIdb = idb.filter((x) => x && x.id && !deletedSet.has(x.id));
+      if (cleanIdb.length === 0) return;
+
+      const cur = memoryKunjungan.length > 0 ? memoryKunjungan : initialLocal;
+      const curMap = new Map<string, KunjunganWargaData>();
+      cur.forEach((v) => { if (v && v.id) curMap.set(v.id, v); });
+
+      let didChange = false;
+      cleanIdb.forEach((idbItem) => {
+        const existing = curMap.get(idbItem.id);
+        if (!existing) {
+          if (!hasLiveFirestore) {
+            curMap.set(idbItem.id, idbItem);
+            didChange = true;
+          }
+        } else if (!getVisitPhotoSrc(existing) && getVisitPhotoSrc(idbItem)) {
+          curMap.set(idbItem.id, mergeVisitWithPreservedPhoto(existing, idbItem));
+          didChange = true;
+        }
+      });
+
+      if (didChange) {
+        const merged = sortKunjunganDesc(Array.from(curMap.values()));
+        setLocalKunjunganList(merged);
+        cb(merged);
       }
     })
     .catch(() => {});
 
-  // 3. Server API buffer ONLY as cold-start fallback if Firestore hasn't delivered yet
+  // 3. Server API buffer ONLY as cold-start / photo-hydration fallback
   fetch('/api/kunjungan')
     .then((res) => res.json())
     .then((resData) => {
-      if (!isActive || hasLiveFirestore) return;
+      if (!isActive) return;
       if (resData && resData.success && Array.isArray(resData.data) && resData.data.length > 0) {
         const deletedSet = new Set(getDeletedKunjunganIds());
         const serverItems: KunjunganWargaData[] = resData.data.filter(
           (x: any) => x && x.id && !deletedSet.has(x.id)
         );
         const current = getLocalKunjunganList();
-        if (current.length === 0 && serverItems.length > 0) {
+        if (!hasLiveFirestore && current.length === 0 && serverItems.length > 0) {
           const sorted = sortKunjunganDesc(serverItems);
           setLocalKunjunganList(sorted);
           saveVisitsToIndexedDB(sorted).catch(() => {});
           cb(sorted);
+        } else if (current.length > 0 && current.some((c) => !getVisitPhotoSrc(c))) {
+          const hydrated = mergeVisitListPreservingPhotos(current, serverItems);
+          const restoredAny = hydrated.some(
+            (h, i) => Boolean(getVisitPhotoSrc(h)) && !getVisitPhotoSrc(current[i])
+          );
+          if (restoredAny) {
+            setLocalKunjunganList(hydrated);
+            saveVisitsToIndexedDB(hydrated).catch(() => {});
+            cb(hydrated);
+          }
         }
       }
     })
@@ -587,7 +953,7 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
             }
           });
 
-          const sorted = sortKunjunganDesc(remoteItems);
+          const sorted = sortKunjunganDesc(mergeVisitListPreservingPhotos(remoteItems, memoryKunjungan));
           if (!snapshot.metadata.fromCache) {
             hasLiveFirestore = true;
             setLocalKunjunganList(sorted);
@@ -637,14 +1003,7 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
       bc = new BroadcastChannel(KUNJUNGAN_CHANNEL);
       bc.onmessage = (event) => {
         if (isActive && event.data && event.data.type === 'SYNC_KUNJUNGAN' && Array.isArray(event.data.items)) {
-          const memMap = new Map<string, KunjunganWargaData>();
-          memoryKunjungan.forEach((m) => { if (m && m.id) memMap.set(m.id, m); });
-          const hydrated = event.data.items.map((it: KunjunganWargaData) => {
-            if (!it?.fotoUrl && memMap.get(it.id)?.fotoUrl) {
-              return { ...it, fotoUrl: memMap.get(it.id)!.fotoUrl };
-            }
-            return it;
-          });
+          const hydrated = mergeVisitListPreservingPhotos(event.data.items, memoryKunjungan);
           memoryKunjungan = hydrated;
           cb(hydrated);
         }

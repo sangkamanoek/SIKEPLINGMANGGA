@@ -47,9 +47,9 @@ export const isReportDeleted = (r: LaporanHarianItem): boolean => {
 };
 
 /**
- * Fetch all reports with instant offline fallback from HP IndexedDB & LocalStorage
+ * Fetch all raw (unconsolidated) reports from Firestore / server / local fallback
  */
-export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
+export const fetchAllRawReports = async (): Promise<LaporanHarianItem[]> => {
   const localFallbackMap = new Map<string, LaporanHarianItem>();
 
   // 1. Read HP IndexedDB & LocalStorage as instant offline fallback / photo hydration source
@@ -104,13 +104,7 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
           }
         }
       });
-      const consolidated = consolidateAllReports(Array.from(authMap.values()));
-      consolidated.sort((a, b) => {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.tanggal ? new Date(a.tanggal).getTime() : 0);
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.tanggal ? new Date(b.tanggal).getTime() : 0);
-        return timeB - timeA;
-      });
-      return consolidated;
+      return Array.from(authMap.values());
     }
   } catch (err) {
     console.warn('[Online Firestore] Error reading Firestore reports:', err);
@@ -159,8 +153,15 @@ export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
     console.warn('[Online API] Error reading /api/reports:', e);
   }
 
-  const merged = Array.from(localFallbackMap.values());
-  const consolidated = consolidateAllReports(merged);
+  return Array.from(localFallbackMap.values());
+};
+
+/**
+ * Fetch all reports with instant offline fallback from HP IndexedDB & LocalStorage
+ */
+export const fetchAllReports = async (): Promise<LaporanHarianItem[]> => {
+  const raw = await fetchAllRawReports();
+  const consolidated = consolidateAllReports(raw);
   consolidated.sort((a, b) => {
     const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.tanggal ? new Date(a.tanggal).getTime() : 0);
     const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.tanggal ? new Date(b.tanggal).getTime() : 0);

@@ -8,6 +8,11 @@ export const formatRupiah = (val: number): string => {
 export const formatTanggalIndonesia = (dateStr: string | Date): string => {
   if (!dateStr) return '';
   try {
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr.trim())) {
+      const [y, m, day] = dateStr.trim().split('-').map(Number);
+      const localD = new Date(y, m - 1, day);
+      return localD.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
     const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
     return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   } catch {
@@ -24,9 +29,28 @@ export const getTodayLocalIso = (date?: Date): string => {
 };
 
 export const isReportMatchingKepling = (report: LaporanHarianItem, kepling: UserAccount): boolean => {
-  if (report.keplingId === kepling.id) return true;
-  if (report.namaKepling?.trim().toLowerCase() === kepling.nama.trim().toLowerCase()) return true;
-  if (String(report.lingkungan).trim().toLowerCase() === kepling.lingkungan.trim().toLowerCase()) return true;
+  if (!report || !kepling) return false;
+  if (report.keplingId && kepling.id && report.keplingId === kepling.id) return true;
+  if (report.namaKepling && kepling.nama && report.namaKepling.trim().toLowerCase() === kepling.nama.trim().toLowerCase()) {
+    return true;
+  }
+  if (
+    report.lingkungan &&
+    kepling.lingkungan &&
+    String(report.lingkungan).trim().toLowerCase() === String(kepling.lingkungan).trim().toLowerCase()
+  ) {
+    return true;
+  }
+  const repLk =
+    Number((report as any).lingkunganNomor || 0) ||
+    extractNomorLingkungan(report.lingkungan) ||
+    extractNomorLingkungan(report.jabatan) ||
+    extractNomorLingkungan(report.keplingId);
+  const kepLk =
+    Number(kepling.nomorLingkungan || 0) ||
+    extractNomorLingkungan(kepling.lingkungan) ||
+    extractNomorLingkungan(kepling.id);
+  if (repLk > 0 && kepLk > 0 && repLk === kepLk) return true;
   return false;
 };
 

@@ -635,6 +635,22 @@ app.post('/api/kunjungan', (req, res) => {
     const items = rawBody?.items || (Array.isArray(rawBody) ? rawBody : null);
     const item = rawBody?.item || (!items && rawBody?.namaWarga ? rawBody : null);
 
+    const mergeKunjunganWithCachedPhotos = (cached: any, incoming: any) => {
+      if (!cached) return incoming;
+      const hasStr = (v: unknown) => typeof v === 'string' && v.trim().length > 20;
+      const merged = { ...cached, ...incoming };
+      if (!hasStr(incoming.fotoUrl) && hasStr(cached.fotoUrl)) {
+        merged.fotoUrl = cached.fotoUrl;
+      }
+      if (!hasStr(incoming.fotoDokumentasi) && hasStr(cached.fotoDokumentasi)) {
+        merged.fotoDokumentasi = cached.fotoDokumentasi;
+      }
+      if (!hasStr(incoming.fotoRumah) && hasStr(cached.fotoRumah)) {
+        merged.fotoRumah = cached.fotoRumah;
+      }
+      return merged;
+    };
+
     // Batch save
     if (Array.isArray(items)) {
       for (const it of items) {
@@ -643,7 +659,10 @@ app.post('/api/kunjungan', (req, res) => {
         if (it.alamat) it.alamat = String(it.alamat).trim().toUpperCase();
         const idx = kunjunganCache.findIndex((k) => k.id === it.id);
         if (idx >= 0) {
-          kunjunganCache[idx] = { ...kunjunganCache[idx], ...it, updatedAt: new Date().toISOString() };
+          kunjunganCache[idx] = {
+            ...mergeKunjunganWithCachedPhotos(kunjunganCache[idx], it),
+            updatedAt: new Date().toISOString(),
+          };
         } else {
           kunjunganCache.unshift({ ...it, updatedAt: new Date().toISOString() });
         }
@@ -672,7 +691,10 @@ app.post('/api/kunjungan', (req, res) => {
 
     const idx = kunjunganCache.findIndex((k) => k.id === item.id);
     if (idx >= 0) {
-      kunjunganCache[idx] = { ...kunjunganCache[idx], ...item, updatedAt: new Date().toISOString() };
+      kunjunganCache[idx] = {
+        ...mergeKunjunganWithCachedPhotos(kunjunganCache[idx], item),
+        updatedAt: new Date().toISOString(),
+      };
     } else {
       kunjunganCache.unshift({ ...item, updatedAt: new Date().toISOString() });
     }
@@ -1414,11 +1436,19 @@ app.post('/api/reports', (req, res) => {
       item.createdAt = new Date().toISOString();
     }
 
-    // Check if report with same id exists, or update if matches same Kepling and same date
+    const isAutoGenReportId = (id?: string): boolean => {
+      const s = String(id || '');
+      return s.startsWith('lap_ag_') || s.startsWith('lap_pk_') || s.startsWith('lap_kj_');
+    };
+    const incomingIsAuto = isAutoGenReportId(item.id);
+
+    // Check if report with same id exists, or update if manual report matches same Kepling and same date
     const existingIndex = reportsCache.findIndex(
       (r) =>
         r.id === item.id ||
-        (r.namaKepling?.trim().toLowerCase() === item.namaKepling?.trim().toLowerCase() &&
+        (!incomingIsAuto &&
+          !isAutoGenReportId(r.id) &&
+          r.namaKepling?.trim().toLowerCase() === item.namaKepling?.trim().toLowerCase() &&
           r.tanggal?.trim().toLowerCase() === item.tanggal?.trim().toLowerCase())
     );
 
@@ -1486,31 +1516,62 @@ app.post('/api/reports', (req, res) => {
         mergedPhotos.push(inc);
       });
 
-      reportsCache[existingIndex] = {
-        ...existing,
-        ...item,
-        id: existing.id,
-        kinerja: {
-          ...eKin,
-          ...iKin,
-          opsirPbbWp: parseNum(eKin.opsirPbbWp) + parseNum(iKin.opsirPbbWp),
-          opsirPbbKeterangan: combineNotes(eKin.opsirPbbKeterangan, iKin.opsirPbbKeterangan),
-          perlinsosKk: parseNum(eKin.perlinsosKk) + parseNum(iKin.perlinsosKk),
-          perlinsosKeterangan: combineNotes(eKin.perlinsosKeterangan, iKin.perlinsosKeterangan),
-          perlinsosMenolakKk: parseNum(eKin.perlinsosMenolakKk) + parseNum(iKin.perlinsosMenolakKk),
-          perlinsosTidakDiTempatKk: parseNum(eKin.perlinsosTidakDiTempatKk) + parseNum(iKin.perlinsosTidakDiTempatKk),
-          ikdOrang: parseNum(eKin.ikdOrang) + parseNum(iKin.ikdOrang),
-          ikdKeterangan: combineNotes(eKin.ikdKeterangan, iKin.ikdKeterangan),
-          bpjsKetenagakerjaanOrang: parseNum(eKin.bpjsKetenagakerjaanOrang) + parseNum(iKin.bpjsKetenagakerjaanOrang),
-          bpjsKetenagakerjaanKeterangan: combineNotes(eKin.bpjsKetenagakerjaanKeterangan, iKin.bpjsKetenagakerjaanKeterangan),
-          kegiatanLainnya: combineNotes(eKin.kegiatanLainnya, iKin.kegiatanLainnya),
-          poskamlingKeterangan: combineNotes(eKin.poskamlingKeterangan, iKin.poskamlingKeterangan),
-          posyanduKeterangan: combineNotes(eKin.posyanduKeterangan, iKin.posyanduKeterangan),
-        },
-        dokumentasiFoto: mergedPhotos,
-        jumlahDokumentasi: mergedPhotos.length,
-        updatedAt: new Date().toISOString(),
-      };
+      if (incomingIsAuto) {
+        // Auto-generated snapshots already represent the full recalculated total for that module/day,
+        // while still protecting existing valid photos against empty/stripped sync payloads
+        const exHasValid = exList.some((ex) => hasValidFotoUrl(ex));
+        const autoFotos =
+          inList.length > 0
+            ? mergedPhotos.filter((m) =>
+                inList.some(
+                  (inc) =>
+                    (inc?.id && inc.id === m?.id) ||
+                    (inc?.name && inc.name === m?.name) ||
+                    (hasValidFotoUrl(inc) && inc.url === m?.url)
+                )
+              )
+            : exHasValid && Number(item.jumlahDokumentasi || 0) > 0
+            ? exList
+            : [];
+        reportsCache[existingIndex] = {
+          ...existing,
+          ...item,
+          id: existing.id,
+          createdAt: existing.createdAt || item.createdAt,
+          kinerja: {
+            ...iKin,
+          },
+          dokumentasiFoto: autoFotos,
+          jumlahDokumentasi: Math.max(Number(item.jumlahDokumentasi || 0), autoFotos.length),
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        reportsCache[existingIndex] = {
+          ...existing,
+          ...item,
+          id: existing.id,
+          kinerja: {
+            ...eKin,
+            ...iKin,
+            opsirPbbWp: parseNum(eKin.opsirPbbWp) + parseNum(iKin.opsirPbbWp),
+            opsirPbbKeterangan: combineNotes(eKin.opsirPbbKeterangan, iKin.opsirPbbKeterangan),
+            perlinsosKk: parseNum(eKin.perlinsosKk) + parseNum(iKin.perlinsosKk),
+            perlinsosKeterangan: combineNotes(eKin.perlinsosKeterangan, iKin.perlinsosKeterangan),
+            perlinsosMenolakKk: parseNum(eKin.perlinsosMenolakKk) + parseNum(iKin.perlinsosMenolakKk),
+            perlinsosTidakDiTempatKk: parseNum(eKin.perlinsosTidakDiTempatKk) + parseNum(iKin.perlinsosTidakDiTempatKk),
+            ikdOrang: parseNum(eKin.ikdOrang) + parseNum(iKin.ikdOrang),
+            ikdKeterangan: combineNotes(eKin.ikdKeterangan, iKin.ikdKeterangan),
+            bpjsKetenagakerjaanOrang: parseNum(eKin.bpjsKetenagakerjaanOrang) + parseNum(iKin.bpjsKetenagakerjaanOrang),
+            bpjsKetenagakerjaanKeterangan: combineNotes(eKin.bpjsKetenagakerjaanKeterangan, iKin.bpjsKetenagakerjaanKeterangan),
+            kegiatanLainnya: combineNotes(eKin.kegiatanLainnya, iKin.kegiatanLainnya),
+            poskamlingKeterangan: combineNotes(eKin.poskamlingKeterangan, iKin.poskamlingKeterangan),
+            posyanduKeterangan: combineNotes(eKin.posyanduKeterangan, iKin.posyanduKeterangan),
+          },
+          dokumentasiFoto: mergedPhotos,
+          jumlahDokumentasi: mergedPhotos.length,
+          updatedAt: new Date().toISOString(),
+        };
+      }
     } else {
       // Add new report at the beginning
       reportsCache = [item, ...reportsCache];
@@ -1532,14 +1593,22 @@ app.post('/api/reports/batch', (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid reports array' });
     }
 
+    const isAutoGenId = (id?: string): boolean => {
+      const s = String(id || '');
+      return s.startsWith('lap_ag_') || s.startsWith('lap_pk_') || s.startsWith('lap_kj_');
+    };
+
     const deletedSet = new Set(deletedReportsCache);
     let addedCount = 0;
     for (const item of items) {
       if (!item || !item.namaKepling || (item.id && deletedSet.has(item.id))) continue;
+      const incomingIsAuto = isAutoGenId(item.id);
       const exists = reportsCache.some(
         (r) =>
           r.id === item.id ||
-          (r.namaKepling?.trim().toLowerCase() === item.namaKepling?.trim().toLowerCase() &&
+          (!incomingIsAuto &&
+            !isAutoGenId(r.id) &&
+            r.namaKepling?.trim().toLowerCase() === item.namaKepling?.trim().toLowerCase() &&
             r.tanggal?.trim().toLowerCase() === item.tanggal?.trim().toLowerCase())
       );
       if (!exists) {

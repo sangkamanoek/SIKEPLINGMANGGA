@@ -105,6 +105,12 @@ export function getPendingSyncCount(): number {
   return readLocalQueue().length;
 }
 
+export function isDocQueuedForWrite(colName: string, docId: string): boolean {
+  if (!colName || !docId) return false;
+  const targetKey = `${colName}::${docId}`;
+  return readLocalQueue().some((rec) => rec && rec.key === targetKey && rec.op === 'set');
+}
+
 async function enqueueWrite(record: QueuedWriteRecord): Promise<void> {
   try {
     await putWriteQueueItemIDB(record).catch(() => {});

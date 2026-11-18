@@ -1250,18 +1250,25 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                 </span>
                               </td>
                               <td className="border border-black text-center py-1 px-1">
-                                {kunj.fotoDokumentasi ? (
-                                  <div className="w-6 h-6 mx-auto rounded overflow-hidden border border-slate-300">
-                                    <img
-                                      src={getDirectImageUrl(kunj.fotoDokumentasi)}
-                                      alt={kunj.namaWarga}
-                                      crossOrigin="anonymous"
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-400 text-[6.5pt]">-</span>
-                                )}
+                                {(() => {
+                                  const kunjFoto =
+                                    kunj.fotoUrl ||
+                                    (typeof kunj.fotoDokumentasi === 'string'
+                                      ? kunj.fotoDokumentasi
+                                      : '');
+                                  return kunjFoto ? (
+                                    <div className="w-6 h-6 mx-auto rounded overflow-hidden border border-slate-300">
+                                      <img
+                                        src={getDirectImageUrl(kunjFoto)}
+                                        alt={kunj.namaWarga}
+                                        crossOrigin="anonymous"
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 text-[6.5pt]">-</span>
+                                  );
+                                })()}
                               </td>
                             </tr>
                           ))}
@@ -2503,23 +2510,30 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                             </span>
                           </td>
                           <td className="py-1 px-2 text-center">
-                            {kunj.fotoDokumentasi ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenPhotoPreview(kunj.fotoDokumentasi!, `Kunjungan - ${kunj.namaWarga}`)}
-                                className="w-7 h-7 mx-auto rounded overflow-hidden border border-emerald-300 hover:ring-2 hover:ring-emerald-500 block transition-transform hover:scale-105 cursor-pointer"
-                                title="Lihat Foto Kunjungan"
-                              >
-                                <img
-                                  src={getDirectImageUrl(kunj.fotoDokumentasi)}
-                                  alt={kunj.namaWarga}
-                                  crossOrigin="anonymous"
-                                  className="w-full h-full object-cover"
-                                />
-                              </button>
-                            ) : (
-                              <span className="text-slate-400 text-[10px]">-</span>
-                            )}
+                            {(() => {
+                              const kunjFoto =
+                                kunj.fotoUrl ||
+                                (typeof kunj.fotoDokumentasi === 'string'
+                                  ? kunj.fotoDokumentasi
+                                  : '');
+                              return kunjFoto ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPhotoPreview(kunjFoto, `Kunjungan - ${kunj.namaWarga}`)}
+                                  className="w-7 h-7 mx-auto rounded overflow-hidden border border-emerald-300 hover:ring-2 hover:ring-emerald-500 block transition-transform hover:scale-105 cursor-pointer"
+                                  title="Lihat Foto Kunjungan"
+                                >
+                                  <img
+                                    src={getDirectImageUrl(kunjFoto)}
+                                    alt={kunj.namaWarga}
+                                    crossOrigin="anonymous"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </button>
+                              ) : (
+                                <span className="text-slate-400 text-[10px]">-</span>
+                              );
+                            })()}
                           </td>
                         </tr>
                       ))}
