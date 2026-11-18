@@ -382,7 +382,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
   });
 
   useEffect(() => {
-    if (Array.isArray(kunjunganList) && kunjunganList.length > 0) {
+    if (Array.isArray(kunjunganList)) {
       setLiveKunjunganList(kunjunganList);
     }
   }, [kunjunganList]);
@@ -396,11 +396,20 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     } catch {}
 
     const unsub = subscribeKunjunganWarga((items) => {
-      if (Array.isArray(items) && items.length > 0) {
+      if (Array.isArray(items)) {
         setLiveKunjunganList(items);
       }
     });
-    return () => unsub();
+
+    const handleKunjunganLocalUpdate = () => {
+      setLiveKunjunganList(getLocalKunjunganList());
+    };
+    window.addEventListener('kunjungan-data-updated', handleKunjunganLocalUpdate);
+
+    return () => {
+      unsub();
+      window.removeEventListener('kunjungan-data-updated', handleKunjunganLocalUpdate);
+    };
   }, []);
 
   // Real-time Absensi Kehadiran Kepala Lingkungan berdasarkan Agenda Kelurahan
@@ -771,8 +780,8 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
   // Memori Kunjungan Harian (prioritas live state, props, lalu getLocalKunjunganList)
   const effectiveKunjunganList = useMemo(() => {
-    if (Array.isArray(liveKunjunganList) && liveKunjunganList.length > 0) return liveKunjunganList;
-    if (Array.isArray(kunjunganList) && kunjunganList.length > 0) return kunjunganList;
+    if (Array.isArray(liveKunjunganList)) return liveKunjunganList;
+    if (Array.isArray(kunjunganList)) return kunjunganList;
     return getLocalKunjunganList();
   }, [liveKunjunganList, kunjunganList]);
 
@@ -1674,7 +1683,12 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   </div>
                   <div className="bg-black/20 p-2 rounded-xl text-center">
                     <span className="block opacity-80 font-bold">🏠 Kunjungan</span>
-                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.kunjunganPercentage}%</strong>
+                    <strong className="text-xs block mt-0.5">
+                      {myPerformanceData.item.kunjunganPercentage}%
+                      <span className="font-normal opacity-80 ml-1">
+                        ({myPerformanceData.item.totalKunjungan})
+                      </span>
+                    </strong>
                   </div>
                   <div className="bg-black/20 p-2 rounded-xl text-center">
                     <span className="block opacity-80 font-bold">🔦 Ronda</span>

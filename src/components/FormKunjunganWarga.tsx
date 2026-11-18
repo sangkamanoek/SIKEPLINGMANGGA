@@ -143,7 +143,11 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       };
 
       await saveKunjunganWargaToFirestore(payload);
-      setSuccessMsg(editItem ? 'Kunjungan berhasil diperbarui!' : 'Kunjungan warga berhasil disimpan ke database Firestore (koleksi: kunjungan_warga)!');
+      setSuccessMsg(
+        editItem
+          ? 'Kunjungan berhasil diperbarui & otomatis tersinkron ke Laporan Harian serta Capaian Kinerja!'
+          : 'Kunjungan warga berhasil disimpan & otomatis tercatat di Laporan Harian serta Capaian Kinerja Kepling!'
+      );
       setTimeout(() => {
         setIsSubmitting(false);
         setNamaWarga('');
@@ -167,7 +171,9 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
         <Users className="w-5 h-5 text-emerald-600" />
         <div>
           <h3 className="font-black text-sm text-slate-900">Form Kunjungan Warga (Door-to-Door)</h3>
-          <p className="text-[11px] text-slate-500">Tersimpan langsung ke Database Cloud Firestore (Koleksi: kunjungan_warga)</p>
+          <p className="text-[11px] text-slate-500">
+            Tersimpan ke Firestore &amp; otomatis tercatat pada Laporan Harian serta Capaian Kinerja Kepling
+          </p>
         </div>
       </div>
 

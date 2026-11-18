@@ -235,12 +235,17 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
     // Also include photos from relevant Kunjungan Warga if not already present
     relevantKunjungan.forEach((kunj, kIdx) => {
-      if (kunj.fotoDokumentasi) {
-        const alreadyHas = list.some((p) => p.url === kunj.fotoDokumentasi);
+      const resolvedUrl =
+        (typeof kunj.fotoUrl === 'string' && kunj.fotoUrl.trim()) ||
+        (typeof kunj.fotoDokumentasi === 'string'
+          ? kunj.fotoDokumentasi.trim()
+          : String((kunj.fotoDokumentasi as any)?.[0] || '').trim());
+      if (resolvedUrl) {
+        const alreadyHas = list.some((p) => p.url === resolvedUrl);
         if (!alreadyHas) {
           list.push({
             id: `kunj_foto_${kunj.id || kIdx}`,
-            url: typeof kunj.fotoDokumentasi === 'string' ? kunj.fotoDokumentasi : String((kunj.fotoDokumentasi as any)?.[0] || ''),
+            url: resolvedUrl,
             name: `[KUNJUNGAN] ${kunj.namaWarga} - ${kunj.alamat}`,
             timestamp: kunj.createdAt || new Date().toISOString(),
             kategori: 'perlinsos',
