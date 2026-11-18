@@ -267,18 +267,7 @@ const computeKunjunganDailyReport = (
 ): ComputedKunjunganDaily => {
   const reportId = buildKunjunganReportId(resolved.resolvedKeplingId, tanggalIso);
 
-  let perlinsosSudahCount = 0;
-  let perlinsosMenolakCount = 0;
-  let ikdCount = 0;
-  let bpjsCount = 0;
-  let pbbCount = 0;
-
   const wargaNames: string[] = [];
-  const menolakDetails: string[] = [];
-  const pbbDetails: string[] = [];
-  const ikdDetails: string[] = [];
-  const bpjsDetails: string[] = [];
-
   const fotos: FotoDokumentasi[] = [];
   let totalFotoUrlChars = 0;
   let totalVisitsWithPhoto = 0;
@@ -301,41 +290,7 @@ const computeKunjunganDailyReport = (
       wargaNames.push(wargaLabel);
     }
 
-    // 1. Perlinsos: prioritaskan pilihan dropdown perlinsos; fallback ke statusBansos hanya jika perlinsos kosong
-    const rawPerlinsos = (v.perlinsos || v.statusBansos || '').trim().toLowerCase();
-    if (rawPerlinsos === 'sudah' || rawPerlinsos === 'layak') {
-      perlinsosSudahCount += 1;
-    } else if (rawPerlinsos === 'menolak') {
-      perlinsosMenolakCount += 1;
-      if (menolakDetails.length < 10) menolakDetails.push(wargaLabel);
-    }
-
-    // 2. PBB
-    const rawPbb = (v.pbb || '').trim().toLowerCase();
-    if (rawPbb === 'sudah' || rawPbb === 'lunas') {
-      pbbCount += 1;
-      if (pbbDetails.length < 10) pbbDetails.push(v.namaWarga);
-    }
-
-    // 3. IKD
-    const rawIkd = (v.ikd || '').trim().toLowerCase();
-    if (rawIkd === 'sudah') {
-      ikdCount += 1;
-      if (ikdDetails.length < 10) ikdDetails.push(v.namaWarga);
-    }
-
-    // 4. BPJS Ketenagakerjaan
-    const rawBpjs = (v.bpjsTk || '').trim().toLowerCase();
-    if (
-      rawBpjs.includes('perisai') ||
-      rawBpjs.includes('sudah') ||
-      (rawBpjs.includes('aktif') && !rawBpjs.includes('non-aktif'))
-    ) {
-      bpjsCount += 1;
-      if (bpjsDetails.length < 10) bpjsDetails.push(v.namaWarga);
-    }
-
-    // 5. Dokumentasi Foto (dibatasi agar ukuran dokumen Firestore aman < 1 MB)
+    // Dokumentasi Foto Kegiatan Kunjungan Warga (dibatasi agar ukuran dokumen Firestore aman < 1 MB)
     const directFoto = getVisitPhotoSrc(v);
     const fotoId = `foto_kj_${v.id || idx}`;
     const existingMatchedFoto =
@@ -360,8 +315,8 @@ const computeKunjunganDailyReport = (
           url: rawFoto,
           name: `[KUNJUNGAN] ${v.namaWarga} - ${v.alamat || resolved.resolvedLingkungan}`,
           timestamp: v.updatedAt || v.createdAt || new Date().toISOString(),
-          kategori: 'perlinsos',
-          keterangan: `Kunjungan Warga: ${v.namaWarga}`,
+          kategori: 'umum',
+          keterangan: `Kegiatan Kunjungan Warga: ${v.namaWarga}`,
         });
       }
     }
@@ -398,33 +353,31 @@ const computeKunjunganDailyReport = (
     tanggal: tanggalIso,
     tanggalLaporan: tanggalIso,
     kinerja: {
-      opsirPbbWp: pbbCount,
-      opsirPbbKeterangan:
-        pbbCount > 0 ? `Terdata lunas saat Kunjungan Warga: ${pbbDetails.join(', ')}` : '',
-      perlinsosKk: perlinsosSudahCount,
-      perlinsosKeterangan: `Kunjungan Warga Door-to-Door (${sortedVisits.length} warga dikunjungi): ${summaryListText}`,
-      perlinsosMenolakKk: perlinsosMenolakCount,
-      perlinsosMenolakRincian:
-        menolakDetails.length > 0 ? `Menolak Perlinsos: ${menolakDetails.join(', ')}` : '',
-      ikdOrang: ikdCount,
-      ikdKeterangan:
-        ikdCount > 0 ? `Sudah aktivasi IKD saat kunjungan: ${ikdDetails.join(', ')}` : '',
-      bpjsKetenagakerjaanOrang: bpjsCount,
-      bpjsKetenagakerjaanKeterangan:
-        bpjsCount > 0 ? `BPJS TK Aktif/Terdaftar: ${bpjsDetails.join(', ')}` : '',
-      kegiatanLainnya: `${KUNJUNGAN_LAPORAN_PREFIX} ${sortedVisits.length} Warga Dikunjungi: ${summaryListText}`,
+      opsirPbbWp: 0,
+      opsirPbbKeterangan: '',
+      perlinsosKk: 0,
+      perlinsosKeterangan: '',
+      perlinsosMenolakKk: 0,
+      perlinsosMenolakRincian: '',
+      perlinsosTidakDiTempatKk: 0,
+      perlinsosTidakDiTempatRincian: '',
+      ikdOrang: 0,
+      ikdKeterangan: '',
+      bpjsKetenagakerjaanOrang: 0,
+      bpjsKetenagakerjaanKeterangan: '',
+      kegiatanLainnya: `${KUNJUNGAN_LAPORAN_PREFIX} Melaksanakan Kegiatan Kunjungan Warga (${sortedVisits.length} Warga Dikunjungi): ${summaryListText}`,
     },
     jumlahDokumentasi: Math.max(effectiveFotos.length, totalVisitsWithPhoto, Number(existingReport?.jumlahDokumentasi || 0)),
     dokumentasiFoto: effectiveFotos,
     petugasNama: resolved.resolvedNama,
     petugasRole: 'kepling',
-    uraianTugas: `Kunjungan Warga Door-to-Door (${sortedVisits.length} Rumah): ${summaryListText}`,
-    catatanUmum: `Tercatat otomatis dari ${sortedVisits.length} data Kunjungan Warga (Door-to-Door) pada ${tanggalIso}.`,
+    uraianTugas: `Kegiatan Kunjungan Warga (${sortedVisits.length} Rumah): ${summaryListText}`,
+    catatanUmum: `Tercatat otomatis sebagai Kegiatan Kunjungan Warga (${sortedVisits.length} rumah) pada ${tanggalIso}.`,
     createdAt: existingReport?.createdAt || earliestCreatedAt,
     updatedAt: nowIso,
   };
 
-  const signature = `${sortedVisits.length}|${pbbCount}|${perlinsosSudahCount}|${perlinsosMenolakCount}|${ikdCount}|${bpjsCount}|${validFotoCount}|${sortedVisits
+  const signature = `activity_only|${sortedVisits.length}|${validFotoCount}|${sortedVisits
     .map((v) => `${v.id}:${v.updatedAt || ''}:${v.namaWarga || ''}:${getVisitPhotoSrc(v) ? 1 : 0}`)
     .join(',')}`;
 
@@ -700,15 +653,19 @@ export const syncAllKunjunganToLaporanHarian = async (
 
       const needsUpsert =
         !existing ||
-        Number(existing.kinerja?.opsirPbbWp || 0) !== Number(finalReportItem.kinerja.opsirPbbWp || 0) ||
-        Number(existing.kinerja?.perlinsosKk || 0) !== Number(finalReportItem.kinerja.perlinsosKk || 0) ||
-        Number(existing.kinerja?.perlinsosMenolakKk || 0) !==
-          Number(finalReportItem.kinerja.perlinsosMenolakKk || 0) ||
-        Number(existing.kinerja?.ikdOrang || 0) !== Number(finalReportItem.kinerja.ikdOrang || 0) ||
-        Number(existing.kinerja?.bpjsKetenagakerjaanOrang || 0) !==
-          Number(finalReportItem.kinerja.bpjsKetenagakerjaanOrang || 0) ||
+        Number(existing.kinerja?.opsirPbbWp || 0) !== 0 ||
+        Number(existing.kinerja?.perlinsosKk || 0) !== 0 ||
+        Number(existing.kinerja?.perlinsosMenolakKk || 0) !== 0 ||
+        Number(existing.kinerja?.perlinsosTidakDiTempatKk || 0) !== 0 ||
+        Number(existing.kinerja?.ikdOrang || 0) !== 0 ||
+        Number(existing.kinerja?.bpjsKetenagakerjaanOrang || 0) !== 0 ||
+        Boolean(existing.kinerja?.opsirPbbKeterangan?.trim()) ||
+        Boolean(existing.kinerja?.perlinsosKeterangan?.trim()) ||
+        Boolean(existing.kinerja?.perlinsosMenolakRincian?.trim()) ||
+        Boolean(existing.kinerja?.ikdKeterangan?.trim()) ||
+        Boolean(existing.kinerja?.bpjsKetenagakerjaanKeterangan?.trim()) ||
         !String(existing.kinerja?.kegiatanLainnya || '').includes(
-          `${group.visits.length} Warga Dikunjungi`
+          `Kegiatan Kunjungan Warga (${group.visits.length} Warga Dikunjungi)`
         ) ||
         nextValidFotos > existingValidFotos;
 

@@ -312,7 +312,8 @@ export const subscribeReportsFromFirestore = (cb: (items: any[]) => void) => {
   }
 };
 
-export const shouldFilterReport = (_r?: any) => false;
+export const shouldFilterReport = (r?: any) =>
+  Boolean(r && typeof r.id === 'string' && r.id.startsWith('lap_kj_'));
 
 export const fetchTargetsFromFirestore = async (): Promise<any> => {
   if (!db || isFirestoreQuotaCooldownActive()) return {};

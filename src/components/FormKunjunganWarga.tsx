@@ -145,8 +145,8 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       await saveKunjunganWargaToFirestore(payload);
       setSuccessMsg(
         editItem
-          ? 'Kunjungan berhasil diperbarui & otomatis tersinkron ke Laporan Harian serta Capaian Kinerja!'
-          : 'Kunjungan warga berhasil disimpan & otomatis tercatat di Laporan Harian serta Capaian Kinerja Kepling!'
+          ? 'Kunjungan berhasil diperbarui & otomatis tercatat sebagai Kegiatan Kunjungan Warga di Laporan Harian!'
+          : 'Kunjungan warga berhasil disimpan & otomatis tercatat sebagai Kegiatan Kunjungan Warga di Laporan Harian!'
       );
       setTimeout(() => {
         setIsSubmitting(false);
@@ -172,7 +172,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
         <div>
           <h3 className="font-black text-sm text-slate-900">Form Kunjungan Warga (Door-to-Door)</h3>
           <p className="text-[11px] text-slate-500">
-            Tersimpan ke Firestore &amp; otomatis tercatat pada Laporan Harian serta Capaian Kinerja Kepling
+            Tersimpan ke Firestore &amp; otomatis tercatat sebagai Kegiatan Kunjungan Warga pada Laporan Harian
           </p>
         </div>
       </div>
