@@ -233,6 +233,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
 
             <button
+              id="btn-mobile-nav-apel-pem"
+              type="button"
+              onClick={() => onSelectTab('absensi_kepling')}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+                activeTab === 'absensi_kepling' ? 'text-teal-700 font-extrabold' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <UserCheck className={`w-5 h-5 ${activeTab === 'absensi_kepling' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+              <span className="text-[10px] mt-0.5 tracking-tight">Apel Pagi</span>
+            </button>
+
+            <button
               id="btn-mobile-nav-riwayat-pem"
               type="button"
               onClick={() => onSelectTab('riwayat')}

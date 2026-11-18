@@ -648,6 +648,30 @@ export interface AbsensiAgendaKepling {
   updatedAt?: string;
 }
 
+export type StatusApelPagi = 'Hadir' | 'Terlambat' | 'Izin' | 'Sakit' | 'Alpa';
+
+export interface AbsensiApelEntry {
+  keplingId: string;
+  nomorLingkungan: number;
+  namaKepling: string;
+  jabatan: string;
+  status: StatusApelPagi;
+  jamHadir?: string;
+  catatan?: string;
+}
+
+export interface AbsensiApelHarian {
+  id: string; // e.g. "apel_2026-11-18"
+  tanggal: string; // YYYY-MM-DD
+  waktuApel?: string; // e.g. "07.30 - 08.00 WIB"
+  lokasi?: string; // e.g. "Halaman Kantor Lurah Mangga"
+  entries: Record<string, AbsensiApelEntry>;
+  diinputOlehNama?: string;
+  diinputOlehRole?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 // Jadwal Posko Trantibum & Posko Kewaspadaan Banjir
 export type JenisPosko = 'posko_trantibum' | 'posko_banjir' | 'posko_bersih_sampah';
 export type StatusPosko = 'TERJADWAL' | 'BERLANGSUNG' | 'SELESAI';
@@ -662,6 +686,9 @@ export interface KeplingPetugasPosko {
   fotoKehadiranUrl?: string; // Base64 or image URL
   waktuUploadFoto?: string; // ISO String
   catatanSituasi?: string; // Laporan kondisi lapangan
+  verifikasiAdminStatus?: 'TERVERIFIKASI' | 'DITOLAK';
+  diverifikasiAdminOleh?: string;
+  diverifikasiAdminAt?: string;
 }
 
 export interface JadwalPoskoItem {

@@ -275,6 +275,23 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "agendaId", "namaKegiatan", "tanggalKegiatan"]
+    },
+    "AbsensiApelHarian": {
+      "title": "Absensi Apel Pagi Kepala Lingkungan",
+      "description": "Daftar hadir harian Apel Pagi 24 Kepala Lingkungan (Hadir, Terlambat, Izin, Sakit, Alpa).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 120 },
+        "tanggal": { "type": "string", "maxLength": 20 },
+        "waktuApel": { "type": "string", "maxLength": 40 },
+        "lokasi": { "type": "string", "maxLength": 300 },
+        "entries": { "type": "object" },
+        "diinputOlehNama": { "type": "string", "maxLength": 120 },
+        "diinputOlehRole": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tanggal"]
     }
   },
   "firestore": {
@@ -350,6 +367,10 @@
     "absensi_agenda_kepling/{docId}": {
       "schema": "AbsensiAgendaKepling",
       "description": "Koleksi daftar hadir 24 Kepala Lingkungan per Agenda Kelurahan (khusus Superadmin dan Seklur)."
+    },
+    "absensi_apel_pagi/{docId}": {
+      "schema": "AbsensiApelHarian",
+      "description": "Koleksi daftar hadir Apel Pagi harian 24 Kepala Lingkungan (Superadmin, Seklur, dan Kasi Pemerintahan)."
     },
     "jadwal_posko_kelurahan/{docId}": {
       "schema": "JadwalPosko",

@@ -34,7 +34,7 @@ import {
 import { saveReportToFirestore } from '../lib/firestoreService';
 import { fetchAllReports } from '../lib/reportsApi';
 import { optimizeAndCleanBrowserMemory } from '../lib/safeStorage';
-import { UserAccount, LaporanHarianItem, isPkkRole } from '../types';
+import { UserAccount, LaporanHarianItem, AbsensiApelHarian, isPkkRole } from '../types';
 import { canAccountAccessTab } from '../lib/rolePermissions';
 import { RealtimeSyncStatusPanel } from './RealtimeSyncStatusPanel';
 import { SpptPbbItem } from '../data/pbbSampleData';
@@ -60,6 +60,11 @@ import { getLocalKunjunganList, subscribeKunjunganWarga } from '../lib/kunjungan
 import { getLocalAgendaList, subscribeAgendaFromFirestore } from '../lib/agendaService';
 import { getLocalJadwalPoskoList } from '../lib/jadwalPoskoService';
 import { getLocalPembangunanList, subscribeToPembangunan } from '../lib/pembangunanService';
+import {
+  getLocalAbsensiApelList,
+  fetchAbsensiApelFromFirestore,
+  subscribeAbsensiApelFromFirestore,
+} from '../lib/absensiApelService';
 
 interface SmartHubDashboardProps {
   activeAccount: UserAccount;
@@ -352,10 +357,69 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
     todayReportsList.map((r) => r.keplingId || r.namaKepling || String(r.lingkungan))
   ).size;
 
-  const todayApelCount = uniqueKeplingsWithReportsToday;
-  const hasAbsenApelToday = hasSubmittedReportToday;
+  const [apelRecords, setApelRecords] = useState<AbsensiApelHarian[]>(() => getLocalAbsensiApelList());
+
+  useEffect(() => {
+    let active = true;
+    fetchAbsensiApelFromFirestore()
+      .then((items) => {
+        if (active && Array.isArray(items)) setApelRecords(items);
+      })
+      .catch(() => {});
+    const unsubApel = subscribeAbsensiApelFromFirestore((items) => {
+      if (active && Array.isArray(items)) setApelRecords(items);
+    });
+    const onApelLocal = () => {
+      if (active) setApelRecords(getLocalAbsensiApelList());
+    };
+    window.addEventListener('absensi-apel-updated', onApelLocal);
+    return () => {
+      active = false;
+      unsubApel();
+      window.removeEventListener('absensi-apel-updated', onApelLocal);
+    };
+  }, []);
+
+  const todayApelRecord = useMemo(
+    () => apelRecords.find((r) => r.tanggal === todayStr) || null,
+    [apelRecords, todayStr]
+  );
+
+  const myTodayApelEntry = useMemo(() => {
+    if (!todayApelRecord || !isKepling) return null;
+    return (
+      todayApelRecord.entries?.[activeAccount.id] ||
+      Object.values(todayApelRecord.entries || {}).find(
+        (e) =>
+          e.nomorLingkungan === activeAccount.nomorLingkungan ||
+          e.namaKepling?.trim().toLowerCase() === activeAccount.nama.trim().toLowerCase()
+      ) ||
+      null
+    );
+  }, [todayApelRecord, isKepling, activeAccount]);
+
+  const todayApelCount = useMemo(() => {
+    if (todayApelRecord) {
+      return Object.values(todayApelRecord.entries || {}).filter(
+        (e) => e.status === 'Hadir' || e.status === 'Terlambat'
+      ).length;
+    }
+    return 0;
+  }, [todayApelRecord]);
+
+  const hasAbsenApelToday = Boolean(
+    myTodayApelEntry && (myTodayApelEntry.status === 'Hadir' || myTodayApelEntry.status === 'Terlambat')
+  );
   const onOpenAbsenApel = () => {
-    onNavigate('form');
+    if (
+      activeAccount.role === 'super_admin' ||
+      activeAccount.role === 'sekretaris' ||
+      activeAccount.role === 'kasi_pemerintahan'
+    ) {
+      onNavigate('absensi_kepling');
+    } else {
+      onNavigate('capaian');
+    }
   };
 
   const isPbbAllowed =
@@ -766,16 +830,27 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
             },
           ]
         : []),
-      ...(activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris'
+      ...((activeAccount.role as string) === 'super_admin' ||
+      (activeAccount.role as string) === 'sekretaris' ||
+      (activeAccount.role as string) === 'kasi_pemerintahan'
         ? [
             {
               id: 'absensi_kepling',
-              title: 'Absensi Kepala Lingkungan (Agenda & Cetak PDF)',
-              desc: 'Daftar hadir 24 Kepala Lingkungan berdasarkan Agenda Kelurahan dengan rekap harian, mingguan, bulanan & cetak PDF resmi ber-KOP Kelurahan.',
+              title:
+                (activeAccount.role as string) === 'kasi_pemerintahan'
+                  ? 'Absensi Apel Pagi Kepala Lingkungan (PDF)'
+                  : 'Absensi Apel Pagi & Agenda Kepala Lingkungan (PDF)',
+              desc:
+                (activeAccount.role as string) === 'kasi_pemerintahan'
+                  ? 'Daftar hadir Apel Pagi harian 24 Kepala Lingkungan (Hadir, Terlambat, Izin, Sakit, Alpa), rekap mingguan/bulanan & cetak PDF.'
+                  : 'Daftar hadir Apel Pagi (10%) dan Agenda Kelurahan (5%) untuk 24 Kepala Lingkungan lengkap rekap harian, mingguan, bulanan & cetak PDF.',
               category: 'absen',
               icon: UserCheck,
               iconBg: 'bg-teal-50 text-teal-700',
-              badge: 'SUPERADMIN & SEKLUR',
+              badge:
+                (activeAccount.role as string) === 'kasi_pemerintahan'
+                  ? 'APEL PAGI'
+                  : 'LURAH, SEKLUR & KASI PEM',
               badgeColor: 'bg-teal-100 text-teal-900',
               action: () => onNavigate('absensi_kepling'),
             },
@@ -1674,8 +1749,12 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                 {/* Kartu 1: Absen Apel Pagi */}
                 <div
                   className={`p-3.5 sm:p-4 rounded-xl border flex flex-col justify-between gap-3 transition-all ${
-                    hasAbsenApelToday
+                    myTodayApelEntry?.status === 'Hadir'
                       ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
+                      : myTodayApelEntry?.status === 'Terlambat'
+                      ? 'bg-amber-50/90 border-amber-300 text-amber-950 shadow-xs'
+                      : myTodayApelEntry?.status === 'Alpa'
+                      ? 'bg-rose-50/80 border-rose-300 text-rose-950 shadow-xs'
                       : 'bg-amber-50/80 border-amber-300 text-amber-950 shadow-xs ring-1 ring-amber-400/50'
                   }`}
                 >
@@ -1683,31 +1762,39 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-black uppercase tracking-wider">1. Absen Apel Pagi</span>
-                        {!hasAbsenApelToday && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-400 text-slate-950 animate-pulse">
-                            WAJIB
+                        {!myTodayApelEntry && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-400 text-slate-950">
+                            07.30-08.00 WIB
                           </span>
                         )}
                       </div>
                       <p className="text-[11px] font-semibold mt-1 opacity-90">
-                        {hasAbsenApelToday ? '✅ Sudah Terverifikasi Hadir' : '⚠️ Jam 07.45 - 08.00 WIB di Kantor Lurah'}
+                        {myTodayApelEntry
+                          ? myTodayApelEntry.status === 'Hadir'
+                            ? `✅ Hadir Apel Pagi (${myTodayApelEntry.jamHadir || 'Tepat Waktu'})`
+                            : myTodayApelEntry.status === 'Terlambat'
+                            ? `⚠️ Hadir Terlambat (${myTodayApelEntry.jamHadir || '-'})`
+                            : `📌 Status Apel: ${myTodayApelEntry.status}`
+                          : todayApelRecord
+                          ? 'Belum tercatat hadir pada apel hari ini'
+                          : 'Diabsen Admin (Lurah / Seklur / Kasi Pem.)'}
                       </p>
                     </div>
                     {hasAbsenApelToday ? (
                       <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
                     ) : (
-                      <Clock className="w-5 h-5 text-amber-600 shrink-0 animate-bounce" />
+                      <Clock className="w-5 h-5 text-amber-600 shrink-0" />
                     )}
                   </div>
 
-                  {hasAbsenApelToday ? (
-                    <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between text-[11px] text-emerald-800 font-bold">
-                      <span>Laporan Tercatat</span>
+                  {myTodayApelEntry ? (
+                    <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between text-[11px] text-emerald-900 font-bold">
+                      <span>Dicatat oleh Admin</span>
                       <button
                         onClick={onOpenAbsenApel}
                         className="underline hover:text-emerald-950 cursor-pointer"
                       >
-                        Lihat Bukti
+                        Lihat Capaian Apel
                       </button>
                     </div>
                   ) : (
@@ -1717,7 +1804,11 @@ export const SmartHubDashboard: React.FC<SmartHubDashboardProps> = React.memo(({
                       className="w-full py-2 px-3 bg-amber-500 hover:bg-amber-400 active:scale-98 text-slate-950 text-xs font-black rounded-lg shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-transform"
                     >
                       <UserCheck className="w-4 h-4" />
-                      <span>Ambil Absen Apel Sekarang</span>
+                      <span>
+                        {isAdmin || activeAccount.role === 'sekretaris' || activeAccount.role === 'kasi_pemerintahan'
+                          ? 'Input Absensi Apel Pagi'
+                          : 'Lihat Rekap Apel Pagi'}
+                      </span>
                     </button>
                   )}
                 </div>

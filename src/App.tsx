@@ -1099,7 +1099,9 @@ export default function App() {
             onOpenRekapPbb={() => handleTabChange('rekap_pbb')}
             onNavigateToKunjungan={() => handleTabChange('kunjungan')}
             onOpenAbsensiKepling={
-              activeAccount.role === 'super_admin' || activeAccount.role === 'sekretaris'
+              activeAccount.role === 'super_admin' ||
+              activeAccount.role === 'sekretaris' ||
+              activeAccount.role === 'kasi_pemerintahan'
                 ? () => handleTabChange('absensi_kepling')
                 : undefined
             }

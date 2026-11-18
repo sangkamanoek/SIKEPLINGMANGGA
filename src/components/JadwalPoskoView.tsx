@@ -45,6 +45,7 @@ import {
   deleteJadwalPoskoItem,
   updateKeplingPoskoKehadiran,
   selesaikanPosko,
+  isKeplingPoskoDutyScored,
 } from '../lib/jadwalPoskoService';
 import { fileToCompressedBase64 } from '../utils/imageCompressor';
 import { KopSuratResmi } from './KopSuratResmi';
@@ -1302,6 +1303,24 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                               </div>
                             )}
 
+                            {isHadir && (
+                              <div className="pt-0.5">
+                                {isKeplingPoskoDutyScored(posko, petugas) ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100/90 text-emerald-900 border border-emerald-300 text-[10px] font-black">
+                                    ✓ Dihitung Poin Kinerja (
+                                    {petugas.fotoKehadiranUrl ? 'Foto' : ''}
+                                    {petugas.fotoKehadiranUrl && (petugas.verifikasiAdminStatus === 'TERVERIFIKASI' || posko.status === 'SELESAI') ? ' & ' : ''}
+                                    {(petugas.verifikasiAdminStatus === 'TERVERIFIKASI' || posko.status === 'SELESAI') ? 'Terverifikasi Admin' : ''}
+                                    )
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold">
+                                    ⏳ Belum Dihitung — Unggah Foto atau Verifikasi Admin
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
                             {isMe && (
                               <button
                                 type="button"
@@ -1329,22 +1348,26 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                                         statusKehadiran: 'Hadir',
                                         jamHadir: petugas.jamHadir && !petugas.jamHadir.includes('Verifikasi') ? petugas.jamHadir : currentWibTime,
                                         catatanSituasi: petugas.catatanSituasi || 'Kehadiran diverifikasi langsung oleh Super Admin.',
+                                        verifikasiAdminStatus: 'TERVERIFIKASI',
+                                        diverifikasiAdminOleh: currentUser.nama,
                                       });
                                       setPoskoList(getLocalJadwalPoskoList());
-                                      notify(`Kehadiran Lingkungan ${petugas.nomorLingkungan} (${petugas.namaKepling}) berhasil diverifikasi Hadir!`, 'success');
+                                      notify(`Kehadiran Lingkungan ${petugas.nomorLingkungan} (${petugas.namaKepling}) berhasil diverifikasi Hadir & dihitung poin kinerja!`, 'success');
                                     } catch {
                                       notify('Gagal memverifikasi kehadiran kepling.', 'error');
                                     }
                                   }}
                                   className={`px-2 py-1 rounded-md text-[10px] font-black cursor-pointer shadow-2xs ${
-                                    isHadir
+                                    isHadir && (petugas.verifikasiAdminStatus === 'TERVERIFIKASI' || posko.status === 'SELESAI')
                                       ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                                       : 'bg-indigo-700 text-white hover:bg-indigo-600'
                                   }`}
                                 >
-                                  {isHadir ? '✓ Hadir (Terverifikasi)' : '⚡ Verifikasi Hadir'}
+                                  {isHadir && (petugas.verifikasiAdminStatus === 'TERVERIFIKASI' || posko.status === 'SELESAI')
+                                    ? '✓ Hadir (Terverifikasi)'
+                                    : '⚡ Verifikasi Hadir'}
                                 </button>
-                                {!isHadir && (
+                                {(isHadir || petugas.verifikasiAdminStatus) && (
                                   <button
                                     type="button"
                                     onClick={async () => {
@@ -1352,6 +1375,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                                         await updateKeplingPoskoKehadiran(posko.id, petugas.keplingId, {
                                           statusKehadiran: 'Belum Hadir',
                                           jamHadir: '-',
+                                          verifikasiAdminStatus: null,
                                         });
                                         setPoskoList(getLocalJadwalPoskoList());
                                         notify(`Status Lingkungan ${petugas.nomorLingkungan} direset ke Belum Hadir.`, 'info');

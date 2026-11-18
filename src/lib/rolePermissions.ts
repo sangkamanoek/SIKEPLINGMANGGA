@@ -42,6 +42,7 @@ const SEKRETARIS_TABS: AppTabType[] = [
 const KASI_PEMERINTAHAN_TABS: AppTabType[] = [
   'hub',
   'dashboard_kasi',
+  'absensi_kepling',
   'rekap_pbb',
   'riwayat',
 ];
@@ -116,7 +117,7 @@ export function getAccessDeniedMessage(
     return 'Akses Dibatasi: Menu Kegiatan Lurah hanya dapat diakses oleh akun Super Admin.';
   }
   if (tab === 'absensi_kepling') {
-    return 'Akses Dibatasi: Absensi Kepala Lingkungan hanya dapat diakses oleh Superadmin dan Seklur.';
+    return 'Akses Dibatasi: Absensi Apel Pagi & Agenda Kepala Lingkungan hanya dapat diakses oleh Lurah (Superadmin), Seklur, dan Kasi Pemerintahan.';
   }
   if (role === 'kasi_trantibum') {
     return 'Akses Dibatasi: Akun Kasi Trantibum hanya dapat mengakses tupoksi Trantibum, Jadwal Posko, & Arsip Trantibum.';

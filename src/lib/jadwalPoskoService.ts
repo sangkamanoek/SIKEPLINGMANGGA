@@ -535,7 +535,27 @@ export const syncPoskoKehadiranToLaporanHarian = async (
 };
 
 /**
- * Update kehadiran Kepling bertugas (Jam hadir, foto, catatan)
+ * Cek apakah keikutsertaan Kepling pada Posko (Trantibum, Banjir, Bersih Sampah)
+ * sah dihitung sebagai poin kinerja (10%):
+ * Wajib status Hadir, tidak ditolak admin, serta (telah unggah foto kehadiran ATAU terverifikasi Super Admin / status SELESAI).
+ */
+export const isKeplingPoskoDutyScored = (
+  posko: JadwalPoskoItem,
+  petugas: KeplingPetugasPosko
+): boolean => {
+  if (!posko || !petugas) return false;
+  if (petugas.statusKehadiran !== 'Hadir') return false;
+  if (petugas.verifikasiAdminStatus === 'DITOLAK') return false;
+  const hasFoto = Boolean(petugas.fotoKehadiranUrl && petugas.fotoKehadiranUrl.trim().length > 0);
+  const isAdminVerified =
+    petugas.verifikasiAdminStatus === 'TERVERIFIKASI' ||
+    posko.status === 'SELESAI' ||
+    Boolean(petugas.jamHadir && petugas.jamHadir.includes('Verifikasi Admin'));
+  return hasFoto || isAdminVerified;
+};
+
+/**
+ * Update kehadiran Kepling bertugas (Jam hadir, foto, catatan, verifikasi admin)
  */
 export const updateKeplingPoskoKehadiran = async (
   poskoId: string,
@@ -545,6 +565,8 @@ export const updateKeplingPoskoKehadiran = async (
     jamHadir?: string;
     fotoKehadiranUrl?: string;
     catatanSituasi?: string;
+    verifikasiAdminStatus?: 'TERVERIFIKASI' | 'DITOLAK' | null;
+    diverifikasiAdminOleh?: string;
   }
 ): Promise<void> => {
   const list = getLocalJadwalPoskoList();
@@ -558,6 +580,12 @@ export const updateKeplingPoskoKehadiran = async (
 
   const updatedPetugas = posko.petugasKepling.map((k) => {
     if (k.keplingId === keplingId || String(k.nomorLingkungan) === keplingId.replace('kepling_', '')) {
+      const nextVerifStatus =
+        payload.verifikasiAdminStatus === null
+          ? undefined
+          : payload.verifikasiAdminStatus !== undefined
+          ? payload.verifikasiAdminStatus
+          : k.verifikasiAdminStatus;
       const nextPetugas: KeplingPetugasPosko = {
         ...k,
         statusKehadiran: payload.statusKehadiran,
@@ -565,6 +593,17 @@ export const updateKeplingPoskoKehadiran = async (
         fotoKehadiranUrl: payload.fotoKehadiranUrl || k.fotoKehadiranUrl,
         waktuUploadFoto: payload.fotoKehadiranUrl ? now : k.waktuUploadFoto,
         catatanSituasi: payload.catatanSituasi !== undefined ? payload.catatanSituasi : k.catatanSituasi,
+        verifikasiAdminStatus: nextVerifStatus,
+        diverifikasiAdminOleh:
+          payload.verifikasiAdminStatus === null
+            ? undefined
+            : payload.diverifikasiAdminOleh || k.diverifikasiAdminOleh,
+        diverifikasiAdminAt:
+          payload.verifikasiAdminStatus === null
+            ? undefined
+            : payload.verifikasiAdminStatus
+            ? now
+            : k.diverifikasiAdminAt,
       };
       updatedTargetPetugas = nextPetugas;
       return nextPetugas;
@@ -608,6 +647,16 @@ export const selesaikanPosko = async (
   if (!posko) return;
 
   const now = new Date().toISOString();
+  const updatedPetugas = (posko.petugasKepling || []).map((k) =>
+    k.statusKehadiran === 'Hadir' && k.verifikasiAdminStatus !== 'DITOLAK'
+      ? {
+          ...k,
+          verifikasiAdminStatus: 'TERVERIFIKASI' as const,
+          diverifikasiAdminOleh: verifikator.nama,
+          diverifikasiAdminAt: now,
+        }
+      : k
+  );
   const updatedPosko: JadwalPoskoItem = {
     ...posko,
     status: 'SELESAI',
@@ -615,6 +664,7 @@ export const selesaikanPosko = async (
     catatanSelesai: verifikator.catatan || 'Posko telah selesai dan daftar hadir diverifikasi lengkap.',
     diverifikasiOlehNama: verifikator.nama,
     diverifikasiOlehRole: verifikator.role,
+    petugasKepling: updatedPetugas,
     updatedAt: now,
   };
 

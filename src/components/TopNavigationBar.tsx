@@ -95,10 +95,11 @@ export const TopNavigationBar: React.FC<TopNavigationBarProps> = ({
     { id: 'riwayat', label: 'Arsip Riwayat', icon: History },
   ];
 
-  // Dedicated Kasi Tata Pemerintahan Navigation Menu Items (PBB-P2, IKD, Arsip Pemerintahan)
+  // Dedicated Kasi Tata Pemerintahan Navigation Menu Items (PBB-P2, IKD, Apel Pagi, Arsip Pemerintahan)
   const kasiPemMenuItems: MenuItemConfig[] = [
     { id: 'hub', label: 'Pusat Menu', icon: Compass },
     { id: 'dashboard_kasi', label: 'Dashboard Pemerintahan', icon: Award, badge: 'PBB & IKD', badgeVariant: 'mint' },
+    { id: 'absensi_kepling', label: 'Absensi Apel Pagi', icon: UserCheck, badge: 'APEL PAGI', badgeVariant: 'mint' },
     { id: 'rekap_pbb', label: 'Realisasi PBB', icon: FileSpreadsheet, badge: '2026', badgeVariant: 'default' },
     { id: 'riwayat', label: 'Arsip Pemerintahan', icon: History },
   ];

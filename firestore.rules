@@ -177,6 +177,15 @@ service cloud.firestore {
       allow delete: if true;
     }
 
+    // Absensi Apel Pagi Kepala Lingkungan (Lurah / Seklur / Kasi Pemerintahan)
+    match /absensi_apel_pagi/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['id', 'tanggal'])
+                            && isValidString(request.resource.data.id, 1, 120)
+                            && isValidString(request.resource.data.tanggal, 4, 20);
+      allow delete: if true;
+    }
+
     // Jadwal Posko Trantibum & Posko Kewaspadaan Banjir
     match /jadwal_posko_kelurahan/{docId} {
       allow read: if true;

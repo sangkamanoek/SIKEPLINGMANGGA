@@ -36,6 +36,9 @@ import {
   KeplingTargetCapaian,
   EventAttendance,
   AbsensiAgendaKepling,
+  AbsensiApelHarian,
+  JadwalPoskoItem,
+  StatusApelPagi,
   StatusKehadiranKepling,
   type CustomEvent,
 } from '../types';
@@ -114,16 +117,31 @@ import {
   subscribeAbsensiAgendaFromFirestore,
   formatTanggalSingkatIndonesia,
 } from '../lib/absensiAgendaService';
+import {
+  getApelStatusScore,
+  getLocalAbsensiApelList,
+  fetchAbsensiApelFromFirestore,
+  subscribeAbsensiApelFromFirestore,
+} from '../lib/absensiApelService';
+import {
+  getLocalJadwalPoskoList,
+  fetchJadwalPoskoFromFirestore,
+  subscribeJadwalPoskoFromFirestore,
+  isKeplingPoskoDutyScored,
+} from '../lib/jadwalPoskoService';
 
 export type LeaderboardSortCriterion =
   | 'KOMPOSIT'
-  | 'KEHADIRAN'
-  | 'KEGIATAN'
-  | 'PERLINSOS'
   | 'PBB'
+  | 'PERLINSOS'
+  | 'IKD'
   | 'BPJS'
   | 'KUNJUNGAN'
-  | 'POSKAMLING';
+  | 'POSKAMLING'
+  | 'APEL'
+  | 'KEHADIRAN'
+  | 'KEGIATAN'
+  | 'KONSISTENSI';
 
 interface DashboardCapaianKeplingProps {
   reports: LaporanHarianItem[];
@@ -288,6 +306,75 @@ export function checkDateInPeriod(dateIso: string, period: string, referenceDate
   return true;
 }
 
+/**
+ * Target jumlah hari kalender berjalan dalam periode terpilih untuk menilai
+ * Konsistensi Laporan Harian Kepling (15%).
+ */
+export function getElapsedCalendarDaysInPeriod(period: string, referenceDate: Date = new Date()): number {
+  const now = new Date(referenceDate);
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const dayOfMonth = now.getDate();
+  const currentYearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+  if (period === 'TODAY' || period === 'HARIAN') return 1;
+
+  if (period === 'THIS_WEEK') {
+    const dow = now.getDay();
+    return dow === 0 ? 7 : dow;
+  }
+
+  if (period === 'LAST_WEEK' || period === '7_DAYS' || period === 'WEEK_1' || period === 'WEEK_2' || period === 'WEEK_3') {
+    return 7;
+  }
+
+  if (period === 'WEEK_4') {
+    const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+    if (dayOfMonth >= 22) return dayOfMonth - 21;
+    return Math.max(1, totalDaysInMonth - 21);
+  }
+
+  if (period === 'THIS_MONTH') {
+    return Math.max(1, dayOfMonth);
+  }
+
+  if (period.startsWith('MONTH_')) {
+    const ym = period.replace('MONTH_', '');
+    if (ym === currentYearMonth) return Math.max(1, dayOfMonth);
+    const [yStr, mStr] = ym.split('-');
+    const y = parseInt(yStr, 10);
+    const m = parseInt(mStr, 10);
+    if (!isNaN(y) && !isNaN(m) && m >= 1 && m <= 12) {
+      if (y > year || (y === year && m - 1 > month)) return 1;
+      return new Date(y, m, 0).getDate();
+    }
+    return 30;
+  }
+
+  if (period === 'THIS_YEAR' || period.startsWith('YEAR_')) {
+    const targetYr = period === 'THIS_YEAR' ? year : parseInt(period.replace('YEAR_', ''), 10);
+    if (!isNaN(targetYr)) {
+      if (targetYr === year) {
+        const startOfYear = new Date(year, 0, 1);
+        const todayStart = new Date(year, month, dayOfMonth);
+        return Math.max(1, Math.floor((todayStart.getTime() - startOfYear.getTime()) / 86400000) + 1);
+      }
+      if (targetYr < year) {
+        return targetYr % 4 === 0 && (targetYr % 100 !== 0 || targetYr % 400 === 0) ? 366 : 365;
+      }
+    }
+    return 1;
+  }
+
+  if (period === 'ALL') {
+    const startRef = new Date(2026, 0, 1);
+    const todayStart = new Date(year, month, dayOfMonth);
+    return Math.max(1, Math.floor((todayStart.getTime() - startRef.getTime()) / 86400000) + 1);
+  }
+
+  return Math.max(1, dayOfMonth);
+}
+
 export const getPeriodLabel = (p: string, referenceDate: Date = new Date()) => {
   const bounds = getPeriodDateBounds(referenceDate);
   const curMonthName = INDONESIAN_MONTH_NAMES[bounds.month] || 'Bulan Ini';
@@ -444,6 +531,64 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       active = false;
       unsubAbsensi();
       window.removeEventListener('absensi-agenda-updated', handleLocalUpdate);
+    };
+  }, []);
+
+  // Real-time Absensi Apel Pagi Kepala Lingkungan
+  const [absensiApelList, setAbsensiApelList] = useState<AbsensiApelHarian[]>(() =>
+    getLocalAbsensiApelList()
+  );
+
+  useEffect(() => {
+    let active = true;
+    fetchAbsensiApelFromFirestore()
+      .then((items) => {
+        if (active && Array.isArray(items)) setAbsensiApelList(items);
+      })
+      .catch(() => {});
+
+    const unsubApel = subscribeAbsensiApelFromFirestore((items) => {
+      if (active && Array.isArray(items)) setAbsensiApelList(items);
+    });
+
+    const handleApelUpdate = () => {
+      if (active) setAbsensiApelList(getLocalAbsensiApelList());
+    };
+    window.addEventListener('absensi-apel-updated', handleApelUpdate);
+
+    return () => {
+      active = false;
+      unsubApel();
+      window.removeEventListener('absensi-apel-updated', handleApelUpdate);
+    };
+  }, []);
+
+  // Real-time Jadwal Posko Malam (Trantibum, Banjir, Bersih Sampah)
+  const [jadwalPoskoList, setJadwalPoskoList] = useState<JadwalPoskoItem[]>(() =>
+    getLocalJadwalPoskoList()
+  );
+
+  useEffect(() => {
+    let active = true;
+    fetchJadwalPoskoFromFirestore()
+      .then((items) => {
+        if (active && Array.isArray(items)) setJadwalPoskoList(items);
+      })
+      .catch(() => {});
+
+    const unsubPosko = subscribeJadwalPoskoFromFirestore((items) => {
+      if (active && Array.isArray(items)) setJadwalPoskoList(items);
+    });
+
+    const handlePoskoUpdate = () => {
+      if (active) setJadwalPoskoList(getLocalJadwalPoskoList());
+    };
+    window.addEventListener('jadwal-posko-updated', handlePoskoUpdate);
+
+    return () => {
+      active = false;
+      unsubPosko();
+      window.removeEventListener('jadwal-posko-updated', handlePoskoUpdate);
     };
   }, []);
 
@@ -673,6 +818,25 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       .sort((a, b) => (b.tanggalKegiatan || '').localeCompare(a.tanggalKegiatan || ''));
   }, [absensiAgendaList, period, now]);
 
+  // 4C. Filter Absensi Apel Pagi sesuai periode
+  const filteredApelByPeriod = useMemo(() => {
+    return (absensiApelList || [])
+      .filter((rec) => rec && rec.tanggal && checkDateInPeriod(rec.tanggal, period, now))
+      .sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+  }, [absensiApelList, period, now]);
+
+  // 4D. Filter Jadwal Posko (Trantibum, Banjir, Bersih Sampah) sesuai periode
+  const filteredPoskoByPeriod = useMemo(() => {
+    return (jadwalPoskoList || [])
+      .filter((p) => p && p.tanggal && checkDateInPeriod(p.tanggal, period, now));
+  }, [jadwalPoskoList, period, now]);
+
+  // Target hari kalender berjalan dalam periode terpilih (untuk Konsistensi Laporan Harian 15%)
+  const konsistensiTargetHari = useMemo(
+    () => getElapsedCalendarDaysInPeriod(period, now),
+    [period, now]
+  );
+
   // Kepling specific reports
   const myReports = useMemo(() => {
     if (mode !== 'kepling') return [];
@@ -725,8 +889,8 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       totalBpjs += Number(r.kinerja?.bpjsKetenagakerjaanOrang) || 0;
     });
 
-    const uniqueDays = new Set(myReports.map((r) => r.createdAt?.split('T')[0] || r.tanggal));
-    const allUniqueDays = new Set(myAllTimeReports.map((r) => r.createdAt?.split('T')[0] || r.tanggal));
+    const uniqueDays = new Set(myReports.map((r) => getReportIsoDate(r)));
+    const allUniqueDays = new Set(myAllTimeReports.map((r) => getReportIsoDate(r)));
 
     return {
       totalPbb: myPbbStats !== undefined ? pbbFromSppt : reportedPbb,
@@ -800,20 +964,25 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     });
   }, [effectiveKunjunganList, period, isCumulativePeriod, now]);
 
-  // Aggregasi untuk Seluruh 24 Kepling (7 Kriteria Kinerja Terpadu)
-
-
+  // Aggregasi untuk Seluruh 24 Kepling (9 Kriteria Kinerja Terpadu - Total 100%)
   const keplingSummaryList = useMemo(() => {
-    // Dynamic Poskamling target based on period:
-    // Mingguan/Harian: 2 giat per minggu; Tahunan: 96 giat; Bulanan: 8 giat
+    // Dynamic Posko & Poskamling target based on period
     const isWeeklyOrDaily =
       period === 'TODAY' ||
+      period === 'HARIAN' ||
       period === 'THIS_WEEK' ||
       period === 'LAST_WEEK' ||
       period === '7_DAYS' ||
       period.startsWith('WEEK_');
     const isYearlyOrAll = period === 'THIS_YEAR' || period.startsWith('YEAR_') || period === 'ALL';
-    const targetPoskamlingPeriod = isWeeklyOrDaily ? 2 : isYearlyOrAll ? 96 : 8;
+    const targetPoskamlingPeriod =
+      period === 'TODAY' || period === 'HARIAN'
+        ? 1
+        : isWeeklyOrDaily
+        ? 2
+        : isYearlyOrAll
+        ? 96
+        : 8;
 
     return KEPLING_ACCOUNTS.map((k, index) => {
       const kReports = filteredReportsByPeriod.filter((r) => isReportMatchingKepling(r, k));
@@ -832,25 +1001,20 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         targetConfig?.targetPerlinsos ??
         DEFAULT_PERLINSOS_TARGETS[(k.nomorLingkungan || index + 1) - 1] ??
         300;
-      // Target Perlinsos: Tahunan = Pagu (misal 300 KK), Bulanan = Pagu / 12 (misal 25 KK/bulan)
       const targetPerlinsos = isCumulativePeriod
         ? rawAnnualPerlinsos
         : Math.max(1, Math.round(rawAnnualPerlinsos / 12));
-      
-      // Ambil data realisasi SPPT PBB untuk lingkungan ini
-      const lkNum = k.nomorLingkungan || (index + 1);
+
+      const lkNum = k.nomorLingkungan || index + 1;
       const lkSummary = periodPbbOverview.lingkunganSummaries.find((s) => s.lingkungan === lkNum);
       const allTimeLkSummary = pbbOverview.lingkunganSummaries.find((s) => s.lingkungan === lkNum);
 
-      // Target PBB:
-      // - Jika Tahunan / Kumulatif: Pagu PBB totalWp (misal 1166 WP)
-      // - Jika Bulanan (Opsi A): Target bulanan adalah target tahunan dibagi 12 bulan (misal 1166 / 12 = 97 WP/bulan)
-      //   sehingga kepling dinilai adil berdasarkan WP yang membayar khusus di bulan tersebut!
-      const rawAnnualTarget = (targetConfig?.targetPbb && targetConfig.targetPbb !== 100)
-        ? targetConfig.targetPbb
-        : (allTimeLkSummary && allTimeLkSummary.totalWp > 0)
-        ? allTimeLkSummary.totalWp
-        : (targetConfig?.targetPbb || 100);
+      const rawAnnualTarget =
+        targetConfig?.targetPbb && targetConfig.targetPbb !== 100
+          ? targetConfig.targetPbb
+          : allTimeLkSummary && allTimeLkSummary.totalWp > 0
+          ? allTimeLkSummary.totalWp
+          : targetConfig?.targetPbb || 100;
 
       const targetPbb = isCumulativePeriod
         ? rawAnnualTarget
@@ -859,15 +1023,100 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       const rawAnnualIkd = targetConfig?.targetIkd ?? 50;
       const targetIkd = isCumulativePeriod ? rawAnnualIkd : Math.max(1, Math.round(rawAnnualIkd / 12));
 
-      const rawAnnualBpjs = (targetConfig?.targetBpjs && targetConfig.targetBpjs >= 50) ? targetConfig.targetBpjs : 50;
+      const rawAnnualBpjs =
+        targetConfig?.targetBpjs && targetConfig.targetBpjs >= 50 ? targetConfig.targetBpjs : 50;
       const targetBpjs = isCumulativePeriod ? rawAnnualBpjs : Math.max(1, Math.round(rawAnnualBpjs / 12));
 
-      // Hitung Capaian Efektif: Jika bulanan/non-kumulatif, akumulasi poin mulai dari NOL (hanya laporan periode ini)
       const effective = calculateEffectiveKinerja(reported, targetConfig, index, isCumulativePeriod);
 
-      const uniqueDays = new Set(kReports.map((r) => r.createdAt?.split('T')[0] || r.tanggal));
+      const uniqueDays = new Set(kReports.map((r) => getReportIsoDate(r)));
+      const hariMelapor = uniqueDays.size;
 
-      // 1. KEHADIRAN KEPALA LINGKUNGAN BERDASARKAN AGENDA KELURAHAN (Bobot 20%)
+      // 1. REALISASI PBB-P2 (Bobot 20%)
+      const pbbPercentage =
+        targetPbb > 0
+          ? Math.round((effective.pbb / targetPbb) * 100)
+          : lkSummary && lkSummary.persentaseWpLunas > 0
+          ? Math.round(lkSummary.persentaseWpLunas)
+          : 0;
+
+      // 2. PENDATAAN PERLINSOS (Bobot 10%)
+      const perlinsosPercentage =
+        targetPerlinsos > 0 ? Math.round((effective.perlinsos / targetPerlinsos) * 100) : 0;
+
+      // 3. AKTIVASI IKD (Bobot 10%)
+      const ikdPercentage = targetIkd > 0 ? Math.round((effective.ikd / targetIkd) * 100) : 0;
+
+      // 4. BPJS KETENAGAKERJAAN (Bobot 10%)
+      const bpjsPercentage = targetBpjs > 0 ? Math.round((effective.bpjs / targetBpjs) * 100) : 0;
+
+      // 5. KUNJUNGAN WARGA (Bobot 10%)
+      const kKunjunganRecords =
+        isCumulativePeriod || mode === 'super_admin'
+          ? effectiveKunjunganList.filter((kj: any) => isKunjunganMatchingKepling(kj, k))
+          : filteredKunjunganByPeriod.filter((kj: any) => isKunjunganMatchingKepling(kj, k));
+      const targetKunjunganHarian = targetPerlinsos;
+      const totalKunjungan = kKunjunganRecords.length;
+      const kunjunganPercentage =
+        targetPerlinsos > 0 ? Math.round((totalKunjungan / targetPerlinsos) * 100) : 0;
+
+      // 6. POSKO & POSKAMLING (Bobot 10% - Trantibum, Banjir, Bersih Sampah + Poskamling Manual)
+      const validPoskoCount = filteredPoskoByPeriod.filter((posko) => {
+        const petugas = (posko.petugasKepling || []).find(
+          (p) =>
+            p.keplingId === k.id ||
+            p.nomorLingkungan === k.nomorLingkungan ||
+            p.namaKepling?.trim().toLowerCase() === k.nama.trim().toLowerCase()
+        );
+        return petugas ? isKeplingPoskoDutyScored(posko, petugas) : false;
+      }).length;
+
+      const manualPoskamlingCount = kReports.filter(
+        (r) =>
+          !r.id?.startsWith('lap_pk_') &&
+          (r.kinerja?.poskamlingAdaGiat === true ||
+            (r.kinerja?.poskamlingStatus && r.kinerja.poskamlingStatus !== 'Tidak Ada') ||
+            r.dokumentasiFoto?.some((f) => f.kategori === 'poskamling'))
+      ).length;
+
+      const targetPoskamlingBulan = targetPoskamlingPeriod;
+      const poskamlingCount = validPoskoCount + manualPoskamlingCount;
+      const poskamlingPercentage = Math.min(
+        100,
+        Math.round((poskamlingCount / targetPoskamlingBulan) * 100)
+      );
+
+      // 7. APEL PAGI (Bobot 10%)
+      let apelHadir = 0;
+      let apelTerlambat = 0;
+      let apelIzin = 0;
+      let apelSakit = 0;
+      let apelAlpa = 0;
+      let apelScoreSum = 0;
+
+      filteredApelByPeriod.forEach((rec) => {
+        const directEntry = rec.entries?.[k.id];
+        const matchedEntry =
+          directEntry ||
+          Object.values(rec.entries || {}).find(
+            (e) =>
+              e.nomorLingkungan === k.nomorLingkungan ||
+              e.namaKepling?.trim().toLowerCase() === k.nama.trim().toLowerCase()
+          );
+        const st: StatusApelPagi = matchedEntry?.status || 'Hadir';
+        if (st === 'Hadir') apelHadir += 1;
+        else if (st === 'Terlambat') apelTerlambat += 1;
+        else if (st === 'Izin') apelIzin += 1;
+        else if (st === 'Sakit') apelSakit += 1;
+        else if (st === 'Alpa') apelAlpa += 1;
+        apelScoreSum += getApelStatusScore(st);
+      });
+
+      const apelTotal = filteredApelByPeriod.length;
+      const apelPercentage =
+        apelTotal > 0 ? Math.min(100, Math.round((apelScoreSum / apelTotal) * 100)) : 100;
+
+      // 8. KEHADIRAN AGENDA / RAPAT KELURAHAN (Bobot 5%)
       let kehadiranHadir = 0;
       let kehadiranTidakHadir = 0;
       let kehadiranSakit = 0;
@@ -891,74 +1140,48 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
       const kehadiranTotal = filteredAbsensiAgendaByPeriod.length;
 
-      // Fallback ke eventAttendanceList bila belum ada absensi agenda kelurahan
       const kEventRecords = filteredEventAttendanceByPeriod.filter(
         (e) =>
           e.accountId === k.id ||
           e.nomorLingkungan === k.nomorLingkungan ||
           e.namaKepling?.trim().toLowerCase() === k.nama.trim().toLowerCase()
       );
-      const legacyKegiatanHadir = kEventRecords.filter((e) => e.status === 'Hadir' || e.status === 'Dinas Luar').length;
+      const legacyKegiatanHadir = kEventRecords.filter(
+        (e) => e.status === 'Hadir' || e.status === 'Dinas Luar'
+      ).length;
       const relevantEvents = filteredCustomEventsByPeriod.filter(
         (ev) => ev.required || !ev.targetKeplingIds?.length || ev.targetKeplingIds.includes(k.id)
       );
 
       const kegiatanHadir = kehadiranTotal > 0 ? kehadiranHadir : legacyKegiatanHadir;
-      const kegiatanPercentage =
+      const agendaPercentage =
         kehadiranTotal > 0
           ? Math.min(100, Math.round((kehadiranHadir / kehadiranTotal) * 100))
           : relevantEvents.length > 0
           ? Math.min(100, Math.round((legacyKegiatanHadir / relevantEvents.length) * 100))
           : 100;
-      const kehadiranPercentage = kegiatanPercentage;
+      const kehadiranPercentage = agendaPercentage;
+      const kegiatanPercentage = agendaPercentage;
 
-      // 2. CAPAIAN PERLINSOS (Bobot 25%)
-      const perlinsosPercentage =
-        targetPerlinsos > 0 ? Math.round((effective.perlinsos / targetPerlinsos) * 100) : 0;
-
-      // 3. REALISASI PBB (Bobot 25%)
-      const pbbPercentage =
-        targetPbb > 0
-          ? Math.round((effective.pbb / targetPbb) * 100)
-          : (lkSummary && lkSummary.persentaseWpLunas > 0)
-          ? Math.round(lkSummary.persentaseWpLunas)
-          : 0;
-
-      // 4. BPJS KETENAGAKERJAAN (Bobot 10%)
-      const bpjsPercentage = targetBpjs > 0 ? Math.round((effective.bpjs / targetBpjs) * 100) : 0;
-
-      // 5. KUNJUNGAN HARIAN (Bobot 10%)
-      const kKunjunganRecords = (isCumulativePeriod || mode === 'super_admin')
-        ? effectiveKunjunganList.filter((kj: any) => isKunjunganMatchingKepling(kj, k))
-        : filteredKunjunganByPeriod.filter((kj: any) => isKunjunganMatchingKepling(kj, k));
-      const targetKunjunganHarian = targetPerlinsos;
-      const totalKunjungan = kKunjunganRecords.length;
-      const kunjunganPercentage =
-        targetPerlinsos > 0
-          ? Math.round((totalKunjungan / targetPerlinsos) * 100)
-          : 0;
-
-      // 6. POSKAMLING / SISKAMLING (Bobot 10%)
-      const poskamlingGiatReports = kReports.filter(
-        (r) =>
-          r.kinerja?.poskamlingAdaGiat === true ||
-          (r.kinerja?.poskamlingStatus && r.kinerja.poskamlingStatus !== 'Tidak Ada') ||
-          r.dokumentasiFoto?.some((f) => f.kategori === 'poskamling')
+      // 9. KONSISTENSI LAPORAN HARIAN (Bobot 15% - Target = Jumlah Hari Kalender Berjalan)
+      const konsistensiPercentage = Math.min(
+        100,
+        Math.round((hariMelapor / Math.max(1, konsistensiTargetHari)) * 100)
       );
-      const targetPoskamlingBulan = targetPoskamlingPeriod;
-      const poskamlingCount = poskamlingGiatReports.length;
-      const poskamlingPercentage = Math.min(100, Math.round((poskamlingCount / targetPoskamlingBulan) * 100));
 
-      // SKOR KOMPOSIT 6 KRITERIA TERPADU (Indeks Kinerja Kepling / IKKT - Skala 100 Poin)
-      // Bobot Resmi:
-      // Kehadiran Kepling (20%) + Perlinsos (25%) + PBB (25%) + BPJS (10%) + Kunjungan (10%) + Poskamling (10%) = 100%
+      // SKOR KOMPOSIT 9 KRITERIA TERPADU (Indeks Kinerja Kepling / IKKT - Total 100%)
+      // PBB (20%) + Perlinsos (10%) + IKD (10%) + BPJS TK (10%) + Kunjungan (10%)
+      // + Posko/Poskamling (10%) + Apel Pagi (10%) + Agenda/Rapat (5%) + Konsistensi Lapor (15%) = 100%
       const compositeScoreRaw =
-        Math.min(100, kehadiranPercentage) * 0.20 +
-        Math.min(110, perlinsosPercentage) * 0.25 +
-        Math.min(110, pbbPercentage) * 0.25 +
+        Math.min(100, pbbPercentage) * 0.20 +
+        Math.min(100, perlinsosPercentage) * 0.10 +
+        Math.min(100, ikdPercentage) * 0.10 +
         Math.min(100, bpjsPercentage) * 0.10 +
         Math.min(100, kunjunganPercentage) * 0.10 +
-        Math.min(100, poskamlingPercentage) * 0.10;
+        Math.min(100, poskamlingPercentage) * 0.10 +
+        Math.min(100, apelPercentage) * 0.10 +
+        Math.min(100, agendaPercentage) * 0.05 +
+        Math.min(100, konsistensiPercentage) * 0.15;
 
       const compositeScore = Math.min(100, Math.round(compositeScoreRaw));
       const compositeScoreDecimal = Number(compositeScoreRaw.toFixed(1));
@@ -966,7 +1189,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       return {
         kepling: k,
         reportCount: kReports.length,
-        hariMelapor: uniqueDays.size,
+        hariMelapor,
+        konsistensiTargetHari,
+        konsistensiPercentage,
         // Pilar Dasar
         pbb: effective.pbb,
         perlinsos: effective.perlinsos,
@@ -980,20 +1205,33 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         targetBpjs,
         perlinsosPercentage,
         pbbPercentage,
+        ikdPercentage,
         bpjsPercentage,
-        // Kriteria Kehadiran Kepala Lingkungan & Kinerja
+        // Apel Pagi (10%)
+        apelHadir,
+        apelTerlambat,
+        apelIzin,
+        apelSakit,
+        apelAlpa,
+        apelTotal,
+        apelPercentage,
+        // Agenda Kelurahan (5%)
         kehadiranHadir,
         kehadiranTidakHadir,
         kehadiranSakit,
         kehadiranIzin,
         kehadiranTotal,
         kehadiranPercentage,
+        agendaPercentage,
         kegiatanHadir,
         relevantEventsCount: kehadiranTotal > 0 ? kehadiranTotal : relevantEvents.length,
         kegiatanPercentage,
+        // Kunjungan & Posko
         totalKunjungan,
         targetKunjunganHarian,
         kunjunganPercentage,
+        validPoskoCount,
+        manualPoskamlingCount,
         poskamlingCount,
         targetPoskamlingBulan,
         poskamlingPercentage,
@@ -1007,7 +1245,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         catatanPenyesuaian: targetConfig?.catatanPenyesuaian || '',
       };
     });
-
   }, [
     period,
     isCumulativePeriod,
@@ -1015,24 +1252,38 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     reportedStatsMap,
     targetsMap,
     filteredAbsensiAgendaByPeriod,
+    filteredApelByPeriod,
+    filteredPoskoByPeriod,
     filteredEventAttendanceByPeriod,
     filteredCustomEventsByPeriod,
     filteredKunjunganByPeriod,
     effectiveKunjunganList,
+    konsistensiTargetHari,
     mode,
     periodPbbOverview.lingkunganSummaries,
     pbbOverview.lingkunganSummaries,
   ]);
 
-  // Sorted leaderboard - Mendukung Pengurutan Komposit 6 Kriteria & Kriteria Spesifik
+  // Sorted leaderboard - Mendukung Pengurutan Komposit 9 Kriteria & Kriteria Spesifik
   const sortedLeaderboard = useMemo(() => {
     return [...keplingSummaryList].sort((a, b) => {
-      if (leaderboardSort === 'KEHADIRAN' || leaderboardSort === 'KEGIATAN') {
-        if (b.kehadiranPercentage !== a.kehadiranPercentage) return b.kehadiranPercentage - a.kehadiranPercentage;
+      if (leaderboardSort === 'APEL') {
+        if (b.apelPercentage !== a.apelPercentage) return b.apelPercentage - a.apelPercentage;
+        if (b.apelHadir !== a.apelHadir) return b.apelHadir - a.apelHadir;
+      } else if (leaderboardSort === 'KEHADIRAN' || leaderboardSort === 'KEGIATAN') {
+        if (b.agendaPercentage !== a.agendaPercentage) return b.agendaPercentage - a.agendaPercentage;
         if (b.kehadiranHadir !== a.kehadiranHadir) return b.kehadiranHadir - a.kehadiranHadir;
+      } else if (leaderboardSort === 'KONSISTENSI') {
+        if (b.konsistensiPercentage !== a.konsistensiPercentage)
+          return b.konsistensiPercentage - a.konsistensiPercentage;
+        if (b.hariMelapor !== a.hariMelapor) return b.hariMelapor - a.hariMelapor;
       } else if (leaderboardSort === 'PERLINSOS') {
-        if (b.perlinsosPercentage !== a.perlinsosPercentage) return b.perlinsosPercentage - a.perlinsosPercentage;
+        if (b.perlinsosPercentage !== a.perlinsosPercentage)
+          return b.perlinsosPercentage - a.perlinsosPercentage;
         if (b.perlinsos !== a.perlinsos) return b.perlinsos - a.perlinsos;
+      } else if (leaderboardSort === 'IKD') {
+        if (b.ikdPercentage !== a.ikdPercentage) return b.ikdPercentage - a.ikdPercentage;
+        if (b.ikd !== a.ikd) return b.ikd - a.ikd;
       } else if (leaderboardSort === 'PBB') {
         if (b.pbbPercentage !== a.pbbPercentage) return b.pbbPercentage - a.pbbPercentage;
         if (b.pbb !== a.pbb) return b.pbb - a.pbb;
@@ -1041,34 +1292,39 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         if (b.bpjs !== a.bpjs) return b.bpjs - a.bpjs;
       } else if (leaderboardSort === 'KUNJUNGAN') {
         if (b.totalKunjungan !== a.totalKunjungan) return b.totalKunjungan - a.totalKunjungan;
-        if (b.kunjunganPercentage !== a.kunjunganPercentage) return b.kunjunganPercentage - a.kunjunganPercentage;
+        if (b.kunjunganPercentage !== a.kunjunganPercentage)
+          return b.kunjunganPercentage - a.kunjunganPercentage;
       } else if (leaderboardSort === 'POSKAMLING') {
         if (b.poskamlingCount !== a.poskamlingCount) return b.poskamlingCount - a.poskamlingCount;
-        if (b.poskamlingPercentage !== a.poskamlingPercentage) return b.poskamlingPercentage - a.poskamlingPercentage;
+        if (b.poskamlingPercentage !== a.poskamlingPercentage)
+          return b.poskamlingPercentage - a.poskamlingPercentage;
       } else {
-        // 'KOMPOSIT' (Default: 6 Kriteria Terpadu)
+        // 'KOMPOSIT' (Default: 9 Kriteria Terpadu)
         if (b.compositeScoreDecimal !== a.compositeScoreDecimal) {
           return b.compositeScoreDecimal - a.compositeScoreDecimal;
         }
       }
 
       // Tie-breakers
-      if (b.compositeScoreDecimal !== a.compositeScoreDecimal) return b.compositeScoreDecimal - a.compositeScoreDecimal;
-      if (b.perlinsosPercentage !== a.perlinsosPercentage) return b.perlinsosPercentage - a.perlinsosPercentage;
-      if (b.pbb !== a.pbb) return b.pbb - a.pbb;
+      if (b.compositeScoreDecimal !== a.compositeScoreDecimal)
+        return b.compositeScoreDecimal - a.compositeScoreDecimal;
+      if (b.pbbPercentage !== a.pbbPercentage) return b.pbbPercentage - a.pbbPercentage;
+      if (b.perlinsosPercentage !== a.perlinsosPercentage)
+        return b.perlinsosPercentage - a.perlinsosPercentage;
       if (b.reportCount !== a.reportCount) return b.reportCount - a.reportCount;
       return (a.kepling.nomorLingkungan || 0) - (b.kepling.nomorLingkungan || 0);
     });
   }, [keplingSummaryList, leaderboardSort]);
 
-  // 1. Peringkat Resmi Komposit Bulanan 24 Kepling (Murni skor bulanan tanpa pengaruh toggle sortir kolom sementara)
+  // 1. Peringkat Resmi Komposit Bulanan 24 Kepling
   const monthlyCompositeRanking = useMemo(() => {
     return [...keplingSummaryList].sort((a, b) => {
       if (b.compositeScoreDecimal !== a.compositeScoreDecimal) {
         return b.compositeScoreDecimal - a.compositeScoreDecimal;
       }
       if (b.pbbPercentage !== a.pbbPercentage) return b.pbbPercentage - a.pbbPercentage;
-      if (b.perlinsosPercentage !== a.perlinsosPercentage) return b.perlinsosPercentage - a.perlinsosPercentage;
+      if (b.perlinsosPercentage !== a.perlinsosPercentage)
+        return b.perlinsosPercentage - a.perlinsosPercentage;
       if (b.reportCount !== a.reportCount) return b.reportCount - a.reportCount;
       return (a.kepling.nomorLingkungan || 0) - (b.kepling.nomorLingkungan || 0);
     });
@@ -1088,7 +1344,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     return new Set(monthlyBottom5Accounts.map((item) => item.kepling.nomorLingkungan));
   }, [monthlyBottom5Accounts]);
 
-  // Simpan status 5 terbawah bulanan ke localStorage untuk disinkronkan ke seluruh profil akun pengguna
   useEffect(() => {
     try {
       const b5Array = Array.from(monthlyBottom5Ids);
@@ -1097,7 +1352,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     } catch {}
   }, [monthlyBottom5Ids]);
 
-  // Indeks Kinerja & Peringkat Kepling yang sedang login (untuk Lencana Akun Kepling)
   const myPerformanceData = useMemo(() => {
     if (mode !== 'kepling') return null;
     const idx = monthlyCompositeRanking.findIndex(
@@ -1109,7 +1363,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     if (idx === -1) return null;
     const item = monthlyCompositeRanking[idx];
     const rank = idx + 1;
-    // Logika 5 Akun Capaian Terendah Setiap Bulannya:
     const isBottom5 =
       monthlyBottom5Ids.has(item.kepling.id) ||
       (item.kepling.nomorLingkungan ? monthlyBottom5NomorLingkungan.has(item.kepling.nomorLingkungan) : false) ||
@@ -1128,7 +1381,6 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     };
   }, [monthlyCompositeRanking, monthlyBottom5Ids, monthlyBottom5NomorLingkungan, activeAccount, mode]);
 
-  // Filtered kepling cards for display
   const displayedKeplingCards = useMemo(() => {
     if (!searchQuery.trim()) return sortedLeaderboard;
     const q = searchQuery.toLowerCase();
@@ -1146,6 +1398,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     let totalPerlinsos = 0;
     let totalTargetPerlinsos = 0;
     let totalIkd = 0;
+    let totalTargetIkd = 0;
     let totalBpjs = 0;
     let totalTargetBpjs = 0;
     let totalKunjunganSum = 0;
@@ -1153,6 +1406,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     let totalKeplingTidakHadir = 0;
     let totalKeplingSakitIzin = 0;
     let totalSlotsKehadiran = 0;
+    let sumApelPct = 0;
+    let totalApelHadir = 0;
+    let totalApelTerlambat = 0;
+    let totalApelAlpa = 0;
+    let sumKonsistensiPct = 0;
     let totalReports = filteredReportsByPeriod.length;
 
     keplingSummaryList.forEach((item) => {
@@ -1160,6 +1418,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       totalPerlinsos += item.perlinsos;
       totalTargetPerlinsos += item.targetPerlinsos;
       totalIkd += item.ikd;
+      totalTargetIkd += item.targetIkd;
       totalBpjs += item.bpjs;
       totalTargetBpjs += item.targetBpjs;
       totalKunjunganSum += item.totalKunjungan;
@@ -1167,33 +1426,37 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       totalKeplingTidakHadir += item.kehadiranTidakHadir;
       totalKeplingSakitIzin += item.kehadiranSakit + item.kehadiranIzin;
       totalSlotsKehadiran += item.kehadiranTotal;
+      sumApelPct += item.apelPercentage;
+      totalApelHadir += item.apelHadir;
+      totalApelTerlambat += item.apelTerlambat;
+      totalApelAlpa += item.apelAlpa;
+      sumKonsistensiPct += item.konsistensiPercentage;
     });
 
     const totalAgendaTercatat = filteredAbsensiAgendaByPeriod.length;
     const avgKehadiranRate =
-      totalSlotsKehadiran > 0
-        ? Math.round((totalKeplingHadir / totalSlotsKehadiran) * 100)
-        : 0;
+      totalSlotsKehadiran > 0 ? Math.round((totalKeplingHadir / totalSlotsKehadiran) * 100) : 0;
+
+    const totalApelHari = filteredApelByPeriod.length;
+    const avgApelRate = totalApelHari > 0 ? Math.round(sumApelPct / 24) : 0;
+    const avgKonsistensiRate = Math.round(sumKonsistensiPct / 24);
 
     const allTimeKunjunganCount = effectiveKunjunganList.length;
     const periodKunjunganCount = filteredKunjunganByPeriod.length;
-    // Di menu Capaian Target Superadmin / periode kumulatif, pastikan total kunjungan mencerminkan data riil dari menu Kunjungan Warga (230 Warga)
-    const totalKunjungan = (isCumulativePeriod || mode === 'super_admin')
-      ? Math.max(totalKunjunganSum, allTimeKunjunganCount)
-      : Math.max(totalKunjunganSum, periodKunjunganCount);
+    const totalKunjungan =
+      isCumulativePeriod || mode === 'super_admin'
+        ? Math.max(totalKunjunganSum, allTimeKunjunganCount)
+        : Math.max(totalKunjunganSum, periodKunjunganCount);
 
     const activeKeplingCount = keplingSummaryList.filter((k) => k.reportCount > 0).length;
     const kepatuhanRate = Math.round((activeKeplingCount / 24) * 100);
     const perlinsosPercentage =
-      totalTargetPerlinsos > 0
-        ? Math.round((totalPerlinsos / totalTargetPerlinsos) * 100)
-        : 0;
+      totalTargetPerlinsos > 0 ? Math.round((totalPerlinsos / totalTargetPerlinsos) * 100) : 0;
+    const ikdPercentage = totalTargetIkd > 0 ? Math.round((totalIkd / totalTargetIkd) * 100) : 0;
     const bpjsPercentage =
       totalTargetBpjs > 0 ? Math.round((totalBpjs / totalTargetBpjs) * 100) : 0;
     const kunjunganPercentage =
-      totalTargetPerlinsos > 0
-        ? Math.round((totalKunjungan / totalTargetPerlinsos) * 100)
-        : 0;
+      totalTargetPerlinsos > 0 ? Math.round((totalKunjungan / totalTargetPerlinsos) * 100) : 0;
 
     return {
       totalPbb,
@@ -1201,6 +1464,8 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       totalTargetPerlinsos,
       perlinsosPercentage,
       totalIkd,
+      totalTargetIkd,
+      ikdPercentage,
       totalBpjs,
       totalTargetBpjs,
       bpjsPercentage,
@@ -1215,10 +1480,19 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       totalKeplingSakitIzin,
       totalSlotsKehadiran,
       avgKehadiranRate,
+      totalApelHari,
+      avgApelRate,
+      totalApelHadir,
+      totalApelTerlambat,
+      totalApelAlpa,
+      avgKonsistensiRate,
+      konsistensiTargetHari,
     };
   }, [
     filteredReportsByPeriod,
     filteredAbsensiAgendaByPeriod,
+    filteredApelByPeriod,
+    konsistensiTargetHari,
     keplingSummaryList,
     effectiveKunjunganList,
     filteredKunjunganByPeriod,
@@ -1250,6 +1524,29 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
     });
   }, [mode, filteredAbsensiAgendaByPeriod, activeAccount]);
 
+  // Rincian Riwayat Apel Pagi milik Kepling aktif
+  const myRecentApelAttendance = useMemo(() => {
+    if (mode !== 'kepling') return [];
+    return filteredApelByPeriod.slice(0, 6).map((rec) => {
+      const directEntry = rec.entries?.[activeAccount.id];
+      const matchedEntry =
+        directEntry ||
+        Object.values(rec.entries || {}).find(
+          (e) =>
+            e.nomorLingkungan === activeAccount.nomorLingkungan ||
+            e.namaKepling?.trim().toLowerCase() === activeAccount.nama.trim().toLowerCase()
+        );
+      return {
+        id: rec.id,
+        tanggal: rec.tanggal,
+        waktuApel: rec.waktuApel || '07.30 - 08.00 WIB',
+        status: (matchedEntry?.status || 'Hadir') as StatusApelPagi,
+        jamHadir: matchedEntry?.jamHadir || '',
+        catatan: matchedEntry?.catatan || '',
+      };
+    });
+  }, [mode, filteredApelByPeriod, activeAccount]);
+
   const handlePrint = () => {
     const todayStr = new Date().toISOString().split('T')[0];
     printOfficialDocument('lembar-cetak-rekap-capaian', `REKAP_CAPAIAN_KINERJA_KEPLING_${todayStr}`);
@@ -1275,8 +1572,8 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </h2>
             <p className="text-xs sm:text-sm text-emerald-100/90 max-w-2xl leading-relaxed font-medium">
               {mode === 'kepling'
-                ? `Pantau akumulasi pencapaian 4 pilar kinerja harian Anda (PBB, Perlinsos, IKD, dan BPJS Ketenagakerjaan) sebagai wujud pelayanan prima warga.`
-                : `Monitoring evaluasi pencapaian 4 pilar kinerja seluruh 24 Lingkungan di Kelurahan Mangga Kecamatan Medan Tuntungan.`}
+                ? `Pantau akumulasi pencapaian 9 kriteria kinerja terpadu Anda (PBB, Perlinsos, IKD, BPJS TK, Kunjungan, Posko/Poskamling, Apel Pagi, Agenda Rapat, dan Konsistensi Laporan Harian) sebagai wujud pelayanan prima warga.`
+                : `Monitoring evaluasi pencapaian 9 kriteria kinerja terpadu seluruh 24 Lingkungan di Kelurahan Mangga Kecamatan Medan Tuntungan.`}
             </p>
           </div>
 
@@ -1460,12 +1757,23 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center flex-1 sm:flex-none sm:min-w-[120px]">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center flex-1 sm:flex-none sm:min-w-[140px]">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                  Hari Lapor Periode Ini
+                  Konsistensi Lapor (15%)
                 </span>
                 <span className="text-lg font-black text-emerald-700">
-                  {myStats.hariMelapor} <span className="text-xs font-semibold text-slate-500">Hari</span>
+                  {myStats.hariMelapor}{' '}
+                  <span className="text-xs font-semibold text-slate-500">
+                    / {konsistensiTargetHari} Hari
+                  </span>
+                </span>
+                <span className="block text-[10px] font-bold text-emerald-600 mt-0.5">
+                  {myPerformanceData?.item?.konsistensiPercentage ??
+                    Math.min(
+                      100,
+                      Math.round((myStats.hariMelapor / Math.max(1, konsistensiTargetHari)) * 100)
+                    )}
+                  % Kalender Berjalan
                 </span>
               </div>
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center flex-1 sm:flex-none sm:min-w-[120px]">
@@ -1647,10 +1955,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 </div>
               </div>
 
-              {/* 7 Indikator Breakdown Mini Bar untuk Kepling */}
+              {/* 9 Indikator Breakdown Mini Bar untuk Kepling (Total 100%) */}
               {myPerformanceData.item && (
                 <div
-                  className={`mt-4 pt-3 border-t grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-[10px] ${
+                  className={`mt-4 pt-3 border-t grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 text-[10px] ${
                     myPerformanceData.isBottom5
                       ? 'border-red-400/40'
                       : myPerformanceData.rank === 1
@@ -1659,30 +1967,23 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   }`}
                 >
                   <div className="bg-black/20 p-2 rounded-xl text-center">
-                    <span className="block opacity-80 font-bold">👤 Kehadiran</span>
-                    <strong className="text-xs block mt-0.5">
-                      {myPerformanceData.item.kehadiranPercentage}%
-                      {myPerformanceData.item.kehadiranTotal > 0 && (
-                        <span className="font-normal opacity-80 ml-1">
-                          ({myPerformanceData.item.kehadiranHadir}/{myPerformanceData.item.kehadiranTotal})
-                        </span>
-                      )}
-                    </strong>
-                  </div>
-                  <div className="bg-black/20 p-2 rounded-xl text-center">
-                    <span className="block opacity-80 font-bold">📋 Perlinsos</span>
-                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.perlinsosPercentage}%</strong>
-                  </div>
-                  <div className="bg-black/20 p-2 rounded-xl text-center">
-                    <span className="block opacity-80 font-bold">💰 PBB</span>
+                    <span className="block opacity-80 font-bold">💰 PBB (20%)</span>
                     <strong className="text-xs block mt-0.5">{myPerformanceData.item.pbbPercentage}%</strong>
                   </div>
                   <div className="bg-black/20 p-2 rounded-xl text-center">
-                    <span className="block opacity-80 font-bold">🛡️ BPJS TK</span>
+                    <span className="block opacity-80 font-bold">📋 Perlinsos (10%)</span>
+                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.perlinsosPercentage}%</strong>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded-xl text-center">
+                    <span className="block opacity-80 font-bold">📱 IKD (10%)</span>
+                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.ikdPercentage}%</strong>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded-xl text-center">
+                    <span className="block opacity-80 font-bold">🛡️ BPJS (10%)</span>
                     <strong className="text-xs block mt-0.5">{myPerformanceData.item.bpjsPercentage}%</strong>
                   </div>
                   <div className="bg-black/20 p-2 rounded-xl text-center">
-                    <span className="block opacity-80 font-bold">🏠 Kunjungan</span>
+                    <span className="block opacity-80 font-bold">🏠 Kunjungan (10%)</span>
                     <strong className="text-xs block mt-0.5">
                       {myPerformanceData.item.kunjunganPercentage}%
                       <span className="font-normal opacity-80 ml-1">
@@ -1691,15 +1992,51 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </strong>
                   </div>
                   <div className="bg-black/20 p-2 rounded-xl text-center">
-                    <span className="block opacity-80 font-bold">🔦 Ronda</span>
-                    <strong className="text-xs block mt-0.5">{myPerformanceData.item.poskamlingPercentage}%</strong>
+                    <span className="block opacity-80 font-bold">🔦 Posko (10%)</span>
+                    <strong className="text-xs block mt-0.5">
+                      {myPerformanceData.item.poskamlingPercentage}%
+                      <span className="font-normal opacity-80 ml-1">
+                        ({myPerformanceData.item.poskamlingCount})
+                      </span>
+                    </strong>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded-xl text-center">
+                    <span className="block opacity-80 font-bold">🫡 Apel (10%)</span>
+                    <strong className="text-xs block mt-0.5">
+                      {myPerformanceData.item.apelPercentage}%
+                      {myPerformanceData.item.apelTotal > 0 && (
+                        <span className="font-normal opacity-80 ml-1">
+                          ({myPerformanceData.item.apelHadir}/{myPerformanceData.item.apelTotal})
+                        </span>
+                      )}
+                    </strong>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded-xl text-center">
+                    <span className="block opacity-80 font-bold">🏛️ Agenda (5%)</span>
+                    <strong className="text-xs block mt-0.5">
+                      {myPerformanceData.item.agendaPercentage}%
+                      {myPerformanceData.item.kehadiranTotal > 0 && (
+                        <span className="font-normal opacity-80 ml-1">
+                          ({myPerformanceData.item.kehadiranHadir}/{myPerformanceData.item.kehadiranTotal})
+                        </span>
+                      )}
+                    </strong>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded-xl text-center col-span-3 sm:col-span-1">
+                    <span className="block opacity-80 font-bold">📅 Konsistensi (15%)</span>
+                    <strong className="text-xs block mt-0.5">
+                      {myPerformanceData.item.konsistensiPercentage}%
+                      <span className="font-normal opacity-80 ml-1">
+                        ({myPerformanceData.item.hariMelapor}/{myPerformanceData.item.konsistensiTargetHari})
+                      </span>
+                    </strong>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* 4 Pilar Kinerja Cards */}
+          {/* 4 Pilar Lapangan + Kedisiplinan & Konsistensi Cards */}
           {(() => {
             const activeTargetConfig = targetsMap[activeAccount.id];
             const rawActiveAnnualPerlinsos =
@@ -1709,6 +2046,19 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             const activeTargetPerlinsos = isCumulativePeriod
               ? rawActiveAnnualPerlinsos
               : Math.max(1, Math.round(rawActiveAnnualPerlinsos / 12));
+
+            const rawActiveAnnualIkd = activeTargetConfig?.targetIkd ?? 50;
+            const activeTargetIkd = isCumulativePeriod
+              ? rawActiveAnnualIkd
+              : Math.max(1, Math.round(rawActiveAnnualIkd / 12));
+
+            const rawActiveAnnualBpjs =
+              activeTargetConfig?.targetBpjs && activeTargetConfig.targetBpjs >= 50
+                ? activeTargetConfig.targetBpjs
+                : 50;
+            const activeTargetBpjs = isCumulativePeriod
+              ? rawActiveAnnualBpjs
+              : Math.max(1, Math.round(rawActiveAnnualBpjs / 12));
 
             const effectiveMyKinerja = calculateEffectiveKinerja(
               {
@@ -1726,11 +2076,19 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                 ? ((effectiveMyKinerja.perlinsos / activeTargetPerlinsos) * 100).toFixed(1)
                 : '0';
             const sisaTargetPerlinsos = Math.max(0, activeTargetPerlinsos - effectiveMyKinerja.perlinsos);
+            const myIkdPct =
+              activeTargetIkd > 0
+                ? Math.min(100, Math.round((effectiveMyKinerja.ikd / activeTargetIkd) * 100))
+                : 0;
+            const myBpjsPct =
+              activeTargetBpjs > 0
+                ? Math.min(100, Math.round((effectiveMyKinerja.bpjs / activeTargetBpjs) * 100))
+                : 0;
 
             return (
               <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Realisasi PBB (Terkoneksi Master SPPT) */}
+                {/* 1. Realisasi PBB (Bobot 20% - Terkoneksi Master SPPT) */}
                 <div
                   onClick={() => onOpenRekapPbb && onOpenRekapPbb()}
                   className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
@@ -1739,10 +2097,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
-                        1. Realisasi PBB ({pbbYear})
+                        1. PBB-P2 ({pbbYear})
                       </span>
                       <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold">
-                        SPPT Riil
+                        20% IKKT
                       </span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
@@ -1791,7 +2149,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   </div>
                 </div>
 
-                {/* 2. Perlinsos (Dengan Target & Capaian Resmi) */}
+                {/* 2. Perlinsos (Bobot 10% - Target & Capaian Resmi) */}
                 <div
                   onClick={() => onNavigateToKunjungan?.()}
                   className="bg-white rounded-2xl p-5 border-2 border-blue-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
@@ -1801,6 +2159,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     <div className="flex items-center gap-1.5">
                       <span className="text-[11px] font-black text-blue-900 uppercase tracking-wider">
                         2. Perlinsos
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[9px] font-black">
+                        10% IKKT
                       </span>
                       {effectiveMyKinerja.isPerlinsosOverridden && (
                         <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-black" title="Capaian disesuaikan Super Admin">
@@ -1856,172 +2217,395 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   </div>
                 </div>
 
-                {/* 3. IKD */}
+                {/* 3. IKD (Bobot 10%) */}
                 <div
                   onClick={() => onNavigateToKunjungan?.()}
-                  className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+                  className="bg-white rounded-2xl p-5 border border-purple-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
                   title="Klik untuk membuka Kunjungan Warga (IKD)"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wider">
-                      3. Identitas Digital (IKD)
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wider">
+                        3. Aktivasi IKD
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[9px] font-black">
+                        10% IKKT
+                      </span>
+                    </div>
                     <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
                       <Smartphone className="w-4 h-4" />
                     </div>
                   </div>
-                  <div className="mt-4">
-                    <div className="text-3xl font-black text-slate-900 tracking-tight">
-                      {effectiveMyKinerja.ikd}
-                      <span className="text-xs font-semibold text-slate-500 ml-1.5">Orang</span>
+                  <div className="mt-3">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black text-slate-900 tracking-tight">
+                        {effectiveMyKinerja.ikd}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">
+                        / {activeTargetIkd} Orang
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
+
+                    <div className="mt-2.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold mb-1">
+                        <span className="text-purple-950 font-black">Capaian Target</span>
+                        <span className="text-purple-800 font-black">{myIkdPct}%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-purple-600 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, Math.max(0, myIkdPct))}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500 mt-2">
                       Warga yang berhasil aktivasi KTP Digital (IKD).
                     </p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                    <span>Target: {activeTargetConfig?.targetIkd || 50} Org</span>
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                    <span>Target: {activeTargetIkd} Org</span>
                     <span className="text-purple-700 font-bold">Aktivasi IKD</span>
                   </div>
                 </div>
 
-                {/* 4. BPJS Ketenagakerjaan */}
+                {/* 4. BPJS Ketenagakerjaan (Bobot 10%) */}
                 <div
                   onClick={() => onNavigateToKunjungan?.()}
-                  className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+                  className="bg-white rounded-2xl p-5 border border-amber-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
                   title="Klik untuk membuka Kunjungan Warga & BPJS"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
-                      4. BPJS TK
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
+                        4. BPJS TK
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-black">
+                        10% IKKT
+                      </span>
+                    </div>
                     <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
                       <Shield className="w-4 h-4" />
                     </div>
                   </div>
-                  <div className="mt-4">
-                    <div className="text-3xl font-black text-slate-900 tracking-tight">
-                      {effectiveMyKinerja.bpjs}
-                      <span className="text-xs font-semibold text-slate-500 ml-1.5">Orang</span>
+                  <div className="mt-3">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black text-slate-900 tracking-tight">
+                        {effectiveMyKinerja.bpjs}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">
+                        / {activeTargetBpjs} Orang
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
+
+                    <div className="mt-2.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold mb-1">
+                        <span className="text-amber-950 font-black">Capaian Target</span>
+                        <span className="text-amber-800 font-black">{myBpjsPct}%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-amber-500 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, Math.max(0, myBpjsPct))}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500 mt-2">
                       Pekerja rentan / mandiri teredukasi dan terdaftar.
                     </p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                    <span>Target: {(activeTargetConfig?.targetBpjs && activeTargetConfig.targetBpjs >= 50) ? activeTargetConfig.targetBpjs : 50} Org</span>
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                    <span>Target: {activeTargetBpjs} Org</span>
                     <span className="text-amber-700 font-bold">Perlindungan Kerja</span>
                   </div>
                 </div>
               </div>
 
-              {/* 5. Indikator Kehadiran Kepala Lingkungan (Agenda Kelurahan) */}
+              {/* 5. Kedisiplinan & Kepatuhan (Apel Pagi 10%, Agenda/Rapat 5%, Konsistensi Lapor 15%, Posko Terverifikasi 10%) */}
               {(() => {
                 const kh = myPerformanceData?.item;
+                const totalApel = kh?.apelTotal || 0;
+                const hadirApel = kh?.apelHadir || 0;
+                const terlambatApel = kh?.apelTerlambat || 0;
+                const izinApel = kh?.apelIzin || 0;
+                const sakitApel = kh?.apelSakit || 0;
+                const alpaApel = kh?.apelAlpa || 0;
+                const pctApel = kh?.apelPercentage ?? 100;
+
                 const totalAg = kh?.kehadiranTotal || 0;
                 const hadirAg = kh?.kehadiranHadir || 0;
                 const alphaAg = kh?.kehadiranTidakHadir || 0;
                 const sakitAg = kh?.kehadiranSakit || 0;
                 const izinAg = kh?.kehadiranIzin || 0;
-                const pctAg = totalAg > 0 ? Math.round((hadirAg / totalAg) * 100) : 100;
+                const pctAg = kh?.agendaPercentage ?? (totalAg > 0 ? Math.round((hadirAg / totalAg) * 100) : 100);
+
+                const hariMelapor = kh?.hariMelapor ?? myStats.hariMelapor;
+                const targetHari = kh?.konsistensiTargetHari ?? konsistensiTargetHari;
+                const pctKonsistensi =
+                  kh?.konsistensiPercentage ??
+                  Math.min(100, Math.round((hariMelapor / Math.max(1, targetHari)) * 100));
+
+                const validPosko = kh?.validPoskoCount ?? 0;
+                const manualRonda = kh?.manualPoskamlingCount ?? 0;
+                const totalPoskoGiat = kh?.poskamlingCount ?? 0;
+                const targetPoskoGiat = kh?.targetPoskamlingBulan ?? 8;
+                const pctPosko = kh?.poskamlingPercentage ?? 0;
 
                 return (
-                  <div className="bg-white rounded-2xl p-5 border-2 border-indigo-200 shadow-sm space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-200">
-                          <UserCheck className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[11px] font-black text-indigo-900 uppercase tracking-wider">
-                              5. Kehadiran Kepala Lingkungan
-                            </span>
-                            <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black">
-                              Bobot 20% IKKT
-                            </span>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Card 5A: Apel Pagi (10%) & Konsistensi Laporan Harian (15%) */}
+                    <div className="bg-white rounded-2xl p-5 border-2 border-emerald-200 shadow-sm space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200">
+                            <Sun className="w-5 h-5" />
                           </div>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            Rekap kehadiran resmi berdasarkan daftar hadir Agenda Kelurahan pada periode {getPeriodLabel(period, now)}.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 self-start sm:self-auto">
-                        <div className="text-right">
-                          <div className="text-2xl font-black text-indigo-950">
-                            {totalAg > 0 ? `${pctAg}%` : '—'}
-                          </div>
-                          <div className="text-[11px] font-bold text-slate-500">
-                            {totalAg > 0 ? `${hadirAg} dari ${totalAg} Agenda` : 'Belum ada agenda diabsen'}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          pctAg >= 85 ? 'bg-emerald-500' : pctAg >= 65 ? 'bg-indigo-600' : 'bg-rose-500'
-                        }`}
-                        style={{ width: `${totalAg > 0 ? Math.min(100, pctAg) : 0}%` }}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center justify-between">
-                        <span className="font-bold text-emerald-800">Hadir</span>
-                        <span className="font-black text-emerald-950">{hadirAg}</span>
-                      </div>
-                      <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 flex items-center justify-between">
-                        <span className="font-bold text-rose-800">Tidak Hadir</span>
-                        <span className="font-black text-rose-950">{alphaAg}</span>
-                      </div>
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center justify-between">
-                        <span className="font-bold text-amber-800">Sakit</span>
-                        <span className="font-black text-amber-950">{sakitAg}</span>
-                      </div>
-                      <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 flex items-center justify-between">
-                        <span className="font-bold text-blue-800">Izin</span>
-                        <span className="font-black text-blue-950">{izinAg}</span>
-                      </div>
-                    </div>
-
-                    {myRecentAgendaAttendance.length > 0 && (
-                      <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                          Riwayat Absensi Agenda Terbaru
-                        </span>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {myRecentAgendaAttendance.slice(0, 4).map((ag) => (
-                            <div
-                              key={ag.id}
-                              className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs"
-                            >
-                              <div className="min-w-0">
-                                <p className="font-bold text-slate-800 truncate">{ag.namaKegiatan}</p>
-                                <p className="text-[10px] text-slate-500">
-                                  {formatTanggalSingkatIndonesia(ag.tanggalKegiatan)}
-                                </p>
-                              </div>
-                              <span
-                                className={`px-2 py-0.5 rounded-lg text-[10px] font-black shrink-0 border ${
-                                  ag.status === 'Hadir'
-                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                                    : ag.status === 'Tidak Hadir'
-                                    ? 'bg-rose-100 text-rose-800 border-rose-200'
-                                    : ag.status === 'Sakit'
-                                    ? 'bg-amber-100 text-amber-800 border-amber-200'
-                                    : 'bg-blue-100 text-blue-800 border-blue-200'
-                                }`}
-                              >
-                                {ag.status}
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] font-black text-emerald-950 uppercase tracking-wider">
+                                5. Apel Pagi & Disiplin Laporan
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 text-[10px] font-black">
+                                Bobot 25% IKKT
                               </span>
                             </div>
-                          ))}
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              Apel Pagi (10%) dicatat Admin/Kasi Pemerintahan · Konsistensi Laporan (15%) sesuai hari kalender berjalan.
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    )}
+
+                      {/* Sub-blok Apel Pagi 10% */}
+                      <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-slate-800">
+                            🫡 Apel Pagi Kepling (Bobot 10%)
+                          </span>
+                          <span className="text-sm font-black text-emerald-800">
+                            {totalApel > 0 ? `${pctApel}%` : '—'}
+                            <span className="text-[10px] font-semibold text-slate-500 ml-1">
+                              ({totalApel > 0 ? `${hadirApel}/${totalApel} Apel` : 'Belum ada data apel'})
+                            </span>
+                          </span>
+                        </div>
+                        <div className="w-full bg-white h-2 rounded-full overflow-hidden border border-slate-200">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              pctApel >= 85 ? 'bg-emerald-500' : pctApel >= 65 ? 'bg-amber-500' : 'bg-rose-500'
+                            }`}
+                            style={{ width: `${totalApel > 0 ? Math.min(100, pctApel) : 0}%` }}
+                          />
+                        </div>
+                        <div className="grid grid-cols-5 gap-1.5 text-[10px]">
+                          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1 text-center">
+                            <span className="block text-emerald-700 font-bold">Hadir</span>
+                            <strong className="text-emerald-950 text-xs">{hadirApel}</strong>
+                          </div>
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 text-center">
+                            <span className="block text-amber-700 font-bold">Telat</span>
+                            <strong className="text-amber-950 text-xs">{terlambatApel}</strong>
+                          </div>
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg px-2 py-1 text-center">
+                            <span className="block text-blue-700 font-bold">Izin</span>
+                            <strong className="text-blue-950 text-xs">{izinApel}</strong>
+                          </div>
+                          <div className="bg-orange-50 border border-orange-200 rounded-lg px-2 py-1 text-center">
+                            <span className="block text-orange-700 font-bold">Sakit</span>
+                            <strong className="text-orange-950 text-xs">{sakitApel}</strong>
+                          </div>
+                          <div className="bg-rose-50 border border-rose-200 rounded-lg px-2 py-1 text-center">
+                            <span className="block text-rose-700 font-bold">Alpa</span>
+                            <strong className="text-rose-950 text-xs">{alpaApel}</strong>
+                          </div>
+                        </div>
+
+                        {myRecentApelAttendance.length > 0 && (
+                          <div className="pt-2 border-t border-slate-200 space-y-1">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                              Riwayat Apel Pagi Terbaru
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                              {myRecentApelAttendance.slice(0, 4).map((ap) => (
+                                <div
+                                  key={ap.id}
+                                  className="flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px]"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-slate-800 truncate">
+                                      {formatTanggalSingkatIndonesia(ap.tanggal)}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500">
+                                      {ap.jamHadir ? `Pukul ${ap.jamHadir} WIB` : ap.waktuApel}
+                                    </p>
+                                  </div>
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-black shrink-0 border ${
+                                      ap.status === 'Hadir'
+                                        ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                        : ap.status === 'Terlambat'
+                                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                        : ap.status === 'Izin'
+                                        ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                        : ap.status === 'Sakit'
+                                        ? 'bg-orange-100 text-orange-800 border-orange-200'
+                                        : 'bg-rose-100 text-rose-800 border-rose-200'
+                                    }`}
+                                  >
+                                    {ap.status}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Sub-blok Konsistensi Laporan Harian 15% */}
+                      <div className="bg-teal-50/70 border border-teal-200 rounded-xl p-3.5 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-teal-950">
+                            📅 Konsistensi Laporan Harian (Bobot 15%)
+                          </span>
+                          <span className="text-sm font-black text-teal-900">
+                            {pctKonsistensi}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-white h-2 rounded-full overflow-hidden border border-teal-200">
+                          <div
+                            className="h-full bg-teal-600 rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, pctKonsistensi)}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] text-teal-900 font-medium">
+                          Melapor <strong>{hariMelapor} hari</strong> dari target{' '}
+                          <strong>{targetHari} hari kalender berjalan</strong> pada periode{' '}
+                          {getPeriodLabel(period, now)}.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card 5B: Kehadiran Agenda / Rapat (5%) & Posko Terverifikasi / Poskamling (10%) */}
+                    <div className="bg-white rounded-2xl p-5 border-2 border-indigo-200 shadow-sm space-y-4 flex flex-col justify-between">
+                      <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-200">
+                              <UserCheck className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[11px] font-black text-indigo-900 uppercase tracking-wider">
+                                  6. Agenda Rapat & Posko Lapangan
+                                </span>
+                                <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black">
+                                  Bobot 15% IKKT
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Kehadiran Agenda Kelurahan (5%) dan Tugas Posko/Poskamling Terverifikasi (10%).
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <div className="text-2xl font-black text-indigo-950">
+                              {totalAg > 0 ? `${pctAg}%` : '—'}
+                            </div>
+                            <div className="text-[10px] font-bold text-slate-500">
+                              {totalAg > 0 ? `${hadirAg}/${totalAg} Agenda` : 'Belum ada agenda'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              pctAg >= 85 ? 'bg-emerald-500' : pctAg >= 65 ? 'bg-indigo-600' : 'bg-rose-500'
+                            }`}
+                            style={{ width: `${totalAg > 0 ? Math.min(100, pctAg) : 0}%` }}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5 flex items-center justify-between">
+                            <span className="font-bold text-emerald-800">Hadir</span>
+                            <span className="font-black text-emerald-950">{hadirAg}</span>
+                          </div>
+                          <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-1.5 flex items-center justify-between">
+                            <span className="font-bold text-rose-800">Alpha</span>
+                            <span className="font-black text-rose-950">{alphaAg}</span>
+                          </div>
+                          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5 flex items-center justify-between">
+                            <span className="font-bold text-amber-800">Sakit</span>
+                            <span className="font-black text-amber-950">{sakitAg}</span>
+                          </div>
+                          <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5 flex items-center justify-between">
+                            <span className="font-bold text-blue-800">Izin</span>
+                            <span className="font-black text-blue-950">{izinAg}</span>
+                          </div>
+                        </div>
+
+                        {myRecentAgendaAttendance.length > 0 && (
+                          <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                              Riwayat Absensi Agenda Terbaru
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {myRecentAgendaAttendance.slice(0, 4).map((ag) => (
+                                <div
+                                  key={ag.id}
+                                  className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-slate-800 truncate">{ag.namaKegiatan}</p>
+                                    <p className="text-[10px] text-slate-500">
+                                      {formatTanggalSingkatIndonesia(ag.tanggalKegiatan)}
+                                    </p>
+                                  </div>
+                                  <span
+                                    className={`px-2 py-0.5 rounded-lg text-[10px] font-black shrink-0 border ${
+                                      ag.status === 'Hadir'
+                                        ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                        : ag.status === 'Tidak Hadir'
+                                        ? 'bg-rose-100 text-rose-800 border-rose-200'
+                                        : ag.status === 'Sakit'
+                                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                        : 'bg-blue-100 text-blue-800 border-blue-200'
+                                    }`}
+                                  >
+                                    {ag.status}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Sub-blok Posko & Poskamling (10%) */}
+                      <div className="bg-purple-50/80 border border-purple-200 rounded-xl p-3.5 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-purple-950">
+                            🔦 Posko Terverifikasi & Poskamling (Bobot 10%)
+                          </span>
+                          <span className="text-sm font-black text-purple-900">
+                            {pctPosko}% ({totalPoskoGiat}/{targetPoskoGiat} Giat)
+                          </span>
+                        </div>
+                        <div className="w-full bg-white h-2 rounded-full overflow-hidden border border-purple-200">
+                          <div
+                            className="h-full bg-purple-600 rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, pctPosko)}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] text-purple-900 font-medium">
+                          Terdiri dari <strong>{validPosko} tugas Posko sah</strong> (Trantibum / Banjir / Bersih Sampah dengan foto atau verifikasi Super Admin) dan{' '}
+                          <strong>{manualRonda} giat Poskamling</strong>.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 );
               })()}
@@ -2254,21 +2838,70 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         <div className="space-y-6">
           {/* Kelurahan Aggregation Metric Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 sm:gap-4">
-            {/* Total Laporan */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs">
-              <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase block">
-                Total Laporan Masuk
-              </span>
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-                {kelurahanTotals.totalReports}
-                <span className="text-xs font-semibold text-slate-500 ml-1">Lap</span>
+            {/* Konsistensi Laporan Harian (15%) */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-teal-200 shadow-xs">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] sm:text-[11px] font-black text-teal-900 uppercase block">
+                  Konsistensi Laporan (15%)
+                </span>
+                <span className="text-[10px] bg-teal-100 text-teal-900 font-black px-1.5 py-0.5 rounded">
+                  Target {kelurahanTotals.konsistensiTargetHari} Hari
+                </span>
               </div>
-              <p className="text-[11px] text-emerald-700 font-semibold mt-1">
-                {kelurahanTotals.activeKeplingCount} dari 24 Kepling aktif
+              <div className="text-2xl sm:text-3xl font-black text-teal-950 mt-1">
+                {kelurahanTotals.avgKonsistensiRate}%
+                <span className="text-xs font-semibold text-slate-500 ml-1">
+                  ({kelurahanTotals.totalReports} Lap)
+                </span>
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2">
+                <div
+                  className="bg-teal-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, kelurahanTotals.avgKonsistensiRate)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-emerald-700 font-semibold mt-1 truncate">
+                {kelurahanTotals.activeKeplingCount}/24 Kepling aktif melapor
               </p>
             </div>
 
-            {/* Kehadiran Kepala Lingkungan (Absensi Agenda Kelurahan) */}
+            {/* Apel Pagi Kepling (10%) */}
+            <div
+              onClick={() => onOpenAbsensiKepling?.()}
+              className={`bg-white rounded-2xl p-4 sm:p-5 border-2 border-emerald-200 shadow-xs transition-all ${
+                onOpenAbsensiKepling ? 'cursor-pointer hover:border-emerald-400 hover:shadow-md group' : ''
+              }`}
+              title={
+                onOpenAbsensiKepling
+                  ? 'Klik untuk membuka Absensi Apel Pagi Kepala Lingkungan'
+                  : 'Rata-rata kedisiplinan Apel Pagi 24 Kepala Lingkungan'
+              }
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] sm:text-[11px] font-black text-emerald-900 uppercase block group-hover:text-emerald-700 transition-colors">
+                  Apel Pagi (10%) {onOpenAbsensiKepling ? '↗' : ''}
+                </span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-900 font-black px-1.5 py-0.5 rounded">
+                  {kelurahanTotals.totalApelHari} Hari Apel
+                </span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-950 mt-1">
+                {kelurahanTotals.totalApelHari > 0 ? `${kelurahanTotals.avgApelRate}%` : '—'}
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2">
+                <div
+                  className="bg-emerald-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, kelurahanTotals.avgApelRate)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1 truncate">
+                {kelurahanTotals.totalApelHari > 0
+                  ? `${kelurahanTotals.totalApelHadir} Hadir · ${kelurahanTotals.totalApelTerlambat} Telat · ${kelurahanTotals.totalApelAlpa} Alpa`
+                  : 'Belum ada absensi apel pagi'}
+              </p>
+            </div>
+
+            {/* Kehadiran Agenda / Rapat (5%) */}
             <div
               onClick={() => onOpenAbsensiKepling?.()}
               className={`bg-white rounded-2xl p-4 sm:p-5 border-2 border-indigo-200 shadow-xs transition-all ${
@@ -2282,7 +2915,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             >
               <div className="flex items-center justify-between gap-1">
                 <span className="text-[10px] sm:text-[11px] font-black text-indigo-900 uppercase block group-hover:text-indigo-700 transition-colors">
-                  Kehadiran Kepling {onOpenAbsensiKepling ? '↗' : ''}
+                  Agenda / Rapat (5%) {onOpenAbsensiKepling ? '↗' : ''}
                 </span>
                 <span className="text-[10px] bg-indigo-100 text-indigo-900 font-black px-1.5 py-0.5 rounded">
                   {kelurahanTotals.totalAgendaTercatat} Agenda
@@ -2367,23 +3000,34 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               </p>
             </div>
 
-            {/* Total IKD */}
+            {/* Total IKD (10%) */}
             <div
               onClick={() => onNavigateToKunjungan?.()}
-              className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs cursor-pointer hover:border-purple-400 hover:shadow-md transition-all group"
+              className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-purple-200 shadow-xs cursor-pointer hover:border-purple-400 hover:shadow-md transition-all group"
               title="Klik untuk membuka Kunjungan Warga (IKD)"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] sm:text-[11px] font-bold text-purple-700 uppercase block group-hover:text-purple-900 transition-colors">
-                  Total IKD Warga ↗
+                <span className="text-[10px] sm:text-[11px] font-black text-purple-800 uppercase block group-hover:text-purple-950 transition-colors">
+                  Total IKD (10%) ↗
+                </span>
+                <span className="text-[10px] bg-purple-100 text-purple-900 font-black px-1.5 py-0.5 rounded">
+                  {kelurahanTotals.ikdPercentage}%
                 </span>
               </div>
-              <div className="text-2xl sm:text-3xl font-black text-purple-800 mt-1">
+              <div className="text-2xl sm:text-3xl font-black text-purple-900 mt-1">
                 {kelurahanTotals.totalIkd}
-                <span className="text-xs font-semibold text-slate-500 ml-1">Orang</span>
+                <span className="text-xs font-semibold text-slate-500 ml-1">
+                  / {kelurahanTotals.totalTargetIkd} Org
+                </span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Aktivasi KTP Digital
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2">
+                <div
+                  className="bg-purple-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, kelurahanTotals.ikdPercentage)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Target 24 Lingk: {kelurahanTotals.totalTargetIkd} Orang
               </p>
             </div>
 
@@ -2488,7 +3132,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             />
           </React.Suspense>
 
-          {/* Leaderboard & Ranking Section - 7 Kriteria Terpadu */}
+          {/* Leaderboard & Ranking Section - 9 Kriteria Terpadu (Total 100%) */}
           <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-7 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
               <div className="flex items-center gap-3">
@@ -2504,26 +3148,35 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       className={`text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                         leaderboardSort === 'KOMPOSIT'
                           ? 'bg-amber-100 text-amber-950 border-amber-300 ring-1 ring-amber-200'
-                          : leaderboardSort === 'KEGIATAN'
+                          : leaderboardSort === 'APEL'
+                          ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                          : leaderboardSort === 'KEHADIRAN' || leaderboardSort === 'KEGIATAN'
                           ? 'bg-indigo-100 text-indigo-950 border-indigo-300'
+                          : leaderboardSort === 'KONSISTENSI'
+                          ? 'bg-teal-100 text-teal-950 border-teal-300'
                           : leaderboardSort === 'PERLINSOS'
                           ? 'bg-blue-100 text-blue-950 border-blue-300'
+                          : leaderboardSort === 'IKD'
+                          ? 'bg-purple-100 text-purple-950 border-purple-300'
                           : leaderboardSort === 'PBB'
                           ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
                           : leaderboardSort === 'BPJS'
-                          ? 'bg-teal-100 text-teal-900 border-teal-300'
+                          ? 'bg-cyan-100 text-cyan-900 border-cyan-300'
                           : leaderboardSort === 'KUNJUNGAN'
                           ? 'bg-amber-100 text-amber-900 border-amber-300'
-                          : 'bg-purple-100 text-purple-900 border-purple-300'
+                          : 'bg-fuchsia-100 text-fuchsia-900 border-fuchsia-300'
                       }`}
                     >
-                      {leaderboardSort === 'KOMPOSIT' && '⭐ 6 Kriteria Terpadu (Skor Komposit)'}
-                      {(leaderboardSort === 'KEHADIRAN' || leaderboardSort === 'KEGIATAN') && '👤 Kehadiran Kepling (20%)'}
-                      {leaderboardSort === 'PERLINSOS' && '📋 Capaian Perlinsos (25%)'}
-                      {leaderboardSort === 'PBB' && '💰 Realisasi PBB (25%)'}
-                      {leaderboardSort === 'BPJS' && '🛡️ BPJS Ketenagakerjaan (10%)'}
-                      {leaderboardSort === 'KUNJUNGAN' && '🏠 Kunjungan Harian (10%)'}
-                      {leaderboardSort === 'POSKAMLING' && '🔦 Poskamling / Siskamling (10%)'}
+                      {leaderboardSort === 'KOMPOSIT' && '⭐ 9 Kriteria Terpadu (100%)'}
+                      {leaderboardSort === 'PBB' && '💰 Realisasi PBB (20%)'}
+                      {leaderboardSort === 'PERLINSOS' && '📋 Perlinsos (10%)'}
+                      {leaderboardSort === 'IKD' && '📱 Aktivasi IKD (10%)'}
+                      {leaderboardSort === 'BPJS' && '🛡️ BPJS TK (10%)'}
+                      {leaderboardSort === 'KUNJUNGAN' && '🏠 Kunjungan Warga (10%)'}
+                      {leaderboardSort === 'POSKAMLING' && '🔦 Posko & Poskamling (10%)'}
+                      {leaderboardSort === 'APEL' && '🫡 Apel Pagi (10%)'}
+                      {(leaderboardSort === 'KEHADIRAN' || leaderboardSort === 'KEGIATAN') && '🏛️ Agenda / Rapat (5%)'}
+                      {leaderboardSort === 'KONSISTENSI' && '📅 Konsistensi Lapor (15%)'}
                     </span>
 
                     <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-2xs">
@@ -2532,10 +3185,13 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">
-                    Peringkat resmi terpadu untuk periode <strong>{getPeriodLabel(period, now)}</strong> dihitung dari <strong>6 Kriteria Kinerja</strong> (Kehadiran Kepling 20%, Perlinsos 25%, PBB 25%, BPJS TK 10%, Kunjungan 10%, Poskamling 10%). 
+                    Peringkat resmi terpadu untuk periode <strong>{getPeriodLabel(period, now)}</strong> dihitung dari{' '}
+                    <strong>9 Kriteria Kinerja (Total 100%)</strong>: Realisasi PBB 20%, Perlinsos 10%, IKD 10%, BPJS TK 10%,
+                    Kunjungan Warga 10%, Posko & Poskamling Terverifikasi 10%, Apel Pagi 10%, Agenda/Rapat 5%, dan
+                    Konsistensi Laporan Harian 15% (target {konsistensiTargetHari} hari kalender berjalan).
                     {!isCumulativePeriod ? (
                       <span className="text-emerald-700 font-semibold block mt-0.5">
-                        ⚡ Mode Bulanan Aktif: Akumulasi poin direset otomatis dari 0 pada tanggal 1 bulan berjalan (hanya menghitung transaksi & keaktifan bulan ini). Evaluasi total kumulatif setahun penuh dapat dilihat melalui filter "Tahun 2026".
+                        ⚡ Mode Bulanan Aktif: Akumulasi poin direset otomatis dari 0 pada tanggal 1 bulan berjalan (hanya menghitung transaksi & keaktifan bulan ini). Evaluasi total kumulatif setahun penuh dapat dilihat melalui filter "Tahun {now.getFullYear()}".
                       </span>
                     ) : (
                       <span className="text-blue-700 font-semibold block mt-0.5">
@@ -2555,7 +3211,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     setIsModalEditOpen(true);
                   }}
                   className="px-3.5 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all shrink-0 cursor-pointer"
-                  title="Atur Target PERLINSOS dan Edit Capaian 24 Kepling"
+                  title="Atur Target PERLINSOS, IKD, BPJS dan Edit Capaian 24 Kepling"
                 >
                   <Sliders className="w-3.5 h-3.5 text-amber-300" />
                   <span>Kelola Target & Capaian</span>
@@ -2574,11 +3230,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
               </div>
             </div>
 
-            {/* Filter & Kriteria Selection Toolbar */}
+            {/* Filter & Kriteria Selection Toolbar (9 Kriteria = 100%) */}
             <div className="mt-4 pt-3 border-t border-slate-100 print:hidden">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2">
                 <Filter className="w-3.5 h-3.5 text-slate-400" />
-                <span>Pilih Urutan Peringkat Berdasarkan Kriteria:</span>
+                <span>Pilih Urutan Peringkat Berdasarkan Kriteria (Total Bobot 100%):</span>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <button
@@ -2591,35 +3247,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   }`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>6 Kriteria Terpadu (Default)</span>
-                </button>
-
-
-
-                <button
-                  type="button"
-                  onClick={() => setLeaderboardSort('KEHADIRAN')}
-                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
-                    leaderboardSort === 'KEHADIRAN' || leaderboardSort === 'KEGIATAN'
-                      ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-300 scale-102'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  <UserCheck className="w-3.5 h-3.5" />
-                  <span>Kehadiran Kepling (20%)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setLeaderboardSort('PERLINSOS')}
-                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
-                    leaderboardSort === 'PERLINSOS'
-                      ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-300 scale-102'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  <FileCheck2 className="w-3.5 h-3.5" />
-                  <span>Perlinsos (25%)</span>
+                  <span>9 Kriteria Terpadu (100%)</span>
                 </button>
 
                 {isPbbAllowed && (
@@ -2633,16 +3261,42 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     }`}
                   >
                     <CreditCard className="w-3.5 h-3.5" />
-                    <span>Realisasi PBB (25%)</span>
+                    <span>PBB (20%)</span>
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => setLeaderboardSort('PERLINSOS')}
+                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    leaderboardSort === 'PERLINSOS'
+                      ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-300 scale-102'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <FileCheck2 className="w-3.5 h-3.5" />
+                  <span>Perlinsos (10%)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLeaderboardSort('IKD')}
+                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    leaderboardSort === 'IKD'
+                      ? 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-300 scale-102'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>IKD (10%)</span>
+                </button>
 
                 <button
                   type="button"
                   onClick={() => setLeaderboardSort('BPJS')}
                   className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
                     leaderboardSort === 'BPJS'
-                      ? 'bg-teal-600 text-white shadow-sm ring-2 ring-teal-300 scale-102'
+                      ? 'bg-cyan-700 text-white shadow-sm ring-2 ring-cyan-300 scale-102'
                       : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                   }`}
                 >
@@ -2659,7 +3313,7 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                   }`}
                 >
-                  <UserCheck className="w-3.5 h-3.5" />
+                  <Users className="w-3.5 h-3.5" />
                   <span>Kunjungan (10%)</span>
                 </button>
 
@@ -2668,464 +3322,526 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                   onClick={() => setLeaderboardSort('POSKAMLING')}
                   className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
                     leaderboardSort === 'POSKAMLING'
-                      ? 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-300 scale-102'
+                      ? 'bg-fuchsia-700 text-white shadow-sm ring-2 ring-fuchsia-300 scale-102'
                       : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                   }`}
                 >
                   <Radio className="w-3.5 h-3.5" />
-                  <span>Poskamling (10%)</span>
+                  <span>Posko & Ronda (10%)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLeaderboardSort('APEL')}
+                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    leaderboardSort === 'APEL'
+                      ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-300 scale-102'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <Sun className="w-3.5 h-3.5" />
+                  <span>Apel Pagi (10%)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLeaderboardSort('KEHADIRAN')}
+                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    leaderboardSort === 'KEHADIRAN' || leaderboardSort === 'KEGIATAN'
+                      ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-300 scale-102'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Agenda / Rapat (5%)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLeaderboardSort('KONSISTENSI')}
+                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    leaderboardSort === 'KONSISTENSI'
+                      ? 'bg-teal-700 text-white shadow-sm ring-2 ring-teal-300 scale-102'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <CalendarCheck className="w-3.5 h-3.5" />
+                  <span>Konsistensi Lapor (15%)</span>
                 </button>
               </div>
             </div>
 
-            {/* Top 3 Podium Highlights with 7 Kriteria Breakdowns */}
+            {/* Top 3 Podium Highlights with 9 Kriteria Breakdowns */}
             {sortedLeaderboard.length >= 3 && !searchQuery && (
               <div className="my-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Juara 2 */}
-                <div className="p-4 bg-gradient-to-b from-slate-50 to-slate-100/70 rounded-2xl border border-slate-200 text-center relative overflow-hidden order-2 md:order-1 flex flex-col justify-between shadow-2xs">
-                  <div>
-                    <span className="inline-block px-3 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-black uppercase mb-2 shadow-2xs">
-                      🥈 Peringkat 2
-                    </span>
-                    <div className="text-3xl font-black text-slate-900 tracking-tight">
-                      {sortedLeaderboard[1].compositeScoreDecimal}
-                      <span className="text-xs font-bold text-slate-500 ml-1">/100 Poin</span>
-                    </div>
-                    <div className="text-[11px] font-semibold text-slate-600 mt-0.5 mb-2">
-                      Indeks Kinerja Kepling Terpadu
-                    </div>
-
-                    <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-800 font-black text-sm mx-auto flex items-center justify-center mb-1 shadow-2xs">
-                      {sortedLeaderboard[1].kepling.nomorLingkungan}
-                    </div>
-                    <h4 className="font-bold text-slate-900 text-sm truncate">
-                      {sortedLeaderboard[1].kepling.nama}
-                    </h4>
-                    <p className="text-xs text-slate-500 font-medium">
-                      {sortedLeaderboard[1].kepling.lingkungan}
-                    </p>
-                  </div>
-
-                  <div className="mt-3 pt-2.5 border-t border-slate-200 grid grid-cols-2 gap-1.5 text-[10px] text-left">
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
-                      <span className="text-slate-400 block font-medium">👤 Kehadiran</span>
-                      <strong className="text-indigo-700">{sortedLeaderboard[1].kehadiranPercentage}%</strong>
-                      {sortedLeaderboard[1].kehadiranTotal > 0 ? ` (${sortedLeaderboard[1].kehadiranHadir}/${sortedLeaderboard[1].kehadiranTotal})` : ''}
-                    </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
-                      <span className="text-slate-400 block font-medium">📋 Perlinsos</span>
-                      <strong className="text-blue-700">{sortedLeaderboard[1].perlinsosPercentage}%</strong> ({sortedLeaderboard[1].perlinsos} KK)
-                    </div>
-                    {isPbbAllowed && (
-                      <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
-                        <span className="text-slate-400 block font-medium">💰 PBB</span>
-                        <strong className="text-emerald-800">{sortedLeaderboard[1].pbbPercentage}%</strong> ({sortedLeaderboard[1].pbb}/{sortedLeaderboard[1].targetPbb} WP)
+                {[
+                  {
+                    row: sortedLeaderboard[1],
+                    rank: 2,
+                    orderClass: 'order-2 md:order-1',
+                    cardClass: 'p-4 bg-gradient-to-b from-slate-50 to-slate-100/70 border border-slate-200 shadow-2xs',
+                    badgeClass: 'bg-slate-200 text-slate-800 text-[10px]',
+                    badgeText: '🥈 Peringkat 2',
+                    scoreClass: 'text-3xl text-slate-900',
+                    subScoreClass: 'text-slate-600',
+                    avatarClass: 'w-10 h-10 bg-slate-200 text-slate-800 text-sm',
+                    borderClass: 'border-slate-200',
+                    cellClass: 'bg-white/85 border-slate-100',
+                  },
+                  {
+                    row: sortedLeaderboard[0],
+                    rank: 1,
+                    orderClass: 'order-1 md:order-2',
+                    cardClass: 'p-5 bg-gradient-to-b from-amber-50 to-amber-100/70 border-2 border-amber-400 shadow-md',
+                    badgeClass: 'bg-amber-400 text-slate-950 text-[11px]',
+                    badgeText: '🥇 Peringkat 1 Terbaik',
+                    scoreClass: 'text-4xl text-amber-950',
+                    subScoreClass: 'text-amber-900 font-bold',
+                    avatarClass: 'w-12 h-12 bg-amber-400 text-slate-950 text-base ring-2 ring-amber-300',
+                    borderClass: 'border-amber-200',
+                    cellClass: 'bg-white/90 border-amber-200',
+                  },
+                  {
+                    row: sortedLeaderboard[2],
+                    rank: 3,
+                    orderClass: 'order-3',
+                    cardClass: 'p-4 bg-gradient-to-b from-amber-50/40 to-orange-50/50 border border-amber-200 shadow-2xs',
+                    badgeClass: 'bg-amber-200 text-amber-950 text-[10px]',
+                    badgeText: '🥉 Peringkat 3',
+                    scoreClass: 'text-3xl text-amber-950',
+                    subScoreClass: 'text-amber-900',
+                    avatarClass: 'w-10 h-10 bg-amber-200 text-amber-950 text-sm',
+                    borderClass: 'border-amber-200',
+                    cellClass: 'bg-white/85 border-amber-100',
+                  },
+                ].map((podium) => (
+                  <div
+                    key={podium.row.kepling.id}
+                    className={`rounded-2xl text-center relative overflow-hidden flex flex-col justify-between ${podium.cardClass} ${podium.orderClass}`}
+                  >
+                    <div>
+                      <span className={`inline-block px-3 py-0.5 rounded-full font-black uppercase mb-2 shadow-2xs ${podium.badgeClass}`}>
+                        {podium.badgeText}
+                      </span>
+                      <div className={`font-black tracking-tight ${podium.scoreClass}`}>
+                        {podium.row.compositeScoreDecimal}
+                        <span className="text-xs font-bold opacity-70 ml-1">/100 Poin</span>
                       </div>
-                    )}
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
-                      <span className="text-slate-400 block font-medium">🛡️ BPJS TK</span>
-                      <strong className="text-teal-800">{sortedLeaderboard[1].bpjsPercentage}%</strong> ({sortedLeaderboard[1].bpjs} Org)
-                    </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
-                      <span className="text-slate-400 block font-medium">🏠 Kunjungan</span>
-                      <strong className="text-amber-800">{sortedLeaderboard[1].totalKunjungan} KK</strong>
-                    </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100 col-span-2">
-                      <span className="text-slate-400 block font-medium">🔦 Poskamling</span>
-                      <strong className="text-purple-800">{sortedLeaderboard[1].poskamlingCount} Giat</strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Juara 1 (Podium Tertinggi) */}
-                <div className="p-5 bg-gradient-to-b from-amber-50 to-amber-100/70 rounded-2xl border-2 border-amber-400 text-center relative overflow-hidden shadow-md order-1 md:order-2 flex flex-col justify-between">
-                  <div>
-                    <span className="inline-block px-3.5 py-1 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black uppercase mb-2 shadow-xs">
-                      🥇 Peringkat 1 Terbaik
-                    </span>
-                    <div className="text-4xl font-black text-amber-950 tracking-tight">
-                      {sortedLeaderboard[0].compositeScoreDecimal}
-                      <span className="text-sm font-bold text-amber-800 ml-1">/100 Poin</span>
-                    </div>
-                    <div className="text-xs font-bold text-amber-900 mt-0.5 mb-2">
-                      Indeks Kinerja Kepling Terpadu
-                    </div>
-
-                    <div className="w-12 h-12 rounded-full bg-amber-400 text-slate-950 font-black text-base mx-auto flex items-center justify-center mb-1.5 shadow-sm ring-2 ring-amber-300">
-                      {sortedLeaderboard[0].kepling.nomorLingkungan}
-                    </div>
-                    <h4 className="font-black text-slate-900 text-base truncate">
-                      {sortedLeaderboard[0].kepling.nama}
-                    </h4>
-                    <p className="text-xs text-amber-950 font-bold">
-                      {sortedLeaderboard[0].kepling.lingkungan}
-                    </p>
-                  </div>
-
-                  <div className="mt-3.5 pt-3 border-t border-amber-200 grid grid-cols-2 gap-1.5 text-[10px] text-left">
-                    <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
-                      <span className="text-amber-800 block font-medium">👤 Kehadiran</span>
-                      <strong className="text-indigo-700 font-bold">{sortedLeaderboard[0].kehadiranPercentage}%</strong>
-                      {sortedLeaderboard[0].kehadiranTotal > 0 ? ` (${sortedLeaderboard[0].kehadiranHadir}/${sortedLeaderboard[0].kehadiranTotal})` : ''}
-                    </div>
-                    <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
-                      <span className="text-amber-800 block font-medium">📋 Perlinsos</span>
-                      <strong className="text-blue-700 font-bold">{sortedLeaderboard[0].perlinsosPercentage}%</strong> ({sortedLeaderboard[0].perlinsos} KK)
-                    </div>
-                    {isPbbAllowed && (
-                      <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
-                        <span className="text-amber-800 block font-medium">💰 PBB</span>
-                        <strong className="text-emerald-800 font-bold">{sortedLeaderboard[0].pbbPercentage}%</strong> ({sortedLeaderboard[0].pbb}/{sortedLeaderboard[0].targetPbb} WP)
+                      <div className={`text-[11px] mt-0.5 mb-2 ${podium.subScoreClass}`}>
+                        Indeks Kinerja Kepling Terpadu
                       </div>
-                    )}
-                    <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
-                      <span className="text-amber-800 block font-medium">🛡️ BPJS TK</span>
-                      <strong className="text-teal-800 font-bold">{sortedLeaderboard[0].bpjsPercentage}%</strong> ({sortedLeaderboard[0].bpjs} Org)
-                    </div>
-                    <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200">
-                      <span className="text-amber-800 block font-medium">🏠 Kunjungan</span>
-                      <strong className="text-amber-900 font-bold">{sortedLeaderboard[0].totalKunjungan} KK</strong>
-                    </div>
-                    <div className="bg-white/90 p-1.5 rounded-lg border border-amber-200 col-span-2">
-                      <span className="text-amber-800 block font-medium">🔦 Poskamling</span>
-                      <strong className="text-purple-800 font-bold">{sortedLeaderboard[0].poskamlingCount} Giat</strong>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Juara 3 */}
-                <div className="p-4 bg-gradient-to-b from-amber-50/40 to-orange-50/50 rounded-2xl border border-amber-200 text-center relative overflow-hidden order-3 flex flex-col justify-between shadow-2xs">
-                  <div>
-                    <span className="inline-block px-3 py-0.5 rounded-full bg-amber-200 text-amber-950 text-[10px] font-black uppercase mb-2 shadow-2xs">
-                      🥉 Peringkat 3
-                    </span>
-                    <div className="text-3xl font-black text-amber-950 tracking-tight">
-                      {sortedLeaderboard[2].compositeScoreDecimal}
-                      <span className="text-xs font-bold text-amber-800 ml-1">/100 Poin</span>
-                    </div>
-                    <div className="text-[11px] font-semibold text-amber-900 mt-0.5 mb-2">
-                      Indeks Kinerja Kepling Terpadu
-                    </div>
-
-                    <div className="w-10 h-10 rounded-full bg-amber-200 text-amber-950 font-black text-sm mx-auto flex items-center justify-center mb-1 shadow-2xs">
-                      {sortedLeaderboard[2].kepling.nomorLingkungan}
-                    </div>
-                    <h4 className="font-bold text-slate-900 text-sm truncate">
-                      {sortedLeaderboard[2].kepling.nama}
-                    </h4>
-                    <p className="text-xs text-slate-500 font-medium">
-                      {sortedLeaderboard[2].kepling.lingkungan}
-                    </p>
-                  </div>
-
-                  <div className="mt-3 pt-2.5 border-t border-amber-200 grid grid-cols-2 gap-1.5 text-[10px] text-left">
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
-                      <span className="text-slate-400 block font-medium">👤 Kehadiran</span>
-                      <strong className="text-indigo-700">{sortedLeaderboard[2].kehadiranPercentage}%</strong>
-                      {sortedLeaderboard[2].kehadiranTotal > 0 ? ` (${sortedLeaderboard[2].kehadiranHadir}/${sortedLeaderboard[2].kehadiranTotal})` : ''}
-                    </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
-                      <span className="text-slate-400 block font-medium">📋 Perlinsos</span>
-                      <strong className="text-blue-700">{sortedLeaderboard[2].perlinsosPercentage}%</strong> ({sortedLeaderboard[2].perlinsos} KK)
-                    </div>
-                    {isPbbAllowed && (
-                      <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
-                        <span className="text-slate-400 block font-medium">💰 PBB</span>
-                        <strong className="text-emerald-800">{sortedLeaderboard[2].pbbPercentage}%</strong> ({sortedLeaderboard[2].pbb}/{sortedLeaderboard[2].targetPbb} WP)
+                      <div className={`rounded-full font-black mx-auto flex items-center justify-center mb-1 shadow-2xs ${podium.avatarClass}`}>
+                        {podium.row.kepling.nomorLingkungan}
                       </div>
-                    )}
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
-                      <span className="text-slate-400 block font-medium">🛡️ BPJS TK</span>
-                      <strong className="text-teal-800">{sortedLeaderboard[2].bpjsPercentage}%</strong> ({sortedLeaderboard[2].bpjs} Org)
+                      <h4 className="font-black text-slate-900 text-sm truncate">
+                        {podium.row.kepling.nama}
+                      </h4>
+                      <p className="text-xs text-slate-600 font-semibold">
+                        {podium.row.kepling.lingkungan}
+                      </p>
                     </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
-                      <span className="text-slate-400 block font-medium">🏠 Kunjungan</span>
-                      <strong className="text-amber-800">{sortedLeaderboard[2].totalKunjungan} KK</strong>
-                    </div>
-                    <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100 col-span-2">
-                      <span className="text-slate-400 block font-medium">🔦 Poskamling</span>
-                      <strong className="text-purple-800">{sortedLeaderboard[2].poskamlingCount} Giat</strong>
+
+                    <div className={`mt-3 pt-2.5 border-t grid grid-cols-3 gap-1.5 text-[10px] text-left ${podium.borderClass}`}>
+                      {isPbbAllowed && (
+                        <div className={`p-1.5 rounded-lg border ${podium.cellClass}`}>
+                          <span className="text-slate-400 block font-medium">💰 PBB</span>
+                          <strong className="text-emerald-800">{podium.row.pbbPercentage}%</strong>
+                        </div>
+                      )}
+                      <div className={`p-1.5 rounded-lg border ${podium.cellClass}`}>
+                        <span className="text-slate-400 block font-medium">📋 Perlinsos</span>
+                        <strong className="text-blue-700">{podium.row.perlinsosPercentage}%</strong>
+                      </div>
+                      <div className={`p-1.5 rounded-lg border ${podium.cellClass}`}>
+                        <span className="text-slate-400 block font-medium">📱 IKD</span>
+                        <strong className="text-purple-700">{podium.row.ikdPercentage}%</strong>
+                      </div>
+                      <div className={`p-1.5 rounded-lg border ${podium.cellClass}`}>
+                        <span className="text-slate-400 block font-medium">🛡️ BPJS</span>
+                        <strong className="text-cyan-800">{podium.row.bpjsPercentage}%</strong>
+                      </div>
+                      <div className={`p-1.5 rounded-lg border ${podium.cellClass}`}>
+                        <span className="text-slate-400 block font-medium">🏠 Kunjungan</span>
+                        <strong className="text-amber-800">{podium.row.kunjunganPercentage}%</strong>
+                      </div>
+                      <div className={`p-1.5 rounded-lg border ${podium.cellClass}`}>
+                        <span className="text-slate-400 block font-medium">🔦 Posko</span>
+                        <strong className="text-fuchsia-800">{podium.row.poskamlingCount} Giat</strong>
+                      </div>
+                      <div className={`p-1.5 rounded-lg border ${podium.cellClass}`}>
+                        <span className="text-slate-400 block font-medium">🫡 Apel Pagi</span>
+                        <strong className="text-emerald-700">{podium.row.apelPercentage}%</strong>
+                      </div>
+                      <div className={`p-1.5 rounded-lg border ${podium.cellClass}`}>
+                        <span className="text-slate-400 block font-medium">🏛️ Agenda</span>
+                        <strong className="text-indigo-700">{podium.row.agendaPercentage}%</strong>
+                      </div>
+                      <div className={`p-1.5 rounded-lg border ${podium.cellClass}`}>
+                        <span className="text-slate-400 block font-medium">📅 Lapor</span>
+                        <strong className="text-teal-800">{podium.row.hariMelapor}/{podium.row.konsistensiTargetHari}h</strong>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ))}
               </div>
             )}
 
-            {/* List / Table of All 24 Kepling Performance (7 Kriteria Terpadu) */}
-            <div className="divide-y divide-slate-100 mt-4 overflow-x-auto">
-              <div className="hidden xl:grid grid-cols-12 gap-2 py-2 px-3 text-[11px] font-black text-slate-400 uppercase tracking-wider items-center bg-slate-50/70 rounded-xl mb-1">
-                <div className="col-span-1 text-center">Rank</div>
-                <div className={`text-left ${isPbbAllowed ? 'col-span-2' : 'col-span-3'}`}>Kepala Lingkungan</div>
-                <div className="col-span-1 text-center bg-amber-100/70 text-amber-950 py-1 rounded-md font-black">
-                  Skor IKKT
+            {/* List / Table of All 24 Kepling Performance (9 Kriteria Terpadu = 100%) */}
+            <div className="mt-4 overflow-x-auto">
+              <div className="divide-y divide-slate-100 xl:min-w-[1220px]">
+                <div
+                  className={`hidden xl:grid gap-1.5 py-2.5 px-3 text-[10px] font-black text-slate-500 uppercase tracking-wider items-center bg-slate-50/90 rounded-xl mb-1 border border-slate-200/70 ${
+                    isPbbAllowed
+                      ? 'xl:[grid-template-columns:48px_minmax(185px,1.5fr)_74px_repeat(9,minmax(76px,1fr))_72px]'
+                      : 'xl:[grid-template-columns:48px_minmax(195px,1.5fr)_74px_repeat(8,minmax(80px,1fr))_72px]'
+                  }`}
+                >
+                  <div className="text-center">Rank</div>
+                  <div className="text-left">Kepala Lingkungan</div>
+                  <div className="text-center bg-amber-100/80 text-amber-950 py-1 rounded-md font-black">
+                    IKKT
+                  </div>
+                  {isPbbAllowed && <div className="text-center">💰 PBB (20%)</div>}
+                  <div className="text-center">📋 Perlinsos (10%)</div>
+                  <div className="text-center">📱 IKD (10%)</div>
+                  <div className="text-center">🛡️ BPJS (10%)</div>
+                  <div className="text-center">🏠 Kunj (10%)</div>
+                  <div className="text-center">🔦 Posko (10%)</div>
+                  <div className="text-center">🫡 Apel (10%)</div>
+                  <div className="text-center">🏛️ Agenda (5%)</div>
+                  <div className="text-center">📅 Lapor (15%)</div>
+                  <div className="text-right">Aksi</div>
                 </div>
 
-                <div className="col-span-1 text-center">👤 Hadir (20%)</div>
-                <div className="col-span-1 text-center">📋 Perlinsos (25%)</div>
-                {isPbbAllowed && (
-                  <div className="col-span-1 text-center">💰 PBB (25%)</div>
-                )}
-                <div className="col-span-1 text-center">🛡️ BPJS (10%)</div>
-                <div className="col-span-1 text-center">🏠 Kunjungan (10%)</div>
-                <div className="col-span-1 text-center">🔦 Poskamling (10%)</div>
-                <div className="col-span-1 text-right">Aksi</div>
-              </div>
+                {displayedKeplingCards.map((item, index) => {
+                  const isTop1 = index === 0;
+                  const isTop2 = index === 1;
+                  const isTop3 = index === 2;
 
-              {displayedKeplingCards.map((item, index) => {
-                const isTop1 = index === 0;
-                const isTop2 = index === 1;
-                const isTop3 = index === 2;
+                  const scoreColorClass =
+                    item.compositeScoreDecimal >= 85
+                      ? 'bg-emerald-600 text-white'
+                      : item.compositeScoreDecimal >= 70
+                      ? 'bg-blue-600 text-white'
+                      : item.compositeScoreDecimal >= 50
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-rose-500 text-white';
 
-                const scoreColorClass =
-                  item.compositeScoreDecimal >= 85
-                    ? 'bg-emerald-600 text-white'
-                    : item.compositeScoreDecimal >= 70
-                    ? 'bg-blue-600 text-white'
-                    : item.compositeScoreDecimal >= 50
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-rose-500 text-white';
+                  return (
+                    <div
+                      key={item.kepling.id}
+                      className={`py-3 px-3 hover:bg-slate-50/80 rounded-xl transition-colors flex flex-col xl:grid gap-2 xl:gap-1.5 items-start xl:items-center text-xs ${
+                        isPbbAllowed
+                          ? 'xl:[grid-template-columns:48px_minmax(185px,1.5fr)_74px_repeat(9,minmax(76px,1fr))_72px]'
+                          : 'xl:[grid-template-columns:48px_minmax(195px,1.5fr)_74px_repeat(8,minmax(80px,1fr))_72px]'
+                      }`}
+                    >
+                      {/* Rank Badge & Mobile Header */}
+                      <div className="flex items-center gap-2 xl:justify-center w-full xl:w-auto justify-between">
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const rankNum = index + 1;
+                            const isBottom5Rank = rankNum >= 20;
+                            return (
+                              <span
+                                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                                  isTop1
+                                    ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300'
+                                    : isTop2
+                                    ? 'bg-slate-300 text-slate-900'
+                                    : isTop3
+                                    ? 'bg-amber-200 text-amber-950'
+                                    : isBottom5Rank
+                                    ? 'bg-red-600 text-white ring-2 ring-red-400'
+                                    : 'bg-slate-100 text-slate-600'
+                                }`}
+                                title={isBottom5Rank ? 'Peringkat 5 Terbawah - Kinerja Kepling Terburuk' : `Peringkat #${rankNum}`}
+                              >
+                                {rankNum}
+                              </span>
+                            );
+                          })()}
+                          <div className="xl:hidden">
+                            <span className="font-bold text-slate-900 block">
+                              {item.kepling.lingkungan} • {item.kepling.nama}
+                            </span>
+                            {(index + 1) >= 20 ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-red-100 text-red-800 border border-red-300 mt-0.5">
+                                🚨 KINERJA KEPLING TERBURUK
+                              </span>
+                            ) : isTop1 ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 mt-0.5">
+                                🥇 KEPLING TERBAIK I
+                              </span>
+                            ) : null}
+                            <span className="text-[10px] text-slate-400 font-medium block">
+                              {item.reportCount} Laporan ({item.hariMelapor}/{item.konsistensiTargetHari} Hari)
+                            </span>
+                          </div>
+                        </div>
 
-                return (
-                  <div
-                    key={item.kepling.id}
-                    className="py-3 px-3 hover:bg-slate-50/80 rounded-xl transition-colors flex flex-col xl:grid xl:grid-cols-12 gap-2 xl:gap-2 items-start xl:items-center text-xs"
-                  >
-                    {/* Rank Badge & Kepling Info (Mobile + Desktop) */}
-                    <div className="col-span-1 flex items-center gap-2 xl:justify-center w-full xl:w-auto justify-between">
-                      <div className="flex items-center gap-2">
-                        {(() => {
-                          const rankNum = index + 1;
-                          const isBottom5Rank = rankNum >= 20;
-                          return (
-                            <span
-                              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
-                                isTop1
-                                  ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300'
-                                  : isTop2
-                                  ? 'bg-slate-300 text-slate-900'
-                                  : isTop3
-                                  ? 'bg-amber-200 text-amber-950'
-                                  : isBottom5Rank
-                                  ? 'bg-red-600 text-white ring-2 ring-red-400'
-                                  : 'bg-slate-100 text-slate-600'
-                              }`}
-                              title={isBottom5Rank ? 'Peringkat 5 Terbawah - Kinerja Kepling Terburuk' : `Peringkat #${rankNum}`}
-                            >
-                              {rankNum}
-                            </span>
-                          );
-                        })()}
-                        <div className="xl:hidden">
-                          <span className="font-bold text-slate-900 block">
-                            {item.kepling.lingkungan} • {item.kepling.nama}
-                          </span>
-                          {(index + 1) >= 20 ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-red-100 text-red-800 border border-red-300 mt-0.5">
-                              🚨 KINERJA KEPLING TERBURUK
-                            </span>
-                          ) : isTop1 ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 mt-0.5">
-                              🥇 KEPLING TERBAIK I
-                            </span>
-                          ) : null}
-                          <span className="text-[10px] text-slate-400 font-medium block">
-                            {item.reportCount} Laporan ({item.hariMelapor} Hari)
+                        {/* Mobile Badge Skor */}
+                        <div className="xl:hidden flex items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded-full font-black text-xs ${scoreColorClass}`}>
+                            {item.compositeScoreDecimal}
                           </span>
                         </div>
                       </div>
 
-                      {/* Mobile Badge Skor */}
-                      <div className="xl:hidden flex items-center gap-1.5">
-                        <span className={`px-2 py-0.5 rounded-full font-black text-xs ${scoreColorClass}`}>
+                      {/* Info Kepling (Desktop) */}
+                      <div className="hidden xl:block min-w-0">
+                        <div className="font-bold text-xs text-slate-900 truncate flex items-center gap-1 flex-wrap">
+                          <span className="truncate">{item.kepling.nama}</span>
+                          {item.isOverridden && (
+                            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" title="Capaian disesuaikan Super Admin" />
+                          )}
+                          {(index + 1) >= 20 && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-red-100 text-red-800 border border-red-300 shadow-2xs">
+                              🚨 TERBURUK
+                            </span>
+                          )}
+                          {isTop1 && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                              🥇 TERBAIK I
+                            </span>
+                          )}
+                          {isTop2 && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-slate-200 text-slate-800 border border-slate-300 shadow-2xs">
+                              🥈 TERBAIK II
+                            </span>
+                          )}
+                          {isTop3 && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs">
+                              🥉 TERBAIK III
+                            </span>
+                          )}
+                        </div>
+                        {(() => {
+                          const lingStats = kelurahanPemetaanOverview.perLingkunganMap[item.kepling.id];
+                          return (
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mt-0.5">
+                              <span>{item.kepling.lingkungan}</span>
+                              {lingStats && lingStats.totalRumah > 0 && (
+                                <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.5 rounded border border-emerald-200">
+                                  {lingStats.totalRumah} Rumah
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Skor Komposit Terpadu (IKKT) */}
+                      <div className="hidden xl:flex items-center justify-center">
+                        <span className={`px-2.5 py-1 rounded-full font-black text-xs shadow-2xs ${scoreColorClass}`}>
                           {item.compositeScoreDecimal}
                         </span>
                       </div>
-                    </div>
 
-                    {/* Info Kepling (Desktop) */}
-                    <div className={`${isPbbAllowed ? 'col-span-2' : 'col-span-3'} hidden xl:block`}>
-                      <div className="font-bold text-xs text-slate-900 truncate flex items-center gap-1.5 flex-wrap">
-                        <span>{item.kepling.nama}</span>
-                        {item.isOverridden && (
-                          <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" title="Capaian disesuaikan Super Admin" />
-                        )}
-                        {(index + 1) >= 20 && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-red-100 text-red-800 border border-red-300 shadow-2xs">
-                            🚨 TERBURUK
-                          </span>
-                        )}
-                        {isTop1 && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
-                            🥇 TERBAIK I
-                          </span>
-                        )}
-                        {isTop2 && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-slate-200 text-slate-800 border border-slate-300 shadow-2xs">
-                            🥈 TERBAIK II
-                          </span>
-                        )}
-                        {isTop3 && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs">
-                            🥉 TERBAIK III
-                          </span>
-                        )}
-                      </div>
-                      {(() => {
-                        const lingStats = kelurahanPemetaanOverview.perLingkunganMap[item.kepling.id];
-                        return (
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mt-0.5">
-                            <span>{item.kepling.lingkungan}</span>
-                            {lingStats && lingStats.totalRumah > 0 && (
-                              <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.5 rounded border border-emerald-200">
-                                {lingStats.totalRumah} Rumah
-                              </span>
-                            )}
+                      {/* 9 Criteria Cells (Mobile Grid + Desktop xl:contents) */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 w-full xl:contents">
+                        {/* 1. PBB (20%) */}
+                        {isPbbAllowed && (
+                          <div
+                            onClick={() => onOpenRekapPbb && onOpenRekapPbb()}
+                            className="w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-emerald-50 transition-colors"
+                            title="Klik untuk membuka Rekapitulasi SPPT PBB"
+                          >
+                            <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">💰 PBB (20%)</div>
+                            <span className="inline-block font-black text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded text-[11px]">
+                              {item.pbbPercentage}%
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-semibold block truncate" title={`${item.pbb} dari target ${item.targetPbb} WP`}>
+                              {item.pbb}/{item.targetPbb} WP
+                            </span>
                           </div>
-                        );
-                      })()}
-                    </div>
+                        )}
 
-                    {/* Skor Komposit Terpadu (IKKT) */}
-                    <div className="col-span-1 hidden xl:flex items-center justify-center">
-                      <span className={`px-2.5 py-1 rounded-full font-black text-xs shadow-2xs ${scoreColorClass}`}>
-                        {item.compositeScoreDecimal}
-                      </span>
-                    </div>
+                        {/* 2. Perlinsos (10%) */}
+                        <div
+                          onClick={() => onNavigateToKunjungan?.()}
+                          className="w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors"
+                          title="Klik untuk membuka Kunjungan Warga (Perlinsos)"
+                        >
+                          <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">📋 Perlinsos (10%)</div>
+                          <span
+                            className={`inline-block font-black px-1.5 py-0.5 rounded text-[11px] ${
+                              item.perlinsosPercentage >= 100
+                                ? 'text-emerald-700 bg-emerald-50'
+                                : item.perlinsosPercentage >= 50
+                                ? 'text-blue-700 bg-blue-50'
+                                : 'text-amber-700 bg-amber-50'
+                            }`}
+                          >
+                            {item.perlinsosPercentage}%
+                          </span>
+                          <span className="text-[10px] text-slate-400 block truncate" title={`${item.perlinsos} dari ${item.targetPerlinsos} KK`}>
+                            {item.perlinsos}/{item.targetPerlinsos} KK
+                          </span>
+                        </div>
 
+                        {/* 3. IKD (10%) */}
+                        <div
+                          onClick={() => onNavigateToKunjungan?.()}
+                          className="w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-purple-50 transition-colors"
+                          title="Klik untuk membuka Kunjungan Warga (IKD)"
+                        >
+                          <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">📱 IKD (10%)</div>
+                          <span className="inline-block font-black text-purple-800 bg-purple-50 px-1.5 py-0.5 rounded text-[11px]">
+                            {item.ikdPercentage}%
+                          </span>
+                          <span className="text-[10px] text-slate-500 block truncate">
+                            {item.ikd}/{item.targetIkd} Org
+                          </span>
+                        </div>
 
+                        {/* 4. BPJS TK (10%) */}
+                        <div
+                          onClick={() => onNavigateToKunjungan?.()}
+                          className="w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-cyan-50 transition-colors"
+                          title="Klik untuk membuka Kunjungan Warga (BPJS)"
+                        >
+                          <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">🛡️ BPJS TK (10%)</div>
+                          <span className="inline-block font-black text-cyan-800 bg-cyan-50 px-1.5 py-0.5 rounded text-[11px]">
+                            {item.bpjsPercentage}%
+                          </span>
+                          <span className="text-[10px] text-slate-500 block truncate">
+                            {item.bpjs}/{item.targetBpjs} Org
+                          </span>
+                        </div>
 
-                    {/* 2. Kehadiran Kepala Lingkungan */}
-                    <div
-                      onClick={() => onOpenAbsensiKepling?.()}
-                      className={`col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg ${
-                        onOpenAbsensiKepling ? 'cursor-pointer hover:bg-indigo-50 transition-colors' : ''
-                      }`}
-                      title={`Hadir: ${item.kehadiranHadir}, Tidak Hadir: ${item.kehadiranTidakHadir}, Sakit: ${item.kehadiranSakit}, Izin: ${item.kehadiranIzin} (dari ${item.kehadiranTotal} Agenda)`}
-                    >
-                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">👤 Kehadiran (20%)</div>
-                      <span
-                        className={`inline-block font-black px-1.5 py-0.5 rounded text-[11px] ${
-                          item.kehadiranPercentage >= 90
-                            ? 'text-indigo-700 bg-indigo-50'
-                            : item.kehadiranPercentage >= 70
-                            ? 'text-blue-700 bg-blue-50'
-                            : 'text-rose-700 bg-rose-50'
-                        }`}
-                      >
-                        {item.kehadiranPercentage}%
-                      </span>
-                      <span className="text-[10px] text-slate-400 block">
-                        {item.kehadiranTotal > 0
-                          ? `${item.kehadiranHadir}/${item.kehadiranTotal} Hadir`
-                          : '0 Agenda'}
-                      </span>
-                    </div>
+                        {/* 5. Kunjungan Warga (10%) */}
+                        <div
+                          onClick={() => onNavigateToKunjungan?.()}
+                          className="w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-amber-50 transition-colors"
+                          title="Klik untuk membuka Buku Kunjungan Warga"
+                        >
+                          <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">🏠 Kunjungan (10%)</div>
+                          <span className="inline-block font-black text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded text-[11px]">
+                            {item.kunjunganPercentage}%
+                          </span>
+                          <span className="text-[10px] text-slate-500 block truncate" title={`${item.totalKunjungan} dari target ${item.targetPerlinsos} KK Perlinsos`}>
+                            {item.totalKunjungan}/{item.targetPerlinsos} KK
+                          </span>
+                        </div>
 
-                    {/* 3. Perlinsos */}
-                    <div
-                      onClick={() => onNavigateToKunjungan?.()}
-                      className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors"
-                      title="Klik untuk membuka Kunjungan Warga (Perlinsos)"
-                    >
-                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">📋 Perlinsos (25%)</div>
-                      <span
-                        className={`inline-block font-black px-1.5 py-0.5 rounded text-[11px] ${
-                          item.perlinsosPercentage >= 100
-                            ? 'text-emerald-700 bg-emerald-50'
-                            : item.perlinsosPercentage >= 50
-                            ? 'text-blue-700 bg-blue-50'
-                            : 'text-amber-700 bg-amber-50'
-                        }`}
-                      >
-                        {item.perlinsosPercentage}%
-                      </span>
-                      <span className="text-[10px] text-slate-400 block truncate" title={`${item.perlinsos} dari ${item.targetPerlinsos} KK`}>
-                        {item.perlinsos}/{item.targetPerlinsos} KK
-                      </span>
-                    </div>
+                        {/* 6. Posko & Poskamling (10%) */}
+                        <div
+                          className="w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg"
+                          title={`Posko Terverifikasi: ${item.validPoskoCount} · Poskamling Manual: ${item.manualPoskamlingCount} (Target: ${item.targetPoskamlingBulan} Giat)`}
+                        >
+                          <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">🔦 Posko/Ronda (10%)</div>
+                          <span className="inline-block font-black text-fuchsia-800 bg-fuchsia-50 px-1.5 py-0.5 rounded text-[11px]">
+                            {item.poskamlingPercentage}%
+                          </span>
+                          <span className="text-[10px] text-slate-500 block truncate">
+                            {item.poskamlingCount}/{item.targetPoskamlingBulan} Giat
+                          </span>
+                        </div>
 
-                    {/* 4. Realisasi PBB */}
-                    {isPbbAllowed && (
-                      <div
-                        onClick={() => onOpenRekapPbb && onOpenRekapPbb()}
-                        className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-emerald-50 transition-colors"
-                        title="Klik untuk membuka Rekapitulasi SPPT PBB"
-                      >
-                        <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">💰 PBB (25%)</div>
-                        <span className="inline-block font-black text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded text-[11px]">
-                          {item.pbbPercentage}%
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-semibold block truncate" title={`${item.pbb} dari target ${item.targetPbb} WP`}>
-                          {item.pbb}/{item.targetPbb} WP
-                        </span>
+                        {/* 7. Apel Pagi (10%) */}
+                        <div
+                          onClick={() => onOpenAbsensiKepling?.()}
+                          className={`w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg ${
+                            onOpenAbsensiKepling ? 'cursor-pointer hover:bg-emerald-50 transition-colors' : ''
+                          }`}
+                          title={`Apel Pagi — Hadir: ${item.apelHadir}, Telat: ${item.apelTerlambat}, Izin: ${item.apelIzin}, Sakit: ${item.apelSakit}, Alpa: ${item.apelAlpa} (dari ${item.apelTotal} hari apel)`}
+                        >
+                          <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">🫡 Apel Pagi (10%)</div>
+                          <span
+                            className={`inline-block font-black px-1.5 py-0.5 rounded text-[11px] ${
+                              item.apelPercentage >= 90
+                                ? 'text-emerald-700 bg-emerald-50'
+                                : item.apelPercentage >= 70
+                                ? 'text-amber-700 bg-amber-50'
+                                : 'text-rose-700 bg-rose-50'
+                            }`}
+                          >
+                            {item.apelPercentage}%
+                          </span>
+                          <span className="text-[10px] text-slate-400 block truncate">
+                            {item.apelTotal > 0 ? `${item.apelHadir}/${item.apelTotal} Hadir` : '0 Apel'}
+                          </span>
+                        </div>
+
+                        {/* 8. Agenda / Rapat (5%) */}
+                        <div
+                          onClick={() => onOpenAbsensiKepling?.()}
+                          className={`w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg ${
+                            onOpenAbsensiKepling ? 'cursor-pointer hover:bg-indigo-50 transition-colors' : ''
+                          }`}
+                          title={`Agenda Rapat — Hadir: ${item.kehadiranHadir}, Alpha: ${item.kehadiranTidakHadir}, Sakit: ${item.kehadiranSakit}, Izin: ${item.kehadiranIzin} (dari ${item.kehadiranTotal} Agenda)`}
+                        >
+                          <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">🏛️ Agenda (5%)</div>
+                          <span
+                            className={`inline-block font-black px-1.5 py-0.5 rounded text-[11px] ${
+                              item.agendaPercentage >= 90
+                                ? 'text-indigo-700 bg-indigo-50'
+                                : item.agendaPercentage >= 70
+                                ? 'text-blue-700 bg-blue-50'
+                                : 'text-rose-700 bg-rose-50'
+                            }`}
+                          >
+                            {item.agendaPercentage}%
+                          </span>
+                          <span className="text-[10px] text-slate-400 block truncate">
+                            {item.kehadiranTotal > 0 ? `${item.kehadiranHadir}/${item.kehadiranTotal} Rpt` : '0 Agd'}
+                          </span>
+                        </div>
+
+                        {/* 9. Konsistensi Laporan Harian (15%) */}
+                        <div
+                          className="w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg col-span-2 sm:col-span-1"
+                          title={`Konsistensi Laporan: ${item.hariMelapor} hari melapor dari target ${item.konsistensiTargetHari} hari kalender berjalan`}
+                        >
+                          <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">📅 Konsistensi (15%)</div>
+                          <span
+                            className={`inline-block font-black px-1.5 py-0.5 rounded text-[11px] ${
+                              item.konsistensiPercentage >= 85
+                                ? 'text-teal-800 bg-teal-50'
+                                : item.konsistensiPercentage >= 60
+                                ? 'text-amber-700 bg-amber-50'
+                                : 'text-rose-700 bg-rose-50'
+                            }`}
+                          >
+                            {item.konsistensiPercentage}%
+                          </span>
+                          <span className="text-[10px] text-slate-500 block truncate">
+                            {item.hariMelapor}/{item.konsistensiTargetHari} Hari
+                          </span>
+                        </div>
                       </div>
-                    )}
 
-                    {/* 5. BPJS Ketenagakerjaan */}
-                    <div
-                      onClick={() => onNavigateToKunjungan?.()}
-                      className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-teal-50 transition-colors"
-                      title="Klik untuk membuka Kunjungan Warga (BPJS)"
-                    >
-                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">🛡️ BPJS TK (10%)</div>
-                      <span className="inline-block font-black text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded text-[11px]">
-                        {item.bpjsPercentage}%
-                      </span>
-                      <span className="text-[10px] text-slate-500 block">{item.bpjs} Org</span>
-                    </div>
-
-                    {/* 6. Kunjungan Harian */}
-                    <div
-                      onClick={() => onNavigateToKunjungan?.()}
-                      className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg cursor-pointer hover:bg-amber-50 transition-colors"
-                      title="Klik untuk membuka Buku Kunjungan Warga"
-                    >
-                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">🏠 Kunjungan (10%)</div>
-                      <span className="inline-block font-black text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded text-[11px]">
-                        {item.kunjunganPercentage}%
-                      </span>
-                      <span className="text-[10px] text-slate-500 block truncate" title={`${item.totalKunjungan} dari target ${item.targetPerlinsos} KK Perlinsos`}>
-                        {item.totalKunjungan}/{item.targetPerlinsos} KK
-                      </span>
-                    </div>
-
-                    {/* 7. Poskamling */}
-                    <div className="col-span-1 w-full xl:w-auto text-center bg-slate-50 xl:bg-transparent p-1.5 xl:p-0 rounded-lg">
-                      <div className="text-[10px] text-slate-400 font-bold xl:hidden mb-0.5">🔦 Poskamling (10%)</div>
-                      <span className="inline-block font-black text-purple-800 bg-purple-50 px-1.5 py-0.5 rounded text-[11px]">
-                        {item.poskamlingPercentage}%
-                      </span>
-                      <span className="text-[10px] text-slate-500 block">{item.poskamlingCount} Giat</span>
-                    </div>
-
-                    {/* Aksi Buttons */}
-                    <div className="col-span-1 flex items-center justify-end gap-1.5 w-full xl:w-auto pt-2 xl:pt-0 border-t xl:border-0 border-slate-100">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingKepling(item.kepling);
-                          setIsModalEditOpen(true);
-                        }}
-                        className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 transition-colors cursor-pointer border border-amber-200"
-                        title="Edit Target PERLINSOS atau Total Capaian Kepling ini"
-                      >
-                        <Sliders className="w-3.5 h-3.5 text-amber-700" />
-                      </button>
-
-                      {onSelectKeplingRiwayat && (
+                      {/* Aksi Buttons */}
+                      <div className="flex items-center justify-end gap-1.5 w-full xl:w-auto pt-2 xl:pt-0 border-t xl:border-0 border-slate-100">
                         <button
                           type="button"
-                          onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
-                          className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-600 text-[11px] font-bold transition-colors cursor-pointer text-center"
-                          title="Lihat riwayat laporan kepling ini"
+                          onClick={() => {
+                            setEditingKepling(item.kepling);
+                            setIsModalEditOpen(true);
+                          }}
+                          className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 transition-colors cursor-pointer border border-amber-200"
+                          title="Edit Target PERLINSOS, IKD, BPJS atau Total Capaian Kepling ini"
                         >
-                          Riwayat
+                          <Sliders className="w-3.5 h-3.5 text-amber-700" />
                         </button>
-                      )}
+
+                        {onSelectKeplingRiwayat && (
+                          <button
+                            type="button"
+                            onClick={() => onSelectKeplingRiwayat(item.kepling.nama)}
+                            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-600 text-[11px] font-bold transition-colors cursor-pointer text-center"
+                            title="Lihat riwayat laporan kepling ini"
+                          >
+                            Riwayat
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
 
