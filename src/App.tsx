@@ -501,6 +501,7 @@ export default function App() {
           deletedKeplingIds?: string[];
           stripDate?: string;
           stripPrefix?: string;
+          stripAgendaName?: string;
         }>
       ).detail;
       const upserted = Array.isArray(detail?.upsertedReports) ? detail.upsertedReports : [];
@@ -510,6 +511,7 @@ export default function App() {
       );
       const stripDate = detail?.stripDate || '';
       const stripPrefix = detail?.stripPrefix || '';
+      const stripAgendaName = detail?.stripAgendaName || '';
 
       deletedSet.forEach((delId) => {
         deletedReportIdsRef.current.add(delId);
@@ -517,15 +519,23 @@ export default function App() {
       });
 
       if (stripPrefix && deletedKeplingSet.size > 0) {
+        const agendaNameMarker = stripAgendaName ? `: ${stripAgendaName}` : '';
         for (const [id, r] of rawReportsMapRef.current.entries()) {
           if (
             deletedKeplingSet.has(r.keplingId || '') &&
             (!stripDate || r.tanggal === stripDate || r.tanggalLaporan === stripDate) &&
-            r.kinerja?.kegiatanLainnya?.includes(stripPrefix)
+            r.kinerja?.kegiatanLainnya?.includes(stripPrefix) &&
+            (!agendaNameMarker || r.kinerja.kegiatanLainnya.includes(agendaNameMarker))
           ) {
             const filteredLines = r.kinerja.kegiatanLainnya
               .split('\n')
-              .filter((line) => !line.includes(stripPrefix))
+              .filter(
+                (line) =>
+                  !(
+                    line.includes(stripPrefix) &&
+                    (!agendaNameMarker || line.includes(agendaNameMarker))
+                  )
+              )
               .map((line) => line.replace(/^•\s*/, '').trim())
               .filter(Boolean);
             rawReportsMapRef.current.set(id, {

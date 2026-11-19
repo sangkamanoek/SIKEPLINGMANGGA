@@ -9,16 +9,24 @@ import {
 import { cleanFirestoreData } from './firestoreService';
 import { resilientSetDoc } from './firestoreWriteQueue';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
+import { saveSingleReportToIndexedDB } from './indexedDbStorage';
 import {
   AbsensiApelEntry,
   AbsensiApelHarian,
+  LaporanHarianItem,
   StatusApelPagi,
 } from '../types';
+import {
+  KEPLING_ACCOUNTS,
+  ROMAN_NUMERALS,
+  getEffectiveProfile,
+} from '../data/keplingList';
 import {
   formatHariTanggalIndonesia,
   getEffectiveKeplingList,
   getMonthRangeFromYm,
   getWeekRangeFromIso,
+  parseIsoLocal,
 } from './absensiAgendaService';
 
 export const APEL_PAGI_STORAGE_KEY = 'sikepling_absensi_apel_pagi_v1';
@@ -37,14 +45,42 @@ export const STATUS_APEL_OPTIONS: StatusApelPagi[] = [
  * Hadir tepat waktu = 1.0 (100%)
  * Terlambat = 0.6 (60%)
  * Izin / Sakit = 0.5 (50% - keterangan sah)
- * Alpa / Tanpa Keterangan = 0 (0%)
+ * Alpa / Tanpa Keterangan = 0 (0%) + Penalti langsung Poin Capaian Target (IKKT)
  */
+export const PENALTI_POIN_APEL_ALPA = 3.0;
+export const PENALTI_POIN_AGENDA_ALPHA = 1.5;
+
 export const getApelStatusScore = (status: StatusApelPagi | string | undefined): number => {
   if (status === 'Hadir') return 1;
   if (status === 'Terlambat') return 0.6;
   if (status === 'Izin' || status === 'Sakit') return 0.5;
   if (status === 'Alpa') return 0;
   return 1;
+};
+
+/**
+ * Menghitung total pengurangan Poin Capaian Target (IKKT 0-100) akibat
+ * ketidakhadiran tanpa keterangan (Alpa Apel Pagi & Tidak Hadir Agenda/Kegiatan).
+ * Status Izin dan Sakit yang sah tidak dikenakan pengurangan poin langsung.
+ */
+export const calculatePenaltiTanpaKeterangan = (
+  apelAlpa: number,
+  kegiatanTidakHadirTanpaKeterangan: number = 0
+): {
+  penaltiApelAlpa: number;
+  penaltiAgendaAlpha: number;
+  totalPenalti: number;
+} => {
+  const safeApelAlpa = Math.max(0, Number(apelAlpa || 0));
+  const safeAgendaAlpha = Math.max(0, Number(kegiatanTidakHadirTanpaKeterangan || 0));
+  const penaltiApelAlpa = Number((safeApelAlpa * PENALTI_POIN_APEL_ALPA).toFixed(1));
+  const penaltiAgendaAlpha = Number((safeAgendaAlpha * PENALTI_POIN_AGENDA_ALPHA).toFixed(1));
+  const totalPenalti = Number((penaltiApelAlpa + penaltiAgendaAlpha).toFixed(1));
+  return {
+    penaltiApelAlpa,
+    penaltiAgendaAlpha,
+    totalPenalti,
+  };
 };
 
 export const buildDefaultApelEntries = (
@@ -221,9 +257,222 @@ export const subscribeAbsensiApelFromFirestore = (
   }
 };
 
+const HARI_APEL_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+export const buildApelAttendanceReportId = (
+  tanggal: string,
+  nomorLingkungan: number
+): string => {
+  const cleanDate = String(tanggal || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  return `lap_ap_${cleanDate}_lk${nomorLingkungan}`;
+};
+
+/**
+ * Otomatis mencatat seluruh status kehadiran Apel Pagi (HADIR, TERLAMBAT, IZIN, SAKIT, ALPA)
+ * yang telah dikonfirmasi/disimpan oleh Admin ke dalam Laporan Harian Kepling
+ * (Firestore `reports`, IndexedDB, LocalStorage).
+ */
+export const syncAbsensiApelToLaporanHarian = async (
+  record: AbsensiApelHarian
+): Promise<{
+  syncedHadir: number;
+  syncedTerlambat: number;
+  syncedIzin: number;
+  syncedSakit: number;
+  syncedAlpa: number;
+  totalSynced: number;
+}> => {
+  const LAPORAN_STORAGE_KEY = 'kepling_local_laporan_history_v2';
+  const nowIso = new Date().toISOString();
+  const parsedDate = parseIsoLocal(record.tanggal);
+  const hari = HARI_APEL_ID[parsedDate.getDay()] || 'Senin';
+  const formattedTanggal = formatHariTanggalIndonesia(record.tanggal);
+
+  const apelTagPrefix = '[Absensi Apel Pagi]';
+  const apelTitleMarker = 'Apel Pagi Kelurahan';
+  const waktuApel = record.waktuApel || '07.30 - 08.00 WIB';
+  const lokasiApel = record.lokasi || 'Halaman Kantor Lurah Mangga';
+
+  const upsertedReports: LaporanHarianItem[] = [];
+  const upsertedKeplingIds: string[] = [];
+
+  let syncedHadir = 0;
+  let syncedTerlambat = 0;
+  let syncedIzin = 0;
+  let syncedSakit = 0;
+  let syncedAlpa = 0;
+
+  const getStatusUpper = (status: StatusApelPagi | string | undefined): string => {
+    if (status === 'Terlambat') return 'TERLAMBAT';
+    if (status === 'Izin') return 'IZIN';
+    if (status === 'Sakit') return 'SAKIT';
+    if (status === 'Alpa') return 'ALPA';
+    return 'HADIR';
+  };
+
+  const localReports = safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_STORAGE_KEY, []);
+  const entries = Object.values(record.entries || {});
+
+  for (const entry of entries) {
+    if (!entry || !entry.nomorLingkungan) continue;
+    const reportId = buildApelAttendanceReportId(record.tanggal, entry.nomorLingkungan);
+    const acc = KEPLING_ACCOUNTS.find(
+      (k) => k.nomorLingkungan === entry.nomorLingkungan || k.id === entry.keplingId
+    );
+    const profile = acc ? getEffectiveProfile(acc) : null;
+    const roman = ROMAN_NUMERALS[entry.nomorLingkungan - 1] || String(entry.nomorLingkungan);
+    const resolvedKeplingId = acc?.id || entry.keplingId || `kepling_${entry.nomorLingkungan}`;
+
+    const status = entry.status || 'Hadir';
+    const statusUpper = getStatusUpper(status);
+    if (status === 'Hadir') syncedHadir += 1;
+    else if (status === 'Terlambat') syncedTerlambat += 1;
+    else if (status === 'Izin') syncedIzin += 1;
+    else if (status === 'Sakit') syncedSakit += 1;
+    else if (status === 'Alpa') syncedAlpa += 1;
+
+    const jamSuffix =
+      (status === 'Hadir' || status === 'Terlambat') && entry.jamHadir?.trim()
+        ? ` • Pukul ${entry.jamHadir.trim()}`
+        : '';
+
+    const apelDetailText = `${apelTagPrefix} ${statusUpper}: ${apelTitleMarker} (${waktuApel}${jamSuffix}) di ${lokasiApel}${
+      entry.catatan?.trim() ? ` — ${entry.catatan.trim()}` : ''
+    }`;
+
+    const reportItem: LaporanHarianItem = {
+      id: reportId,
+      keplingId: resolvedKeplingId,
+      lingkungan: acc?.lingkungan || `Lingkungan ${roman}`,
+      namaKepling: profile?.nama || acc?.nama || entry.namaKepling,
+      jabatan: acc?.jabatan || entry.jabatan || `Kepala Lingkungan ${roman}`,
+      kelurahan: 'Kelurahan Mangga',
+      kecamatan: 'Kecamatan Medan Tuntungan',
+      hari,
+      tanggal: record.tanggal,
+      tanggalLaporan: record.tanggal,
+      kinerja: {
+        opsirPbbWp: 0,
+        perlinsosKk: 0,
+        ikdOrang: 0,
+        bpjsKetenagakerjaanOrang: 0,
+        kegiatanLainnya: apelDetailText,
+      },
+      jumlahDokumentasi: 0,
+      dokumentasiFoto: [],
+      petugasNama: record.diinputOlehNama || 'Admin Kelurahan',
+      petugasRole: record.diinputOlehRole || 'super_admin',
+      uraianTugas: `Absensi Apel Pagi (${statusUpper}): ${formattedTanggal}`,
+      catatanUmum: entry.catatan?.trim()
+        ? `Catatan Apel Pagi (${statusUpper}): ${entry.catatan.trim()}`
+        : `Tercatat otomatis dari Absensi Apel Pagi (Status: ${statusUpper}, dikonfirmasi oleh ${
+            record.diinputOlehNama || 'Admin Kelurahan'
+          }).`,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    upsertedReports.push(reportItem);
+    upsertedKeplingIds.push(resolvedKeplingId);
+  }
+
+  try {
+    const upsertedKeplingSet = new Set(upsertedKeplingIds);
+    const upsertMap = new Map<string, LaporanHarianItem>(
+      upsertedReports.map((r) => [r.id, r])
+    );
+
+    const cleanedLocal = localReports.map((r) => {
+      if (!r || !r.id) return r;
+      if (upsertMap.has(r.id)) {
+        return upsertMap.get(r.id)!;
+      }
+      const repKeplingId = r.keplingId || '';
+      const matchesTarget =
+        upsertedKeplingSet.has(repKeplingId) &&
+        (r.tanggal === record.tanggal || r.tanggalLaporan === record.tanggal);
+      if (
+        matchesTarget &&
+        r.kinerja?.kegiatanLainnya?.includes(apelTagPrefix) &&
+        r.kinerja?.kegiatanLainnya?.includes(apelTitleMarker)
+      ) {
+        const filteredLines = r.kinerja.kegiatanLainnya
+          .split('\n')
+          .filter((line) => !(line.includes(apelTagPrefix) && line.includes(apelTitleMarker)))
+          .map((line) => line.replace(/^•\s*/, '').trim())
+          .filter(Boolean);
+        return {
+          ...r,
+          kinerja: {
+            ...r.kinerja,
+            kegiatanLainnya: filteredLines.join('\n• '),
+          },
+        };
+      }
+      return r;
+    });
+
+    upsertedReports.forEach((u) => {
+      if (!cleanedLocal.some((r) => r && r.id === u.id)) {
+        cleanedLocal.unshift(u);
+      }
+    });
+
+    safeSetLocalStorage(LAPORAN_STORAGE_KEY, JSON.stringify(cleanedLocal), {
+      skipIdbMirror: true,
+    });
+  } catch {
+    // Non-blocking fallback
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('sikepling-reports-updated', {
+        detail: {
+          upsertedReports,
+          deletedIds: [],
+          deletedKeplingIds: upsertedKeplingIds,
+          stripDate: record.tanggal,
+          stripPrefix: apelTagPrefix,
+          stripAgendaName: apelTitleMarker,
+        },
+      })
+    );
+  }
+
+  const BATCH_SIZE = 6;
+  for (let i = 0; i < upsertedReports.length; i += BATCH_SIZE) {
+    const chunk = upsertedReports.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      chunk.map(async (item) => {
+        await saveSingleReportToIndexedDB(item).catch(() => {});
+        const cleaned = cleanFirestoreData(item);
+        await resilientSetDoc('reports', item.id, cleaned, { merge: true }).catch(() => {});
+      })
+    );
+  }
+
+  return {
+    syncedHadir,
+    syncedTerlambat,
+    syncedIzin,
+    syncedSakit,
+    syncedAlpa,
+    totalSynced: upsertedReports.length,
+  };
+};
+
 export const saveAbsensiApelRecord = async (
   record: AbsensiApelHarian
-): Promise<{ ok: boolean }> => {
+): Promise<{
+  ok: boolean;
+  syncedHadir: number;
+  syncedTerlambat: number;
+  syncedIzin: number;
+  syncedSakit: number;
+  syncedAlpa: number;
+  totalSynced: number;
+}> => {
   const current = getLocalAbsensiApelList();
   const nowIso = new Date().toISOString();
   const targetId = record.id || `apel_${record.tanggal}`;
@@ -251,8 +500,22 @@ export const saveAbsensiApelRecord = async (
   }
 
   const cleaned = cleanFirestoreData(payload);
-  const res = await resilientSetDoc(APEL_PAGI_COLLECTION, payload.id, cleaned, { merge: true });
-  return { ok: res.synced || res.queued };
+  const [res, syncStats] = await Promise.all([
+    resilientSetDoc(APEL_PAGI_COLLECTION, payload.id, cleaned, { merge: true }),
+    syncAbsensiApelToLaporanHarian(payload).catch(() => ({
+      syncedHadir: 0,
+      syncedTerlambat: 0,
+      syncedIzin: 0,
+      syncedSakit: 0,
+      syncedAlpa: 0,
+      totalSynced: 0,
+    })),
+  ]);
+
+  return {
+    ok: res.synced || res.queued,
+    ...syncStats,
+  };
 };
 
 export const exportAbsensiApelToExcel = (

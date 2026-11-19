@@ -1192,6 +1192,61 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                         🏠 Kunjungan Warga
                       </span>
                     )}
+                    {(() => {
+                      const keg = item.kinerja?.kegiatanLainnya || '';
+                      if (
+                        !keg.includes('[Absensi Agenda Kelurahan]') &&
+                        !keg.includes('[Absensi Posko]') &&
+                        !keg.includes('[Absensi Apel Pagi]')
+                      ) {
+                        return null;
+                      }
+                      const badges: React.ReactNode[] = [];
+                      const kegWithoutTidakHadir = keg.replace(/TIDAK HADIR:/g, '');
+                      if (kegWithoutTidakHadir.includes('HADIR:') || kegWithoutTidakHadir.includes('Hadir:')) {
+                        badges.push(
+                          <span key="hadir" className="text-[10px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                            ✓ HADIR
+                          </span>
+                        );
+                      }
+                      if (keg.includes('TERLAMBAT:')) {
+                        badges.push(
+                          <span key="terlambat" className="text-[10px] font-black text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                            ⏰ TERLAMBAT
+                          </span>
+                        );
+                      }
+                      if (keg.includes('IZIN:')) {
+                        badges.push(
+                          <span key="izin" className="text-[10px] font-black text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                            📝 IZIN
+                          </span>
+                        );
+                      }
+                      if (keg.includes('TIDAK HADIR:')) {
+                        badges.push(
+                          <span key="tidak_hadir" className="text-[10px] font-black text-rose-800 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
+                            ✖ TIDAK HADIR
+                          </span>
+                        );
+                      }
+                      if (keg.includes('ALPA:')) {
+                        badges.push(
+                          <span key="alpa" className="text-[10px] font-black text-rose-800 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">
+                            ✖ ALPA (APEL)
+                          </span>
+                        );
+                      }
+                      if (keg.includes('SAKIT:')) {
+                        badges.push(
+                          <span key="sakit" className="text-[10px] font-black text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                            🏥 SAKIT
+                          </span>
+                        );
+                      }
+                      return badges;
+                    })()}
                     {item.jumlahDokumentasi > 0 && (
                       <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                         📷 {item.jumlahDokumentasi} Foto
@@ -1345,7 +1400,7 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
               )}
 
               {item.kinerja?.kegiatanLainnya && (
-                <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100 whitespace-pre-line">
                   <span className="font-semibold text-slate-700">Kegiatan Lainnya:</span> {item.kinerja.kegiatanLainnya}
                 </p>
               )}

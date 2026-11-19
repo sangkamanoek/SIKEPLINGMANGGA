@@ -686,7 +686,7 @@ export interface KeplingPetugasPosko {
   nomorLingkungan: number;
   namaKepling: string;
   telepon?: string;
-  statusKehadiran: 'Hadir' | 'Belum Hadir' | 'Izin' | 'Sakit';
+  statusKehadiran: 'Hadir' | 'Belum Hadir' | 'Izin' | 'Sakit' | 'Tidak Hadir';
   jamHadir?: string; // e.g. "21:10 WIB"
   fotoKehadiranUrl?: string; // Base64 or image URL
   waktuUploadFoto?: string; // ISO String

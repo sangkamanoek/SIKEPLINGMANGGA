@@ -376,9 +376,10 @@ const getHariIndonesiaFromIso = (isoDate: string): string => {
 };
 
 /**
- * Otomatis mencatat absen kehadiran Posko oleh Kepling (status Hadir)
- * ke dalam Laporan Harian Kepling (Firestore `reports`, IndexedDB, LocalStorage)
- * dan menghapus entri otomatis bila status diubah ke non-Hadir.
+ * Otomatis mencatat status absen Posko / Kegiatan Khusus yang telah dikonfirmasi
+ * (HADIR, IZIN, TIDAK HADIR, SAKIT) ke dalam Laporan Harian Kepling
+ * (Firestore `reports`, IndexedDB, LocalStorage) dan menghapus entri otomatis
+ * hanya bila status direset ke Belum Hadir atau ditolak Admin.
  */
 export const syncPoskoKehadiranToLaporanHarian = async (
   posko: JadwalPoskoItem,
@@ -413,27 +414,55 @@ export const syncPoskoKehadiranToLaporanHarian = async (
     }
   };
   const jenisLabel = getPoskoLabel(posko.jenisPosko);
-  const poskoPrefix = `[Absensi Posko] Hadir: ${posko.namaPosko || jenisLabel}`;
-  const poskoDetail = `${poskoPrefix} [${jenisLabel}] (${petugas.jamHadir || formatDeviceClockWib()}) di ${posko.lokasiPosko}${
-    petugas.catatanSituasi?.trim() ? ` — ${petugas.catatanSituasi.trim()}` : ''
-  }`;
+  const poskoName = posko.namaPosko || jenisLabel;
+  const poskoTagPrefix = '[Absensi Posko]';
+
+  const isConfirmedByAdmin =
+    petugas.verifikasiAdminStatus === 'TERVERIFIKASI' ||
+    posko.status === 'SELESAI' ||
+    Boolean(petugas.diverifikasiAdminOleh);
+
+  const shouldRecordToLaporan =
+    petugas.verifikasiAdminStatus !== 'DITOLAK' &&
+    (petugas.statusKehadiran === 'Hadir' ||
+      ((petugas.statusKehadiran === 'Izin' ||
+        petugas.statusKehadiran === 'Tidak Hadir' ||
+        petugas.statusKehadiran === 'Sakit') &&
+        isConfirmedByAdmin));
 
   const localReports = safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_STORAGE_KEY, []);
 
-  if (petugas.statusKehadiran === 'Hadir') {
-    const isTrantibum = posko.jenisPosko === 'posko_trantibum';
-    const fotos = petugas.fotoKehadiranUrl
-      ? [
-          {
-            id: `foto_${reportId}`,
-            url: petugas.fotoKehadiranUrl,
-            name: `Kehadiran_${posko.jenisPosko}_Lk${petugas.nomorLingkungan}.jpg`,
-            timestamp: petugas.waktuUploadFoto || nowIso,
-            kategori: isTrantibum ? 'poskamling' : 'umum',
-            keterangan: `${posko.namaPosko} (${petugas.jamHadir || ''})`,
-          },
-        ]
-      : [];
+  if (shouldRecordToLaporan) {
+    const statusUpper =
+      petugas.statusKehadiran === 'Izin'
+        ? 'IZIN'
+        : petugas.statusKehadiran === 'Tidak Hadir'
+        ? 'TIDAK HADIR'
+        : petugas.statusKehadiran === 'Sakit'
+        ? 'SAKIT'
+        : 'HADIR';
+
+    const poskoDetail = `${poskoTagPrefix} ${statusUpper}: ${poskoName} [${jenisLabel}] (${
+      petugas.jamHadir || formatDeviceClockWib()
+    }) di ${posko.lokasiPosko}${
+      petugas.catatanSituasi?.trim() ? ` — ${petugas.catatanSituasi.trim()}` : ''
+    }`;
+
+    const isTrantibumHadir =
+      posko.jenisPosko === 'posko_trantibum' && petugas.statusKehadiran === 'Hadir';
+    const fotos =
+      petugas.statusKehadiran === 'Hadir' && petugas.fotoKehadiranUrl
+        ? [
+            {
+              id: `foto_${reportId}`,
+              url: petugas.fotoKehadiranUrl,
+              name: `Kehadiran_${posko.jenisPosko}_Lk${petugas.nomorLingkungan}.jpg`,
+              timestamp: petugas.waktuUploadFoto || nowIso,
+              kategori: isTrantibumHadir ? 'poskamling' : 'umum',
+              keterangan: `${posko.namaPosko} (${petugas.jamHadir || ''})`,
+            },
+          ]
+        : [];
 
     const reportItem: LaporanHarianItem = {
       id: reportId,
@@ -451,7 +480,7 @@ export const syncPoskoKehadiranToLaporanHarian = async (
         perlinsosKk: 0,
         ikdOrang: 0,
         bpjsKetenagakerjaanOrang: 0,
-        ...(isTrantibum
+        ...(isTrantibumHadir
           ? {
               poskamlingAdaGiat: true,
               poskamlingStatus: 'Piket Posko Trantibum',
@@ -467,10 +496,16 @@ export const syncPoskoKehadiranToLaporanHarian = async (
       dokumentasiFoto: fotos,
       petugasNama: profile?.nama || acc?.nama || petugas.namaKepling,
       petugasRole: 'kepling',
-      uraianTugas: `Kehadiran ${posko.namaPosko || jenisLabel} (${petugas.jamHadir || formatDeviceClockWib()})`,
+      uraianTugas: `Absensi ${poskoName} (${statusUpper})${
+        petugas.jamHadir ? ` (${petugas.jamHadir})` : ''
+      }`,
       catatanUmum: petugas.catatanSituasi?.trim()
-        ? `Situasi ${jenisLabel}: ${petugas.catatanSituasi.trim()}`
-        : `Tercatat otomatis dari Absensi ${jenisLabel} di ${posko.lokasiPosko}.`,
+        ? `Status ${statusUpper} (${jenisLabel}): ${petugas.catatanSituasi.trim()}`
+        : `Tercatat otomatis dari Absensi ${jenisLabel} di ${posko.lokasiPosko} (Status: ${statusUpper}${
+            petugas.diverifikasiAdminOleh
+              ? `, dikonfirmasi oleh ${petugas.diverifikasiAdminOleh}`
+              : ''
+          }).`,
       createdAt: nowIso,
       updatedAt: nowIso,
     };
@@ -491,7 +526,14 @@ export const syncPoskoKehadiranToLaporanHarian = async (
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('sikepling-reports-updated', {
-          detail: { upsertedReports: [reportItem], deletedIds: [] },
+          detail: {
+            upsertedReports: [reportItem],
+            deletedIds: [],
+            deletedKeplingIds: [resolvedKeplingId],
+            stripDate: posko.tanggal,
+            stripPrefix: poskoTagPrefix,
+            stripAgendaName: poskoName,
+          },
         })
       );
     }
@@ -508,10 +550,16 @@ export const syncPoskoKehadiranToLaporanHarian = async (
           const matchesTarget =
             r.keplingId === resolvedKeplingId &&
             (r.tanggal === posko.tanggal || r.tanggalLaporan === posko.tanggal);
-          if (matchesTarget && r.kinerja?.kegiatanLainnya?.includes(poskoPrefix)) {
+          if (
+            matchesTarget &&
+            r.kinerja?.kegiatanLainnya?.includes(poskoTagPrefix) &&
+            r.kinerja?.kegiatanLainnya?.includes(`: ${poskoName}`)
+          ) {
             const filteredLines = r.kinerja.kegiatanLainnya
               .split('\n')
-              .filter((line) => !line.includes(poskoPrefix))
+              .filter(
+                (line) => !(line.includes(poskoTagPrefix) && line.includes(`: ${poskoName}`))
+              )
               .map((line) => line.replace(/^•\s*/, '').trim())
               .filter(Boolean);
             return {
@@ -540,7 +588,8 @@ export const syncPoskoKehadiranToLaporanHarian = async (
             deletedIds: [reportId],
             deletedKeplingIds: [resolvedKeplingId],
             stripDate: posko.tanggal,
-            stripPrefix: poskoPrefix,
+            stripPrefix: poskoTagPrefix,
+            stripAgendaName: poskoName,
           },
         })
       );
@@ -578,7 +627,7 @@ export const updateKeplingPoskoKehadiran = async (
   poskoId: string,
   keplingId: string,
   payload: {
-    statusKehadiran: 'Hadir' | 'Belum Hadir' | 'Izin' | 'Sakit';
+    statusKehadiran: 'Hadir' | 'Belum Hadir' | 'Izin' | 'Sakit' | 'Tidak Hadir';
     jamHadir?: string;
     fotoKehadiranUrl?: string;
     catatanSituasi?: string;
@@ -665,7 +714,11 @@ export const selesaikanPosko = async (
 
   const now = new Date().toISOString();
   const updatedPetugas = (posko.petugasKepling || []).map((k) =>
-    k.statusKehadiran === 'Hadir' && k.verifikasiAdminStatus !== 'DITOLAK'
+    (k.statusKehadiran === 'Hadir' ||
+      k.statusKehadiran === 'Izin' ||
+      k.statusKehadiran === 'Sakit' ||
+      k.statusKehadiran === 'Tidak Hadir') &&
+    k.verifikasiAdminStatus !== 'DITOLAK'
       ? {
           ...k,
           verifikasiAdminStatus: 'TERVERIFIKASI' as const,
@@ -686,4 +739,10 @@ export const selesaikanPosko = async (
   };
 
   await saveJadwalPoskoItem(updatedPosko);
+
+  await Promise.all(
+    updatedPetugas
+      .filter((k) => k.statusKehadiran !== 'Belum Hadir')
+      .map((k) => syncPoskoKehadiranToLaporanHarian(updatedPosko, k).catch(() => {}))
+  );
 };

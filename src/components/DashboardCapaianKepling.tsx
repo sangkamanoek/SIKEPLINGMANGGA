@@ -119,6 +119,7 @@ import {
 } from '../lib/absensiAgendaService';
 import {
   getApelStatusScore,
+  calculatePenaltiTanpaKeterangan,
   getLocalAbsensiApelList,
   fetchAbsensiApelFromFirestore,
   subscribeAbsensiApelFromFirestore,
@@ -1029,7 +1030,30 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
 
       const effective = calculateEffectiveKinerja(reported, targetConfig, index, isCumulativePeriod);
 
-      const uniqueDays = new Set(kReports.map((r) => getReportIsoDate(r)));
+      const uniqueDays = new Set(
+        kReports
+          .filter((r) => {
+            const isAutoAttendance =
+              r.id?.startsWith('lap_ag_') ||
+              r.id?.startsWith('lap_pk_') ||
+              r.id?.startsWith('lap_ap_');
+            if (!isAutoAttendance) return true;
+            const text = r.kinerja?.kegiatanLainnya || '';
+            const hasHadir =
+              text.replace(/TIDAK HADIR:/g, '').includes('HADIR:') ||
+              text.includes('Hadir:') ||
+              text.includes('TERLAMBAT:') ||
+              Boolean(r.kinerja?.poskamlingAdaGiat);
+            const hasNumericKinerja =
+              Number(r.kinerja?.opsirPbbWp || 0) > 0 ||
+              Number(r.kinerja?.perlinsosKk || 0) > 0 ||
+              Number(r.kinerja?.ikdOrang || 0) > 0 ||
+              Number(r.kinerja?.bpjsKetenagakerjaanOrang || 0) > 0 ||
+              Number(r.jumlahDokumentasi || 0) > 0;
+            return hasHadir || hasNumericKinerja;
+          })
+          .map((r) => getReportIsoDate(r))
+      );
       const hariMelapor = uniqueDays.size;
 
       // 1. REALISASI PBB-P2 (Bobot 20%)
@@ -1069,6 +1093,16 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
             p.namaKepling?.trim().toLowerCase() === k.nama.trim().toLowerCase()
         );
         return petugas ? isKeplingPoskoDutyScored(posko, petugas) : false;
+      }).length;
+
+      const poskoTidakHadirCount = filteredPoskoByPeriod.filter((posko) => {
+        const petugas = (posko.petugasKepling || []).find(
+          (p) =>
+            p.keplingId === k.id ||
+            p.nomorLingkungan === k.nomorLingkungan ||
+            p.namaKepling?.trim().toLowerCase() === k.nama.trim().toLowerCase()
+        );
+        return petugas?.statusKehadiran === 'Tidak Hadir';
       }).length;
 
       const manualPoskamlingCount = kReports.filter(
@@ -1172,7 +1206,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
       // SKOR KOMPOSIT 9 KRITERIA TERPADU (Indeks Kinerja Kepling / IKKT - Total 100%)
       // PBB (20%) + Perlinsos (10%) + IKD (10%) + BPJS TK (10%) + Kunjungan (10%)
       // + Posko/Poskamling (10%) + Apel Pagi (10%) + Agenda/Rapat (5%) + Konsistensi Lapor (15%) = 100%
-      const compositeScoreRaw =
+      // Dikurangi penalti langsung ketidakhadiran tanpa keterangan:
+      // - Alpa Apel Pagi: -3.0 Poin / kejadian
+      // - Tidak Hadir Agenda/Posko tanpa keterangan: -1.5 Poin / kejadian
+      const baseCompositeScoreRaw =
         Math.min(100, pbbPercentage) * 0.20 +
         Math.min(100, perlinsosPercentage) * 0.10 +
         Math.min(100, ikdPercentage) * 0.10 +
@@ -1183,8 +1220,17 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         Math.min(100, agendaPercentage) * 0.05 +
         Math.min(100, konsistensiPercentage) * 0.15;
 
+      const totalKegiatanTanpaKeterangan = kehadiranTidakHadir + poskoTidakHadirCount;
+      const {
+        penaltiApelAlpa,
+        penaltiAgendaAlpha,
+        totalPenalti: totalPenaltiTanpaKeterangan,
+      } = calculatePenaltiTanpaKeterangan(apelAlpa, totalKegiatanTanpaKeterangan);
+
+      const compositeScoreRaw = Math.max(0, baseCompositeScoreRaw - totalPenaltiTanpaKeterangan);
       const compositeScore = Math.min(100, Math.round(compositeScoreRaw));
       const compositeScoreDecimal = Number(compositeScoreRaw.toFixed(1));
+      const baseCompositeScoreDecimal = Number(Math.min(100, baseCompositeScoreRaw).toFixed(1));
 
       return {
         kepling: k,
@@ -1231,10 +1277,16 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
         targetKunjunganHarian,
         kunjunganPercentage,
         validPoskoCount,
+        poskoTidakHadirCount,
         manualPoskamlingCount,
         poskamlingCount,
         targetPoskamlingBulan,
         poskamlingPercentage,
+        // Penalti Kedisiplinan (Tanpa Keterangan)
+        penaltiApelAlpa,
+        penaltiAgendaAlpha,
+        totalPenaltiTanpaKeterangan,
+        baseCompositeScoreDecimal,
         // Skor Komposit
         compositeScore,
         compositeScoreDecimal,
@@ -1939,6 +1991,14 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     {myPerformanceData.score}
                     <span className="text-xs font-bold ml-1 opacity-70">/100 Poin</span>
                   </div>
+                  {(myPerformanceData.item?.totalPenaltiTanpaKeterangan || 0) > 0 && (
+                    <span
+                      className="inline-block mt-1 text-[10px] font-black px-2 py-0.5 rounded bg-rose-600 text-white border border-rose-300 shadow-2xs"
+                      title={`Skor dasar ${myPerformanceData.item?.baseCompositeScoreDecimal} dikurangi potongan ketidakhadiran tanpa keterangan`}
+                    >
+                      Potongan Alpa: -{myPerformanceData.item?.totalPenaltiTanpaKeterangan} Poin
+                    </span>
+                  )}
                   <span
                     className={`inline-block mt-1 text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                       myPerformanceData.isBottom5
@@ -2420,6 +2480,32 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                             <strong className="text-rose-950 text-xs">{alpaApel}</strong>
                           </div>
                         </div>
+
+                        {(kh?.totalPenaltiTanpaKeterangan || 0) > 0 && (
+                          <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-300 text-[11px] text-rose-900 space-y-0.5">
+                            <div className="font-black flex items-center justify-between gap-2">
+                              <span>⚠️ Pengurangan Poin Capaian Target (Tanpa Keterangan)</span>
+                              <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px]">
+                                -{kh?.totalPenaltiTanpaKeterangan} Poin
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-rose-800 leading-snug">
+                              {alpaApel > 0 && (
+                                <span>
+                                  • <strong>{alpaApel}x Alpa Apel Pagi</strong> (-{kh?.penaltiApelAlpa} Poin){' '}
+                                </span>
+                              )}
+                              {((kh?.kehadiranTidakHadir || 0) + (kh?.poskoTidakHadirCount || 0)) > 0 && (
+                                <span>
+                                  • <strong>{(kh?.kehadiranTidakHadir || 0) + (kh?.poskoTidakHadirCount || 0)}x Tidak Hadir Agenda/Kegiatan</strong> (-{kh?.penaltiAgendaAlpha} Poin)
+                                </span>
+                              )}
+                              <span className="block mt-0.5 text-rose-700 font-medium">
+                                Kedisiplinan Apel Pagi sangat menentukan untuk memaksimalkan Poin Capaian Target (Izin/Sakit sah tidak memotong poin).
+                              </span>
+                            </p>
+                          </div>
+                        )}
 
                         {myRecentApelAttendance.length > 0 && (
                           <div className="pt-2 border-t border-slate-200 space-y-1">
@@ -3188,7 +3274,10 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                     Peringkat resmi terpadu untuk periode <strong>{getPeriodLabel(period, now)}</strong> dihitung dari{' '}
                     <strong>9 Kriteria Kinerja (Total 100%)</strong>: Realisasi PBB 20%, Perlinsos 10%, IKD 10%, BPJS TK 10%,
                     Kunjungan Warga 10%, Posko & Poskamling Terverifikasi 10%, Apel Pagi 10%, Agenda/Rapat 5%, dan
-                    Konsistensi Laporan Harian 15% (target {konsistensiTargetHari} hari kalender berjalan).
+                    Konsistensi Laporan Harian 15% (target {konsistensiTargetHari} hari kalender berjalan).{' '}
+                    <span className="text-rose-700 font-semibold">
+                      Penalti Kedisiplinan: Setiap ketidakhadiran tanpa keterangan mengurangi langsung Poin Capaian Target (-3 Poin per Alpa Apel Pagi &amp; -1,5 Poin per Tidak Hadir Agenda/Kegiatan tanpa keterangan).
+                    </span>
                     {!isCumulativePeriod ? (
                       <span className="text-emerald-700 font-semibold block mt-0.5">
                         ⚡ Mode Bulanan Aktif: Akumulasi poin direset otomatis dari 0 pada tanggal 1 bulan berjalan (hanya menghitung transaksi & keaktifan bulan ini). Evaluasi total kumulatif setahun penuh dapat dilihat melalui filter "Tahun {now.getFullYear()}".
@@ -3427,6 +3516,11 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                         {podium.row.compositeScoreDecimal}
                         <span className="text-xs font-bold opacity-70 ml-1">/100 Poin</span>
                       </div>
+                      {podium.row.totalPenaltiTanpaKeterangan > 0 && (
+                        <div className="inline-block mt-0.5 mb-1 px-2 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300 text-[10px] font-black">
+                          Potongan Alpa: -{podium.row.totalPenaltiTanpaKeterangan} Poin
+                        </div>
+                      )}
                       <div className={`text-[11px] mt-0.5 mb-2 ${podium.subScoreClass}`}>
                         Indeks Kinerja Kepling Terpadu
                       </div>
@@ -3582,10 +3676,15 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                         </div>
 
                         {/* Mobile Badge Skor */}
-                        <div className="xl:hidden flex items-center gap-1.5">
+                        <div className="xl:hidden flex flex-col items-end gap-0.5">
                           <span className={`px-2 py-0.5 rounded-full font-black text-xs ${scoreColorClass}`}>
                             {item.compositeScoreDecimal}
                           </span>
+                          {item.totalPenaltiTanpaKeterangan > 0 && (
+                            <span className="text-[9px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-1.5 rounded">
+                              -{item.totalPenaltiTanpaKeterangan} Alpa
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -3633,10 +3732,22 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                       </div>
 
                       {/* Skor Komposit Terpadu (IKKT) */}
-                      <div className="hidden xl:flex items-center justify-center">
-                        <span className={`px-2.5 py-1 rounded-full font-black text-xs shadow-2xs ${scoreColorClass}`}>
+                      <div className="hidden xl:flex flex-col items-center justify-center gap-0.5">
+                        <span
+                          className={`px-2.5 py-1 rounded-full font-black text-xs shadow-2xs ${scoreColorClass}`}
+                          title={
+                            item.totalPenaltiTanpaKeterangan > 0
+                              ? `Skor Dasar: ${item.baseCompositeScoreDecimal} - Potongan Alpa Apel (${item.penaltiApelAlpa}) - Potongan Tidak Hadir Agenda/Posko (${item.penaltiAgendaAlpha}) = ${item.compositeScoreDecimal}`
+                              : `Skor Indeks Kinerja Kepling Terpadu: ${item.compositeScoreDecimal}/100`
+                          }
+                        >
                           {item.compositeScoreDecimal}
                         </span>
+                        {item.totalPenaltiTanpaKeterangan > 0 && (
+                          <span className="text-[9px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded whitespace-nowrap">
+                            -{item.totalPenaltiTanpaKeterangan} Alpa
+                          </span>
+                        )}
                       </div>
 
                       {/* 9 Criteria Cells (Mobile Grid + Desktop xl:contents) */}
@@ -3762,6 +3873,9 @@ export const DashboardCapaianKepling: React.FC<DashboardCapaianKeplingProps> = (
                           </span>
                           <span className="text-[10px] text-slate-400 block truncate">
                             {item.apelTotal > 0 ? `${item.apelHadir}/${item.apelTotal} Hadir` : '0 Apel'}
+                            {item.apelAlpa > 0 && (
+                              <span className="text-rose-700 font-black ml-1">({item.apelAlpa} Alpa)</span>
+                            )}
                           </span>
                         </div>
 

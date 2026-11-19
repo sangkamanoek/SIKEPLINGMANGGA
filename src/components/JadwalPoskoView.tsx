@@ -1366,6 +1366,8 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                                     ? 'bg-blue-100 text-blue-800'
                                     : petugas.statusKehadiran === 'Sakit'
                                     ? 'bg-amber-100 text-amber-800'
+                                    : petugas.statusKehadiran === 'Tidak Hadir'
+                                    ? 'bg-rose-100 text-rose-800'
                                     : 'bg-slate-200 text-slate-700'
                                 }`}
                               >
@@ -1442,6 +1444,32 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                               </button>
                             )}
 
+                            {!isHadir &&
+                              (petugas.statusKehadiran === 'Izin' ||
+                                petugas.statusKehadiran === 'Tidak Hadir' ||
+                                petugas.statusKehadiran === 'Sakit') && (
+                                <div className="pt-0.5">
+                                  {petugas.verifikasiAdminStatus === 'TERVERIFIKASI' ||
+                                  posko.status === 'SELESAI' ? (
+                                    <span
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-black ${
+                                        petugas.statusKehadiran === 'Tidak Hadir'
+                                          ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                          : petugas.statusKehadiran === 'Izin'
+                                          ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                                      }`}
+                                    >
+                                      ✓ {petugas.statusKehadiran} (Dikonfirmasi Admin • Tercatat di Laporan Harian)
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-300 text-[10px] font-bold">
+                                      ⏳ Menunggu Konfirmasi Admin
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
                             {isSuperAdmin && (
                               <div className="pt-2 mt-1 border-t border-slate-200/80 flex items-center gap-1.5 flex-wrap">
                                 <span className="text-[10px] font-bold text-indigo-900 uppercase">Verifikasi Admin:</span>
@@ -1462,7 +1490,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                                         diverifikasiAdminOleh: currentUser.nama,
                                       });
                                       setPoskoList(getLocalJadwalPoskoList());
-                                      notify(`Kehadiran Lingkungan ${petugas.nomorLingkungan} (${petugas.namaKepling}) berhasil diverifikasi Hadir & dihitung poin kinerja!`, 'success');
+                                      notify(`Kehadiran Lingkungan ${petugas.nomorLingkungan} (${petugas.namaKepling}) berhasil dikonfirmasi HADIR & tercatat ke Laporan Harian!`, 'success');
                                     } catch {
                                       notify('Gagal memverifikasi kehadiran kepling.', 'error');
                                     }
@@ -1474,10 +1502,68 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                                   }`}
                                 >
                                   {isHadir && (petugas.verifikasiAdminStatus === 'TERVERIFIKASI' || posko.status === 'SELESAI')
-                                    ? '✓ Hadir (Terverifikasi)'
-                                    : '⚡ Verifikasi Hadir'}
+                                    ? '✓ Hadir'
+                                    : '⚡ Hadir'}
                                 </button>
-                                {(isHadir || petugas.verifikasiAdminStatus) && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      await updateKeplingPoskoKehadiran(posko.id, petugas.keplingId, {
+                                        statusKehadiran: 'Izin',
+                                        jamHadir: 'Izin (Konfirmasi Admin)',
+                                        catatanSituasi: petugas.catatanSituasi || 'Izin dikonfirmasi oleh Super Admin.',
+                                        verifikasiAdminStatus: 'TERVERIFIKASI',
+                                        diverifikasiAdminOleh: currentUser.nama,
+                                      });
+                                      setPoskoList(getLocalJadwalPoskoList());
+                                      notify(`Status Lingkungan ${petugas.nomorLingkungan} (${petugas.namaKepling}) dikonfirmasi IZIN & tercatat ke Laporan Harian!`, 'success');
+                                    } catch {
+                                      notify('Gagal mengkonfirmasi status Izin.', 'error');
+                                    }
+                                  }}
+                                  className={`px-2 py-1 rounded-md text-[10px] font-black cursor-pointer shadow-2xs ${
+                                    petugas.statusKehadiran === 'Izin' &&
+                                    (petugas.verifikasiAdminStatus === 'TERVERIFIKASI' || posko.status === 'SELESAI')
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100'
+                                  }`}
+                                >
+                                  {petugas.statusKehadiran === 'Izin' &&
+                                  (petugas.verifikasiAdminStatus === 'TERVERIFIKASI' || posko.status === 'SELESAI')
+                                    ? '✓ Izin'
+                                    : 'Izin'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      await updateKeplingPoskoKehadiran(posko.id, petugas.keplingId, {
+                                        statusKehadiran: 'Tidak Hadir',
+                                        jamHadir: 'Tidak Hadir (Konfirmasi Admin)',
+                                        catatanSituasi: petugas.catatanSituasi || 'Tidak hadir dikonfirmasi oleh Super Admin.',
+                                        verifikasiAdminStatus: 'TERVERIFIKASI',
+                                        diverifikasiAdminOleh: currentUser.nama,
+                                      });
+                                      setPoskoList(getLocalJadwalPoskoList());
+                                      notify(`Status Lingkungan ${petugas.nomorLingkungan} (${petugas.namaKepling}) dikonfirmasi TIDAK HADIR & tercatat ke Laporan Harian!`, 'info');
+                                    } catch {
+                                      notify('Gagal mengkonfirmasi status Tidak Hadir.', 'error');
+                                    }
+                                  }}
+                                  className={`px-2 py-1 rounded-md text-[10px] font-black cursor-pointer shadow-2xs ${
+                                    petugas.statusKehadiran === 'Tidak Hadir' &&
+                                    (petugas.verifikasiAdminStatus === 'TERVERIFIKASI' || posko.status === 'SELESAI')
+                                      ? 'bg-rose-600 text-white'
+                                      : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+                                  }`}
+                                >
+                                  {petugas.statusKehadiran === 'Tidak Hadir' &&
+                                  (petugas.verifikasiAdminStatus === 'TERVERIFIKASI' || posko.status === 'SELESAI')
+                                    ? '✓ Tidak Hadir'
+                                    : 'Tidak Hadir'}
+                                </button>
+                                {(petugas.statusKehadiran !== 'Belum Hadir' || petugas.verifikasiAdminStatus) && (
                                   <button
                                     type="button"
                                     onClick={async () => {
@@ -2357,7 +2443,15 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                           {k.catatanSituasi || '-'}
                         </td>
                         <td style={{ border: '1px solid #000', padding: '3.5px 6px', textAlign: 'center', fontSize: '8pt', color: '#555' }}>
-                          {k.statusKehadiran === 'Hadir' ? '✓ Hadir' : '-'}
+                          {k.statusKehadiran === 'Hadir'
+                            ? '✓ Hadir'
+                            : k.statusKehadiran === 'Izin'
+                            ? 'Izin'
+                            : k.statusKehadiran === 'Tidak Hadir'
+                            ? 'Tidak Hadir'
+                            : k.statusKehadiran === 'Sakit'
+                            ? 'Sakit'
+                            : '-'}
                         </td>
                       </tr>
                     ))}

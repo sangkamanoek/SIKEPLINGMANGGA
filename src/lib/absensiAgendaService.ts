@@ -7,12 +7,9 @@ import {
   markFirestoreQuotaExhausted,
 } from './firebase';
 import { cleanFirestoreData } from './firestoreService';
-import { resilientDeleteDoc, resilientSetDoc } from './firestoreWriteQueue';
+import { resilientSetDoc } from './firestoreWriteQueue';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
-import {
-  deleteReportFromIndexedDB,
-  saveSingleReportToIndexedDB,
-} from './indexedDbStorage';
+import { saveSingleReportToIndexedDB } from './indexedDbStorage';
 import {
   AbsensiAgendaKepling,
   AbsensiKeplingEntry,
@@ -227,14 +224,21 @@ export const buildAgendaAttendanceReportId = (
 ): string => `lap_ag_${sanitizeAgendaKey(agendaId)}_lk${nomorLingkungan}`;
 
 /**
- * Otomatis mencatat Kepala Lingkungan yang berstatus "Hadir" pada Agenda Kelurahan
- * ke dalam Laporan Harian Kepling (Firestore `reports`, IndexedDB, LocalStorage),
- * serta membersihkan entri otomatis bila status diubah menjadi selain Hadir.
+ * Otomatis mencatat seluruh status kehadiran Kepala Lingkungan (HADIR, IZIN, TIDAK HADIR, SAKIT)
+ * pada Agenda Kelurahan yang telah dikonfirmasi/disimpan oleh Admin
+ * ke dalam Laporan Harian Kepling (Firestore `reports`, IndexedDB, LocalStorage).
  */
 export const syncAbsensiAgendaHadirToLaporanHarian = async (
   record: AbsensiAgendaKepling,
-  previousRecord?: AbsensiAgendaKepling
-): Promise<{ syncedHadir: number; removedNonHadir: number }> => {
+  _previousRecord?: AbsensiAgendaKepling
+): Promise<{
+  syncedHadir: number;
+  syncedIzin: number;
+  syncedTidakHadir: number;
+  syncedSakit: number;
+  totalSynced: number;
+  removedNonHadir: number;
+}> => {
   const LAPORAN_STORAGE_KEY = 'kepling_local_laporan_history_v2';
   const nowIso = new Date().toISOString();
   const parsedDate = parseIsoLocal(record.tanggalKegiatan);
@@ -242,17 +246,24 @@ export const syncAbsensiAgendaHadirToLaporanHarian = async (
   const formattedTanggal = formatHariTanggalIndonesia(record.tanggalKegiatan);
 
   const upsertedReports: LaporanHarianItem[] = [];
-  const deletedIds: string[] = [];
-  const deletedKeplingIds: string[] = [];
+  const upsertedKeplingIds: string[] = [];
 
-  const agendaSummaryPrefix = `[Absensi Agenda Kelurahan] Hadir: ${record.namaKegiatan}`;
-  const agendaDetailText = `${agendaSummaryPrefix}${
-    record.jamKegiatan ? ` (${record.jamKegiatan})` : ''
-  }${record.lokasi ? ` di ${record.lokasi}` : ''}`;
+  let syncedHadir = 0;
+  let syncedIzin = 0;
+  let syncedTidakHadir = 0;
+  let syncedSakit = 0;
+
+  const agendaTagPrefix = '[Absensi Agenda Kelurahan]';
+  const agendaNameMarker = `: ${record.namaKegiatan}`;
+
+  const getStatusUpper = (status: StatusKehadiranKepling | string | undefined): string => {
+    if (status === 'Izin') return 'IZIN';
+    if (status === 'Tidak Hadir') return 'TIDAK HADIR';
+    if (status === 'Sakit') return 'SAKIT';
+    return 'HADIR';
+  };
 
   const localReports = safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_STORAGE_KEY, []);
-  const localIdSet = new Set(localReports.map((r) => r?.id).filter(Boolean));
-
   const entries = Object.values(record.entries || {});
 
   for (const entry of entries) {
@@ -265,93 +276,95 @@ export const syncAbsensiAgendaHadirToLaporanHarian = async (
     const roman = ROMAN_NUMERALS[entry.nomorLingkungan - 1] || String(entry.nomorLingkungan);
     const resolvedKeplingId = acc?.id || entry.keplingId || `kepling_${entry.nomorLingkungan}`;
 
-    if (entry.status === 'Hadir') {
-      const reportItem: LaporanHarianItem = {
-        id: reportId,
-        keplingId: resolvedKeplingId,
-        lingkungan: acc?.lingkungan || `Lingkungan ${roman}`,
-        namaKepling: profile?.nama || acc?.nama || entry.namaKepling,
-        jabatan: acc?.jabatan || entry.jabatan || `Kepala Lingkungan ${roman}`,
-        kelurahan: 'Kelurahan Mangga',
-        kecamatan: 'Kecamatan Medan Tuntungan',
-        hari,
-        tanggal: record.tanggalKegiatan,
-        tanggalLaporan: record.tanggalKegiatan,
-        kinerja: {
-          opsirPbbWp: 0,
-          perlinsosKk: 0,
-          ikdOrang: 0,
-          bpjsKetenagakerjaanOrang: 0,
-          kegiatanLainnya: entry.catatan?.trim()
-            ? `${agendaDetailText} — ${entry.catatan.trim()}`
-            : agendaDetailText,
-        },
-        jumlahDokumentasi: 0,
-        dokumentasiFoto: [],
-        petugasNama: record.diinputOlehNama || 'Admin Kelurahan',
-        petugasRole: record.diinputOlehRole || 'super_admin',
-        uraianTugas: `Kehadiran Agenda Kelurahan: ${record.namaKegiatan} (${formattedTanggal})`,
-        catatanUmum: entry.catatan?.trim()
-          ? `Catatan Absensi Agenda: ${entry.catatan.trim()}`
-          : 'Tercatat otomatis dari Absensi Kehadiran Agenda Kelurahan.',
-        createdAt: nowIso,
-        updatedAt: nowIso,
-      };
-      upsertedReports.push(reportItem);
-    } else {
-      const prevEntry =
-        previousRecord?.entries?.[entry.keplingId] ||
-        Object.values(previousRecord?.entries || {}).find(
-          (pe) => pe.nomorLingkungan === entry.nomorLingkungan
-        );
-      if (prevEntry?.status === 'Hadir' || localIdSet.has(reportId)) {
-        deletedIds.push(reportId);
-        deletedKeplingIds.push(resolvedKeplingId);
-      }
-    }
+    const status = entry.status || 'Hadir';
+    const statusUpper = getStatusUpper(status);
+    if (status === 'Hadir') syncedHadir += 1;
+    else if (status === 'Izin') syncedIzin += 1;
+    else if (status === 'Tidak Hadir') syncedTidakHadir += 1;
+    else if (status === 'Sakit') syncedSakit += 1;
+
+    const agendaDetailText = `${agendaTagPrefix} ${statusUpper}: ${record.namaKegiatan}${
+      record.jamKegiatan ? ` (${record.jamKegiatan})` : ''
+    }${record.lokasi ? ` di ${record.lokasi}` : ''}${
+      entry.catatan?.trim() ? ` — ${entry.catatan.trim()}` : ''
+    }`;
+
+    const reportItem: LaporanHarianItem = {
+      id: reportId,
+      keplingId: resolvedKeplingId,
+      lingkungan: acc?.lingkungan || `Lingkungan ${roman}`,
+      namaKepling: profile?.nama || acc?.nama || entry.namaKepling,
+      jabatan: acc?.jabatan || entry.jabatan || `Kepala Lingkungan ${roman}`,
+      kelurahan: 'Kelurahan Mangga',
+      kecamatan: 'Kecamatan Medan Tuntungan',
+      hari,
+      tanggal: record.tanggalKegiatan,
+      tanggalLaporan: record.tanggalKegiatan,
+      kinerja: {
+        opsirPbbWp: 0,
+        perlinsosKk: 0,
+        ikdOrang: 0,
+        bpjsKetenagakerjaanOrang: 0,
+        kegiatanLainnya: agendaDetailText,
+      },
+      jumlahDokumentasi: 0,
+      dokumentasiFoto: [],
+      petugasNama: record.diinputOlehNama || 'Admin Kelurahan',
+      petugasRole: record.diinputOlehRole || 'super_admin',
+      uraianTugas: `Absensi Kegiatan Kelurahan (${statusUpper}): ${record.namaKegiatan} (${formattedTanggal})`,
+      catatanUmum: entry.catatan?.trim()
+        ? `Catatan Absensi Agenda (${statusUpper}): ${entry.catatan.trim()}`
+        : `Tercatat otomatis dari Absensi Kegiatan Kelurahan (Status: ${statusUpper}, dikonfirmasi oleh ${
+            record.diinputOlehNama || 'Admin Kelurahan'
+          }).`,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    upsertedReports.push(reportItem);
+    upsertedKeplingIds.push(resolvedKeplingId);
   }
 
   // 1. Update LocalStorage cache dalam satu kali proses (hemat memori)
   try {
-    const deleteSet = new Set(deletedIds);
-    const deletedKeplingSet = new Set(deletedKeplingIds);
+    const upsertedKeplingSet = new Set(upsertedKeplingIds);
     const upsertMap = new Map<string, LaporanHarianItem>(
       upsertedReports.map((r) => [r.id, r])
     );
 
-    const cleanedLocal = localReports
-      .filter((r) => r && r.id && !deleteSet.has(r.id))
-      .map((r) => {
-        if (upsertMap.has(r.id)) {
-          return upsertMap.get(r.id)!;
-        }
-        // Bersihkan baris agenda terkait hanya untuk Kepling yang statusnya diubah dari Hadir ke non-Hadir
-        const repKeplingId = r.keplingId || '';
-        const matchesDeletedTarget =
-          deletedKeplingSet.has(repKeplingId) &&
-          (r.tanggal === record.tanggalKegiatan || r.tanggalLaporan === record.tanggalKegiatan);
-        if (
-          matchesDeletedTarget &&
-          r.kinerja?.kegiatanLainnya?.includes(agendaSummaryPrefix)
-        ) {
-          const filteredLines = r.kinerja.kegiatanLainnya
-            .split('\n')
-            .filter((line) => !line.includes(agendaSummaryPrefix))
-            .map((line) => line.replace(/^•\s*/, '').trim())
-            .filter(Boolean);
-          return {
-            ...r,
-            kinerja: {
-              ...r.kinerja,
-              kegiatanLainnya: filteredLines.join('\n• '),
-            },
-          };
-        }
-        return r;
-      });
+    const cleanedLocal = localReports.map((r) => {
+      if (!r || !r.id) return r;
+      if (upsertMap.has(r.id)) {
+        return upsertMap.get(r.id)!;
+      }
+      // Bersihkan baris agenda lama untuk kegiatan yang sama pada laporan manual di tanggal tsb agar status terbaru tidak ganda
+      const repKeplingId = r.keplingId || '';
+      const matchesTarget =
+        upsertedKeplingSet.has(repKeplingId) &&
+        (r.tanggal === record.tanggalKegiatan || r.tanggalLaporan === record.tanggalKegiatan);
+      if (
+        matchesTarget &&
+        r.kinerja?.kegiatanLainnya?.includes(agendaTagPrefix) &&
+        r.kinerja?.kegiatanLainnya?.includes(agendaNameMarker)
+      ) {
+        const filteredLines = r.kinerja.kegiatanLainnya
+          .split('\n')
+          .filter((line) => !(line.includes(agendaTagPrefix) && line.includes(agendaNameMarker)))
+          .map((line) => line.replace(/^•\s*/, '').trim())
+          .filter(Boolean);
+        return {
+          ...r,
+          kinerja: {
+            ...r.kinerja,
+            kegiatanLainnya: filteredLines.join('\n• '),
+          },
+        };
+      }
+      return r;
+    });
 
     upsertedReports.forEach((u) => {
-      if (!cleanedLocal.some((r) => r.id === u.id)) {
+      if (!cleanedLocal.some((r) => r && r.id === u.id)) {
         cleanedLocal.unshift(u);
       }
     });
@@ -369,10 +382,11 @@ export const syncAbsensiAgendaHadirToLaporanHarian = async (
       new CustomEvent('sikepling-reports-updated', {
         detail: {
           upsertedReports,
-          deletedIds,
-          deletedKeplingIds,
+          deletedIds: [],
+          deletedKeplingIds: upsertedKeplingIds,
           stripDate: record.tanggalKegiatan,
-          stripPrefix: agendaSummaryPrefix,
+          stripPrefix: agendaTagPrefix,
+          stripAgendaName: record.namaKegiatan,
         },
       })
     );
@@ -391,25 +405,26 @@ export const syncAbsensiAgendaHadirToLaporanHarian = async (
     );
   }
 
-  for (let i = 0; i < deletedIds.length; i += BATCH_SIZE) {
-    const chunk = deletedIds.slice(i, i + BATCH_SIZE);
-    await Promise.all(
-      chunk.map(async (id) => {
-        await deleteReportFromIndexedDB(id).catch(() => {});
-        await resilientDeleteDoc('reports', id).catch(() => {});
-      })
-    );
-  }
-
   return {
-    syncedHadir: upsertedReports.length,
-    removedNonHadir: deletedIds.length,
+    syncedHadir,
+    syncedIzin,
+    syncedTidakHadir,
+    syncedSakit,
+    totalSynced: upsertedReports.length,
+    removedNonHadir: 0,
   };
 };
 
 export const saveAbsensiAgendaRecord = async (
   record: AbsensiAgendaKepling
-): Promise<{ ok: boolean; syncedHadir: number }> => {
+): Promise<{
+  ok: boolean;
+  syncedHadir: number;
+  syncedIzin: number;
+  syncedTidakHadir: number;
+  syncedSakit: number;
+  totalSynced: number;
+}> => {
   const current = getLocalAbsensiAgendaList();
   const nowIso = new Date().toISOString();
   const targetId = record.id || `abs_${record.agendaId}`;
@@ -439,6 +454,10 @@ export const saveAbsensiAgendaRecord = async (
     resilientSetDoc(ABSENSI_COLLECTION, payload.id, cleaned, { merge: true }),
     syncAbsensiAgendaHadirToLaporanHarian(payload, previousRecord).catch(() => ({
       syncedHadir: 0,
+      syncedIzin: 0,
+      syncedTidakHadir: 0,
+      syncedSakit: 0,
+      totalSynced: 0,
       removedNonHadir: 0,
     })),
   ]);
@@ -446,6 +465,10 @@ export const saveAbsensiAgendaRecord = async (
   return {
     ok: res.synced || res.queued,
     syncedHadir: syncStats.syncedHadir,
+    syncedIzin: syncStats.syncedIzin,
+    syncedTidakHadir: syncStats.syncedTidakHadir,
+    syncedSakit: syncStats.syncedSakit,
+    totalSynced: syncStats.totalSynced,
   };
 };
 

@@ -616,11 +616,11 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
         createdAt: savedApelForDate?.createdAt || nowIso,
         updatedAt: nowIso,
       };
-      await saveAbsensiApelRecord(record);
+      const saveResult = await saveAbsensiApelRecord(record);
       setApelList(getLocalAbsensiApelList());
       setHasUnsavedApelChanges(false);
       notify(
-        `Absensi Apel Pagi (${formatHariTanggalIndonesia(apelDate)}) disimpan! Poin kedisiplinan Apel (10%) otomatis terupdate.`,
+        `Absensi Apel Pagi (${formatHariTanggalIndonesia(apelDate)}) disimpan & tercatat ke Laporan Harian! Hadir (${saveResult.syncedHadir}), Telat (${saveResult.syncedTerlambat}), Izin (${saveResult.syncedIzin}), Sakit (${saveResult.syncedSakit}), Alpa (${saveResult.syncedAlpa}).`,
         'success'
       );
     } catch {
@@ -698,7 +698,9 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
       setAbsensiList(getLocalAbsensiAgendaList());
       setHasUnsavedChanges(false);
       notify(
-        `Daftar Hadir "${activeAgenda.namaKegiatan}" disimpan! ${saveResult.syncedHadir} Kepling Hadir otomatis tercatat ke Laporan Harian & Capaian Kinerja.`,
+        `Daftar Hadir "${activeAgenda.namaKegiatan}" disimpan! Tercatat ke Laporan Harian: Hadir (${saveResult.syncedHadir}), Izin (${saveResult.syncedIzin}), Tidak Hadir (${saveResult.syncedTidakHadir})${
+          saveResult.syncedSakit > 0 ? `, Sakit (${saveResult.syncedSakit})` : ''
+        }.`,
         'success'
       );
     } catch {
@@ -1169,7 +1171,11 @@ export const AbsensiAgendaKeplingView: React.FC<AbsensiAgendaKeplingViewProps> =
                 {formatHariTanggalIndonesia(apelDate)}
               </span>
               <span className="text-[11px] text-slate-600 block">
-                Bobot Penilaian Kinerja: Hadir 100%, Terlambat 60%, Izin/Sakit 50%, Alpa 0%.
+                Bobot Kinerja: Hadir 100%, Terlambat 60%, Izin/Sakit 50%, Alpa 0%{' '}
+                <strong className="text-rose-700">
+                  (+ Potongan langsung -3 Poin Capaian Target per 1x Alpa Apel Pagi &amp; -1,5 Poin per 1x Tidak Hadir tanpa keterangan)
+                </strong>
+                .
               </span>
             </div>
             <div>

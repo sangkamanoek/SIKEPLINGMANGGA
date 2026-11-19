@@ -1119,8 +1119,19 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                         <tr>
                           <td className="text-center font-bold border border-black py-1">6</td>
                           <td className="font-bold border border-black px-1.5 py-1">Kegiatan Lapangan Lainnya</td>
-                          <td className="text-center font-bold border border-black py-1">Terlaksana</td>
-                          <td className="border border-black px-1.5 py-1">{item.kinerja?.kegiatanLainnya || '-'}</td>
+                          <td className="text-center font-bold border border-black py-1">
+                            {(() => {
+                              const kText = item.kinerja?.kegiatanLainnya || '';
+                              const hasHadir = kText.replace(/TIDAK HADIR:/g, '').includes('HADIR:') || kText.includes('Hadir:');
+                              if (!hasHadir && kText.includes('ALPA:')) return 'Alpa';
+                              if (!hasHadir && kText.includes('TIDAK HADIR:')) return 'Tidak Hadir';
+                              if (!hasHadir && kText.includes('IZIN:')) return 'Izin';
+                              if (!hasHadir && kText.includes('SAKIT:')) return 'Sakit';
+                              if (!hasHadir && kText.includes('TERLAMBAT:')) return 'Terlambat';
+                              return kText ? 'Terlaksana' : '-';
+                            })()}
+                          </td>
+                          <td className="border border-black px-1.5 py-1 whitespace-pre-line">{item.kinerja?.kegiatanLainnya || '-'}</td>
                         </tr>
                         <tr>
                           <td className="text-center font-bold border border-black py-1">7</td>
@@ -2044,7 +2055,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-emerald-500"
                 />
               ) : (
-                <p className="text-slate-600">{item.kinerja?.kegiatanLainnya || 'Tidak ada kegiatan tambahan.'}</p>
+                <p className="text-slate-600 whitespace-pre-line">{item.kinerja?.kegiatanLainnya || 'Tidak ada kegiatan tambahan.'}</p>
               )}
             </div>
 
@@ -3043,8 +3054,19 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                   <tr>
                     <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>6</td>
                     <td style={{ border: '1px solid #000000', fontWeight: 'bold', padding: '3px 6px' }}>Kegiatan Lapangan Lainnya</td>
-                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>Terlaksana</td>
-                    <td style={{ border: '1px solid #000000', padding: '3px 6px' }}>{item.kinerja?.kegiatanLainnya || '-'}</td>
+                    <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>
+                      {(() => {
+                        const kText = item.kinerja?.kegiatanLainnya || '';
+                        const hasHadir = kText.replace(/TIDAK HADIR:/g, '').includes('HADIR:') || kText.includes('Hadir:');
+                        if (!hasHadir && kText.includes('ALPA:')) return 'Alpa';
+                        if (!hasHadir && kText.includes('TIDAK HADIR:')) return 'Tidak Hadir';
+                        if (!hasHadir && kText.includes('IZIN:')) return 'Izin';
+                        if (!hasHadir && kText.includes('SAKIT:')) return 'Sakit';
+                        if (!hasHadir && kText.includes('TERLAMBAT:')) return 'Terlambat';
+                        return kText ? 'Terlaksana' : '-';
+                      })()}
+                    </td>
+                    <td style={{ border: '1px solid #000000', padding: '3px 6px', whiteSpace: 'pre-line' }}>{item.kinerja?.kegiatanLainnya || '-'}</td>
                   </tr>
                   <tr>
                     <td style={{ border: '1px solid #000000', textAlign: 'center', fontWeight: 'bold', padding: '3px 2px' }}>7</td>
