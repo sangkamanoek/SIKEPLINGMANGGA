@@ -1147,6 +1147,8 @@ export default function App() {
           <JadwalPoskoView
             currentUser={activeAccount}
             onShowToast={showToast}
+            reports={reports}
+            kunjunganList={kunjunganList}
           />
         )}
 

@@ -37,6 +37,10 @@ import {
   JenisPosko,
   StatusPosko,
   KeplingPetugasPosko,
+  LaporanHarianItem,
+  AbsensiApelHarian,
+  AbsensiAgendaKepling,
+  TargetsCapaianMap,
 } from '../types';
 import { KEPLING_DATA_RESMI } from '../data/keplingList';
 import {
@@ -52,11 +56,30 @@ import {
 import { fileToCompressedBase64 } from '../utils/imageCompressor';
 import { KopSuratResmi } from './KopSuratResmi';
 import { printOfficialDocument, downloadPdfDocument } from '../utils/printHelper';
-import { formatHariTanggalIndonesia, formatTanggalSingkatIndonesia } from '../lib/absensiAgendaService';
+import {
+  formatHariTanggalIndonesia,
+  formatTanggalSingkatIndonesia,
+  getLocalAbsensiAgendaList,
+  fetchAbsensiAgendaFromFirestore,
+} from '../lib/absensiAgendaService';
+import {
+  getLocalAbsensiApelList,
+  fetchAbsensiApelFromFirestore,
+} from '../lib/absensiApelService';
+import { fetchTargetsCapaian } from '../lib/targetsApi';
+import { getReportsFromIndexedDB } from '../lib/indexedDbStorage';
+import { getLocalKunjunganList, KunjunganWargaData } from '../lib/kunjunganService';
+import {
+  computeRekomendasiLoketAwalBulan,
+  getPreviousYearMonth,
+} from '../lib/loketRekomendasiService';
+import { ModalSaranPetugasLoket } from './ModalSaranPetugasLoket';
 
 interface JadwalPoskoViewProps {
   currentUser: UserAccount;
   onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  reports?: LaporanHarianItem[];
+  kunjunganList?: KunjunganWargaData[];
 }
 
 const formatDeviceClock = (d: Date = new Date()): string => {
@@ -82,6 +105,8 @@ const formatDeviceDateShort = (d: Date = new Date()): string => {
 export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
   currentUser,
   onShowToast,
+  reports,
+  kunjunganList,
 }) => {
   const isSuperAdmin = currentUser?.role === 'super_admin';
   const isKasiTrantib =
@@ -144,8 +169,108 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
   // Modal Preview Image Zoom
   const [zoomedImage, setZoomedImage] = useState<{ url: string; title: string } | null>(null);
 
+  // Saran Petugas Loket Awal Bulan (berdasarkan Evaluasi Bulan Sebelumnya)
+  const [isSaranLoketOpen, setIsSaranLoketOpen] = useState(false);
+  const [evalYearMonth, setEvalYearMonth] = useState<string>(() => getPreviousYearMonth());
+  const [evalApelList, setEvalApelList] = useState<AbsensiApelHarian[]>(() => getLocalAbsensiApelList());
+  const [evalAgendaList, setEvalAgendaList] = useState<AbsensiAgendaKepling[]>(() =>
+    getLocalAbsensiAgendaList()
+  );
+  const [evalTargetsMap, setEvalTargetsMap] = useState<TargetsCapaianMap | undefined>(undefined);
+  const [evalIdbReports, setEvalIdbReports] = useState<LaporanHarianItem[]>([]);
+  const [isLoadingEvalData, setIsLoadingEvalData] = useState(false);
+
   const notify = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
     if (onShowToast) onShowToast(msg, type);
+  };
+
+  const handleRefreshEvalData = useCallback(async () => {
+    setIsLoadingEvalData(true);
+    try {
+      const [apel, agenda, targets, idbReps] = await Promise.all([
+        fetchAbsensiApelFromFirestore().catch(() => getLocalAbsensiApelList()),
+        fetchAbsensiAgendaFromFirestore().catch(() => getLocalAbsensiAgendaList()),
+        fetchTargetsCapaian().catch(() => undefined),
+        reports && reports.length > 0
+          ? Promise.resolve([])
+          : getReportsFromIndexedDB().catch(() => []),
+      ]);
+      setEvalApelList(apel);
+      setEvalAgendaList(agenda);
+      if (targets) setEvalTargetsMap(targets);
+      if (Array.isArray(idbReps) && idbReps.length > 0) setEvalIdbReports(idbReps);
+    } finally {
+      setIsLoadingEvalData(false);
+    }
+  }, [reports]);
+
+  useEffect(() => {
+    if (!canManagePosko) return;
+    if (isSaranLoketOpen || (isModalOpen && formJenis === 'piket_loket_pelayanan')) {
+      handleRefreshEvalData();
+    }
+  }, [canManagePosko, isSaranLoketOpen, isModalOpen, formJenis, handleRefreshEvalData]);
+
+  const rekomendasiLoket = useMemo(() => {
+    const effectiveReports =
+      reports && reports.length > 0
+        ? reports
+        : evalIdbReports.length > 0
+        ? evalIdbReports
+        : undefined;
+    const effectiveKunjungan =
+      kunjunganList && kunjunganList.length > 0 ? kunjunganList : getLocalKunjunganList();
+
+    return computeRekomendasiLoketAwalBulan({
+      evalYearMonth,
+      poskoList,
+      reports: effectiveReports,
+      absensiApelList: evalApelList,
+      absensiAgendaList: evalAgendaList,
+      kunjunganList: effectiveKunjungan,
+      targetsMap: evalTargetsMap,
+    });
+  }, [
+    evalYearMonth,
+    poskoList,
+    reports,
+    evalIdbReports,
+    kunjunganList,
+    evalApelList,
+    evalAgendaList,
+    evalTargetsMap,
+  ]);
+
+  const evaluasiByKeplingId = useMemo(() => {
+    const map = new Map<string, (typeof rekomendasiLoket.evaluasiSemuaKepling)[number]>();
+    rekomendasiLoket.evaluasiSemuaKepling.forEach((item) => {
+      map.set(item.keplingId, item);
+    });
+    return map;
+  }, [rekomendasiLoket.evaluasiSemuaKepling]);
+
+  const handleApplySaranToJadwal = (payload: {
+    keplingIds: string[];
+    namaPosko: string;
+    tanggal: string;
+    arahanTugas: string;
+  }) => {
+    setIsSaranLoketOpen(false);
+    setEditingItem(null);
+    setFormJenis('piket_loket_pelayanan');
+    setFormNama(payload.namaPosko);
+    setFormTanggal(payload.tanggal);
+    setFormWaktu('Pukul 08.00 WIB - 16.00 WIB');
+    setFormLokasi('Loket Pelayanan Kantor Lurah Mangga');
+    setFormArahan(payload.arahanTugas);
+    setFormPenanggungJawab('Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)');
+    setFormStatus('TERJADWAL');
+    setSelectedKeplingIds(payload.keplingIds);
+    setIsModalOpen(true);
+    notify(
+      `Saran ${payload.keplingIds.length} petugas loket dari evaluasi ${rekomendasiLoket.evalBulanLabel} diterapkan ke form jadwal!`,
+      'success'
+    );
   };
 
   // Subscribe to real-time updates
@@ -261,6 +386,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
       setFormPenanggungJawab('Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)');
     }
 
+    setFormTanggal(today);
     setFormStatus('TERJADWAL');
     setSelectedKeplingIds([]);
 
@@ -856,6 +982,15 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                 </button>
                 <button
                   type="button"
+                  onClick={() => setIsSaranLoketOpen(true)}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black text-xs transition-all shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
+                  title="Saran petugas setiap loket awal bulan berdasarkan evaluasi bulan sebelumnya"
+                >
+                  <Sparkles className="w-4 h-4 shrink-0" />
+                  <span>Saran Petugas Loket</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleOpenAddModal('kegiatan_khusus')}
                   className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs transition-all shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
                 >
@@ -1056,6 +1191,55 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* BANNER RINGKAS SARAN PETUGAS LOKET AWAL BULAN */}
+      {canManagePosko && (filterJenis === 'ALL' || filterJenis === 'piket_loket_pelayanan') && (
+        <div className="bg-gradient-to-r from-indigo-50 via-white to-amber-50/70 rounded-2xl border border-indigo-200 p-4 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="space-y-1.5 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wide">
+                <Sparkles className="w-3 h-3 text-amber-300" />
+                Saran Petugas Loket Awal Bulan {rekomendasiLoket.targetBulanLabel}
+              </span>
+              <span className="text-[11px] font-bold text-slate-600">
+                Basis Evaluasi: <strong>{rekomendasiLoket.evalBulanLabel}</strong> ({rekomendasiLoket.totalApelDaysRecorded} hari apel, {rekomendasiLoket.totalReportsLastMonth} laporan)
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-800">
+              {rekomendasiLoket.loketAssignments.map((slot) => {
+                const lead = slot.petugasUtama[0];
+                return (
+                  <div
+                    key={slot.kodeLoket}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-indigo-200/80 shadow-2xs"
+                  >
+                    <span className="text-[10px] font-black text-indigo-700">{slot.kodeLoket}:</span>
+                    <span className="font-bold text-slate-900">
+                      {lead ? `${lead.namaKepling} (Lk.${lead.nomorLingkungan})` : '-'}
+                    </span>
+                    {lead && (
+                      <span className="text-[10px] font-black text-emerald-700">
+                        • {lead.skorKesiapanLoket}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsSaranLoketOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-sm cursor-pointer transition-colors inline-flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>Lihat Evaluasi &amp; Saran Lengkap</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* LIST KARTU POSKO */}
       {filteredList.length === 0 ? (
@@ -1845,8 +2029,54 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                 />
               </div>
 
-              {/* Pemilihan Kepling Bertugas (Pilih Manual) */}
+              {/* Pemilihan Kepling Bertugas (Pilih Manual / Terapkan Saran Evaluasi) */}
               <div className="space-y-2 pt-2 border-t border-slate-200">
+                {formJenis === 'piket_loket_pelayanan' && (
+                  <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="text-[11px] text-indigo-950">
+                      <span className="font-black inline-flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                        Saran Awal Bulan {rekomendasiLoket.targetBulanLabel}:
+                      </span>{' '}
+                      <span className="text-indigo-800">
+                        Berdasarkan evaluasi disiplin Apel &amp; kinerja {rekomendasiLoket.evalBulanLabel}.
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const utamaIds = rekomendasiLoket.loketAssignments
+                            .flatMap((s) => s.petugasUtama)
+                            .map((k) => k.keplingId);
+                          setSelectedKeplingIds(Array.from(new Set(utamaIds)));
+                          notify('3 Petugas Utama terbaik bulan lalu terpilih!', 'success');
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black cursor-pointer"
+                      >
+                        Terapkan 3 Utama
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedKeplingIds(rekomendasiLoket.suggestedCombinedKeplingIds);
+                          notify('6 Petugas (Utama + Pendamping Rotasi) terpilih!', 'success');
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-100 text-indigo-800 border border-indigo-300 text-[10px] font-black cursor-pointer"
+                      >
+                        Terapkan 6 (Utama+Rotasi)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsSaranLoketOpen(true)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[10px] font-black cursor-pointer"
+                      >
+                        Detail Evaluasi
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <label className="text-[11px] font-black text-slate-800 uppercase tracking-wide">
                     Tentukan Kepala Lingkungan yang Bertugas ({selectedKeplingIds.length} Terpilih):
@@ -1877,26 +2107,54 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                   {KEPLING_DATA_RESMI.map((k) => {
                     const id = `kepling_${k.nomor}`;
                     const checked = selectedKeplingIds.includes(id);
+                    const evalInfo =
+                      formJenis === 'piket_loket_pelayanan' ? evaluasiByKeplingId.get(id) : undefined;
 
                     return (
                       <label
                         key={id}
-                        className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                        className={`flex items-center justify-between gap-2 p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
                           checked
                             ? 'bg-amber-100/70 border-amber-300 text-slate-900 font-bold'
                             : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                         }`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => handleToggleKeplingId(id)}
-                          className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                        />
-                        <span className="w-6 h-6 rounded-md bg-slate-200 text-slate-800 font-black text-[10px] flex items-center justify-center shrink-0">
-                          {k.nomor}
-                        </span>
-                        <span className="truncate">{k.namaKepling}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => handleToggleKeplingId(id)}
+                            className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 shrink-0"
+                          />
+                          <span className="w-6 h-6 rounded-md bg-slate-200 text-slate-800 font-black text-[10px] flex items-center justify-center shrink-0">
+                            {k.nomor}
+                          </span>
+                          <span className="truncate">{k.namaKepling}</span>
+                        </div>
+                        {evalInfo && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            {evalInfo.apelAlpa > 0 && (
+                              <span
+                                title={`${evalInfo.apelAlpa}x Alpa Apel Pagi bulan lalu`}
+                                className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[9px] font-black"
+                              >
+                                {evalInfo.apelAlpa}A
+                              </span>
+                            )}
+                            <span
+                              title={`Skor Kesiapan Loket: ${evalInfo.skorKesiapanLoket} • Piket bulan lalu: ${evalInfo.loketAssignedCount}x`}
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-black ${
+                                evalInfo.kategori === 'PRIORITAS_UTAMA'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : evalInfo.kategori === 'ROTASI_PEMERATAAN'
+                                  ? 'bg-indigo-100 text-indigo-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {evalInfo.skorKesiapanLoket}
+                            </span>
+                          </div>
+                        )}
                       </label>
                     );
                   })}
@@ -2541,6 +2799,18 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL SARAN PETUGAS LOKET AWAL BULAN */}
+      <ModalSaranPetugasLoket
+        isOpen={isSaranLoketOpen}
+        onClose={() => setIsSaranLoketOpen(false)}
+        evalYearMonth={evalYearMonth}
+        onChangeEvalYearMonth={setEvalYearMonth}
+        rekomendasi={rekomendasiLoket}
+        isLoadingData={isLoadingEvalData}
+        onRefreshData={handleRefreshEvalData}
+        onApplyToJadwalLoket={handleApplySaranToJadwal}
+      />
 
       {/* MODAL ZOOM IMAGE PREVIEW */}
       {zoomedImage && (
