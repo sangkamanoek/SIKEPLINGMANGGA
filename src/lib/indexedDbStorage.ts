@@ -298,8 +298,33 @@ export async function saveVisitsToIndexedDB(data: any[]): Promise<boolean> {
       const tx = db.transaction(STORE_VISITS, 'readwrite');
       const store = tx.objectStore(STORE_VISITS);
 
-      const hasValidStr = (v: unknown): boolean =>
-        typeof v === 'string' && v.trim().length > 20;
+      const extractVisitPhoto = (obj: any): string => {
+        if (!obj) return '';
+        const pickStr = (val: unknown): string => {
+          if (typeof val === 'string') {
+            const t = val.trim();
+            return t.length > 20 && t !== '[object Object]' ? t : '';
+          }
+          if (Array.isArray(val)) {
+            for (const el of val) {
+              const found = pickStr(el);
+              if (found) return found;
+            }
+          } else if (val && typeof val === 'object') {
+            const anyObj = val as any;
+            return pickStr(anyObj.url || anyObj.src || anyObj.link || anyObj.fotoUrl);
+          }
+          return '';
+        };
+        return (
+          pickStr(obj.fotoUrl) ||
+          pickStr(obj.fotoDokumentasi) ||
+          pickStr(obj.foto) ||
+          pickStr(obj.photoUrl) ||
+          pickStr(obj.fotoRumah) ||
+          ''
+        );
+      };
 
       const incomingIds = new Set(data.filter((x) => x && x.id).map((x) => String(x.id)));
       const keysReq = store.getAllKeys();
@@ -314,20 +339,18 @@ export async function saveVisitsToIndexedDB(data: any[]): Promise<boolean> {
 
         data.forEach((item) => {
           if (!item || !item.id) return;
-          const missingPhoto =
-            !hasValidStr(item.fotoUrl) && !hasValidStr(item.fotoDokumentasi);
+          const itemPhoto = extractVisitPhoto(item);
 
-          if (missingPhoto) {
+          if (!itemPhoto) {
             const getReq = store.get(item.id);
             getReq.onsuccess = () => {
               const prev = getReq.result as any;
-              if (prev && (hasValidStr(prev.fotoUrl) || hasValidStr(prev.fotoDokumentasi))) {
+              const prevPhoto = extractVisitPhoto(prev);
+              if (prev && prevPhoto) {
                 store.put({
                   ...item,
-                  fotoUrl: hasValidStr(item.fotoUrl) ? item.fotoUrl : prev.fotoUrl || '',
-                  fotoDokumentasi: hasValidStr(item.fotoDokumentasi)
-                    ? item.fotoDokumentasi
-                    : prev.fotoDokumentasi,
+                  fotoUrl: prevPhoto,
+                  ...(prev.fotoDokumentasi ? { fotoDokumentasi: prev.fotoDokumentasi } : {}),
                 });
               } else {
                 store.put(item);

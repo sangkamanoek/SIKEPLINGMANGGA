@@ -609,10 +609,10 @@ app.post('/api/accounts/restore', (req, res) => {
 app.get('/api/kunjungan', (req, res) => {
   if (req.query.light === 'true') {
     const lightKunjungan = kunjunganCache.map((k) => {
-      const { fotoDokumentasi, fotoRumah, ...rest } = k;
+      const { fotoUrl, fotoDokumentasi, fotoRumah, foto, photoUrl, ...rest } = k;
       return {
         ...rest,
-        hasFoto: Boolean(fotoDokumentasi || fotoRumah),
+        hasFoto: Boolean(fotoUrl || fotoDokumentasi || fotoRumah || foto || photoUrl),
       };
     });
     return res.json({
@@ -642,11 +642,17 @@ app.post('/api/kunjungan', (req, res) => {
       if (!hasStr(incoming.fotoUrl) && hasStr(cached.fotoUrl)) {
         merged.fotoUrl = cached.fotoUrl;
       }
-      if (!hasStr(incoming.fotoDokumentasi) && hasStr(cached.fotoDokumentasi)) {
+      if (!incoming.fotoDokumentasi && cached.fotoDokumentasi) {
         merged.fotoDokumentasi = cached.fotoDokumentasi;
       }
       if (!hasStr(incoming.fotoRumah) && hasStr(cached.fotoRumah)) {
         merged.fotoRumah = cached.fotoRumah;
+      }
+      if (!hasStr(incoming.foto) && hasStr(cached.foto)) {
+        merged.foto = cached.foto;
+      }
+      if (!hasStr(incoming.photoUrl) && hasStr(cached.photoUrl)) {
+        merged.photoUrl = cached.photoUrl;
       }
       return merged;
     };

@@ -35,6 +35,7 @@ import {
   getReportIsoDate,
   getTodayLocalIso,
   getDirectImageUrl,
+  getDriveFallbackImageUrl,
   formatTanggalIndonesia,
 } from '../lib/formatter';
 import { VirtualList } from './VirtualList';
@@ -1381,6 +1382,14 @@ export const RiwayatLaporan: React.FC<RiwayatLaporanProps> = ({
                                 className="w-full h-full object-cover"
                                 loading="lazy"
                                 decoding="async"
+                                onError={(e) => {
+                                  const imgEl = e.currentTarget;
+                                  const nextFallback = getDriveFallbackImageUrl(imgEl.src);
+                                  if (nextFallback && imgEl.src !== nextFallback && imgEl.dataset.retried !== nextFallback) {
+                                    imgEl.dataset.retried = nextFallback;
+                                    imgEl.src = nextFallback;
+                                  }
+                                }}
                               />
                             ) : hasValidUrl ? (
                               <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-[8px] text-slate-600 font-bold p-1 text-center leading-tight">

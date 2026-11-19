@@ -43,6 +43,7 @@ import {
   isReportMatchingKepling,
   extractNomorLingkungan,
   getDirectImageUrl,
+  getDriveFallbackImageUrl,
 } from '../lib/formatter';
 
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
@@ -54,6 +55,7 @@ import {
   subscribeKunjunganWarga,
   isKunjunganOnDate,
   getLocalKunjunganList,
+  getVisitPhotoSrc,
 } from '../lib/kunjunganService';
 
 interface DetailLaporanModalProps {
@@ -235,11 +237,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
 
     // Also include photos from relevant Kunjungan Warga if not already present
     relevantKunjungan.forEach((kunj, kIdx) => {
-      const resolvedUrl =
-        (typeof kunj.fotoUrl === 'string' && kunj.fotoUrl.trim()) ||
-        (typeof kunj.fotoDokumentasi === 'string'
-          ? kunj.fotoDokumentasi.trim()
-          : String((kunj.fotoDokumentasi as any)?.[0] || '').trim());
+      const resolvedUrl = getVisitPhotoSrc(kunj);
       if (resolvedUrl) {
         const alreadyHas = list.some((p) => p.url === resolvedUrl);
         if (!alreadyHas) {
@@ -1251,18 +1249,21 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                               </td>
                               <td className="border border-black text-center py-1 px-1">
                                 {(() => {
-                                  const kunjFoto =
-                                    kunj.fotoUrl ||
-                                    (typeof kunj.fotoDokumentasi === 'string'
-                                      ? kunj.fotoDokumentasi
-                                      : '');
+                                  const kunjFoto = getVisitPhotoSrc(kunj);
                                   return kunjFoto ? (
                                     <div className="w-6 h-6 mx-auto rounded overflow-hidden border border-slate-300">
                                       <img
                                         src={getDirectImageUrl(kunjFoto)}
                                         alt={kunj.namaWarga}
-                                        crossOrigin="anonymous"
                                         className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          const imgEl = e.currentTarget;
+                                          const nextFallback = getDriveFallbackImageUrl(imgEl.src);
+                                          if (nextFallback && imgEl.src !== nextFallback && imgEl.dataset.retried !== nextFallback) {
+                                            imgEl.dataset.retried = nextFallback;
+                                            imgEl.src = nextFallback;
+                                          }
+                                        }}
                                       />
                                     </div>
                                   ) : (
@@ -1332,8 +1333,15 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                         <img
                                           src={getDirectImageUrl(foto.url)}
                                           alt={getProperFotoLabel(foto, idx)}
-                                          crossOrigin="anonymous"
                                           className="w-full h-full object-cover object-center"
+                                          onError={(e) => {
+                                            const imgEl = e.currentTarget;
+                                            const nextFallback = getDriveFallbackImageUrl(imgEl.src);
+                                            if (nextFallback && imgEl.src !== nextFallback && imgEl.dataset.retried !== nextFallback) {
+                                              imgEl.dataset.retried = nextFallback;
+                                              imgEl.src = nextFallback;
+                                            }
+                                          }}
                                         />
                                       ) : (
                                         <div className="flex flex-col items-center justify-center text-slate-400 text-center px-2">
@@ -1423,8 +1431,15 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                     <img
                                       src={getDirectImageUrl(foto.url)}
                                       alt={getProperFotoLabel(foto, idx)}
-                                      crossOrigin="anonymous"
                                       className="w-full h-full object-cover object-center"
+                                      onError={(e) => {
+                                        const imgEl = e.currentTarget;
+                                        const nextFallback = getDriveFallbackImageUrl(imgEl.src);
+                                        if (nextFallback && imgEl.src !== nextFallback && imgEl.dataset.retried !== nextFallback) {
+                                          imgEl.dataset.retried = nextFallback;
+                                          imgEl.src = nextFallback;
+                                        }
+                                      }}
                                     />
                                   ) : (
                                     <div className="flex flex-col items-center justify-center text-slate-400 text-center px-3">
@@ -1539,7 +1554,16 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                   alt={foto.name}
                                   className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700"
                                   loading="lazy"
-                                  onError={() => markPhotoFailed(fotoKey)}
+                                  onError={(e) => {
+                                    const imgEl = e.currentTarget;
+                                    const nextFallback = getDriveFallbackImageUrl(imgEl.src);
+                                    if (nextFallback && imgEl.src !== nextFallback && imgEl.dataset.retried !== nextFallback) {
+                                      imgEl.dataset.retried = nextFallback;
+                                      imgEl.src = nextFallback;
+                                      return;
+                                    }
+                                    markPhotoFailed(fotoKey);
+                                  }}
                                 />
 
                                 {/* Hover Overlay with Action Buttons */}
@@ -2511,11 +2535,7 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                           </td>
                           <td className="py-1 px-2 text-center">
                             {(() => {
-                              const kunjFoto =
-                                kunj.fotoUrl ||
-                                (typeof kunj.fotoDokumentasi === 'string'
-                                  ? kunj.fotoDokumentasi
-                                  : '');
+                              const kunjFoto = getVisitPhotoSrc(kunj);
                               return kunjFoto ? (
                                 <button
                                   type="button"
@@ -2526,8 +2546,15 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                   <img
                                     src={getDirectImageUrl(kunjFoto)}
                                     alt={kunj.namaWarga}
-                                    crossOrigin="anonymous"
                                     className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const imgEl = e.currentTarget;
+                                      const nextFallback = getDriveFallbackImageUrl(imgEl.src);
+                                      if (nextFallback && imgEl.src !== nextFallback && imgEl.dataset.retried !== nextFallback) {
+                                        imgEl.dataset.retried = nextFallback;
+                                        imgEl.src = nextFallback;
+                                      }
+                                    }}
                                   />
                                 </button>
                               ) : (
@@ -3157,7 +3184,6 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                                   <img
                                     src={getDirectImageUrl(foto.url)}
                                     alt={getProperFotoLabel(foto, idx)}
-                                    crossOrigin="anonymous"
                                     style={{
                                       maxWidth: '100%',
                                       maxHeight: '106px',
@@ -3364,7 +3390,6 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                               <img
                                 src={getDirectImageUrl(foto.url)}
                                 alt={getProperFotoLabel(foto, idx)}
-                                crossOrigin="anonymous"
                                 style={{
                                   width: '100%',
                                   height: '100%',
@@ -3567,6 +3592,14 @@ export const DetailLaporanModal: React.FC<DetailLaporanModalProps> = ({
                       transition: 'transform 0.15s ease-out',
                     }}
                     className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
+                    onError={(e) => {
+                      const imgEl = e.currentTarget;
+                      const nextFallback = getDriveFallbackImageUrl(imgEl.src);
+                      if (nextFallback && imgEl.src !== nextFallback && imgEl.dataset.retried !== nextFallback) {
+                        imgEl.dataset.retried = nextFallback;
+                        imgEl.src = nextFallback;
+                      }
+                    }}
                   />
                 ) : (
                   <div className="flex flex-col items-center justify-center text-slate-300 p-6 text-center">

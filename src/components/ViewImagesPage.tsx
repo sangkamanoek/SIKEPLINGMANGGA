@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchAllReports } from '../lib/reportsApi';
 import { LaporanHarianItem } from '../types';
 import { Download, ArrowLeft } from 'lucide-react';
-import { getDirectImageUrl } from '../lib/formatter';
+import { getDirectImageUrl, getDriveFallbackImageUrl } from '../lib/formatter';
 
 export default function ViewImagesPage({ reportId }: { reportId: string }) {
   const [report, setReport] = useState<LaporanHarianItem | null>(null);
@@ -114,6 +114,14 @@ export default function ViewImagesPage({ reportId }: { reportId: string }) {
                       alt={foto.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       loading="lazy"
+                      onError={(e) => {
+                        const imgEl = e.currentTarget;
+                        const nextFallback = getDriveFallbackImageUrl(imgEl.src);
+                        if (nextFallback && imgEl.src !== nextFallback && imgEl.dataset.retried !== nextFallback) {
+                          imgEl.dataset.retried = nextFallback;
+                          imgEl.src = nextFallback;
+                        }
+                      }}
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
                       <button

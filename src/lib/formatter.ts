@@ -283,32 +283,46 @@ export const isKunjunganOnDate = (item: KunjunganWargaData | any, dateIsoOrDispl
   return false;
 };
 
+export const extractGoogleDriveFileId = (url?: string): string => {
+  if (!url || typeof url !== 'string') return '';
+  if (!url.includes('drive.google.com') && !url.includes('googleusercontent.com')) return '';
+  const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (idMatch?.[1]) return idMatch[1];
+  const paramMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (paramMatch?.[1]) return paramMatch[1];
+  return '';
+};
+
 export const getDirectImageUrl = (url?: string): string => {
   if (!url) return '';
   if (typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed || trimmed === '[object Object]') return '';
 
-  // Google Drive logic
-  if (url.includes('drive.google.com')) {
-    let fileId = '';
-    const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if (idMatch) {
-      fileId = idMatch[1];
-    } else {
-      const paramMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      if (paramMatch) {
-        fileId = paramMatch[1];
-      }
+  // Google Drive / lh3 logic: strip /u/0/ so multi-account & anonymous viewers never get 403
+  const fileId = extractGoogleDriveFileId(trimmed);
+  if (fileId) {
+    if (trimmed.includes('drive.google.com/thumbnail')) {
+      return trimmed;
     }
-    if (fileId) {
-      // Direct link via lh3 (preferred for speed) or export=view
-      return `https://lh3.googleusercontent.com/u/0/d/${fileId}`;
-    }
+    return `https://lh3.googleusercontent.com/d/${fileId}=w1200`;
   }
 
-  // Handle some other common cases if needed
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
   }
 
-  return url;
+  return trimmed;
+};
+
+export const getDriveFallbackImageUrl = (currentUrl?: string): string => {
+  const fileId = extractGoogleDriveFileId(currentUrl);
+  if (!fileId) return '';
+  if (currentUrl && currentUrl.includes('lh3.googleusercontent.com')) {
+    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200`;
+  }
+  if (currentUrl && currentUrl.includes('drive.google.com/thumbnail')) {
+    return `https://drive.google.com/uc?export=view&id=${fileId}`;
+  }
+  return '';
 };

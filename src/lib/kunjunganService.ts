@@ -12,7 +12,8 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { cleanFirestoreData } from './firestoreService';
-import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
+import { resilientSetDoc, resilientDeleteDoc, isDocQueuedForWrite } from './firestoreWriteQueue';
+import { ensureCompactDataUrl } from './imageCompressor';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
 import {
   getVisitsFromIndexedDB,
@@ -66,39 +67,81 @@ export interface KunjunganWargaData {
 
 let memoryKunjungan: KunjunganWargaData[] = [];
 let deletedKunjunganIdsCache: string[] = safeGetLocalStorage<string[]>(KUNJUNGAN_DELETED_KEY, []);
+const visitPhotoCache = new Map<string, string>();
+const recentlySavedVisitIds = new Set<string>();
 
 export const hasValidVisitPhoto = (val?: unknown): boolean =>
-  typeof val === 'string' && val.trim().length > 20;
+  typeof val === 'string' && val.trim().length > 20 && val.trim() !== '[object Object]';
 
-export const getVisitPhotoSrc = (v?: Partial<KunjunganWargaData> | null): string => {
+const extractPhotoString = (val: unknown): string => {
+  if (hasValidVisitPhoto(val)) return String(val).trim();
+  if (Array.isArray(val)) {
+    for (const el of val) {
+      const found = extractPhotoString(el);
+      if (found) return found;
+    }
+  } else if (val && typeof val === 'object') {
+    const obj = val as Record<string, unknown>;
+    return (
+      extractPhotoString(obj.url) ||
+      extractPhotoString(obj.src) ||
+      extractPhotoString(obj.link) ||
+      extractPhotoString(obj.fotoUrl) ||
+      ''
+    );
+  }
+  return '';
+};
+
+export const getVisitPhotoSrc = (v?: Partial<KunjunganWargaData> | any | null): string => {
   if (!v) return '';
   const candidates = [
     v.fotoUrl,
-    typeof v.fotoDokumentasi === 'string' ? v.fotoDokumentasi : '',
-    (v as any).foto,
-    (v as any).photoUrl,
+    v.fotoDokumentasi,
+    v.foto,
+    v.photoUrl,
+    v.fotoRumah,
+    v.dokumentasiFoto,
   ];
   for (const c of candidates) {
-    if (hasValidVisitPhoto(c)) return String(c).trim();
+    const found = extractPhotoString(c);
+    if (found) return found;
   }
   return '';
+};
+
+const cacheVisitPhotosFromList = (list?: KunjunganWargaData[]): void => {
+  if (!Array.isArray(list)) return;
+  for (const item of list) {
+    if (!item || !item.id) continue;
+    const src = getVisitPhotoSrc(item);
+    if (src) {
+      visitPhotoCache.set(item.id, src);
+    }
+  }
 };
 
 export const mergeVisitWithPreservedPhoto = (
   incoming: KunjunganWargaData,
   existing?: KunjunganWargaData | null
 ): KunjunganWargaData => {
-  if (!existing) return incoming;
   const incPhoto = getVisitPhotoSrc(incoming);
-  const exPhoto = getVisitPhotoSrc(existing);
   if (incPhoto) {
+    if (incoming.id) visitPhotoCache.set(incoming.id, incPhoto);
+    if (!hasValidVisitPhoto(incoming.fotoUrl)) {
+      return { ...incoming, fotoUrl: incPhoto };
+    }
     return incoming;
   }
-  if (exPhoto) {
+  const exPhoto = existing ? getVisitPhotoSrc(existing) : '';
+  const cachedPhoto = incoming.id ? visitPhotoCache.get(incoming.id) || '' : '';
+  const resolvedPhoto = exPhoto || cachedPhoto;
+  if (resolvedPhoto) {
+    if (incoming.id) visitPhotoCache.set(incoming.id, resolvedPhoto);
     return {
       ...incoming,
-      fotoUrl: hasValidVisitPhoto(existing.fotoUrl) ? existing.fotoUrl : exPhoto,
-      ...(hasValidVisitPhoto(existing.fotoDokumentasi)
+      fotoUrl: resolvedPhoto,
+      ...(existing && hasValidVisitPhoto(existing.fotoDokumentasi)
         ? { fotoDokumentasi: existing.fotoDokumentasi }
         : {}),
     };
@@ -110,6 +153,7 @@ export const mergeVisitListPreservingPhotos = (
   incomingList: KunjunganWargaData[],
   fallbackList?: KunjunganWargaData[]
 ): KunjunganWargaData[] => {
+  cacheVisitPhotosFromList(fallbackList);
   if (!Array.isArray(incomingList)) return Array.isArray(fallbackList) ? fallbackList : [];
   const fallbackMap = new Map<string, KunjunganWargaData>();
   if (Array.isArray(fallbackList)) {
@@ -271,8 +315,8 @@ const computeKunjunganDailyReport = (
   const fotos: FotoDokumentasi[] = [];
   let totalFotoUrlChars = 0;
   let totalVisitsWithPhoto = 0;
-  const MAX_SYNCED_PHOTOS = 4;
-  const MAX_TOTAL_PHOTO_CHARS = 360_000;
+  const MAX_SYNCED_PHOTOS = 12;
+  const MAX_TOTAL_PHOTO_CHARS = 620_000;
 
   let earliestCreatedAt = dayVisits[0]?.createdAt || new Date().toISOString();
 
@@ -291,7 +335,7 @@ const computeKunjunganDailyReport = (
     }
 
     // Dokumentasi Foto Kegiatan Kunjungan Warga (dibatasi agar ukuran dokumen Firestore aman < 1 MB)
-    const directFoto = getVisitPhotoSrc(v);
+    const directFoto = getVisitPhotoSrc(v) || (v.id ? visitPhotoCache.get(v.id) || '' : '');
     const fotoId = `foto_kj_${v.id || idx}`;
     const existingMatchedFoto =
       !directFoto && Array.isArray(existingReport?.dokumentasiFoto)
@@ -428,7 +472,7 @@ export const syncKunjunganToLaporanHarian = async (
       isKunjunganMatchingKepling(v, resolved.matchAccount)
   );
 
-  // Hydrate missing visit photos from IndexedDB so earlier visits on the same day keep their photos
+  // Hydrate missing visit photos from IndexedDB & API cache so earlier visits on the same day keep their photos
   if (dayVisits.some((v) => !getVisitPhotoSrc(v))) {
     try {
       const idbVisits = await getVisitsFromIndexedDB();
@@ -436,6 +480,31 @@ export const syncKunjunganToLaporanHarian = async (
         dayVisits = mergeVisitListPreservingPhotos(dayVisits, idbVisits);
       }
     } catch {}
+    if (dayVisits.some((v) => !getVisitPhotoSrc(v))) {
+      try {
+        const res = await fetch('/api/kunjungan');
+        const json = await res.json();
+        if (json?.success && Array.isArray(json.data)) {
+          dayVisits = mergeVisitListPreservingPhotos(dayVisits, json.data);
+        }
+      } catch {}
+    }
+  }
+
+  // Ensure photos included in daily report lap_kj_* stay compact so up to 12 photos fit safely <1MB in Firestore
+  if (dayVisits.length > 0) {
+    dayVisits = await Promise.all(
+      dayVisits.map(async (v) => {
+        const src = getVisitPhotoSrc(v);
+        if (src.startsWith('data:image/') && src.length > 120_000) {
+          const compact = await ensureCompactDataUrl(src, 520, 0.36).catch(() => src);
+          if (compact && compact.length < src.length) {
+            return { ...v, fotoUrl: compact };
+          }
+        }
+        return v;
+      })
+    );
   }
 
   const localReports = safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_STORAGE_KEY, []);
@@ -558,7 +627,7 @@ export const syncAllKunjunganToLaporanHarian = async (
   isSyncingAllKunjungan = true;
 
   try {
-    // Hydrate any stripped visit photos from memoryKunjungan & IndexedDB before building daily reports
+    // Hydrate any stripped visit photos from memoryKunjungan, IndexedDB, & /api/kunjungan before building daily reports
     let hydratedVisits = mergeVisitListPreservingPhotos(visits, memoryKunjungan);
     if (hydratedVisits.some((v) => v && v.id && !getVisitPhotoSrc(v))) {
       try {
@@ -567,7 +636,29 @@ export const syncAllKunjunganToLaporanHarian = async (
           hydratedVisits = mergeVisitListPreservingPhotos(hydratedVisits, idbVisits);
         }
       } catch {}
+      if (hydratedVisits.some((v) => v && v.id && !getVisitPhotoSrc(v))) {
+        try {
+          const res = await fetch('/api/kunjungan');
+          const json = await res.json();
+          if (json?.success && Array.isArray(json.data)) {
+            hydratedVisits = mergeVisitListPreservingPhotos(hydratedVisits, json.data);
+          }
+        } catch {}
+      }
     }
+
+    hydratedVisits = await Promise.all(
+      hydratedVisits.map(async (v) => {
+        const src = getVisitPhotoSrc(v);
+        if (src.startsWith('data:image/') && src.length > 120_000) {
+          const compact = await ensureCompactDataUrl(src, 520, 0.36).catch(() => src);
+          if (compact && compact.length < src.length) {
+            return { ...v, fotoUrl: compact };
+          }
+        }
+        return v;
+      })
+    );
 
     const groups = new Map<
       string,
@@ -709,17 +800,40 @@ export const syncAllKunjunganToLaporanHarian = async (
 };
 
 export const saveKunjunganWargaToFirestore = async (item: KunjunganWargaData): Promise<KunjunganWargaData> => {
+  const visitId = item.id || `visit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const currentBefore = getLocalKunjunganList();
+  const previousVisit = currentBefore.find((p) => p.id === visitId);
+
+  let rawPhoto =
+    getVisitPhotoSrc(item) ||
+    getVisitPhotoSrc(previousVisit) ||
+    visitPhotoCache.get(visitId) ||
+    '';
+
+  // Ensure base64 photo stays safely under Firestore 1MB document limit
+  if (rawPhoto.startsWith('data:image/') && rawPhoto.length > 220_000) {
+    rawPhoto = await ensureCompactDataUrl(rawPhoto, 760, 0.54).catch(() => rawPhoto);
+    if (rawPhoto.length > 480_000) {
+      rawPhoto = await ensureCompactDataUrl(rawPhoto, 560, 0.36).catch(() => rawPhoto);
+    }
+  }
+
   const dataToSave: KunjunganWargaData = {
     ...item,
-    id: item.id || `visit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    createdAt: item.createdAt || new Date().toISOString(),
+    id: visitId,
+    ...(rawPhoto ? { fotoUrl: rawPhoto } : {}),
+    createdAt: item.createdAt || previousVisit?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+
+  if (rawPhoto) {
+    visitPhotoCache.set(visitId, rawPhoto);
+  }
+  recentlySavedVisitIds.add(visitId);
 
   // 1. Update local state & IndexedDB immediately
   const current = getLocalKunjunganList();
   const idx = current.findIndex((p) => p.id === dataToSave.id);
-  const previousVisit = idx >= 0 ? current[idx] : undefined;
   let updatedList = [...current];
   if (idx >= 0) {
     updatedList[idx] = dataToSave;
@@ -729,7 +843,7 @@ export const saveKunjunganWargaToFirestore = async (item: KunjunganWargaData): P
   setLocalKunjunganList(updatedList);
   saveVisitsToIndexedDB(updatedList).catch(() => {});
 
-  // 2. Run Laporan Harian auto-sync (dispatches instant 0ms UI update first), Firestore visit save, & /api/kunjungan concurrently
+  // 2. Run Laporan Harian auto-sync, Firestore visit save, & /api/kunjungan concurrently
   const syncTasks: Promise<any>[] = [
     resilientSetDoc(KUNJUNGAN_COLLECTION, dataToSave.id, cleanFirestoreData(dataToSave), { merge: true }).catch(
       () => {}
@@ -794,14 +908,26 @@ export const fetchKunjunganFromFirestore = async (): Promise<KunjunganWargaData[
     }
     const deletedSet = new Set(getDeletedKunjunganIds());
     const remoteItems: KunjunganWargaData[] = [];
+    const remoteIdSet = new Set<string>();
     snap.forEach((docSnap) => {
       const dat = docSnap.data() as KunjunganWargaData;
       const docId = docSnap.id || dat?.id;
       if (dat && docId && !deletedSet.has(docId)) {
         remoteItems.push({ ...dat, id: docId });
+        remoteIdSet.add(docId);
       }
     });
-    const sorted = sortKunjunganDesc(mergeVisitListPreservingPhotos(remoteItems, memoryKunjungan));
+    const fallbackPool = [...local, ...memoryKunjungan];
+    const pendingExtras = fallbackPool.filter(
+      (v) =>
+        v &&
+        v.id &&
+        !deletedSet.has(v.id) &&
+        !remoteIdSet.has(v.id) &&
+        (isDocQueuedForWrite(KUNJUNGAN_COLLECTION, v.id) || recentlySavedVisitIds.has(v.id))
+    );
+    const merged = mergeVisitListPreservingPhotos([...pendingExtras, ...remoteItems], fallbackPool);
+    const sorted = sortKunjunganDesc(merged);
     if (sorted.length > 0 || !snap.metadata.fromCache) {
       setLocalKunjunganList(sorted);
       saveVisitsToIndexedDB(sorted).catch(() => {});
@@ -820,71 +946,106 @@ export const fetchKunjunganFromFirestore = async (): Promise<KunjunganWargaData[
 export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => void): (() => void) => {
   let isActive = true;
   let hasLiveFirestore = false;
+  const idbMap = new Map<string, KunjunganWargaData>();
+  const serverMap = new Map<string, KunjunganWargaData>();
+  const firestoreMap = new Map<string, KunjunganWargaData>();
+
+  const emitCombined = (persistToIdb: boolean) => {
+    if (!isActive) return;
+    const deletedSet = new Set(getDeletedKunjunganIds());
+    const fallbackPool = [
+      ...memoryKunjungan,
+      ...Array.from(idbMap.values()),
+      ...Array.from(serverMap.values()),
+    ];
+    cacheVisitPhotosFromList(fallbackPool);
+
+    const outMap = new Map<string, KunjunganWargaData>();
+
+    if (hasLiveFirestore) {
+      firestoreMap.forEach((item, id) => {
+        if (!deletedSet.has(id)) outMap.set(id, item);
+      });
+      // Keep locally saved or pending-queue visits even if Firestore snapshot doesn't have them yet
+      fallbackPool.forEach((localItem) => {
+        if (!localItem || !localItem.id || deletedSet.has(localItem.id)) return;
+        if (
+          !outMap.has(localItem.id) &&
+          (isDocQueuedForWrite(KUNJUNGAN_COLLECTION, localItem.id) ||
+            recentlySavedVisitIds.has(localItem.id))
+        ) {
+          outMap.set(localItem.id, localItem);
+        }
+      });
+    } else {
+      // Combine all available sources while waiting for authoritative Firestore snapshot
+      [...serverMap.values(), ...idbMap.values(), ...memoryKunjungan, ...firestoreMap.values()].forEach(
+        (item) => {
+          if (item && item.id && !deletedSet.has(item.id)) {
+            const prev = outMap.get(item.id);
+            outMap.set(item.id, prev ? mergeVisitWithPreservedPhoto(item, prev) : item);
+          }
+        }
+      );
+    }
+
+    const hydrated = mergeVisitListPreservingPhotos(Array.from(outMap.values()), fallbackPool);
+    const sorted = sortKunjunganDesc(hydrated);
+    setLocalKunjunganList(sorted);
+    if (persistToIdb && sorted.length > 0) {
+      saveVisitsToIndexedDB(sorted).catch(() => {});
+    }
+    cb(sorted);
+  };
 
   // 1. Initial local emit (0ms)
   const initialLocal = getLocalKunjunganList();
+  cacheVisitPhotosFromList(initialLocal);
   cb(initialLocal);
 
-  // 2. Fast IndexedDB restore (10ms) — always hydrate missing photos AND missing visits even when lengths match
+  // 2. Fast IndexedDB restore — always hydrate photos & cache into idbMap even if Firestore resolved earlier
   getVisitsFromIndexedDB()
     .then((idb) => {
       if (!isActive || !Array.isArray(idb) || idb.length === 0) return;
       const deletedSet = new Set(getDeletedKunjunganIds());
-      const cleanIdb = idb.filter((x) => x && x.id && !deletedSet.has(x.id));
-      if (cleanIdb.length === 0) return;
-
-      const cur = memoryKunjungan.length > 0 ? memoryKunjungan : initialLocal;
-      const curMap = new Map<string, KunjunganWargaData>();
-      cur.forEach((v) => { if (v && v.id) curMap.set(v.id, v); });
-
-      let didChange = false;
-      cleanIdb.forEach((idbItem) => {
-        const existing = curMap.get(idbItem.id);
-        if (!existing) {
-          if (!hasLiveFirestore) {
-            curMap.set(idbItem.id, idbItem);
-            didChange = true;
+      let addedOrHydrated = false;
+      idb.forEach((x) => {
+        if (x && x.id && !deletedSet.has(x.id)) {
+          idbMap.set(x.id, x);
+          if (getVisitPhotoSrc(x)) {
+            visitPhotoCache.set(x.id, getVisitPhotoSrc(x));
           }
-        } else if (!getVisitPhotoSrc(existing) && getVisitPhotoSrc(idbItem)) {
-          curMap.set(idbItem.id, mergeVisitWithPreservedPhoto(existing, idbItem));
-          didChange = true;
+          addedOrHydrated = true;
         }
       });
-
-      if (didChange) {
-        const merged = sortKunjunganDesc(Array.from(curMap.values()));
-        setLocalKunjunganList(merged);
-        cb(merged);
+      if (addedOrHydrated) {
+        emitCombined(false);
       }
     })
     .catch(() => {});
 
-  // 3. Server API buffer ONLY as cold-start / photo-hydration fallback
+  // 3. Server API buffer as cold-start & photo-hydration source (always populates serverMap even if Firestore fired first)
   fetch('/api/kunjungan')
     .then((res) => res.json())
     .then((resData) => {
       if (!isActive) return;
       if (resData && resData.success && Array.isArray(resData.data) && resData.data.length > 0) {
         const deletedSet = new Set(getDeletedKunjunganIds());
-        const serverItems: KunjunganWargaData[] = resData.data.filter(
-          (x: any) => x && x.id && !deletedSet.has(x.id)
-        );
-        const current = getLocalKunjunganList();
-        if (!hasLiveFirestore && current.length === 0 && serverItems.length > 0) {
-          const sorted = sortKunjunganDesc(serverItems);
-          setLocalKunjunganList(sorted);
-          saveVisitsToIndexedDB(sorted).catch(() => {});
-          cb(sorted);
-        } else if (current.length > 0 && current.some((c) => !getVisitPhotoSrc(c))) {
-          const hydrated = mergeVisitListPreservingPhotos(current, serverItems);
-          const restoredAny = hydrated.some(
-            (h, i) => Boolean(getVisitPhotoSrc(h)) && !getVisitPhotoSrc(current[i])
-          );
-          if (restoredAny) {
-            setLocalKunjunganList(hydrated);
-            saveVisitsToIndexedDB(hydrated).catch(() => {});
-            cb(hydrated);
+        let hasAnyServerPhoto = false;
+        resData.data.forEach((x: any) => {
+          if (x && x.id && !deletedSet.has(x.id)) {
+            serverMap.set(x.id, x);
+            const src = getVisitPhotoSrc(x);
+            if (src) {
+              visitPhotoCache.set(x.id, src);
+              hasAnyServerPhoto = true;
+            }
           }
+        });
+        const current = getLocalKunjunganList();
+        const currentNeedsPhoto = current.some((c) => !getVisitPhotoSrc(c));
+        if ((!hasLiveFirestore && current.length === 0) || (currentNeedsPhoto && hasAnyServerPhoto)) {
+          emitCombined(true);
         }
       }
     })
@@ -901,25 +1062,23 @@ export const subscribeKunjunganWarga = (cb: (items: KunjunganWargaData[]) => voi
         (snapshot) => {
           if (!isActive) return;
           const deletedSet = new Set(getDeletedKunjunganIds());
-          const remoteItems: KunjunganWargaData[] = [];
+          firestoreMap.clear();
           snapshot.forEach((docSnap) => {
             const dat = docSnap.data() as KunjunganWargaData;
             const docId = docSnap.id || dat?.id;
             if (dat && docId && !deletedSet.has(docId)) {
-              remoteItems.push({ ...dat, id: docId });
+              const item = { ...dat, id: docId };
+              firestoreMap.set(docId, item);
+              const src = getVisitPhotoSrc(item);
+              if (src) visitPhotoCache.set(docId, src);
             }
           });
 
-          const sorted = sortKunjunganDesc(mergeVisitListPreservingPhotos(remoteItems, memoryKunjungan));
           if (!snapshot.metadata.fromCache) {
             hasLiveFirestore = true;
-            setLocalKunjunganList(sorted);
-            saveVisitsToIndexedDB(sorted).catch(() => {});
-            cb(sorted);
-          } else if (sorted.length > 0 && !hasLiveFirestore) {
-            setLocalKunjunganList(sorted);
-            saveVisitsToIndexedDB(sorted).catch(() => {});
-            cb(sorted);
+            emitCombined(true);
+          } else if (firestoreMap.size > 0 && !hasLiveFirestore) {
+            emitCombined(false);
           }
         },
         (err) => {

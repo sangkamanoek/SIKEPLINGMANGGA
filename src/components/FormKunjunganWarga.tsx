@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { UserAccount } from '../types';
-import { KunjunganWargaData, saveKunjunganWargaToFirestore } from '../lib/kunjunganService';
+import { KunjunganWargaData, saveKunjunganWargaToFirestore, getVisitPhotoSrc } from '../lib/kunjunganService';
 export type { KunjunganWargaData };
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
 import { Users, CheckCircle2, X, Camera, Upload } from 'lucide-react';
-import { getTodayLocalIso } from '../lib/formatter';
-import { compressImageFile } from '../lib/imageCompressor';
+import { getTodayLocalIso, getDirectImageUrl, getDriveFallbackImageUrl } from '../lib/formatter';
+import { compressImageFile, ensureCompactDataUrl } from '../lib/imageCompressor';
 
 interface FormKunjunganWargaProps {
   isOpen?: boolean;
@@ -44,9 +44,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const [statusBansos, setStatusBansos] = useState<'Sudah' | 'Belum' | 'Menolak' | 'Layak' | 'Tidak Layak'>(editItem?.statusBansos || 'Sudah');
   const [bpjsTk, setBpjsTk] = useState(editItem?.bpjsTk || 'Belum Terdaftar');
   const [keterangan, setKeterangan] = useState(editItem?.keterangan || '');
-  const [fotoUrl, setFotoUrl] = useState(
-    editItem?.fotoUrl || (editItem as any)?.foto || (editItem as any)?.fotoDokumentasi || ''
-  );
+  const [fotoUrl, setFotoUrl] = useState(getVisitPhotoSrc(editItem));
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -66,9 +64,7 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
       setStatusBansos(editItem.statusBansos || 'Sudah');
       setBpjsTk(editItem.bpjsTk || 'Belum Terdaftar');
       setKeterangan(editItem.keterangan || '');
-      setFotoUrl(
-        editItem.fotoUrl || (editItem as any)?.foto || (editItem as any)?.fotoDokumentasi || ''
-      );
+      setFotoUrl(getVisitPhotoSrc(editItem));
     } else if (isKepling) {
       setLingkungan(defaultLingkungan);
       setNamaKepling(defaultKeplingName);
@@ -78,23 +74,34 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
   const handlePhotoUpload = async (file?: File) => {
     if (!file) return;
     setIsProcessingPhoto(true);
+    setErrorMsg(null);
     try {
-      const comp = await compressImageFile(file, 1280, 0.80);
-      if (comp) {
-        setFotoUrl(comp);
-      } else {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          if (ev.target?.result) setFotoUrl(ev.target.result as string);
-        };
-        reader.readAsDataURL(file);
+      let comp = await compressImageFile(file, 960, 0.68);
+      if (!comp) {
+        const rawDataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve((ev.target?.result as string) || '');
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(file);
+        });
+        if (rawDataUrl) {
+          comp = await ensureCompactDataUrl(rawDataUrl, 720, 0.48);
+        }
       }
+      if (!comp) {
+        setErrorMsg('File foto gagal diproses. Coba pilih foto JPG/PNG lain.');
+        return;
+      }
+      if (comp.startsWith('data:image/') && comp.length > 520_000) {
+        comp = await ensureCompactDataUrl(comp, 560, 0.36);
+      }
+      if (comp.startsWith('data:image/') && comp.length > 650_000) {
+        setErrorMsg('Ukuran foto terlalu besar dan gagal dikompresi. Silakan pilih foto dengan resolusi lebih kecil.');
+        return;
+      }
+      setFotoUrl(comp);
     } catch {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        if (ev.target?.result) setFotoUrl(ev.target.result as string);
-      };
-      reader.readAsDataURL(file);
+      setErrorMsg('Gagal memproses foto dokumentasi. Silakan coba lagi.');
     } finally {
       setIsProcessingPhoto(false);
     }
@@ -374,7 +381,18 @@ export const FormKunjunganWarga: React.FC<FormKunjunganWargaProps> = ({
           </div>
         ) : fotoUrl ? (
           <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-500 bg-slate-900 max-w-xs mx-auto shadow-sm">
-            <img src={fotoUrl} alt="Dokumentasi Kunjungan" className="w-full h-48 object-cover" />
+            <img
+              src={getDirectImageUrl(fotoUrl)}
+              alt="Dokumentasi Kunjungan"
+              className="w-full h-48 object-cover"
+              onError={(e) => {
+                const imgEl = e.currentTarget;
+                const nextFallback = getDriveFallbackImageUrl(imgEl.src);
+                if (nextFallback && imgEl.src !== nextFallback) {
+                  imgEl.src = nextFallback;
+                }
+              }}
+            />
             <div className="absolute bottom-2 inset-x-2 flex items-center justify-between bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-xl text-white text-[11px]">
               <span className="font-bold flex items-center gap-1">✅ Foto Terlampir</span>
               <button

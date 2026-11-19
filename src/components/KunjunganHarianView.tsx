@@ -5,6 +5,7 @@ import {
   subscribeKunjunganWarga,
   deleteKunjunganWargaFromFirestore,
   saveKunjunganWargaToFirestore,
+  getVisitPhotoSrc,
 } from '../lib/kunjunganService';
 import { FormKunjunganWarga } from './FormKunjunganWarga';
 import { KEPLING_ACCOUNTS } from '../data/keplingList';
@@ -34,7 +35,7 @@ import {
   ShieldCheck,
   Coins,
 } from 'lucide-react';
-import { compressImageFile } from '../lib/imageCompressor';
+import { compressImageFile, ensureCompactDataUrl } from '../lib/imageCompressor';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import {
@@ -46,7 +47,13 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import { getTodayLocalIso, formatTanggalIndonesia, isKunjunganMatchingKepling } from '../lib/formatter';
+import {
+  getTodayLocalIso,
+  formatTanggalIndonesia,
+  isKunjunganMatchingKepling,
+  getDirectImageUrl,
+  getDriveFallbackImageUrl,
+} from '../lib/formatter';
 import { printOfficialDocument } from '../utils/printHelper';
 
 interface KunjunganHarianViewProps {
@@ -73,12 +80,15 @@ type PeriodFilterType =
 
 export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   currentUser,
+  kunjunganList,
   onShowToast,
 }) => {
   const isKepling = currentUser?.role === 'kepling';
   const userLingkungan = currentUser?.lingkungan || '';
 
-  const [visits, setVisits] = useState<KunjunganWargaData[]>([]);
+  const [visits, setVisits] = useState<KunjunganWargaData[]>(() =>
+    Array.isArray(kunjunganList) ? kunjunganList : []
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLingkungan, setSelectedLingkungan] = useState<string>(isKepling && userLingkungan ? userLingkungan : 'ALL');
   const [selectedKategori, setSelectedKategori] = useState<string>('ALL');
@@ -96,8 +106,19 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
   const [selectedRecapLingkungan, setSelectedRecapLingkungan] = useState<number | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
+  const [brokenPhotoIds, setBrokenPhotoIds] = useState<Record<string, boolean>>({});
 
   const printAreaRef = useRef<HTMLDivElement>(null);
+
+  const handleVisitImgError = (visitId: string, imgEl: HTMLImageElement) => {
+    const nextFallback = getDriveFallbackImageUrl(imgEl.src);
+    if (nextFallback && imgEl.src !== nextFallback && imgEl.dataset.retried !== nextFallback) {
+      imgEl.dataset.retried = nextFallback;
+      imgEl.src = nextFallback;
+      return;
+    }
+    setBrokenPhotoIds((prev) => (prev[visitId] ? prev : { ...prev, [visitId]: true }));
+  };
 
   useEffect(() => {
     const unsub = subscribeKunjunganWarga((list) => {
@@ -225,7 +246,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
 
   // Photo count
   const fotoCount = useMemo(() => {
-    return filteredVisits.filter((v) => !!v.fotoUrl).length;
+    return filteredVisits.filter((v) => Boolean(getVisitPhotoSrc(v))).length;
   }, [filteredVisits]);
 
   // Rekapitulasi 4 Pilar Kunjungan Warga (Perlinsos, PBB, IKD, dan BPJS)
@@ -336,19 +357,29 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
   const handleInlinePhotoUpload = async (visit: KunjunganWargaData, file?: File) => {
     if (!file) return;
     setUploadingPhotoId(visit.id);
+    setInlineError(null);
     try {
-      const comp = await compressImageFile(file, 1024, 0.82);
-      let photoDataUrl = comp;
+      let photoDataUrl = await compressImageFile(file, 960, 0.68);
       if (!photoDataUrl) {
-        photoDataUrl = await new Promise<string>((resolve) => {
+        const rawDataUrl = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = (ev) => resolve((ev.target?.result as string) || '');
+          reader.onerror = () => resolve('');
           reader.readAsDataURL(file);
         });
+        if (rawDataUrl) {
+          photoDataUrl = await ensureCompactDataUrl(rawDataUrl, 720, 0.48);
+        }
       }
 
       if (!photoDataUrl) {
         throw new Error('Gagal memproses file foto');
+      }
+      if (photoDataUrl.startsWith('data:image/') && photoDataUrl.length > 520_000) {
+        photoDataUrl = await ensureCompactDataUrl(photoDataUrl, 560, 0.36);
+      }
+      if (photoDataUrl.startsWith('data:image/') && photoDataUrl.length > 650_000) {
+        throw new Error('Ukuran foto terlalu besar dan gagal dikompresi.');
       }
 
       const updated: KunjunganWargaData = {
@@ -358,6 +389,12 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       };
 
       await saveKunjunganWargaToFirestore(updated);
+      setBrokenPhotoIds((prev) => {
+        if (!prev[visit.id]) return prev;
+        const next = { ...prev };
+        delete next[visit.id];
+        return next;
+      });
       if (onShowToast) {
         onShowToast(`Foto dokumentasi warga ${visit.namaWarga} berhasil disimpan!`, 'success');
       }
@@ -444,7 +481,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
         'Pembayaran PBB': v.pbb || '-',
         'Kategori Program': v.kategoriBansos || '-',
         'Status Penyaluran': v.statusBansos || '-',
-        'Foto Dokumentasi': v.fotoUrl ? 'Ada' : 'Tidak Ada',
+        'Foto Dokumentasi': getVisitPhotoSrc(v) ? 'Ada' : 'Tidak Ada',
         Keterangan: v.keterangan || '-',
       }));
 
@@ -530,7 +567,7 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
       const imgFolder = zip.folder('Foto_Dokumentasi');
       let addedPhotos = 0;
       filteredVisits.forEach((v, idx) => {
-        const photo = v.fotoUrl || (v as any).foto || (v as any).fotoDokumentasi || (v as any).photoUrl;
+        const photo = getVisitPhotoSrc(v);
         if (photo && photo.startsWith('data:image')) {
           const parts = photo.split(',');
           if (parts[1]) {
@@ -1131,13 +1168,11 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                     </td>
                     <td className="p-3.5 text-center whitespace-nowrap">
                       {(() => {
-                        const photoSrc =
-                          item.fotoUrl ||
-                          (item as any).foto ||
-                          (item as any).fotoDokumentasi ||
-                          (item as any).photoUrl;
+                        const rawPhotoSrc = getVisitPhotoSrc(item);
+                        const photoSrc = getDirectImageUrl(rawPhotoSrc);
+                        const isBroken = Boolean(brokenPhotoIds[item.id]);
 
-                        if (photoSrc) {
+                        if (photoSrc && !isBroken) {
                           return (
                             <div className="flex items-center justify-center gap-1.5">
                               <button
@@ -1150,6 +1185,8 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                                   src={photoSrc}
                                   alt={item.namaWarga}
                                   className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  onError={(e) => handleVisitImgError(item.id, e.currentTarget)}
                                 />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
                                   <Eye className="w-4 h-4" />
@@ -1263,19 +1300,19 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                 </div>
 
                 {(() => {
-                  const photoSrc =
-                    item.fotoUrl ||
-                    (item as any).foto ||
-                    (item as any).fotoDokumentasi ||
-                    (item as any).photoUrl;
+                  const rawPhotoSrc = getVisitPhotoSrc(item);
+                  const photoSrc = getDirectImageUrl(rawPhotoSrc);
+                  const isBroken = Boolean(brokenPhotoIds[item.id]);
 
-                  if (photoSrc) {
+                  if (photoSrc && !isBroken) {
                     return (
                       <div className="relative rounded-xl overflow-hidden h-40 bg-slate-100 group">
                         <img
                           src={photoSrc}
                           alt={item.namaWarga}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-pointer"
+                          loading="lazy"
+                          onError={(e) => handleVisitImgError(item.id, e.currentTarget)}
                           onClick={() => setPreviewPhotoUrl(photoSrc)}
                         />
                         <div
@@ -1573,7 +1610,19 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
               </button>
             </div>
             <div className="rounded-2xl overflow-hidden bg-slate-900 max-h-[70vh] flex items-center justify-center">
-              <img src={previewPhotoUrl} alt="Preview" className="max-w-full max-h-[70vh] object-contain" />
+              <img
+                src={getDirectImageUrl(previewPhotoUrl)}
+                alt="Preview"
+                className="max-w-full max-h-[70vh] object-contain"
+                onError={(e) => {
+                  const imgEl = e.currentTarget;
+                  const nextFallback = getDriveFallbackImageUrl(imgEl.src);
+                  if (nextFallback && imgEl.src !== nextFallback && imgEl.dataset.retried !== nextFallback) {
+                    imgEl.dataset.retried = nextFallback;
+                    imgEl.src = nextFallback;
+                  }
+                }}
+              />
             </div>
           </div>
         </div>
@@ -1653,11 +1702,21 @@ export const KunjunganHarianView: React.FC<KunjunganHarianViewProps> = ({
                       <div className="text-[10px] text-slate-500 font-medium">{v.alamat}</div>
                       <div className="text-[10px] text-emerald-600 font-bold mt-0.5">{v.tanggal}</div>
                     </div>
-                    {v.fotoUrl && (
-                      <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200">
-                        <img src={v.fotoUrl} className="w-full h-full object-cover" alt="Warga" />
-                      </div>
-                    )}
+                    {(() => {
+                      const thumb = getDirectImageUrl(getVisitPhotoSrc(v));
+                      if (!thumb || brokenPhotoIds[v.id]) return null;
+                      return (
+                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 shrink-0">
+                          <img
+                            src={thumb}
+                            className="w-full h-full object-cover"
+                            alt="Warga"
+                            loading="lazy"
+                            onError={(e) => handleVisitImgError(v.id, e.currentTarget)}
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               {scopedVisits.filter(v => getLingkunganIndex(v.lingkungan) === selectedRecapLingkungan).length === 0 && (
