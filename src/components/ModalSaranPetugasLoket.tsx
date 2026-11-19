@@ -5,19 +5,20 @@ import {
   Building2,
   Award,
   AlertCircle,
-  CheckCircle2,
   Calendar,
   Users,
   RefreshCw,
   Sun,
   UserCheck,
   TrendingUp,
-  Plus,
+  Clock,
 } from 'lucide-react';
 import {
   HasilRekomendasiLoketAwalBulan,
   KeplingEvaluasiBulanLalu,
   SaranLoketSlot,
+  SHIFT_LOKET_PAGI_WAKTU,
+  SHIFT_LOKET_SIANG_WAKTU,
   formatYearMonthLabel,
   getAvailableEvaluationMonths,
 } from '../lib/loketRekomendasiService';
@@ -35,6 +36,7 @@ interface ModalSaranPetugasLoketProps {
     keplingIds: string[];
     namaPosko: string;
     tanggal: string;
+    waktuMulai?: string;
     arahanTugas: string;
   }) => void;
 }
@@ -75,70 +77,80 @@ export const ModalSaranPetugasLoket: React.FC<ModalSaranPetugasLoketProps> = ({
     );
   };
 
-  const handleApplySlot = (slot: SaranLoketSlot, includePendamping: boolean) => {
-    const officers = includePendamping
-      ? [...slot.petugasUtama, ...slot.petugasPendamping]
-      : [...slot.petugasUtama];
-    const keplingIds = Array.from(new Set(officers.map((o) => o.keplingId)));
-    const utamaNames = slot.petugasUtama
-      .map((u) => `${u.namaKepling} (Lingk. ${u.nomorLingkungan})`)
-      .join(', ');
-    const pendampingNames = slot.petugasPendamping
-      .map((u) => `${u.namaKepling} (Lingk. ${u.nomorLingkungan})`)
-      .join(', ');
+  const handleApplySlotShift = (slot: SaranLoketSlot, shift: 'PAGI' | 'SIANG') => {
+    const isPagi = shift === 'PAGI';
+    const officer = isPagi
+      ? slot.petugasUtama[0] || slot.petugasPendamping[0]
+      : slot.petugasPendamping[0] || slot.petugasUtama[0];
+    if (!officer) return;
+
+    const waktuMulai = isPagi ? SHIFT_LOKET_PAGI_WAKTU : SHIFT_LOKET_SIANG_WAKTU;
+    const sesiLabel = isPagi ? 'Sesi 1 (Pagi 08.15 - 12.30 WIB)' : 'Sesi 2 (Siang 12.30 - 16.30 WIB)';
 
     const arahanTugas = [
-      `Penugasan Awal Bulan ${rekomendasi.targetBulanLabel} berdasarkan Evaluasi ${rekomendasi.evalBulanLabel}.`,
-      `${slot.namaLoket}: ${slot.fokusLayanan}.`,
-      utamaNames ? `Petugas Utama: ${utamaNames}.` : '',
-      includePendamping && pendampingNames ? `Pendamping / Rotasi: ${pendampingNames}.` : '',
-      'Wajib hadir tepat waktu dan unggah foto kamera langsung di Loket Pelayanan Kantor Lurah.',
-    ]
-      .filter(Boolean)
-      .join('\n');
+      `Penugasan Piket Loket Awal Bulan ${rekomendasi.targetBulanLabel} berdasarkan Evaluasi ${rekomendasi.evalBulanLabel}.`,
+      `${slot.namaLoket} — ${sesiLabel} (1 Orang Petugas): ${officer.namaKepling} (Lingk. ${officer.nomorLingkungan}).`,
+      `Fokus Layanan: ${slot.fokusLayanan}.`,
+      'Wajib hadir sesuai jadwal sesi piket dan unggah foto kamera langsung di Loket Pelayanan Kantor Lurah.',
+    ].join('\n');
 
     onApplyToJadwalLoket({
-      keplingIds,
-      namaPosko: `Piket ${slot.namaLoket} — Awal Bulan ${rekomendasi.targetBulanLabel}`,
+      keplingIds: [officer.keplingId],
+      namaPosko: `Piket ${slot.kodeLoket} (${isPagi ? 'Sesi 1: 08.15-12.30' : 'Sesi 2: 12.30-16.30'}) — Awal Bulan ${rekomendasi.targetBulanLabel}`,
       tanggal: targetTanggal || rekomendasi.tanggalAwalKerjaTarget,
+      waktuMulai,
       arahanTugas,
     });
   };
 
-  const handleApplyAllCombined = (includePendamping: boolean) => {
-    const ids = includePendamping
-      ? rekomendasi.suggestedCombinedKeplingIds
-      : Array.from(
-          new Set(
-            rekomendasi.loketAssignments
-              .flatMap((s) => s.petugasUtama)
-              .map((k) => k.keplingId)
-          )
-        );
+  const handleApplySingleShiftGeneral = (shift: 'PAGI' | 'SIANG') => {
+    const isPagi = shift === 'PAGI';
+    const slot0 = rekomendasi.loketAssignments[0];
+    const officer = isPagi
+      ? slot0?.petugasUtama[0] || rekomendasi.evaluasiSemuaKepling[0]
+      : slot0?.petugasPendamping[0] || rekomendasi.evaluasiSemuaKepling[1] || rekomendasi.evaluasiSemuaKepling[0];
+    if (!officer) return;
 
-    const pembagianLines = rekomendasi.loketAssignments.map((slot) => {
-      const utama = slot.petugasUtama
-        .map((u) => `${u.namaKepling} (Lk.${u.nomorLingkungan})`)
-        .join(', ');
-      const pendamping =
-        includePendamping && slot.petugasPendamping.length > 0
-          ? ` | Pendamping: ${slot.petugasPendamping
-              .map((u) => `${u.namaKepling} (Lk.${u.nomorLingkungan})`)
-              .join(', ')}`
-          : '';
-      return `• ${slot.namaLoket}: ${utama}${pendamping}`;
+    const waktuMulai = isPagi ? SHIFT_LOKET_PAGI_WAKTU : SHIFT_LOKET_SIANG_WAKTU;
+    const sesiLabel = isPagi ? 'Sesi 1 Pagi (08.15 - 12.30 WIB)' : 'Sesi 2 Siang (12.30 - 16.30 WIB)';
+
+    onApplyToJadwalLoket({
+      keplingIds: [officer.keplingId],
+      namaPosko: `Piket Loket Pelayanan ${isPagi ? 'Sesi Pagi (08.15 - 12.30)' : 'Sesi Siang (12.30 - 16.30)'}`,
+      tanggal: targetTanggal || rekomendasi.tanggalAwalKerjaTarget,
+      waktuMulai,
+      arahanTugas: `Piket Loket Pelayanan ${sesiLabel} — 1 Orang Petugas: ${officer.namaKepling} (Lingk. ${officer.nomorLingkungan}) berdasarkan evaluasi ${rekomendasi.evalBulanLabel}.\nWajib hadir tepat waktu dan melayani warga dengan ramah, cepat, serta unggah foto kehadiran kamera langsung.`,
     });
+  };
+
+  const handleApplyAllShift3Loket = (shift: 'PAGI' | 'SIANG') => {
+    const isPagi = shift === 'PAGI';
+    const waktuMulai = isPagi ? SHIFT_LOKET_PAGI_WAKTU : SHIFT_LOKET_SIANG_WAKTU;
+    const sesiLabel = isPagi ? 'Sesi 1 (08.15 - 12.30 WIB)' : 'Sesi 2 (12.30 - 16.30 WIB)';
+
+    const officers = rekomendasi.loketAssignments
+      .map((slot) => ({
+        slot,
+        officer: isPagi ? slot.petugasUtama[0] : slot.petugasPendamping[0],
+      }))
+      .filter((x) => Boolean(x.officer));
+
+    const ids = Array.from(new Set(officers.map((x) => x.officer!.keplingId)));
+    const pembagianLines = officers.map(
+      ({ slot, officer }) => `• ${slot.namaLoket} (1 Org): ${officer!.namaKepling} (Lk.${officer!.nomorLingkungan})`
+    );
 
     const arahanTugas = [
-      `Pembagian Petugas Loket Awal Bulan ${rekomendasi.targetBulanLabel} (Hasil Evaluasi ${rekomendasi.evalBulanLabel}):`,
+      `Pembagian Petugas Piket Loket ${sesiLabel} Awal Bulan ${rekomendasi.targetBulanLabel} (1 Orang per Loket — Evaluasi ${rekomendasi.evalBulanLabel}):`,
       ...pembagianLines,
-      'Seluruh petugas wajib hadir pukul 08.00 WIB dan melayani warga secara ramah, cepat, dan tertib administrasi.',
+      'Masing-masing loket diisi 1 petugas Kepling dan wajib unggah foto kehadiran kamera langsung saat bertugas.',
     ].join('\n');
 
     onApplyToJadwalLoket({
       keplingIds: ids,
-      namaPosko: `Piket Loket Pelayanan Awal Bulan ${rekomendasi.targetBulanLabel}`,
+      namaPosko: `Piket Loket Pelayanan ${sesiLabel} — Awal Bulan ${rekomendasi.targetBulanLabel}`,
       tanggal: targetTanggal || rekomendasi.tanggalAwalKerjaTarget,
+      waktuMulai,
       arahanTugas,
     });
   };
@@ -156,7 +168,8 @@ export const ModalSaranPetugasLoket: React.FC<ModalSaranPetugasLoketProps> = ({
       keplingIds: customSelectedIds,
       namaPosko: `Piket Loket Pelayanan Awal Bulan ${rekomendasi.targetBulanLabel}`,
       tanggal: targetTanggal || rekomendasi.tanggalAwalKerjaTarget,
-      arahanTugas: `Penugasan Piket Loket Awal Bulan ${rekomendasi.targetBulanLabel} berdasarkan evaluasi ${rekomendasi.evalBulanLabel}.\nPetugas terpilih: ${listText}.`,
+      waktuMulai: SHIFT_LOKET_PAGI_WAKTU,
+      arahanTugas: `Penugasan Piket Loket Awal Bulan ${rekomendasi.targetBulanLabel} berdasarkan evaluasi ${rekomendasi.evalBulanLabel}.\nPetugas terpilih (${picked.length} orang): ${listText}.`,
     });
   };
 
@@ -342,34 +355,59 @@ export const ModalSaranPetugasLoket: React.FC<ModalSaranPetugasLoketProps> = ({
 
           {activeSubTab === 'PER_LOKET' ? (
             <div className="space-y-4">
-              {/* Banner Quick Apply All */}
-              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="space-y-0.5 text-xs">
-                  <div className="font-black text-indigo-950 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
-                    <span>Terapkan Formasi Loket Awal Bulan {rekomendasi.targetBulanLabel}</span>
+              {/* Banner Standar Jam Piket & Penerapan 1 Orang / Sesi */}
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 space-y-3">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                  <div className="space-y-0.5 text-xs">
+                    <div className="font-black text-indigo-950 flex flex-wrap items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <span>
+                        Jam Piket Loket: Sesi 1 (08.15 – 12.30 WIB) &amp; Sesi 2 (12.30 – 16.30 WIB) • Per Piket 1 Orang
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-indigo-800">
+                      Setiap sesi piket dijadwalkan <strong>1 orang petugas</strong> (atau 1 orang per loket). Penentuan diprioritaskan bagi Kepling bebas Alpa Apel Pagi (-3.0 poin), bebas Tidak Hadir Posko/Agenda (-1.5 poin), konsisten melapor, serta pemerataan rotasi bulan lalu.
+                    </p>
                   </div>
-                  <p className="text-[11px] text-indigo-800">
-                    Kriteria penentuan: bebas Alpa Apel Pagi (-3.0 poin/alpa), bebas Tidak Hadir Posko/Agenda (-1.5 poin), konsistensi laporan, capaian layanan warga, dan pemerataan giliran piket bulan lalu.
-                  </p>
+
+                  <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleApplySingleShiftGeneral('PAGI')}
+                      className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-xs cursor-pointer transition-colors"
+                    >
+                      1 Org Sesi Pagi (08.15–12.30)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplySingleShiftGeneral('SIANG')}
+                      className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-xs cursor-pointer transition-colors"
+                    >
+                      1 Org Sesi Siang (12.30–16.30)
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleApplyAllCombined(false)}
-                    className="px-3 py-2 rounded-xl bg-white hover:bg-indigo-100 text-indigo-900 border border-indigo-300 font-black text-xs cursor-pointer transition-colors"
-                  >
-                    Terapkan 3 Petugas Utama
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleApplyAllCombined(true)}
-                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-sm cursor-pointer transition-colors inline-flex items-center gap-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Terapkan Semua (6 Petugas)</span>
-                  </button>
+                <div className="pt-2 border-t border-indigo-200/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <span className="font-bold text-indigo-900">
+                    Atau jadwalkan gabungan 3 Loket sekaligus (masing-masing loket 1 orang per sesi):
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleApplyAllShift3Loket('PAGI')}
+                      className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-100 text-indigo-900 border border-indigo-300 font-black text-[11px] cursor-pointer"
+                    >
+                      3 Loket Pagi (08.15–12.30)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyAllShift3Loket('SIANG')}
+                      className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-100 text-indigo-900 border border-indigo-300 font-black text-[11px] cursor-pointer"
+                    >
+                      3 Loket Siang (12.30–16.30)
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -383,9 +421,14 @@ export const ModalSaranPetugasLoket: React.FC<ModalSaranPetugasLoketProps> = ({
                     <div className="p-4 space-y-3">
                       <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100">
                         <div>
-                          <span className="inline-block px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase">
-                            {slot.kodeLoket}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="inline-block px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase">
+                              {slot.kodeLoket}
+                            </span>
+                            <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold">
+                              1 Org / Sesi Piket
+                            </span>
+                          </div>
                           <h4 className="text-sm font-black text-slate-900 mt-1">
                             {slot.namaLoket}
                           </h4>
@@ -395,10 +438,15 @@ export const ModalSaranPetugasLoket: React.FC<ModalSaranPetugasLoketProps> = ({
                         </div>
                       </div>
 
-                      {/* Petugas Utama */}
+                      {/* Sesi 1: 08.15 - 12.30 WIB (1 Orang) */}
                       <div className="space-y-1.5">
-                        <div className="text-[10px] font-black uppercase tracking-wider text-emerald-700">
-                          Saran Petugas Utama
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                            Sesi 1 (08.15 – 12.30 WIB)
+                          </div>
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-black">
+                            1 Orang
+                          </span>
                         </div>
                         {slot.petugasUtama.map((k) => (
                           <div
@@ -426,7 +474,7 @@ export const ModalSaranPetugasLoket: React.FC<ModalSaranPetugasLoketProps> = ({
                               </span>
                             </div>
                             <ul className="space-y-0.5 text-[10px] text-slate-700">
-                              {k.alasanRekomendasi.slice(0, 3).map((alasan, idx) => (
+                              {k.alasanRekomendasi.slice(0, 2).map((alasan, idx) => (
                                 <li key={idx} className="flex items-start gap-1">
                                   <span className="text-emerald-600 font-bold">•</span>
                                   <span>{alasan}</span>
@@ -437,10 +485,15 @@ export const ModalSaranPetugasLoket: React.FC<ModalSaranPetugasLoketProps> = ({
                         ))}
                       </div>
 
-                      {/* Petugas Pendamping / Rotasi */}
+                      {/* Sesi 2: 12.30 - 16.30 WIB (1 Orang) */}
                       <div className="space-y-1.5">
-                        <div className="text-[10px] font-black uppercase tracking-wider text-indigo-700">
-                          Pendamping / Pemerataan Rotasi
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="text-[10px] font-black uppercase tracking-wider text-indigo-700">
+                            Sesi 2 (12.30 – 16.30 WIB)
+                          </div>
+                          <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[9px] font-black">
+                            1 Orang
+                          </span>
                         </div>
                         {slot.petugasPendamping.map((k) => (
                           <div
@@ -479,14 +532,22 @@ export const ModalSaranPetugasLoket: React.FC<ModalSaranPetugasLoketProps> = ({
                       </div>
                     </div>
 
-                    <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex items-center gap-2">
+                    <div className="px-3.5 py-3 bg-slate-50 border-t border-slate-200 grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => handleApplySlot(slot, true)}
-                        className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+                        onClick={() => handleApplySlotShift(slot, 'PAGI')}
+                        className="py-2 px-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-black transition-colors cursor-pointer inline-flex items-center justify-center gap-1"
                       >
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>Jadwalkan {slot.kodeLoket}</span>
+                        <Calendar className="w-3 h-3 shrink-0" />
+                        <span>Pagi 08.15–12.30</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplySlotShift(slot, 'SIANG')}
+                        className="py-2 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-black transition-colors cursor-pointer inline-flex items-center justify-center gap-1"
+                      >
+                        <Calendar className="w-3 h-3 shrink-0" />
+                        <span>Siang 12.30–16.30</span>
                       </button>
                     </div>
                   </div>

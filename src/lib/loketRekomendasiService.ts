@@ -29,6 +29,9 @@ import {
 } from './formatter';
 import { safeGetLocalStorage } from './safeStorage';
 
+export const SHIFT_LOKET_PAGI_WAKTU = 'Pukul 08.15 WIB s/d 12.30 WIB';
+export const SHIFT_LOKET_SIANG_WAKTU = 'Pukul 12.30 WIB s/d 16.30 WIB';
+
 const NAMA_BULAN_ID = [
   'Januari',
   'Februari',
@@ -622,7 +625,7 @@ export function computeRekomendasiLoketAwalBulan(params: {
       petugasUtama: l1Utama ? [l1Utama] : [],
       petugasPendamping: l1Pendamping ? [l1Pendamping] : [],
       ringkasanAlasan:
-        'Dipilih dari Kepling dengan disiplin Apel Pagi tertinggi dan konsistensi pelaporan harian paling tertib pada bulan sebelumnya.',
+        'Sesi Pagi (08.15 - 12.30 WIB, 1 Orang) diisi Kepling disiplin Apel Pagi tertinggi & laporan tertib; Sesi Siang (12.30 - 16.30 WIB, 1 Orang) oleh petugas rotasi.',
     },
     {
       loketNomor: 2,
@@ -632,7 +635,7 @@ export function computeRekomendasiLoketAwalBulan(params: {
       petugasUtama: l2Utama ? [l2Utama] : [],
       petugasPendamping: l2Pendamping ? [l2Pendamping] : [],
       ringkasanAlasan:
-        'Dipilih berdasarkan rekam jejak aktivasi IKD, pendataan Perlinsos, dan layanan BPJS TK terbaik pada bulan sebelumnya.',
+        'Sesi Pagi (08.15 - 12.30 WIB, 1 Orang) & Sesi Siang (12.30 - 16.30 WIB, 1 Orang) dipilih berdasarkan capaian layanan IKD, Perlinsos, dan BPJS TK bulan sebelumnya.',
     },
     {
       loketNomor: 3,
@@ -642,7 +645,7 @@ export function computeRekomendasiLoketAwalBulan(params: {
       petugasUtama: l3Utama ? [l3Utama] : [],
       petugasPendamping: l3Pendamping ? [l3Pendamping] : [],
       ringkasanAlasan:
-        'Dipilih berdasarkan capaian PBB-P2, keaktifan kunjungan warga, dan pemerataan rotasi piket loket dari bulan lalu.',
+        'Sesi Pagi (08.15 - 12.30 WIB, 1 Orang) & Sesi Siang (12.30 - 16.30 WIB, 1 Orang) dipilih dari capaian PBB-P2, kunjungan warga, dan pemerataan rotasi piket.',
     },
   ];
 

@@ -72,6 +72,8 @@ import { getLocalKunjunganList, KunjunganWargaData } from '../lib/kunjunganServi
 import {
   computeRekomendasiLoketAwalBulan,
   getPreviousYearMonth,
+  SHIFT_LOKET_PAGI_WAKTU,
+  SHIFT_LOKET_SIANG_WAKTU,
 } from '../lib/loketRekomendasiService';
 import { ModalSaranPetugasLoket } from './ModalSaranPetugasLoket';
 
@@ -253,6 +255,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
     keplingIds: string[];
     namaPosko: string;
     tanggal: string;
+    waktuMulai?: string;
     arahanTugas: string;
   }) => {
     setIsSaranLoketOpen(false);
@@ -260,7 +263,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
     setFormJenis('piket_loket_pelayanan');
     setFormNama(payload.namaPosko);
     setFormTanggal(payload.tanggal);
-    setFormWaktu('Pukul 08.00 WIB - 16.00 WIB');
+    setFormWaktu(payload.waktuMulai || SHIFT_LOKET_PAGI_WAKTU);
     setFormLokasi('Loket Pelayanan Kantor Lurah Mangga');
     setFormArahan(payload.arahanTugas);
     setFormPenanggungJawab('Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)');
@@ -369,11 +372,11 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
           : 'Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)'
       );
     } else if (presetJenis === 'piket_loket_pelayanan') {
-      setFormNama('Piket Loket Pelayanan Kelurahan Mangga');
-      setFormWaktu('Pukul 08.00 WIB - 16.00 WIB');
+      setFormNama('Piket Loket Pelayanan Kelurahan Mangga (Sesi 1: 08.15 - 12.30)');
+      setFormWaktu(SHIFT_LOKET_PAGI_WAKTU);
       setFormLokasi('Loket Pelayanan Kantor Lurah Mangga');
       setFormArahan(
-        'Melaksanakan piket pelayanan administrasi kependudukan dan surat-menyurat warga di Loket Pelayanan Kantor Lurah Mangga secara tertib, ramah, dan responsif.'
+        'Melaksanakan piket pelayanan administrasi warga di Loket Pelayanan Kantor Lurah Mangga (1 orang per sesi piket: Sesi 1 pukul 08.15 - 12.30 WIB / Sesi 2 pukul 12.30 - 16.30 WIB) secara tertib, ramah, dan responsif.'
       );
       setFormPenanggungJawab('Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)');
     } else {
@@ -1202,12 +1205,13 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                 Saran Petugas Loket Awal Bulan {rekomendasiLoket.targetBulanLabel}
               </span>
               <span className="text-[11px] font-bold text-slate-600">
-                Basis Evaluasi: <strong>{rekomendasiLoket.evalBulanLabel}</strong> ({rekomendasiLoket.totalApelDaysRecorded} hari apel, {rekomendasiLoket.totalReportsLastMonth} laporan)
+                Sesi 1: <strong>08.15–12.30</strong> &amp; Sesi 2: <strong>12.30–16.30 WIB</strong> (1 Org/Piket) • Basis: <strong>{rekomendasiLoket.evalBulanLabel}</strong>
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-800">
               {rekomendasiLoket.loketAssignments.map((slot) => {
-                const lead = slot.petugasUtama[0];
+                const pagiLead = slot.petugasUtama[0];
+                const siangLead = slot.petugasPendamping[0];
                 return (
                   <div
                     key={slot.kodeLoket}
@@ -1215,13 +1219,12 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                   >
                     <span className="text-[10px] font-black text-indigo-700">{slot.kodeLoket}:</span>
                     <span className="font-bold text-slate-900">
-                      {lead ? `${lead.namaKepling} (Lk.${lead.nomorLingkungan})` : '-'}
+                      {pagiLead ? `${pagiLead.namaKepling} (Lk.${pagiLead.nomorLingkungan})` : '-'}
                     </span>
-                    {lead && (
-                      <span className="text-[10px] font-black text-emerald-700">
-                        • {lead.skorKesiapanLoket}
-                      </span>
-                    )}
+                    <span className="text-[10px] text-slate-400">|</span>
+                    <span className="text-[10px] font-semibold text-slate-600">
+                      Siang: {siangLead ? `${siangLead.namaKepling} (Lk.${siangLead.nomorLingkungan})` : '-'}
+                    </span>
                   </div>
                 );
               })}
@@ -1893,12 +1896,12 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                     type="button"
                     onClick={() => {
                       setFormJenis('piket_loket_pelayanan');
-                      setFormNama('Piket Loket Pelayanan Kelurahan Mangga');
-                      setFormWaktu('Pukul 08.00 WIB - 16.00 WIB');
+                      setFormNama('Piket Loket Pelayanan Kelurahan Mangga (Sesi 1: 08.15 - 12.30)');
+                      setFormWaktu(SHIFT_LOKET_PAGI_WAKTU);
                       setFormLokasi('Loket Pelayanan Kantor Lurah Mangga');
                       if (!editingItem) {
                         setFormArahan(
-                          'Melaksanakan piket pelayanan administrasi kependudukan dan surat-menyurat warga di Loket Pelayanan Kantor Lurah Mangga secara tertib, ramah, dan responsif.'
+                          'Melaksanakan piket pelayanan administrasi warga di Loket Pelayanan Kantor Lurah Mangga (1 orang per sesi piket: Sesi 1 pukul 08.15 - 12.30 WIB / Sesi 2 pukul 12.30 - 16.30 WIB) secara tertib, ramah, dan responsif.'
                         );
                       }
                     }}
@@ -1911,7 +1914,9 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                     <Building2 className="w-5 h-5 text-indigo-600 shrink-0" />
                     <div>
                       <div className="text-xs font-black">Piket Loket Pelayanan</div>
-                      <div className="text-[10px] text-slate-500 font-normal">Kantor Lurah (08.00 - 16.00)</div>
+                      <div className="text-[10px] text-slate-500 font-normal">
+                        08.15–12.30 &amp; 12.30–16.30 (1 Org)
+                      </div>
                     </div>
                   </button>
 
@@ -1984,6 +1989,42 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                     placeholder="cth. Pukul 21.00 WIB s/d Selesai"
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
+                  {formJenis === 'piket_loket_pelayanan' && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormWaktu(SHIFT_LOKET_PAGI_WAKTU);
+                          if (!editingItem) {
+                            setFormNama('Piket Loket Pelayanan (Sesi 1: 08.15 - 12.30 WIB)');
+                          }
+                        }}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border cursor-pointer ${
+                          formWaktu === SHIFT_LOKET_PAGI_WAKTU
+                            ? 'bg-amber-500 text-slate-950 border-amber-600'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        Sesi 1: 08.15 - 12.30 (1 Org)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormWaktu(SHIFT_LOKET_SIANG_WAKTU);
+                          if (!editingItem) {
+                            setFormNama('Piket Loket Pelayanan (Sesi 2: 12.30 - 16.30 WIB)');
+                          }
+                        }}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border cursor-pointer ${
+                          formWaktu === SHIFT_LOKET_SIANG_WAKTU
+                            ? 'bg-indigo-600 text-white border-indigo-700'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        Sesi 2: 12.30 - 16.30 (1 Org)
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2032,48 +2073,81 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
               {/* Pemilihan Kepling Bertugas (Pilih Manual / Terapkan Saran Evaluasi) */}
               <div className="space-y-2 pt-2 border-t border-slate-200">
                 {formJenis === 'piket_loket_pelayanan' && (
-                  <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="text-[11px] text-indigo-950">
-                      <span className="font-black inline-flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                        Saran Awal Bulan {rekomendasiLoket.targetBulanLabel}:
-                      </span>{' '}
-                      <span className="text-indigo-800">
-                        Berdasarkan evaluasi disiplin Apel &amp; kinerja {rekomendasiLoket.evalBulanLabel}.
-                      </span>
+                  <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 space-y-1.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="text-[11px] text-indigo-950">
+                        <span className="font-black inline-flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                          Saran Awal Bulan {rekomendasiLoket.targetBulanLabel}:
+                        </span>{' '}
+                        <span className="text-indigo-800">
+                          Standar <strong>1 Orang per Piket Sesi</strong> (08.15–12.30 &amp; 12.30–16.30 WIB).
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const top1 =
+                              rekomendasiLoket.loketAssignments[0]?.petugasUtama[0] ||
+                              rekomendasiLoket.evaluasiSemuaKepling[0];
+                            if (top1) {
+                              setSelectedKeplingIds([top1.keplingId]);
+                              setFormWaktu(SHIFT_LOKET_PAGI_WAKTU);
+                              if (!editingItem) {
+                                setFormNama(
+                                  `Piket Loket Pelayanan Sesi 1 (08.15 - 12.30) — ${rekomendasiLoket.targetBulanLabel}`
+                                );
+                              }
+                              notify(
+                                `1 Petugas Sesi Pagi terpilih: ${top1.namaKepling} (Lk.${top1.nomorLingkungan})`,
+                                'success'
+                              );
+                            }
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black cursor-pointer"
+                        >
+                          1 Org Pagi (08.15–12.30)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const topSiang =
+                              rekomendasiLoket.loketAssignments[0]?.petugasPendamping[0] ||
+                              rekomendasiLoket.evaluasiSemuaKepling[1] ||
+                              rekomendasiLoket.evaluasiSemuaKepling[0];
+                            if (topSiang) {
+                              setSelectedKeplingIds([topSiang.keplingId]);
+                              setFormWaktu(SHIFT_LOKET_SIANG_WAKTU);
+                              if (!editingItem) {
+                                setFormNama(
+                                  `Piket Loket Pelayanan Sesi 2 (12.30 - 16.30) — ${rekomendasiLoket.targetBulanLabel}`
+                                );
+                              }
+                              notify(
+                                `1 Petugas Sesi Siang terpilih: ${topSiang.namaKepling} (Lk.${topSiang.nomorLingkungan})`,
+                                'success'
+                              );
+                            }
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black cursor-pointer"
+                        >
+                          1 Org Siang (12.30–16.30)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsSaranLoketOpen(true)}
+                          className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-100 text-indigo-900 border border-indigo-300 text-[10px] font-black cursor-pointer"
+                        >
+                          Detail 3 Loket
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const utamaIds = rekomendasiLoket.loketAssignments
-                            .flatMap((s) => s.petugasUtama)
-                            .map((k) => k.keplingId);
-                          setSelectedKeplingIds(Array.from(new Set(utamaIds)));
-                          notify('3 Petugas Utama terbaik bulan lalu terpilih!', 'success');
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black cursor-pointer"
-                      >
-                        Terapkan 3 Utama
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedKeplingIds(rekomendasiLoket.suggestedCombinedKeplingIds);
-                          notify('6 Petugas (Utama + Pendamping Rotasi) terpilih!', 'success');
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-100 text-indigo-800 border border-indigo-300 text-[10px] font-black cursor-pointer"
-                      >
-                        Terapkan 6 (Utama+Rotasi)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsSaranLoketOpen(true)}
-                        className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[10px] font-black cursor-pointer"
-                      >
-                        Detail Evaluasi
-                      </button>
-                    </div>
+                    {selectedKeplingIds.length > 1 && (
+                      <div className="text-[10px] font-bold text-amber-800 bg-amber-100/80 border border-amber-300 rounded-lg px-2 py-1">
+                        Catatan: Saat ini terpilih {selectedKeplingIds.length} Kepling. Untuk piket 1 sesi tunggal gunakan 1 orang (atau 3 orang jika mengisi Loket 1, 2, dan 3 sekaligus).
+                      </div>
+                    )}
                   </div>
                 )}
 
