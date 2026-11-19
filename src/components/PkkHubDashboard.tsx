@@ -45,6 +45,7 @@ import { getLocalDasaWismaList, subscribeDasaWisma } from '../lib/pkkDasaWismaSe
 import { getLocalPosyanduReports, subscribePosyanduReports } from '../lib/pkkPosyanduService';
 import { subscribeBuku1, DEFAULT_BUKU1_ITEMS, PkkBuku1Anggota } from '../lib/pkkBukuService';
 import { safeGetLocalStorage } from '../lib/safeStorage';
+import { CURRENT_APP_VERSION } from '../lib/appVersionService';
 
 import {
   syncPkkDeviceDataToLiveFirestore,
@@ -205,7 +206,7 @@ export const PkkHubDashboard: React.FC<PkkHubDashboardProps> = ({
                   title="Lihat Info Pembaruan Aplikasi"
                 >
                   <Sparkles className="w-3 h-3" />
-                  <span>Info Pembaruan v2.5.0</span>
+                  <span>Info Pembaruan {CURRENT_APP_VERSION}</span>
                 </button>
               )}
               <button

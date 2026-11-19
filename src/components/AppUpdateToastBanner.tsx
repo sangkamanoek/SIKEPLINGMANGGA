@@ -14,10 +14,14 @@ interface AppUpdateToastBannerProps {
   onOpenUpdateModal?: () => void;
 }
 
-export const AppUpdateToastBanner: React.FC<AppUpdateToastBannerProps> = ({ onOpenDetails }) => {
+export const AppUpdateToastBanner: React.FC<AppUpdateToastBannerProps> = ({
+  onOpenDetails,
+  onOpenUpdateModal,
+}) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
   const latestRelease = getLatestReleaseInfo();
+  const handleOpenModal = onOpenDetails || onOpenUpdateModal;
 
   useEffect(() => {
     // Show banner if there's an unseen update and not dismissed
@@ -71,7 +75,7 @@ export const AppUpdateToastBanner: React.FC<AppUpdateToastBannerProps> = ({ onOp
 
           <div className="flex items-center gap-2 mt-2.5">
             <button
-              onClick={onOpenDetails}
+              onClick={() => handleOpenModal?.()}
               className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center gap-1 transition-all shadow-xs"
             >
               <span>Lihat Apa yang Baru</span>
