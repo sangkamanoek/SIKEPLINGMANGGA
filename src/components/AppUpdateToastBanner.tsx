@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, ArrowRight, X, RefreshCw, Zap } from 'lucide-react';
 import {
   CURRENT_APP_VERSION,
+  getLatestReleaseInfo,
   hasUnseenAppUpdate,
   isUpdateBannerDismissed,
   dismissUpdateBanner,
@@ -16,6 +17,7 @@ interface AppUpdateToastBannerProps {
 export const AppUpdateToastBanner: React.FC<AppUpdateToastBannerProps> = ({ onOpenDetails }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
+  const latestRelease = getLatestReleaseInfo();
 
   useEffect(() => {
     // Show banner if there's an unseen update and not dismissed
@@ -60,7 +62,7 @@ export const AppUpdateToastBanner: React.FC<AppUpdateToastBannerProps> = ({ onOp
           </div>
 
           <p className="text-xs font-bold text-white mt-1 leading-snug">
-            Pembaruan SI-MANGGA: Opsi Perlinsos Menolak &amp; Perbaikan Spasial WebGIS
+            {latestRelease.title}
           </p>
 
           <p className="text-[11px] text-slate-300 mt-0.5 font-normal line-clamp-1">

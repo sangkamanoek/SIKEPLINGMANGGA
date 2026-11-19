@@ -11,15 +11,41 @@ export interface VersionRelease {
   }[];
 }
 
-export const CURRENT_APP_VERSION = 'v2.6.0';
-export const CURRENT_RELEASE_DATE = '17 November 2026';
+export const CURRENT_APP_VERSION = 'v2.6.1';
+export const CURRENT_RELEASE_DATE = '19 November 2026';
 
 export const APP_VERSION_HISTORY: VersionRelease[] = [
+  {
+    version: 'v2.6.1',
+    releaseDate: '19 November 2026',
+    title: 'Perbaikan Foto Kunjungan Warga, Piket Loket Pelayanan & Auto-Sync Realisasi Fisik',
+    badge: 'TERBARU',
+    isImportant: true,
+    highlights: [
+      'Perbaikan Menyeluruh Tampilan & Sinkronisasi Foto Kunjungan Warga (Drive, Kamera, & Laporan Harian)',
+      'Penambahan Piket Loket Pelayanan & Kegiatan Khusus pada Jadwal Posko',
+      'Otomatisasi Realisasi Fisik & Monitoring Lapangan Masuk ke Laporan Harian Kepling',
+      'Peningkatan Cache-Busting Otomatis agar Pembaruan Aplikasi Segera Terbaca'
+    ],
+    changes: [
+      {
+        category: 'PERBAIKAN',
+        description: 'Memperbaiki foto hasil Kunjungan Warga yang gagal tampil akibat atribut CORS, URL Google Drive /u/0/, format field lama, batas dokumen 1 MB Firestore, dan filter lap_kj_* saat segarkan data.'
+      },
+      {
+        category: 'FITUR BARU',
+        description: 'Menambahkan kategori Piket Loket Pelayanan dan Kegiatan Khusus pada Jadwal Posko serta sinkronisasi otomatis Realisasi Fisik dan Monitoring Lapangan ke Laporan Harian.'
+      },
+      {
+        category: 'PENINGKATAN',
+        description: 'Memperbarui header cache Vercel & Service Worker agar pembaruan kode setelah push ke GitHub langsung tampil tanpa tertahan cache browser lama.'
+      }
+    ]
+  },
   {
     version: 'v2.6.0',
     releaseDate: '17 November 2026',
     title: 'Jadwal Posko Malam, Auto-Sync Agenda/Posko, Segregasi Tupoksi Kasi & Panduan PPT Semua Akun',
-    badge: 'TERBARU',
     isImportant: true,
     highlights: [
       'Jadwal Posko Malam (Trantibum 21.00, Banjir 21.00, Bersih Sampah 20.00 WIB) dengan Kamera Langsung & Jam Otomatis HP',
