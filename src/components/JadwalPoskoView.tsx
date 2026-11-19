@@ -28,6 +28,8 @@ import {
   Shield,
   Waves,
   Eye,
+  Building2,
+  Star,
 } from 'lucide-react';
 import {
   UserAccount,
@@ -204,34 +206,61 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
     const today = new Date().toISOString().split('T')[0];
     setEditingItem(null);
     setFormJenis(presetJenis);
-    setFormNama(
-      presetJenis === 'posko_trantibum'
-        ? 'Posko Trantibum (Ketenteraman & Ketertiban Umum)'
-        : presetJenis === 'posko_banjir'
-        ? 'Posko Kewaspadaan Banjir'
-        : 'Posko Bersih Sampah Malam Hari'
-    );
-    setFormTanggal(today);
-    setFormWaktu(presetJenis === 'posko_bersih_sampah' ? 'Pukul 20.00 WIB s/d Selesai' : 'Pukul 21.00 WIB s/d Selesai');
-    setFormLokasi(
-      presetJenis === 'posko_trantibum'
-        ? 'Kantor Lurah'
-        : presetJenis === 'posko_banjir'
-        ? 'Taman Segitiga Lk. 9'
-        : 'Jalan Jamin Ginting'
-    );
-    setFormArahan(
-      presetJenis === 'posko_trantibum'
-        ? 'Lakukan apel malam pukul 21.00 WIB di Kantor Lurah, patroli wilayah siskamling, tertibkan potensi kerumunan remaja/balap liar, dan koordinasi dengan Babinsa/Bhabinkamtibmas.'
-        : presetJenis === 'posko_banjir'
-        ? 'Siaga di Taman Segitiga Lk. 9, pantau debit air saluran primer dan sekunder, cek potensi sumbatan sampah pada gorong-gorong drainase, laporkan ketinggian debit air berkala.'
-        : 'Lakukan pemantauan kebersihan lingkungan dan penertiban sampah liar di sepanjang Jalan Jamin Ginting mulai pukul 20.00 WIB s/d selesai.'
-    );
-    setFormPenanggungJawab(
-      isKasiTrantib
-        ? 'KASI KETENTRAMAN & KETERTIBAN UMUM'
-        : 'Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)'
-    );
+
+    if (presetJenis === 'posko_trantibum') {
+      setFormNama('Posko Trantibum (Ketenteraman & Ketertiban Umum)');
+      setFormWaktu('Pukul 21.00 WIB s/d Selesai');
+      setFormLokasi('Kantor Lurah');
+      setFormArahan(
+        'Lakukan apel malam pukul 21.00 WIB di Kantor Lurah, patroli wilayah siskamling, tertibkan potensi kerumunan remaja/balap liar, dan koordinasi dengan Babinsa/Bhabinkamtibmas.'
+      );
+      setFormPenanggungJawab(
+        isKasiTrantib
+          ? 'KASI KETENTRAMAN & KETERTIBAN UMUM'
+          : 'Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)'
+      );
+    } else if (presetJenis === 'posko_banjir') {
+      setFormNama('Posko Kewaspadaan Banjir');
+      setFormWaktu('Pukul 21.00 WIB s/d Selesai');
+      setFormLokasi('Taman Segitiga Lk. 9');
+      setFormArahan(
+        'Siaga di Taman Segitiga Lk. 9, pantau debit air saluran primer dan sekunder, cek potensi sumbatan sampah pada gorong-gorong drainase, laporkan ketinggian debit air berkala.'
+      );
+      setFormPenanggungJawab(
+        isKasiTrantib
+          ? 'KASI KETENTRAMAN & KETERTIBAN UMUM'
+          : 'Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)'
+      );
+    } else if (presetJenis === 'posko_bersih_sampah') {
+      setFormNama('Posko Bersih Sampah Malam Hari');
+      setFormWaktu('Pukul 20.00 WIB s/d Selesai');
+      setFormLokasi('Jalan Jamin Ginting');
+      setFormArahan(
+        'Lakukan pemantauan kebersihan lingkungan dan penertiban sampah liar di sepanjang Jalan Jamin Ginting mulai pukul 20.00 WIB s/d selesai.'
+      );
+      setFormPenanggungJawab(
+        isKasiTrantib
+          ? 'KASI KETENTRAMAN & KETERTIBAN UMUM'
+          : 'Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)'
+      );
+    } else if (presetJenis === 'piket_loket_pelayanan') {
+      setFormNama('Piket Loket Pelayanan Kelurahan Mangga');
+      setFormWaktu('Pukul 08.00 WIB - 16.00 WIB');
+      setFormLokasi('Loket Pelayanan Kantor Lurah Mangga');
+      setFormArahan(
+        'Melaksanakan piket pelayanan administrasi kependudukan dan surat-menyurat warga di Loket Pelayanan Kantor Lurah Mangga secara tertib, ramah, dan responsif.'
+      );
+      setFormPenanggungJawab('Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)');
+    } else {
+      setFormNama('Posko / Tugas Kegiatan Khusus Kelurahan');
+      setFormWaktu('Sesuai Jadwal Kegiatan');
+      setFormLokasi('Wilayah Kelurahan Mangga');
+      setFormArahan(
+        'Melaksanakan tugas kegiatan khusus kelurahan (monitoring lapangan terpadu, pengamanan acara resmi, atau instruksi khusus pimpinan) sesuai arahan.'
+      );
+      setFormPenanggungJawab('Feriyanto Arapenta Tarigan, A.Md (Lurah Mangga)');
+    }
+
     setFormStatus('TERJADWAL');
     setSelectedKeplingIds([]);
 
@@ -766,28 +795,37 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                 <Trash2 className="w-3.5 h-3.5 shrink-0" />
                 Posko Sampah · 20.00
               </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black uppercase tracking-wider bg-indigo-500/25 text-indigo-200 border border-indigo-400/40">
+                <Building2 className="w-3.5 h-3.5 shrink-0" />
+                Piket Loket Pelayanan
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black uppercase tracking-wider bg-purple-500/25 text-purple-200 border border-purple-400/40">
+                <Star className="w-3.5 h-3.5 shrink-0" />
+                Kegiatan Khusus
+              </span>
             </div>
 
             <h1 className="text-lg sm:text-2xl font-black tracking-tight text-white leading-snug">
-              Jadwal Posko Kelurahan Mangga
+              Jadwal Posko &amp; Piket Kelurahan Mangga
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Jadwal penugasan piket malam Kepala Lingkungan untuk{' '}
+              Jadwal penugasan Kepala Lingkungan untuk{' '}
               <strong>Posko Trantibum (Kantor Lurah, 21.00 WIB)</strong>,{' '}
-              <strong>Posko Kewaspadaan Banjir (Taman Segitiga Lk. 9, 21.00 WIB)</strong>, dan{' '}
-              <strong>Posko Bersih Sampah Malam Hari (Jalan Jamin Ginting, 20.00 WIB)</strong>.
+              <strong>Posko Kewaspadaan Banjir (Taman Segitiga Lk. 9, 21.00 WIB)</strong>,{' '}
+              <strong>Posko Bersih Sampah (Jl. Jamin Ginting, 20.00 WIB)</strong>,{' '}
+              <strong>Piket Loket Pelayanan</strong>, dan <strong>Kegiatan Khusus</strong>.
               Dibuat resmi oleh <strong>Kasi Trantib</strong> &amp; <strong>Lurah</strong>, dilengkapi foto kamera langsung dan cetak PDF Daftar Hadir.
             </p>
           </div>
 
           <div className="w-full lg:w-auto shrink-0">
             {canManagePosko ? (
-              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto lg:max-w-md lg:justify-end">
                 <button
                   type="button"
                   onClick={() => handleOpenAddModal('posko_trantibum')}
-                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
                 >
                   <Plus className="w-4 h-4 shrink-0" />
                   <span>Posko Trantibum</span>
@@ -795,7 +833,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                 <button
                   type="button"
                   onClick={() => handleOpenAddModal('posko_banjir')}
-                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs transition-all shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs transition-all shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
                 >
                   <Plus className="w-4 h-4 shrink-0" />
                   <span>Posko Banjir</span>
@@ -803,17 +841,33 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                 <button
                   type="button"
                   onClick={() => handleOpenAddModal('posko_bersih_sampah')}
-                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
                 >
                   <Plus className="w-4 h-4 shrink-0" />
                   <span>Posko Sampah</span>
                 </button>
                 <button
                   type="button"
+                  onClick={() => handleOpenAddModal('piket_loket_pelayanan')}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition-all shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4 shrink-0" />
+                  <span>Piket Loket</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenAddModal('kegiatan_khusus')}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs transition-all shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4 shrink-0" />
+                  <span>Kegiatan Khusus</span>
+                </button>
+                <button
+                  type="button"
                   onClick={handleManualSync}
                   disabled={isSyncing}
                   title="Sinkronkan dengan Firestore"
-                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap"
                 >
                   <RefreshCw className={`w-4 h-4 shrink-0 ${isSyncing ? 'animate-spin text-emerald-400' : ''}`} />
                   <span className="sm:hidden lg:inline">{isSyncing ? 'Sinkron...' : 'Sinkronkan'}</span>
@@ -851,14 +905,20 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
             <div className="min-w-0">
               <div className="inline-flex items-center gap-1.5 bg-black/20 text-white text-[10px] sm:text-[11px] font-black px-2.5 py-0.5 rounded-full mb-1">
                 <Sparkles className="w-3 h-3 text-amber-200 shrink-0" />
-                <span>PEMBERITAHUAN TUGAS PIKET MALAM INI</span>
+                <span>
+                  {myAssignedPoskoToday.jenisPosko === 'piket_loket_pelayanan'
+                    ? 'PEMBERITAHUAN PIKET LOKET PELAYANAN HARI INI'
+                    : myAssignedPoskoToday.jenisPosko === 'kegiatan_khusus'
+                    ? 'PEMBERITAHUAN TUGAS KEGIATAN KHUSUS HARI INI'
+                    : 'PEMBERITAHUAN TUGAS PIKET POSKO HARI INI'}
+                </span>
               </div>
               <h3 className="text-sm sm:text-lg font-black tracking-tight leading-snug">
                 Halo {currentUser.nama}! Anda Ditugaskan pada {myAssignedPoskoToday.namaPosko}
               </h3>
               <p className="text-xs text-amber-100 mt-0.5 max-w-2xl">
                 Jadwal: <strong>{myAssignedPoskoToday.waktuMulai}</strong> • Lokasi:{' '}
-                <strong>{myAssignedPoskoToday.lokasiPosko}</strong>. Wajib hadir dan mengunggah Foto Kehadiran di lokasi posko.
+                <strong>{myAssignedPoskoToday.lokasiPosko}</strong>. Wajib hadir dan mengunggah Foto Kehadiran di lokasi tugas.
               </p>
             </div>
           </div>
@@ -877,7 +937,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
       {/* FILTER CONTROLS & SEARCH */}
       <div className="bg-white rounded-2xl border border-slate-200 p-3.5 sm:p-4 shadow-2xs space-y-3">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-          {/* Filter Jenis Posko (Grid 2x2 rapi di HP, inline sejajar di desktop) */}
+          {/* Filter Jenis Posko (Grid 2x3 rapi di HP, inline sejajar di desktop) */}
           <div className="grid grid-cols-2 sm:inline-flex sm:flex-wrap items-center gap-1.5 p-1.5 bg-slate-100 rounded-xl border border-slate-200 w-full xl:w-auto">
             <button
               type="button"
@@ -925,6 +985,30 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
             >
               <Trash2 className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">Posko Sampah</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterJenis('piket_loket_pelayanan')}
+              className={`inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                filterJenis === 'piket_loket_pelayanan'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Piket Loket</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterJenis('kegiatan_khusus')}
+              className={`inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                filterJenis === 'kegiatan_khusus'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              <Star className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Kegiatan Khusus</span>
             </button>
           </div>
 
@@ -984,7 +1068,7 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
           </h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             {canManagePosko
-              ? 'Gunakan tombol di atas untuk membuat jadwal Posko Trantibum atau Posko Kewaspadaan Banjir baru.'
+              ? 'Gunakan tombol di atas untuk membuat jadwal Posko Trantibum, Posko Banjir, Posko Sampah, Piket Loket Pelayanan, atau Kegiatan Khusus.'
               : isKepling
               ? `Halaman ini hanya menampilkan jadwal posko yang ditugaskan khusus untuk akun Anda (${currentUser.nama}${
                   currentUser.nomorLingkungan ? ` • Lingkungan ${currentUser.nomorLingkungan}` : ''
@@ -1007,6 +1091,8 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
           {filteredList.map((posko) => {
             const isTrantib = posko.jenisPosko === 'posko_trantibum';
             const isSampah = posko.jenisPosko === 'posko_bersih_sampah';
+            const isLoket = posko.jenisPosko === 'piket_loket_pelayanan';
+            const isKhusus = posko.jenisPosko === 'kegiatan_khusus';
             const totalPetugas = posko.petugasKepling?.length || 0;
             const totalHadir =
               posko.petugasKepling?.filter((k) => k.statusKehadiran === 'Hadir').length || 0;
@@ -1033,6 +1119,10 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                     ? 'border-amber-200/80 hover:border-amber-300'
                     : isSampah
                     ? 'border-emerald-200/80 hover:border-emerald-300'
+                    : isLoket
+                    ? 'border-indigo-200/80 hover:border-indigo-300'
+                    : isKhusus
+                    ? 'border-purple-200/80 hover:border-purple-300'
                     : 'border-cyan-200/80 hover:border-cyan-300'
                 }`}
               >
@@ -1043,6 +1133,10 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                       ? 'bg-amber-50/70 border-amber-100'
                       : isSampah
                       ? 'bg-emerald-50/70 border-emerald-100'
+                      : isLoket
+                      ? 'bg-indigo-50/70 border-indigo-100'
+                      : isKhusus
+                      ? 'bg-purple-50/70 border-purple-100'
                       : 'bg-cyan-50/70 border-cyan-100'
                   }`}
                 >
@@ -1053,6 +1147,10 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                           ? 'bg-amber-600 text-white'
                           : isSampah
                           ? 'bg-emerald-700 text-white'
+                          : isLoket
+                          ? 'bg-indigo-600 text-white'
+                          : isKhusus
+                          ? 'bg-purple-600 text-white'
                           : 'bg-cyan-700 text-white'
                       }`}
                     >
@@ -1060,6 +1158,10 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                         <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6" />
                       ) : isSampah ? (
                         <Trash2 className="w-5 h-5 sm:w-6 sm:h-6" />
+                      ) : isLoket ? (
+                        <Building2 className="w-5 h-5 sm:w-6 sm:h-6" />
+                      ) : isKhusus ? (
+                        <Star className="w-5 h-5 sm:w-6 sm:h-6" />
                       ) : (
                         <Waves className="w-5 h-5 sm:w-6 sm:h-6" />
                       )}
@@ -1072,6 +1174,10 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                               ? 'bg-amber-200 text-amber-900'
                               : isSampah
                               ? 'bg-emerald-200 text-emerald-900'
+                              : isLoket
+                              ? 'bg-indigo-200 text-indigo-900'
+                              : isKhusus
+                              ? 'bg-purple-200 text-purple-900'
                               : 'bg-cyan-200 text-cyan-900'
                           }`}
                         >
@@ -1079,6 +1185,10 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                             ? 'Posko Trantibum'
                             : isSampah
                             ? 'Posko Bersih Sampah'
+                            : isLoket
+                            ? 'Piket Loket Pelayanan'
+                            : isKhusus
+                            ? 'Kegiatan Khusus'
                             : 'Posko Kewaspadaan Banjir'}
                         </span>
 
@@ -1428,9 +1538,9 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
               {/* Jenis Posko Switcher */}
               <div>
                 <label className="text-[11px] font-black text-slate-700 uppercase block mb-1">
-                  Pilih Jenis Posko
+                  Pilih Jenis Posko / Penugasan
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -1438,6 +1548,11 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                       setFormNama('Posko Trantibum (Ketenteraman & Ketertiban Umum)');
                       setFormWaktu('Pukul 21.00 WIB s/d Selesai');
                       setFormLokasi('Kantor Lurah');
+                      if (!editingItem) {
+                        setFormArahan(
+                          'Lakukan apel malam pukul 21.00 WIB di Kantor Lurah, patroli wilayah siskamling, tertibkan potensi kerumunan remaja/balap liar, dan koordinasi dengan Babinsa/Bhabinkamtibmas.'
+                        );
+                      }
                     }}
                     className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
                       formJenis === 'posko_trantibum'
@@ -1459,6 +1574,11 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                       setFormNama('Posko Kewaspadaan Banjir');
                       setFormWaktu('Pukul 21.00 WIB s/d Selesai');
                       setFormLokasi('Taman Segitiga Lk. 9');
+                      if (!editingItem) {
+                        setFormArahan(
+                          'Siaga di Taman Segitiga Lk. 9, pantau debit air saluran primer dan sekunder, cek potensi sumbatan sampah pada gorong-gorong drainase, laporkan ketinggian debit air berkala.'
+                        );
+                      }
                     }}
                     className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
                       formJenis === 'posko_banjir'
@@ -1480,6 +1600,11 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                       setFormNama('Posko Bersih Sampah Malam Hari');
                       setFormWaktu('Pukul 20.00 WIB s/d Selesai');
                       setFormLokasi('Jalan Jamin Ginting');
+                      if (!editingItem) {
+                        setFormArahan(
+                          'Lakukan pemantauan kebersihan lingkungan dan penertiban sampah liar di sepanjang Jalan Jamin Ginting mulai pukul 20.00 WIB s/d selesai.'
+                        );
+                      }
                     }}
                     className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
                       formJenis === 'posko_bersih_sampah'
@@ -1491,6 +1616,58 @@ export const JadwalPoskoView: React.FC<JadwalPoskoViewProps> = ({
                     <div>
                       <div className="text-xs font-black">Posko Bersih Sampah</div>
                       <div className="text-[10px] text-slate-500 font-normal">Jl. Jamin Ginting (20.00)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormJenis('piket_loket_pelayanan');
+                      setFormNama('Piket Loket Pelayanan Kelurahan Mangga');
+                      setFormWaktu('Pukul 08.00 WIB - 16.00 WIB');
+                      setFormLokasi('Loket Pelayanan Kantor Lurah Mangga');
+                      if (!editingItem) {
+                        setFormArahan(
+                          'Melaksanakan piket pelayanan administrasi kependudukan dan surat-menyurat warga di Loket Pelayanan Kantor Lurah Mangga secara tertib, ramah, dan responsif.'
+                        );
+                      }
+                    }}
+                    className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                      formJenis === 'piket_loket_pelayanan'
+                        ? 'bg-indigo-50 border-indigo-400 text-indigo-950 font-black shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Building2 className="w-5 h-5 text-indigo-600 shrink-0" />
+                    <div>
+                      <div className="text-xs font-black">Piket Loket Pelayanan</div>
+                      <div className="text-[10px] text-slate-500 font-normal">Kantor Lurah (08.00 - 16.00)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormJenis('kegiatan_khusus');
+                      setFormNama('Posko / Tugas Kegiatan Khusus Kelurahan');
+                      setFormWaktu('Sesuai Jadwal Kegiatan');
+                      setFormLokasi('Wilayah Kelurahan Mangga');
+                      if (!editingItem) {
+                        setFormArahan(
+                          'Melaksanakan tugas kegiatan khusus kelurahan (monitoring lapangan terpadu, pengamanan acara resmi, atau instruksi khusus pimpinan) sesuai arahan.'
+                        );
+                      }
+                    }}
+                    className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                      formJenis === 'kegiatan_khusus'
+                        ? 'bg-purple-50 border-purple-400 text-purple-950 font-black shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Star className="w-5 h-5 text-purple-600 shrink-0" />
+                    <div>
+                      <div className="text-xs font-black">Kegiatan Khusus</div>
+                      <div className="text-[10px] text-slate-500 font-normal">Penugasan Khusus Pimpinan</div>
                     </div>
                   </button>
                 </div>

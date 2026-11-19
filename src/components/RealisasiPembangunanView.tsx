@@ -54,6 +54,9 @@ import {
   subscribeToPembangunan,
   batchSyncPembangunan,
   PEMBANGUNAN_STORAGE_KEY,
+  syncPembangunanToLaporanHarian,
+  deletePembangunanLaporanHarian,
+  hasLinkedPembangunanLaporanHarian,
 } from '../lib/pembangunanService';
 import { FormLaporanMonitoringModal } from './FormLaporanMonitoringModal';
 import {
@@ -64,6 +67,9 @@ import {
   getLocalMonitoringList,
   formatMonitoringForWhatsApp,
   getWhatsAppShareUrl,
+  syncMonitoringToLaporanHarian,
+  deleteMonitoringLaporanHarian,
+  hasLinkedMonitoringLaporanHarian,
 } from '../lib/monitoringInfrastrukturService';
 import { formatTanggalIndonesia } from '../lib/formatter';
 import { downloadImage, downloadProjectPhotosAsZip, getHighResImageUrl } from '../lib/imageDownloader';
@@ -332,6 +338,7 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
     deletePembangunanFromServer(targetId).catch((err) => {
       console.warn('Delete pembangunan from server notice:', err);
     });
+    deletePembangunanLaporanHarian(targetId).catch(() => {});
     setItemToDelete(null);
     showToast(`Laporan "${targetName.slice(0, 30)}..." berhasil dihapus dari database.`);
   };
@@ -400,14 +407,25 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
   };
 
   const handleSaveMonitoring = async (report: LaporanMonitoringInfrastruktur) => {
-    await saveMonitoringReport(report);
-    showToast(`Laporan Monitoring "${report.nomorLaporan}" berhasil disimpan.`);
+    const savedReport = await saveMonitoringReport(report);
+    const shouldSyncDaily =
+      isKeplingRole || (await hasLinkedMonitoringLaporanHarian(savedReport.id));
+    if (shouldSyncDaily) {
+      await syncMonitoringToLaporanHarian(savedReport, currentUser).catch(() => {});
+    }
+    showToast(
+      isKeplingRole
+        ? `Laporan Monitoring "${savedReport.nomorLaporan}" tersimpan & otomatis masuk ke Laporan Harian!`
+        : `Laporan Monitoring "${savedReport.nomorLaporan}" berhasil disimpan.`
+    );
   };
 
   const confirmDeleteMonitoring = async () => {
     if (!monitoringToDelete) return;
+    const targetId = monitoringToDelete.id;
     const targetNo = monitoringToDelete.nomorLaporan;
-    await deleteMonitoringReport(monitoringToDelete.id);
+    await deleteMonitoringReport(targetId);
+    await deleteMonitoringLaporanHarian(targetId).catch(() => {});
     setMonitoringToDelete(null);
     showToast(`Laporan Monitoring "${targetNo}" berhasil dihapus.`);
   };
@@ -433,6 +451,9 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       updatedAt: new Date().toISOString(),
     };
     await saveMonitoringReport(updated);
+    if (await hasLinkedMonitoringLaporanHarian(updated.id)) {
+      await syncMonitoringToLaporanHarian(updated, currentUser).catch(() => {});
+    }
     showToast(
       newStatus === 'SELESAI_DIPERBAIKI'
         ? `Supervisi: Laporan No. ${mon.nomorLaporan} ditandai [SUDAH DITANGANI]`
@@ -840,10 +861,17 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       };
       setItems((prev) => prev.map((i) => (i.id === editingItem.id ? updated : i)));
       setIsModalOpen(false);
-      const ok = await savePembangunanToServer(updated);
+      const savedUpdated = await savePembangunanToServer(updated);
+      const shouldSyncDaily =
+        isKeplingRole || (await hasLinkedPembangunanLaporanHarian(savedUpdated.id));
+      if (shouldSyncDaily) {
+        await syncPembangunanToLaporanHarian(savedUpdated, currentUser).catch(() => {});
+      }
       showToast(
-        ok
-          ? `Pembaruan proyek "${updated.namaProyek}" berhasil disimpan ke Firebase & database!`
+        savedUpdated
+          ? isKeplingRole
+            ? `Pembaruan proyek "${updated.namaProyek}" tersimpan & otomatis masuk ke Laporan Harian!`
+            : `Pembaruan proyek "${updated.namaProyek}" berhasil disimpan ke Firebase & database!`
           : `Pembaruan proyek "${updated.namaProyek}" tersimpan di memori perangkat.`
       );
     } else {
@@ -875,10 +903,15 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
       };
       setItems((prev) => [newItem, ...prev]);
       setIsModalOpen(false);
-      const ok = await savePembangunanToServer(newItem);
+      const savedCreated = await savePembangunanToServer(newItem);
+      if (isKeplingRole) {
+        await syncPembangunanToLaporanHarian(savedCreated, currentUser).catch(() => {});
+      }
       showToast(
-        ok
-          ? `Laporan proyek "${newItem.namaProyek}" berhasil disimpan ke Firebase Firestore!`
+        savedCreated
+          ? isKeplingRole
+            ? `Laporan proyek "${newItem.namaProyek}" tersimpan & otomatis tercatat di Laporan Harian!`
+            : `Laporan proyek "${newItem.namaProyek}" berhasil disimpan ke Firebase Firestore!`
           : `Laporan proyek "${newItem.namaProyek}" tersimpan di memori lokal.`
       );
     }
@@ -1119,6 +1152,15 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
               <Database className="w-3.5 h-3.5" />
               <span>Database Terhubung</span>
             </span>
+            {isKeplingRole && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-300/30 text-emerald-200 font-bold">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>Otomatis Masuk Laporan Harian</span>
+                </span>
+              </>
+            )}
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug">
@@ -1856,6 +1898,15 @@ export const RealisasiPembangunanView: React.FC<RealisasiPembangunanViewProps> =
                 </span>
                 <span aria-hidden="true">·</span>
                 <span>Kelurahan Mangga</span>
+                {isKeplingRole && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/15 border border-emerald-300/30 text-emerald-100 font-bold">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Otomatis Masuk Laporan Harian</span>
+                    </span>
+                  </>
+                )}
               </div>
 
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug">

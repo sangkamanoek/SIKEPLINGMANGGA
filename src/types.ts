@@ -672,8 +672,13 @@ export interface AbsensiApelHarian {
   updatedAt?: string;
 }
 
-// Jadwal Posko Trantibum & Posko Kewaspadaan Banjir
-export type JenisPosko = 'posko_trantibum' | 'posko_banjir' | 'posko_bersih_sampah';
+// Jadwal Posko Trantibum, Banjir, Bersih Sampah, Piket Loket Pelayanan & Kegiatan Khusus
+export type JenisPosko =
+  | 'posko_trantibum'
+  | 'posko_banjir'
+  | 'posko_bersih_sampah'
+  | 'piket_loket_pelayanan'
+  | 'kegiatan_khusus';
 export type StatusPosko = 'TERJADWAL' | 'BERLANGSUNG' | 'SELESAI';
 
 export interface KeplingPetugasPosko {

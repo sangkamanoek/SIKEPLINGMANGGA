@@ -336,7 +336,7 @@ export const AgendaKelurahanView: React.FC<AgendaKelurahanViewProps> = ({
             }`}
           >
             <ShieldAlert className={`w-4 h-4 shrink-0 ${activeSubTab === 'jadwal_posko' ? 'text-amber-100' : 'text-amber-500'}`} />
-            <span>Jadwal Posko Malam</span>
+            <span>Jadwal Posko &amp; Piket</span>
           </button>
 
           {isSuperAdmin && (

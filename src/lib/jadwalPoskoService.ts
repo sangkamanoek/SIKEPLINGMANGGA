@@ -396,8 +396,25 @@ export const syncPoskoKehadiranToLaporanHarian = async (
   const roman = ROMAN_NUMERALS[petugas.nomorLingkungan - 1] || String(petugas.nomorLingkungan);
   const resolvedKeplingId = acc?.id || petugas.keplingId || `kepling_${petugas.nomorLingkungan}`;
 
-  const poskoPrefix = `[Absensi Posko] Hadir: ${posko.namaPosko}`;
-  const poskoDetail = `${poskoPrefix} (${petugas.jamHadir || formatDeviceClockWib()}) di ${posko.lokasiPosko}${
+  const getPoskoLabel = (jenis: JadwalPoskoItem['jenisPosko']): string => {
+    switch (jenis) {
+      case 'posko_trantibum':
+        return 'Posko Trantibum';
+      case 'posko_banjir':
+        return 'Posko Kewaspadaan Banjir';
+      case 'posko_bersih_sampah':
+        return 'Posko Bersih Sampah';
+      case 'piket_loket_pelayanan':
+        return 'Piket Loket Pelayanan';
+      case 'kegiatan_khusus':
+        return 'Kegiatan Khusus';
+      default:
+        return 'Posko Kelurahan';
+    }
+  };
+  const jenisLabel = getPoskoLabel(posko.jenisPosko);
+  const poskoPrefix = `[Absensi Posko] Hadir: ${posko.namaPosko || jenisLabel}`;
+  const poskoDetail = `${poskoPrefix} [${jenisLabel}] (${petugas.jamHadir || formatDeviceClockWib()}) di ${posko.lokasiPosko}${
     petugas.catatanSituasi?.trim() ? ` — ${petugas.catatanSituasi.trim()}` : ''
   }`;
 
@@ -450,10 +467,10 @@ export const syncPoskoKehadiranToLaporanHarian = async (
       dokumentasiFoto: fotos,
       petugasNama: profile?.nama || acc?.nama || petugas.namaKepling,
       petugasRole: 'kepling',
-      uraianTugas: `Kehadiran ${posko.namaPosko} (${petugas.jamHadir || formatDeviceClockWib()})`,
+      uraianTugas: `Kehadiran ${posko.namaPosko || jenisLabel} (${petugas.jamHadir || formatDeviceClockWib()})`,
       catatanUmum: petugas.catatanSituasi?.trim()
-        ? `Situasi Posko: ${petugas.catatanSituasi.trim()}`
-        : `Tercatat otomatis dari Absensi Kehadiran Posko di ${posko.lokasiPosko}.`,
+        ? `Situasi ${jenisLabel}: ${petugas.catatanSituasi.trim()}`
+        : `Tercatat otomatis dari Absensi ${jenisLabel} di ${posko.lokasiPosko}.`,
       createdAt: nowIso,
       updatedAt: nowIso,
     };
@@ -535,7 +552,7 @@ export const syncPoskoKehadiranToLaporanHarian = async (
 };
 
 /**
- * Cek apakah keikutsertaan Kepling pada Posko (Trantibum, Banjir, Bersih Sampah)
+ * Cek apakah keikutsertaan Kepling pada Posko (Trantibum, Banjir, Bersih Sampah, Piket Loket Pelayanan, Kegiatan Khusus)
  * sah dihitung sebagai poin kinerja (10%):
  * Wajib status Hadir, tidak ditolak admin, serta (telah unggah foto kehadiran ATAU terverifikasi Super Admin / status SELESAI).
  */

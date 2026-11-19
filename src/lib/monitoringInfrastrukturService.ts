@@ -1,4 +1,9 @@
-import { LaporanMonitoringInfrastruktur } from '../types';
+import {
+  FotoDokumentasi,
+  LaporanHarianItem,
+  LaporanMonitoringInfrastruktur,
+  UserAccount,
+} from '../types';
 import {
   db,
   getAccessToken,
@@ -16,6 +21,18 @@ import {
 } from 'firebase/firestore';
 import { resilientSetDoc, resilientDeleteDoc } from './firestoreWriteQueue';
 import { safeGetLocalStorage, safeSetLocalStorage } from './safeStorage';
+import {
+  deleteReportFromIndexedDB,
+  getSingleReportFromIndexedDB,
+  saveSingleReportToIndexedDB,
+} from './indexedDbStorage';
+import { mergeFotoArraysPreservingUrls } from './reportConsolidator';
+import {
+  KEPLING_ACCOUNTS,
+  ROMAN_NUMERALS,
+  getEffectiveProfile,
+} from '../data/keplingList';
+import { getNamaHariIndonesia, getTodayLocalIso } from './formatter';
 import * as XLSX from 'xlsx';
 import { syncMonitoringPhotosToDrive } from './driveSync';
 
@@ -23,6 +40,8 @@ export const MONITORING_INFRA_COLLECTION = 'monitoring_infrastruktur';
 export const MONITORING_INFRA_STORAGE_KEY = 'sikepling_monitoring_infra_v2';
 export const MONITORING_INFRA_DELETED_KEY = 'sikepling_monitoring_infra_deleted_v2';
 export const MONITORING_INFRA_CHANNEL = 'sikepling_monitoring_infra_channel';
+const LAPORAN_STORAGE_KEY = 'kepling_local_laporan_history_v2';
+const MONITORING_LAPORAN_PREFIX = '[Monitoring Lapangan]';
 
 // Default Seed Laporan Monitoring Resmi Sesuai Permintaan User (Kosong agar diisi Kepling)
 export const INITIAL_MONITORING_DATA: LaporanMonitoringInfrastruktur[] = [];
@@ -288,7 +307,7 @@ export const subscribeMonitoringReports = (
 
 export const saveMonitoringReport = async (
   item: LaporanMonitoringInfrastruktur
-): Promise<void> => {
+): Promise<LaporanMonitoringInfrastruktur> => {
   let itemToSave = item;
 
   // 0. Sync to Drive if connected
@@ -311,6 +330,7 @@ export const saveMonitoringReport = async (
 
   const cleaned = cleanFirestoreData(itemToSave);
   await resilientSetDoc(MONITORING_INFRA_COLLECTION, itemToSave.id, cleaned, { merge: true });
+  return itemToSave;
 };
 
 export const deleteMonitoringReport = async (id: string): Promise<void> => {
@@ -414,3 +434,261 @@ export const exportMonitoringToExcel = (
   XLSX.utils.book_append_sheet(wb, ws, 'Monitoring Infrastruktur');
   XLSX.writeFile(wb, `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`);
 };
+
+const sanitizeMonitoringKey = (rawId: string): string => {
+  const clean = String(rawId || 'mon').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (clean.length <= 60) return clean;
+  let h = 0;
+  for (let i = 0; i < clean.length; i++) {
+    h = (h * 31 + clean.charCodeAt(i)) | 0;
+  }
+  return `${clean.slice(0, 42)}_${Math.abs(h).toString(36)}`;
+};
+
+export const buildMonitoringReportId = (monitoringId: string): string =>
+  `lap_mon_${sanitizeMonitoringKey(monitoringId)}`;
+
+const isValidMonitoringPhotoUrl = (url?: string): boolean => {
+  if (typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  return (
+    trimmed.length > 10 &&
+    (trimmed.startsWith('data:image/') ||
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.startsWith('/'))
+  );
+};
+
+const pickMonitoringIsoDate = (report: LaporanMonitoringInfrastruktur): string => {
+  const candidates = [
+    report.tanggal,
+    typeof report.createdAt === 'string' ? report.createdAt.slice(0, 10) : '',
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.trim())) {
+      return c.trim();
+    }
+  }
+  return getTodayLocalIso();
+};
+
+const formatMonitoringStatusLabel = (
+  status?: LaporanMonitoringInfrastruktur['statusTindakLanjut']
+): string => {
+  switch (status) {
+    case 'SELESAI_DIPERBAIKI':
+      return 'Sudah Ditangani';
+    case 'SEDANG_DITANGANI':
+      return 'Sedang Ditangani';
+    case 'MENUNGGU_TINDAK_LANJUT':
+    default:
+      return 'Belum Ditangani';
+  }
+};
+
+export const hasLinkedMonitoringLaporanHarian = async (
+  monitoringId: string
+): Promise<boolean> => {
+  const reportId = buildMonitoringReportId(monitoringId);
+  const localReports = safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_STORAGE_KEY, []);
+  if (localReports.some((r) => r?.id === reportId)) return true;
+  try {
+    const idb = await getSingleReportFromIndexedDB(reportId);
+    return Boolean(idb);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Otomatis mencatat entri Monitoring Lapangan yang diisi Kepala Lingkungan
+ * ke dalam Laporan Harian Kepling (LocalStorage, React State Event, IndexedDB, Firestore, Server API).
+ */
+export const syncMonitoringToLaporanHarian = async (
+  report: LaporanMonitoringInfrastruktur,
+  actor?: UserAccount
+): Promise<LaporanHarianItem | null> => {
+  if (!report || !report.id) return null;
+
+  const nomorLingkungan = Number(report.lingkunganNomor || actor?.nomorLingkungan || 0);
+  if (!nomorLingkungan || nomorLingkungan < 1) return null;
+
+  const acc = KEPLING_ACCOUNTS.find((k) => k.nomorLingkungan === nomorLingkungan) || null;
+  const profile = acc ? getEffectiveProfile(acc) : null;
+  const roman = ROMAN_NUMERALS[nomorLingkungan - 1] || String(nomorLingkungan);
+  const resolvedKeplingId = acc?.id || `kepling_${nomorLingkungan}`;
+  const resolvedLingkungan = acc?.lingkungan || `Lingkungan ${roman}`;
+  const resolvedNama =
+    profile?.nama || acc?.nama || report.pelapor || actor?.nama || `Kepling Lingkungan ${roman}`;
+  const resolvedJabatan = acc?.jabatan || `Kepala Lingkungan ${roman}`;
+
+  const reportId = buildMonitoringReportId(report.id);
+  const tanggalIso = pickMonitoringIsoDate(report);
+  const nowIso = new Date().toISOString();
+
+  const localReports = safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_STORAGE_KEY, []);
+  let existingReport = localReports.find((r) => r?.id === reportId);
+  if (!existingReport) {
+    try {
+      const idbReport = await getSingleReportFromIndexedDB(reportId);
+      if (idbReport) existingReport = idbReport;
+    } catch {
+      // ignore
+    }
+  }
+
+  const angles: Array<{ url?: string; label: string }> = [
+    { url: report.fotoAngle1Url, label: report.fotoAngle1Label || 'Angle 1: Tampak Depan' },
+    { url: report.fotoAngle2Url, label: report.fotoAngle2Label || 'Angle 2: Tampak Samping' },
+    { url: report.fotoAngle3Url, label: report.fotoAngle3Label || 'Angle 3: Tampak Luas' },
+  ];
+
+  const MAX_TOTAL_CHARS = 340_000;
+  const fotos: FotoDokumentasi[] = [];
+  let totalChars = 0;
+  let validPhotoCount = 0;
+
+  angles.forEach((ang, idx) => {
+    if (!isValidMonitoringPhotoUrl(ang.url)) return;
+    const cleanUrl = ang.url!.trim();
+    if (fotos.some((f) => f.url === cleanUrl)) return;
+    validPhotoCount += 1;
+    if (totalChars + cleanUrl.length > MAX_TOTAL_CHARS) return;
+    totalChars += cleanUrl.length;
+    fotos.push({
+      id: `foto_${reportId}_${idx + 1}`,
+      url: cleanUrl,
+      name: `[MONITORING] ${report.subjek} (${ang.label})`,
+      timestamp: report.updatedAt || report.createdAt || nowIso,
+      kategori: 'infrastruktur',
+      keterangan: `${ang.label} — ${report.lokasi}`,
+    });
+  });
+
+  const existingValidFotos = Array.isArray(existingReport?.dokumentasiFoto)
+    ? existingReport!.dokumentasiFoto.filter((f) => f && isValidMonitoringPhotoUrl(f.url))
+    : [];
+  const effectiveFotos =
+    fotos.length > 0
+      ? mergeFotoArraysPreservingUrls(existingReport?.dokumentasiFoto, fotos)
+      : existingValidFotos;
+
+  const statusLabel = formatMonitoringStatusLabel(report.statusTindakLanjut);
+  const noLapText = report.nomorLaporan ? `No. ${report.nomorLaporan}` : '';
+
+  const reportItem: LaporanHarianItem = {
+    id: reportId,
+    keplingId: resolvedKeplingId,
+    lingkungan: resolvedLingkungan,
+    namaKepling: resolvedNama,
+    jabatan: resolvedJabatan,
+    kelurahan: 'Kelurahan Mangga',
+    kecamatan: 'Kecamatan Medan Tuntungan',
+    hari: getNamaHariIndonesia(tanggalIso),
+    tanggal: tanggalIso,
+    tanggalLaporan: tanggalIso,
+    kinerja: {
+      opsirPbbWp: 0,
+      opsirPbbKeterangan: '',
+      perlinsosKk: 0,
+      perlinsosKeterangan: '',
+      ikdOrang: 0,
+      ikdKeterangan: '',
+      bpjsKetenagakerjaanOrang: 0,
+      bpjsKetenagakerjaanKeterangan: '',
+      infrastrukturAdaGiat: true,
+      infrastrukturSubjek: `${MONITORING_LAPORAN_PREFIX} ${report.subjek}${
+        noLapText ? ` (${noLapText})` : ''
+      }`,
+      infrastrukturLokasi: report.lokasi || `${resolvedLingkungan}, Kelurahan Mangga`,
+      infrastrukturTitikKoordinat: report.koordinatUrl || '',
+      infrastrukturTanggalPelaporan: tanggalIso,
+      infrastrukturPelapor: report.pelapor || resolvedNama,
+      kegiatanLainnya: `${MONITORING_LAPORAN_PREFIX} ${
+        noLapText ? `${noLapText} — ` : ''
+      }${report.subjek} di ${report.lokasi} (Kategori: ${
+        report.kategoriIsu || 'Infrastruktur'
+      }, Status: ${statusLabel})${
+        report.keterangan?.trim() ? ` — ${report.keterangan.trim()}` : ''
+      }`,
+    },
+    jumlahDokumentasi: Math.max(effectiveFotos.length, validPhotoCount),
+    dokumentasiFoto: effectiveFotos,
+    petugasNama: report.pelapor || resolvedNama,
+    petugasRole: 'kepling',
+    uraianTugas: `Monitoring Lapangan${noLapText ? ` (${noLapText})` : ''}: ${report.subjek} di ${
+      report.lokasi
+    }`,
+    catatanUmum: report.keterangan?.trim()
+      ? report.keterangan.trim()
+      : `Tercatat otomatis dari Menu Monitoring Lapangan (${statusLabel}).`,
+    createdAt: existingReport?.createdAt || report.createdAt || nowIso,
+    updatedAt: nowIso,
+  };
+
+  try {
+    const idx = localReports.findIndex((r) => r?.id === reportId);
+    const updatedLocal =
+      idx >= 0
+        ? localReports.map((r) => (r?.id === reportId ? reportItem : r))
+        : [reportItem, ...localReports];
+    safeSetLocalStorage(LAPORAN_STORAGE_KEY, JSON.stringify(updatedLocal), {
+      skipIdbMirror: true,
+    });
+  } catch {
+    // ignore
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('sikepling-reports-updated', {
+        detail: { upsertedReports: [reportItem], deletedIds: [] },
+      })
+    );
+  }
+
+  await Promise.allSettled([
+    saveSingleReportToIndexedDB(reportItem).catch(() => {}),
+    resilientSetDoc('reports', reportItem.id, cleanFirestoreData(reportItem), {
+      merge: true,
+    }).catch(() => {}),
+    fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reportItem),
+    }).catch(() => {}),
+  ]);
+
+  return reportItem;
+};
+
+export const deleteMonitoringLaporanHarian = async (monitoringId: string): Promise<void> => {
+  if (!monitoringId) return;
+  const reportId = buildMonitoringReportId(monitoringId);
+
+  try {
+    const localReports = safeGetLocalStorage<LaporanHarianItem[]>(LAPORAN_STORAGE_KEY, []);
+    const cleaned = localReports.filter((r) => r && r.id && r.id !== reportId);
+    safeSetLocalStorage(LAPORAN_STORAGE_KEY, JSON.stringify(cleaned), {
+      skipIdbMirror: true,
+    });
+  } catch {
+    // ignore
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('sikepling-reports-updated', {
+        detail: { upsertedReports: [], deletedIds: [reportId] },
+      })
+    );
+  }
+
+  await Promise.allSettled([
+    deleteReportFromIndexedDB(reportId).catch(() => {}),
+    resilientDeleteDoc('reports', reportId).catch(() => {}),
+    fetch(`/api/reports/${encodeURIComponent(reportId)}`, { method: 'DELETE' }).catch(() => {}),
+  ]);
+};
+

@@ -374,7 +374,7 @@
     },
     "jadwal_posko_kelurahan/{docId}": {
       "schema": "JadwalPosko",
-      "description": "Koleksi jadwal Posko Trantibum dan Posko Kewaspadaan Banjir serta daftar hadir dan foto kehadiran Kepling."
+      "description": "Koleksi jadwal Posko Trantibum, Posko Kewaspadaan Banjir, Posko Bersih Sampah, Piket Loket Pelayanan, dan Kegiatan Khusus serta daftar hadir dan foto kehadiran Kepling."
     }
   }
 }
